@@ -98,8 +98,15 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
         ui.radio_value(&mut app.ignore_orientation, true, "向き無視");
         ui.radio_value(&mut app.ignore_orientation, false, "向きも揃える");
     });
-    if ui.button("解法を探す").clicked() {
-        app.solve();
+
+    if app.solving {
+        // 探索中: プログレスバーを表示
+        ui.add(egui::ProgressBar::new(app.solver_progress));
+    } else {
+        // 探索中でない: ボタンを表示
+        if ui.button("解法を探す").clicked() {
+            app.solve();
+        }
     }
 
     if !app.solution_text.is_empty() {

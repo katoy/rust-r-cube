@@ -241,5 +241,5 @@ fn test_solve_fully_aligned() {
 
     let sol_align2 = solver::solve(&cube, 11, false);
     assert!(sol_align2.found);
-    assert!(sol_align2.moves.len() >= 1);
+    assert!(!sol_align2.moves.is_empty());
 }

@@ -1,6 +1,7 @@
 use crate::cube::{Cube, Move};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
+use std::sync::mpsc::Sender;
 use std::sync::OnceLock;
 
 /// デフォルトの最大探索深度
@@ -66,8 +67,27 @@ pub fn is_fully_solved(cube: &Cube) -> bool {
     get_solved_states().contains(cube)
 }
 
+/// 双方向BFSを使用して最短解を探索（進捗送信あり）
+pub fn solve_with_progress(
+    start_cube: &Cube,
+    max_depth: usize,
+    ignore_orientation: bool,
+    progress_tx: Option<Sender<f32>>,
+) -> Solution {
+    solve_internal(start_cube, max_depth, ignore_orientation, progress_tx)
+}
+
 /// 双方向BFSを使用して最短解を探索
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
+    solve_internal(start_cube, max_depth, ignore_orientation, None)
+}
+
+fn solve_internal(
+    start_cube: &Cube,
+    max_depth: usize,
+    ignore_orientation: bool,
+    progress_tx: Option<Sender<f32>>,
+) -> Solution {
     println!(
         "高速化{}BFS探索開始: 最大深度={}",
         if ignore_orientation {
@@ -94,6 +114,7 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     let all_moves = Move::all_moves();
     let forward_depth = max_depth.div_ceil(2);
     let backward_depth = max_depth - forward_depth;
+    let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
     let mut forward_dist: StateMap = FxHashMap::default();
@@ -113,6 +134,12 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
         let level_size = forward_queue.len();
         if level_size == 0 {
             break;
+        }
+
+        // 進捗送信（順方向探索）
+        if let Some(ref tx) = progress_tx {
+            let progress = (current_depth as f32) / (total_depth as f32);
+            let _ = tx.send(progress);
         }
 
         for _ in 0..level_size {
@@ -149,6 +176,8 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     let mut backward_queue: StateQueue = VecDeque::new();
     let mut backward_map: StateMap = FxHashMap::default();
 
+    // 向き無視の場合も向きも揃える場合も、24通りの完成状態すべてを使用
+    // ただし、キーの取り方が異なる
     for solved in get_solved_states() {
         let s_key = if ignore_orientation {
             solved.normalized()
@@ -157,6 +186,9 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
         };
         if !backward_map.contains_key(&s_key) {
             if forward_dist.contains_key(&s_key) {
+                if let Some(ref tx) = progress_tx {
+                    let _ = tx.send(1.0);
+                }
                 return Solution {
                     moves: reconstruct_path_forward(&forward_dist, &s_key),
                     found: true,
@@ -170,6 +202,13 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     let mut current_depth = 0;
     while !backward_queue.is_empty() && current_depth <= backward_depth {
         let level_size = backward_queue.len();
+
+        // 進捗送信（逆方向探索）
+        if let Some(ref tx) = progress_tx {
+            let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
+            let _ = tx.send(progress);
+        }
+
         for _ in 0..level_size {
             let curr = backward_queue
                 .pop_front()
@@ -180,6 +219,9 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
                 let mut moves = reconstruct_path_forward(&forward_dist, &curr);
                 let rev_moves = reconstruct_path_backward(&backward_map, &curr);
                 moves.extend(rev_moves);
+                if let Some(ref tx) = progress_tx {
+                    let _ = tx.send(1.0);
+                }
                 return Solution { moves, found: true };
             }
 
@@ -209,6 +251,10 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
             }
         }
         current_depth += 1;
+    }
+
+    if let Some(ref tx) = progress_tx {
+        let _ = tx.send(1.0);
     }
 
     Solution {

@@ -88,7 +88,8 @@ pub struct CubeApp {
     pub animation_speed: f32, // seconds per move
     pub is_paused: bool,
     pub solution: Option<Vec<Move>>,
-    solving: bool,
+    pub solving: bool,
+    pub solver_progress: f32,
     pub solution_text: String,
 
     // 表示設定
@@ -97,6 +98,7 @@ pub struct CubeApp {
 
     // ソルバー通信用
     solver_receiver: Option<Receiver<solver::Solution>>,
+    progress_receiver: Option<Receiver<f32>>,
 
     // 解法ステップ管理
     pub solution_step: usize,
@@ -118,10 +120,12 @@ impl Default for CubeApp {
             is_paused: false,
             solution: None,
             solving: false,
+            solver_progress: 0.0,
             solution_text: String::new(),
             view_mode: ViewMode::Both,
             view_3d: View3D::default(),
             solver_receiver: None,
+            progress_receiver: None,
             solution_step: 0,
             solution_cube_state: None,
             pending_solution_update: None,
@@ -194,6 +198,7 @@ impl CubeApp {
             return;
         }
         self.solving = true;
+        self.solver_progress = 0.0;
         self.solution_text = "探索中...".to_string();
 
         // 解法開始時の状態を保存
@@ -202,13 +207,22 @@ impl CubeApp {
 
         let cube_clone = self.cube.clone();
         let (tx, rx) = channel();
+        let (progress_tx, progress_rx) = channel();
         self.solver_receiver = Some(rx);
+        self.progress_receiver = Some(progress_rx);
         let ignore_orientation = self.ignore_orientation;
 
         thread::spawn(move || {
-            println!("ソルバー開始: 深度11まで探索");
-            let max_depth = 11; // 2x2のGod's Numberは11（向き無視）だが、向きアリだと増える可能性がある。今回は11を据え置き。
-            let solution = solver::solve(&cube_clone, max_depth, ignore_orientation);
+            // 向き無視: God's Number = 11
+            // 向きも揃える: より深い探索が必要なたも18に設定
+            let max_depth = if ignore_orientation { 11 } else { 20 };
+            println!("ソルバー開始: 深度{}まで探索", max_depth);
+            let solution = solver::solve_with_progress(
+                &cube_clone,
+                max_depth,
+                ignore_orientation,
+                Some(progress_tx),
+            );
             println!(
                 "ソルバー完了: 解が{}",
                 if solution.found {
@@ -261,6 +275,7 @@ impl CubeApp {
             if let Ok(solution) = rx.try_recv() {
                 self.solving = false;
                 self.solver_receiver = None;
+                self.progress_receiver = None;
 
                 if solution.found {
                     self.solution = Some(solution.moves.clone());
@@ -268,8 +283,18 @@ impl CubeApp {
                     self.solution_step = 0;
                     // 自動実行はしない（ステップ操作で手動実行）
                 } else {
+                    self.solution = None;
                     self.solution_text = "解が見つかりませんでした".to_string();
                 }
+            }
+        }
+    }
+
+    /// ソルバーの進捗を確認
+    fn check_progress(&mut self) {
+        if let Some(rx) = &self.progress_receiver {
+            while let Ok(progress) = rx.try_recv() {
+                self.solver_progress = progress;
             }
         }
     }
@@ -323,9 +348,18 @@ impl CubeApp {
 
     /// 解法を最後まで実行
     pub fn solution_step_to_end(&mut self) {
-        let len = self.solution.as_ref().map(|s| s.len()).unwrap_or(0);
-        while self.solution_step < len {
-            self.solution_step_forward();
+        if let Some(solution) = &self.solution {
+            // アニメーション中は実行しない
+            if self.animation.is_some() {
+                return;
+            }
+
+            // 残りの手を全て即座に適用
+            while self.solution_step < solution.len() {
+                let mv = solution[self.solution_step];
+                self.cube.apply_move(mv);
+                self.solution_step += 1;
+            }
         }
     }
 
@@ -466,14 +500,10 @@ impl CubeApp {
 
 impl eframe::App for CubeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // ソルバーの結果を確認
         self.check_solver_result();
-
-        // キーボード入力処理
-        self.handle_input(ctx);
-
-        // アニメーション更新
+        self.check_progress();
         self.update_animation();
+        self.handle_input(ctx);
 
         // 継続的な再描画をリクエスト
         ctx.request_repaint();

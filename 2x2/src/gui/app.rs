@@ -5,6 +5,33 @@ use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
 
+/// スクランブルの最小手数
+#[allow(dead_code)]
+const MIN_SCRAMBLE_MOVES: usize = 5;
+
+/// スクランブルの最大手数
+const MAX_SCRAMBLE_MOVES: usize = 10;
+
+/// デフォルトのアニメーション時間(秒)
+const DEFAULT_ANIMATION_DURATION: f32 = 0.3;
+
+/// アニメーション速度の最小値
+#[allow(dead_code)]
+const MIN_ANIMATION_SPEED: f32 = 0.1;
+
+/// アニメーション速度の最大値
+#[allow(dead_code)]
+const MAX_ANIMATION_SPEED: f32 = 2.0;
+
+/// ズーム倍率の最小値
+const MIN_ZOOM_SCALE: f32 = 0.5;
+
+/// ズーム倍率の最大値
+const MAX_ZOOM_SCALE: f32 = 3.0;
+
+/// ズーム変化率
+const ZOOM_FACTOR: f32 = 1.1;
+
 /// 表示モード
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ViewMode {
@@ -87,7 +114,7 @@ impl Default for CubeApp {
             cube: Cube::new(),
             animation: None,
             move_queue: Vec::new(),
-            animation_speed: 0.3,
+            animation_speed: DEFAULT_ANIMATION_DURATION,
             is_paused: false,
             solution: None,
             solving: false,
@@ -140,7 +167,7 @@ impl CubeApp {
     /// スクランブル
     pub fn scramble(&mut self) {
         self.cube = Cube::new();
-        self.cube.scramble(10);
+        self.cube.scramble(MAX_SCRAMBLE_MOVES);
         self.solution = None;
         self.solution_text.clear();
         self.move_queue.clear();
@@ -353,8 +380,12 @@ impl CubeApp {
         if response.hovered() {
             let zoom_delta = ui.input(|i| i.raw_scroll_delta.y);
             if zoom_delta != 0.0 {
-                self.view_3d.scale *= if zoom_delta > 0.0 { 1.1 } else { 0.9 };
-                self.view_3d.scale = self.view_3d.scale.clamp(0.5, 3.0);
+                self.view_3d.scale *= if zoom_delta > 0.0 {
+                    ZOOM_FACTOR
+                } else {
+                    1.0 / ZOOM_FACTOR
+                };
+                self.view_3d.scale = self.view_3d.scale.clamp(MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
             }
         }
 

@@ -46,7 +46,7 @@ cargo run --release
 
 ## プロジェクト構造
 
-``` te
+```text
 src/
 ├── main.rs           # エントリーポイント
 ├── lib.rs            # ライブラリルート

@@ -3,6 +3,15 @@ use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::sync::OnceLock;
 
+/// デフォルトの最大探索深度
+pub const DEFAULT_MAX_DEPTH: usize = 11;
+
+/// BFS探索で使用する状態マップ: 状態 → (到達した手, 親の状態)
+type StateMap = FxHashMap<Cube, (Move, Option<Cube>)>;
+
+/// BFS探索で使用する状態キュー
+type StateQueue = VecDeque<Cube>;
+
 /// ソルバーの結果
 #[derive(Debug, Clone)]
 pub struct Solution {
@@ -87,9 +96,8 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     let backward_depth = max_depth - forward_depth;
 
     // --- 順方向探索 ---
-    // Cube -> (至った手, 親の状態)
-    let mut forward_dist: FxHashMap<Cube, (Move, Option<Cube>)> = FxHashMap::default();
-    let mut forward_queue: VecDeque<Cube> = VecDeque::new();
+    let mut forward_dist: StateMap = FxHashMap::default();
+    let mut forward_queue: StateQueue = VecDeque::new();
 
     let start_key = if ignore_orientation {
         start_cube.normalized()
@@ -108,7 +116,9 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
         }
 
         for _ in 0..level_size {
-            let curr = forward_queue.pop_front().unwrap();
+            let curr = forward_queue
+                .pop_front()
+                .expect("forward_queue should not be empty during BFS iteration");
 
             for &mv in &all_moves {
                 // 枝刈り：直前の逆操作を回避
@@ -136,8 +146,8 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     }
 
     // --- 逆方向探索 ---
-    let mut backward_queue: VecDeque<Cube> = VecDeque::new();
-    let mut backward_map: FxHashMap<Cube, (Move, Option<Cube>)> = FxHashMap::default();
+    let mut backward_queue: StateQueue = VecDeque::new();
+    let mut backward_map: StateMap = FxHashMap::default();
 
     for solved in get_solved_states() {
         let s_key = if ignore_orientation {
@@ -161,7 +171,9 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     while !backward_queue.is_empty() && current_depth <= backward_depth {
         let level_size = backward_queue.len();
         for _ in 0..level_size {
-            let curr = backward_queue.pop_front().unwrap();
+            let curr = backward_queue
+                .pop_front()
+                .expect("backward_queue should not be empty during BFS iteration");
 
             // 衝突判定
             if forward_dist.contains_key(&curr) {
@@ -205,10 +217,7 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     }
 }
 
-fn reconstruct_path_forward(
-    dist: &FxHashMap<Cube, (Move, Option<Cube>)>,
-    target: &Cube,
-) -> Vec<Move> {
+fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {
     let mut path = Vec::new();
     let mut curr = target;
     while let Some(&(mv, ref parent_opt)) = dist.get(curr) {
@@ -223,10 +232,7 @@ fn reconstruct_path_forward(
     path
 }
 
-fn reconstruct_path_backward(
-    dist: &FxHashMap<Cube, (Move, Option<Cube>)>,
-    target: &Cube,
-) -> Vec<Move> {
+fn reconstruct_path_backward(dist: &StateMap, target: &Cube) -> Vec<Move> {
     let mut path = Vec::new();
     let mut curr = target;
     while let Some(&(mv, ref parent_opt)) = dist.get(curr) {

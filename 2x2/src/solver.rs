@@ -146,7 +146,7 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
             solved.clone()
         };
         if !backward_map.contains_key(&s_key) {
-            if let Some(_) = forward_dist.get(&s_key) {
+            if forward_dist.contains_key(&s_key) {
                 return Solution {
                     moves: reconstruct_path_forward(&forward_dist, &s_key),
                     found: true,
@@ -164,7 +164,7 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
             let curr = backward_queue.pop_front().unwrap();
 
             // 衝突判定
-            if let Some(_) = forward_dist.get(&curr) {
+            if forward_dist.contains_key(&curr) {
                 let mut moves = reconstruct_path_forward(&forward_dist, &curr);
                 let rev_moves = reconstruct_path_backward(&backward_map, &curr);
                 moves.extend(rev_moves);

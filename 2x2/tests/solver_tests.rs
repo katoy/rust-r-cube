@@ -213,21 +213,12 @@ fn test_solve_max_depth() {
 fn test_solve_fully_aligned() {
     // 向きも揃える解決のテスト
     let mut cube = Cube::new();
-    // 全体回転（U面を回し、D面を逆に回すと、キューブ全体がY軸回転するのに等しい）
-    // これにより色は各面で一色のままだが、ステッカーの位置や向きが初期状態とは異なる。
+    // 全体回転
     cube.apply_move(Move::U);
     cube.apply_move(Move::Dp);
 
-    // 向きを無視（色だけ）すれば完成している
     assert!(cube.is_solved());
-
-    // しかし、初期の向き(Cube::new)とは一致しない
-    // solver::is_fully_solved は24通りの「回転された完成状態」のいずれかであれば true を返す。
-    // 今回の U D' は全体回転なので、is_fully_solved も true を返すはず。
     assert!(solver::is_fully_solved(&cube));
-
-    // 本当に「向きだけがずれている」状態を作るには、回転操作の組み合わせが必要だが、
-    // ここでは「向きを揃える = is_fully_solvedの状態にする」という意味でテストを整理する。
 
     // 向きを考慮した解決（既に回転された完成状態なので0手）
     let sol_align = solver::solve(&cube, 11, false);
@@ -242,4 +233,58 @@ fn test_solve_fully_aligned() {
     let sol_align2 = solver::solve(&cube, 11, false);
     assert!(sol_align2.found);
     assert!(!sol_align2.moves.is_empty());
+}
+
+#[test]
+fn test_solve_with_progress_details() {
+    use std::sync::mpsc;
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    cube.apply_move(Move::U); // 2手離れた状態
+
+    let (tx, rx) = mpsc::channel();
+    // 確実に解ける深度(11)を指定
+    let solution = solver::solve_with_progress(&cube, 11, false, Some(tx));
+
+    assert!(
+        solution.found,
+        "2手スクランブルが深度11で解けないはずがない"
+    );
+    let progress_values: Vec<f32> = rx.into_iter().collect();
+
+    // 少なくとも完了通知(1.0)は含まれているはず
+    assert!(
+        progress_values.contains(&1.0),
+        "完了時に 1.0 が送信されるべき"
+    );
+
+    // 他の進捗値が送られている場合、それらが 0.0 以上 1.0 以下であることを確認
+    for &p in &progress_values {
+        assert!(p >= 0.0 && p <= 1.0, "進捗値 {} は範囲外です", p);
+    }
+}
+
+#[test]
+fn test_solve_unsolvable_at_depth() {
+    let mut cube = Cube::new();
+    // 5手スクランブル
+    cube.apply_move(Move::R);
+    cube.apply_move(Move::U);
+    cube.apply_move(Move::F);
+    cube.apply_move(Move::L);
+    cube.apply_move(Move::B);
+
+    // 2手以内では絶対に解けない
+    let solution = solver::solve(&cube, 2, false);
+    assert!(!solution.found, "2手で5手スクランブルが解けてはいけない");
+}
+
+#[test]
+fn test_solve_is_fully_solved_coverage() {
+    let cube = Cube::new();
+    assert!(solver::is_fully_solved(&cube));
+
+    let mut moved = cube.clone();
+    moved.apply_move(Move::R);
+    assert!(!solver::is_fully_solved(&moved));
 }

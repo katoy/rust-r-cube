@@ -260,7 +260,7 @@ fn test_solve_with_progress_details() {
 
     // 他の進捗値が送られている場合、それらが 0.0 以上 1.0 以下であることを確認
     for &p in &progress_values {
-        assert!(p >= 0.0 && p <= 1.0, "進捗値 {} は範囲外です", p);
+        assert!((0.0..=1.0).contains(&p), "進捗値 {} は範囲外です", p);
     }
 }
 

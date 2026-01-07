@@ -199,133 +199,167 @@ impl Cube {
         }
     }
 
-    /// 面を時計回りに90度回転（内部ヘルパー）
-    fn rotate_face_cw(&mut self, face_start: usize) {
-        let temp = self.stickers[face_start];
-        self.stickers[face_start] = self.stickers[face_start + 2];
-        self.stickers[face_start + 2] = self.stickers[face_start + 3];
-        self.stickers[face_start + 3] = self.stickers[face_start + 1];
-        self.stickers[face_start + 1] = temp;
+    /// 面自体を時計回りに回転
+    fn rotate_face_cw(&mut self, start_idx: usize, orient_delta: u8) {
+        let temp = self.stickers[start_idx];
+        self.stickers[start_idx] = self.stickers[start_idx + 2];
+        self.stickers[start_idx + 2] = self.stickers[start_idx + 3];
+        self.stickers[start_idx + 3] = self.stickers[start_idx + 1];
+        self.stickers[start_idx + 1] = temp;
 
-        // 面上のステッカーの向きを更新
         for i in 0..4 {
-            self.stickers[face_start + i].rotate_cw();
+            for _ in 0..orient_delta {
+                self.stickers[start_idx + i].rotate_cw();
+            }
         }
     }
 
-    /// 面を反時計回りに90度回転（内部ヘルパー）
-    fn rotate_face_ccw(&mut self, face_start: usize) {
-        let temp = self.stickers[face_start];
-        self.stickers[face_start] = self.stickers[face_start + 1];
-        self.stickers[face_start + 1] = self.stickers[face_start + 3];
-        self.stickers[face_start + 3] = self.stickers[face_start + 2];
-        self.stickers[face_start + 2] = temp;
+    /// 面自体を反時計回りに回転
+    fn rotate_face_ccw(&mut self, start_idx: usize, orient_delta: u8) {
+        let temp = self.stickers[start_idx];
+        self.stickers[start_idx] = self.stickers[start_idx + 1];
+        self.stickers[start_idx + 1] = self.stickers[start_idx + 3];
+        self.stickers[start_idx + 3] = self.stickers[start_idx + 2];
+        self.stickers[start_idx + 2] = temp;
 
-        // 面上のステッカーの向きを更新
         for i in 0..4 {
-            self.stickers[face_start + i].rotate_ccw();
+            for _ in 0..orient_delta {
+                self.stickers[start_idx + i].rotate_ccw();
+            }
         }
     }
 
     /// R面を時計回りに回転
     fn rotate_r(&mut self) {
-        self.rotate_face_cw(12); // Right face
+        self.rotate_face_cw(12, 3); // Right face (orient +3)
 
         let temp0 = self.stickers[1];
         let temp1 = self.stickers[3];
 
+        // U <- F (R-slice) [0]
         self.stickers[1] = self.stickers[17];
         self.stickers[3] = self.stickers[19];
 
+        // F <- D (R-slice) [0]
         self.stickers[17] = self.stickers[5];
         self.stickers[19] = self.stickers[7];
 
+        // D <- B [+2]
         self.stickers[5] = self.stickers[22];
+        self.stickers[5].rotate_cw();
+        self.stickers[5].rotate_cw();
         self.stickers[7] = self.stickers[20];
+        self.stickers[7].rotate_cw();
+        self.stickers[7].rotate_cw();
 
+        // B <- U [+2]
         self.stickers[22] = temp0;
+        self.stickers[22].rotate_cw();
+        self.stickers[22].rotate_cw();
         self.stickers[20] = temp1;
+        self.stickers[20].rotate_cw();
+        self.stickers[20].rotate_cw();
     }
 
     /// R面を反時計回りに回転
     fn rotate_rp(&mut self) {
-        self.rotate_face_ccw(12); // Right face
+        self.rotate_face_ccw(12, 3); // Right face (orient +3)
 
         let temp0 = self.stickers[1];
         let temp1 = self.stickers[3];
 
+        // U <- B (+2)
         self.stickers[1] = self.stickers[22];
+        self.stickers[1].rotate_cw();
+        self.stickers[1].rotate_cw();
         self.stickers[3] = self.stickers[20];
+        self.stickers[3].rotate_cw();
+        self.stickers[3].rotate_cw();
 
+        // B <- D (+2)
         self.stickers[22] = self.stickers[5];
+        self.stickers[22].rotate_cw();
+        self.stickers[22].rotate_cw();
         self.stickers[20] = self.stickers[7];
+        self.stickers[20].rotate_cw();
+        self.stickers[20].rotate_cw();
 
+        // D <- F (+0)
         self.stickers[5] = self.stickers[17];
         self.stickers[7] = self.stickers[19];
 
+        // F <- U (+0)
         self.stickers[17] = temp0;
         self.stickers[19] = temp1;
     }
 
     /// L面を時計回りに回転
     fn rotate_l(&mut self) {
-        self.rotate_face_cw(8); // Left face
+        self.rotate_face_cw(8, 3); // Left face (orient +3)
 
-        let mut temp0 = self.stickers[0];
-        temp0.rotate_cw();
-        let mut temp1 = self.stickers[2];
-        temp1.rotate_cw();
+        let temp0 = self.stickers[0];
+        let temp1 = self.stickers[2];
 
-        self.stickers[0] = self.stickers[21];
+        // U <- B [+2]
+        self.stickers[0] = self.stickers[23];
         self.stickers[0].rotate_cw();
-        self.stickers[2] = self.stickers[23];
+        self.stickers[0].rotate_cw();
+        self.stickers[2] = self.stickers[21];
+        self.stickers[2].rotate_cw();
         self.stickers[2].rotate_cw();
 
-        self.stickers[21] = self.stickers[4];
-        self.stickers[21].rotate_cw();
-        self.stickers[23] = self.stickers[6];
+        // B <- D [+2]
+        self.stickers[23] = self.stickers[4];
         self.stickers[23].rotate_cw();
+        self.stickers[23].rotate_cw();
+        self.stickers[21] = self.stickers[6];
+        self.stickers[21].rotate_cw();
+        self.stickers[21].rotate_cw();
 
+        // D <- F [+0]
         self.stickers[4] = self.stickers[16];
-        self.stickers[4].rotate_cw();
         self.stickers[6] = self.stickers[18];
-        self.stickers[6].rotate_cw();
 
+        // F <- U [+0]
         self.stickers[16] = temp0;
         self.stickers[18] = temp1;
     }
 
     /// L面を反時計回りに回転
     fn rotate_lp(&mut self) {
-        self.rotate_face_ccw(8); // Left face
+        self.rotate_face_ccw(8, 3); // Left face (orient +3)
 
-        let mut temp0 = self.stickers[0];
-        temp0.rotate_ccw();
-        let mut temp1 = self.stickers[2];
-        temp1.rotate_ccw();
+        let temp0 = self.stickers[0];
+        let temp1 = self.stickers[2];
 
+        // U <- F [+0]
         self.stickers[0] = self.stickers[16];
-        self.stickers[0].rotate_ccw();
         self.stickers[2] = self.stickers[18];
-        self.stickers[2].rotate_ccw();
 
+        // F <- D [+0]
         self.stickers[16] = self.stickers[4];
-        self.stickers[16].rotate_ccw();
         self.stickers[18] = self.stickers[6];
-        self.stickers[18].rotate_ccw();
 
-        self.stickers[4] = self.stickers[21];
-        self.stickers[4].rotate_ccw();
-        self.stickers[6] = self.stickers[23];
-        self.stickers[6].rotate_ccw();
+        // D <- B [+2]
+        self.stickers[4] = self.stickers[23];
+        self.stickers[4].rotate_cw();
+        self.stickers[4].rotate_cw();
+        self.stickers[6] = self.stickers[21];
+        self.stickers[6].rotate_cw();
+        self.stickers[6].rotate_cw();
 
-        self.stickers[21] = temp0;
-        self.stickers[23] = temp1;
+        // B <- U [+2]
+        self.stickers[23] = temp0;
+        self.stickers[23].rotate_cw();
+        self.stickers[23].rotate_cw();
+        self.stickers[21] = temp1;
+        self.stickers[21].rotate_cw();
+        self.stickers[21].rotate_cw();
     }
 
     /// U面を時計回りに回転
     fn rotate_u(&mut self) {
-        self.rotate_face_cw(0); // Up face
+        self.rotate_face_cw(0, 1); // Up face (orient +1)
 
         let temp0 = self.stickers[16];
         let temp1 = self.stickers[17];
@@ -345,7 +379,7 @@ impl Cube {
 
     /// U面を反時計回りに回転
     fn rotate_up(&mut self) {
-        self.rotate_face_ccw(0); // Up face
+        self.rotate_face_ccw(0, 1); // Up face (orient +1)
 
         let temp0 = self.stickers[16];
         let temp1 = self.stickers[17];
@@ -365,7 +399,7 @@ impl Cube {
 
     /// D面を時計回りに回転
     fn rotate_d(&mut self) {
-        self.rotate_face_cw(4); // Down face
+        self.rotate_face_cw(4, 1); // Down face (orient +1)
 
         let temp0 = self.stickers[18];
         let temp1 = self.stickers[19];
@@ -385,7 +419,7 @@ impl Cube {
 
     /// D面を反時計回りに回転
     fn rotate_dp(&mut self) {
-        self.rotate_face_ccw(4); // Down face
+        self.rotate_face_ccw(4, 1); // Down face (orient +1)
 
         let temp0 = self.stickers[18];
         let temp1 = self.stickers[19];
@@ -405,98 +439,132 @@ impl Cube {
 
     /// F面を時計回りに回転
     fn rotate_f(&mut self) {
-        self.rotate_face_cw(16); // Front face
+        self.rotate_face_cw(16, 1); // Front face (orient +1)
 
         let temp0 = self.stickers[2];
         let temp1 = self.stickers[3];
 
+        // U -> R -> D -> L -> U
+        // F CW: idx 11->2 (L->U) orient 1. idx 2->12 (U->R) orient 3. idx 12->5 (R->D) orient 1. idx 5->11 (D->L) orient 3.
         self.stickers[2] = self.stickers[11];
+        self.stickers[2].rotate_cw();
         self.stickers[3] = self.stickers[9];
+        self.stickers[3].rotate_cw();
 
-        self.stickers[11] = self.stickers[4];
-        self.stickers[9] = self.stickers[5];
+        self.stickers[11] = self.stickers[5];
+        self.stickers[11].rotate_ccw();
+        self.stickers[9] = self.stickers[4];
+        self.stickers[9].rotate_ccw();
 
-        self.stickers[4] = self.stickers[12];
-        self.stickers[5] = self.stickers[14];
+        self.stickers[5] = self.stickers[12];
+        self.stickers[5].rotate_cw();
+        self.stickers[4] = self.stickers[14];
+        self.stickers[4].rotate_cw();
 
-        self.stickers[12] = temp0;
-        self.stickers[14] = temp1;
+        let mut t0 = temp0;
+        t0.rotate_ccw();
+        let mut t1 = temp1;
+        t1.rotate_ccw();
+        self.stickers[12] = t0;
+        self.stickers[14] = t1;
     }
 
     /// F面を反時計回りに回転
     fn rotate_fp(&mut self) {
-        self.rotate_face_ccw(16); // Front face
+        self.rotate_face_ccw(16, 1); // Front face (orient +1)
 
         let temp0 = self.stickers[2];
         let temp1 = self.stickers[3];
 
+        // U -> L -> D -> R -> U
+        // Fp CCW: idx 12->2 (R->U) orient 1. idx 2->11 (U->L) orient 3. idx 11->5 (L->D) orient 1. idx 5->12 (D->R) orient 3.
         self.stickers[2] = self.stickers[12];
+        self.stickers[2].rotate_cw();
         self.stickers[3] = self.stickers[14];
+        self.stickers[3].rotate_cw();
 
-        self.stickers[12] = self.stickers[4];
-        self.stickers[14] = self.stickers[5];
+        self.stickers[12] = self.stickers[5];
+        self.stickers[12].rotate_ccw();
+        self.stickers[14] = self.stickers[4];
+        self.stickers[14].rotate_ccw();
 
-        self.stickers[4] = self.stickers[11];
-        self.stickers[5] = self.stickers[9];
+        self.stickers[5] = self.stickers[11];
+        self.stickers[5].rotate_cw();
+        self.stickers[4] = self.stickers[9];
+        self.stickers[4].rotate_cw();
 
-        self.stickers[11] = temp0;
-        self.stickers[9] = temp1;
+        let mut t0 = temp0;
+        t0.rotate_ccw();
+        let mut t1 = temp1;
+        t1.rotate_ccw();
+        self.stickers[11] = t1; // Correct index: U[3] moves to L-BL=11
+        self.stickers[9] = t0; // Correct index: U[2] moves to L-TL=9
     }
 
     /// B面を時計回りに回転
     fn rotate_b(&mut self) {
-        self.rotate_face_cw(20); // Back face
+        self.rotate_face_cw(20, 1); // Back face (orient +1)
 
         let mut temp0 = self.stickers[0];
-        temp0.rotate_cw();
         let mut temp1 = self.stickers[1];
-        temp1.rotate_cw();
 
+        // U -> L -> D -> R -> U (CW from back)
+        // B CW: idx 13->0 (R->U) orient 3. idx 0->10 (U->L) orient 1. idx 10->7 (L->D) orient 3. idx 7->13 (D->R) orient 1.
         self.stickers[0] = self.stickers[13];
-        self.stickers[0].rotate_cw();
+        self.stickers[0].rotate_ccw(); // U <- R (+3)
         self.stickers[1] = self.stickers[15];
-        self.stickers[1].rotate_cw();
+        self.stickers[1].rotate_ccw(); // U <- R (+3)
 
-        self.stickers[13] = self.stickers[6];
-        self.stickers[13].rotate_cw();
-        self.stickers[15] = self.stickers[7];
-        self.stickers[15].rotate_cw();
+        self.stickers[13] = self.stickers[7];
+        self.stickers[13].rotate_cw(); // R <- D (+1)
+        self.stickers[15] = self.stickers[6];
+        self.stickers[15].rotate_cw(); // R <- D (+1)
 
-        self.stickers[6] = self.stickers[10];
-        self.stickers[6].rotate_cw();
-        self.stickers[7] = self.stickers[8];
-        self.stickers[7].rotate_cw();
+        self.stickers[7] = self.stickers[10];
+        self.stickers[7].rotate_ccw(); // D <- L (+3)
+        self.stickers[6] = self.stickers[8];
+        self.stickers[6].rotate_ccw(); // D <- L (+3)
 
+        temp0.rotate_cw(); // L <- U (+1)
+        temp1.rotate_cw(); // L <- U (+1)
         self.stickers[10] = temp0;
         self.stickers[8] = temp1;
     }
 
     /// B面を反時計回りに回転
     fn rotate_bp(&mut self) {
-        self.rotate_face_ccw(20); // Back face
+        self.rotate_face_ccw(20, 1); // Back face (orient +1)
 
-        let mut temp0 = self.stickers[0];
-        temp0.rotate_ccw();
-        let mut temp1 = self.stickers[1];
-        temp1.rotate_ccw();
+        let temp0 = self.stickers[0];
+        let temp1 = self.stickers[1];
 
+        // U -> R -> D -> L -> U (CCW from back)
+        // B CW:  U<-R(3), R<-D(1), D<-L(3), L<-U(1)
+        // Bp CCW: U<-L(3), L<-D(1), D<-R(3), R<-U(1)
+
+        // U <- L (+3)
         self.stickers[0] = self.stickers[10];
         self.stickers[0].rotate_ccw();
         self.stickers[1] = self.stickers[8];
         self.stickers[1].rotate_ccw();
 
+        // L <- D (+1)
         self.stickers[10] = self.stickers[7];
-        self.stickers[10].rotate_ccw();
+        self.stickers[10].rotate_cw();
         self.stickers[8] = self.stickers[6];
-        self.stickers[8].rotate_ccw();
+        self.stickers[8].rotate_cw();
 
+        // D <- R (+3)
         self.stickers[7] = self.stickers[13];
         self.stickers[7].rotate_ccw();
         self.stickers[6] = self.stickers[15];
         self.stickers[6].rotate_ccw();
 
+        // R <- U (+1)
         self.stickers[13] = temp0;
+        self.stickers[13].rotate_cw();
         self.stickers[15] = temp1;
+        self.stickers[15].rotate_cw();
     }
 
     /// ランダムなスクランブルを生成

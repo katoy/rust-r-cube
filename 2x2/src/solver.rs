@@ -6,8 +6,6 @@ use std::sync::OnceLock;
 
 /// デフォルトの最大探索深度
 pub const DEFAULT_MAX_DEPTH: usize = 11;
-
-/// 進捗更新の間隔（深度ごと）
 const PROGRESS_UPDATE_INTERVAL: usize = 4;
 
 /// BFS探索で使用する状態マップ: 状態 → (到達した手, 親の状態)

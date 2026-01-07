@@ -24,10 +24,7 @@ fn test_solve_with_progress_reporting() {
     }
 
     assert!(!progress_values.is_empty(), "進捗情報が送信されるべき");
-    assert!(
-        progress_values.iter().any(|&p| p == 1.0),
-        "最終的に100%になるべき"
-    );
+    assert!(progress_values.contains(&1.0), "最終的に100%になるべき");
 }
 
 /// 解が見つからない場合のテスト
@@ -52,10 +49,7 @@ fn test_solve_no_solution_found() {
     }
 
     assert!(!progress_values.is_empty(), "進捗情報が送信されるべき");
-    assert!(
-        progress_values.iter().any(|&p| p == 1.0),
-        "最終的に100%になるべき"
-    );
+    assert!(progress_values.contains(&1.0), "最終的に100%になるべき");
 }
 
 /// 逆方向探索で解が見つかる場合のテスト

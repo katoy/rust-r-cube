@@ -7,6 +7,9 @@ use std::sync::OnceLock;
 /// デフォルトの最大探索深度
 pub const DEFAULT_MAX_DEPTH: usize = 11;
 
+/// 進捗更新の間隔（深度ごと）
+const PROGRESS_UPDATE_INTERVAL: usize = 4;
+
 /// BFS探索で使用する状態マップ: 状態 → (到達した手, 親の状態)
 type StateMap = FxHashMap<Cube, (Move, Option<Cube>)>;
 
@@ -139,9 +142,9 @@ fn solve_internal(
             break;
         }
 
-        // 進捗送信（順方向探索） - 深度が4の倍数の時だけ送信
+        // 進捗送信（順方向探索） - 一定間隔で送信
         if let Some(ref tx) = progress_tx {
-            if current_depth % 4 == 0 {
+            if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
                 let progress = (current_depth as f32) / (total_depth as f32);
                 let _ = tx.send(progress);
             }
@@ -212,9 +215,9 @@ fn solve_internal(
     while !backward_queue.is_empty() && current_depth <= backward_depth {
         let level_size = backward_queue.len();
 
-        // 進捗送信（逆方向探索） - 深度が4の倍数の時だけ送信
+        // 進捗送信（逆方向探索） - 一定間隔で送信
         if let Some(ref tx) = progress_tx {
-            if current_depth % 4 == 0 {
+            if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
                 let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
                 let _ = tx.send(progress);
             }

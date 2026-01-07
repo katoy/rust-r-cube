@@ -131,7 +131,26 @@ pub struct Cube {
 }
 
 impl Cube {
-    /// 完成状態のキューブを作成
+    /// 完成状態のキューブを作成します。
+    ///
+    /// # 戻り値
+    ///
+    /// 各面が単色で揃った初期状態の2x2ルービックキューブ。
+    /// - Up面: 白 (White)
+    /// - Down面: 黄 (Yellow)
+    /// - Left面: 緑 (Green)
+    /// - Right面: 青 (Blue)
+    /// - Front面: 赤 (Red)
+    /// - Back面: オレンジ (Orange)
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::Cube;
+    ///
+    /// let cube = Cube::new();
+    /// assert!(cube.is_solved());
+    /// ```
     pub fn new() -> Self {
         let mut stickers = [Sticker::new(Color::White); 24];
 
@@ -163,7 +182,30 @@ impl Cube {
         Self { stickers }
     }
 
-    /// キューブが完成しているか判定
+    /// キューブが完成しているか判定します（色のみ、向きは無視）。
+    ///
+    /// 各面が単色で揃っていれば `true` を返します。
+    /// ステッカーの向き（矢印の方向）は考慮されません。
+    ///
+    /// # 戻り値
+    ///
+    /// - `true`: 各面が単色で揃っている
+    /// - `false`: 少なくとも1面が揃っていない
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::{Cube, Move};
+    ///
+    /// let mut cube = Cube::new();
+    /// assert!(cube.is_solved());
+    ///
+    /// cube.apply_move(Move::R);
+    /// assert!(!cube.is_solved());
+    ///
+    /// cube.apply_move(Move::Rp);
+    /// assert!(cube.is_solved());
+    /// ```
     pub fn is_solved(&self) -> bool {
         for face_start in (0..24).step_by(4) {
             let color = self.stickers[face_start].color;
@@ -176,12 +218,41 @@ impl Cube {
         true
     }
 
-    /// ステッカーを取得
+    /// 指定したインデックスのステッカーを取得します。
+    ///
+    /// # 引数
+    ///
+    /// - `index`: ステッカーのインデックス (0-23)
+    ///   - 0-3: Up面
+    ///   - 4-7: Down面
+    ///   - 8-11: Left面
+    ///   - 12-15: Right面
+    ///   - 16-19: Front面
+    ///   - 20-23: Back面
+    ///
+    /// # 戻り値
+    ///
+    /// 指定されたインデックスのステッカー（色と向き情報を含む）
     pub fn get_sticker(&self, index: usize) -> Sticker {
         self.stickers[index]
     }
 
     /// 回転操作を実行
+    /// 指定した操作をキューブに適用します。
+    ///
+    /// # 引数
+    ///
+    /// - `mv`: 適用する操作（R, L, U, D, F, B およびその逆操作）
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::{Cube, Move};
+    ///
+    /// let mut cube = Cube::new();
+    /// cube.apply_move(Move::R);
+    /// cube.apply_move(Move::U);
+    /// ```
     pub fn apply_move(&mut self, mv: Move) {
         match mv {
             Move::R => self.rotate_r(),
@@ -567,7 +638,21 @@ impl Cube {
         self.stickers[15].rotate_cw();
     }
 
-    /// ランダムなスクランブルを生成
+    /// ランダムなスクランブルを生成します。
+    ///
+    /// # 引数
+    ///
+    /// - `moves`: 適用するランダム操作の回数
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::Cube;
+    ///
+    /// let mut cube = Cube::new();
+    /// cube.scramble(20);
+    /// assert!(!cube.is_solved()); // ほぼ確実に未完成状態になる
+    /// ```
     pub fn scramble(&mut self, moves: usize) {
         use rand::Rng;
         let mut rng = rand::thread_rng();
@@ -579,7 +664,25 @@ impl Cube {
         }
     }
 
-    /// 色情報のみ比較するために、向き情報をリセットしたCubeを返す
+    /// 色情報のみ比較するために、向き情報をリセットしたキューブを返します。
+    ///
+    /// すべてのステッカーの向き（orientation）を0にリセットした新しいキューブを返します。
+    /// 色の配置は元のキューブと同じです。
+    ///
+    /// # 戻り値
+    ///
+    /// 向き情報がリセットされた新しいキューブ
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::{Cube, Move};
+    ///
+    /// let mut cube = Cube::new();
+    /// cube.apply_move(Move::R);
+    /// let normalized = cube.normalized();
+    /// // normalized は色配置は同じだが、すべての向きが0
+    /// ```
     pub fn normalized(&self) -> Self {
         let mut new_cube = self.clone();
         for sticker in &mut new_cube.stickers {

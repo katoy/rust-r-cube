@@ -63,12 +63,63 @@ fn generate_all_solved_states() -> Vec<Cube> {
     states
 }
 
-/// キューブが（向きも含めて）完全に解けているか判定
+/// キューブが（向きも含めて）完全に解けているか判定します。
+///
+/// 色だけでなく、ステッカーの向き（矢印の方向）も初期状態の24通りの
+/// いずれかと一致しているかを確認します。
+///
+/// # 引数
+///
+/// - `cube`: 判定するキューブ
+///
+/// # 戻り値
+///
+/// - `true`: 完全に解けている（24通りの完成状態のいずれか）
+/// - `false`: 解けていない
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::Cube;
+/// use rubiks_cube_2x2::solver::is_fully_solved;
+///
+/// let cube = Cube::new();
+/// assert!(is_fully_solved(&cube));
+/// ```
 pub fn is_fully_solved(cube: &Cube) -> bool {
     get_solved_states().contains(cube)
 }
 
-/// 双方向BFSを使用して最短解を探索（進捗送信あり）
+/// 双方向BFSを使用して最短解を探索します（進捗送信あり）。
+///
+/// GUI用の進捗通知機能付きバージョンです。探索の進捗状況を
+/// チャネル経由で送信します。
+///
+/// # 引数
+///
+/// - `start_cube`: 開始状態のキューブ
+/// - `max_depth`: 最大探索深度
+/// - `ignore_orientation`: `true` の場合、色のみを考慮（向きは無視）
+/// - `progress_tx`: 進捗通知用のSender（Noneの場合は通知なし）
+///
+/// # 戻り値
+///
+/// 解法の結果を含む `Solution` 構造体
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::{Cube, Move};
+/// use rubiks_cube_2x2::solver::solve_with_progress;
+/// use std::sync::mpsc;
+///
+/// let mut cube = Cube::new();
+/// cube.apply_move(Move::R);
+///
+/// let (tx, rx) = mpsc::channel();
+/// let solution = solve_with_progress(&cube, 11, true, Some(tx));
+/// assert!(solution.found);
+/// ```
 pub fn solve_with_progress(
     start_cube: &Cube,
     max_depth: usize,
@@ -78,7 +129,36 @@ pub fn solve_with_progress(
     solve_internal(start_cube, max_depth, ignore_orientation, progress_tx)
 }
 
-/// 双方向BFSを使用して最短解を探索
+/// 双方向BFSを使用して最短解を探索します。
+///
+/// キューブの現在の状態から完成状態への最短手順を探索します。
+///
+/// # 引数
+///
+/// - `start_cube`: 開始状態のキューブ
+/// - `max_depth`: 最大探索深度（デフォルト: 11手）
+/// - `ignore_orientation`: `true` の場合、色のみを考慮（向きは無視）
+///
+/// # 戻り値
+///
+/// 解法の結果を含む `Solution` 構造体
+/// - `found`: 解が見つかったかどうか
+/// - `moves`: 解法の手順（見つかった場合）
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::{Cube, Move};
+/// use rubiks_cube_2x2::solver::solve;
+///
+/// let mut cube = Cube::new();
+/// cube.apply_move(Move::R);
+/// cube.apply_move(Move::U);
+///
+/// let solution = solve(&cube, 11, true);
+/// assert!(solution.found);
+/// println!("解法: {} 手", solution.moves.len());
+/// ```
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
     solve_internal(start_cube, max_depth, ignore_orientation, None)
 }

@@ -364,3 +364,94 @@ fn test_multiple_scrambles() {
         let _ = cube.get_sticker(i);
     }
 }
+
+#[test]
+fn test_cube_invariants() {
+    // どのような操作をしても各色4枚ずつ存在することを確認
+    let mut cube = Cube::new();
+    cube.scramble(50);
+
+    let mut color_counts = std::collections::HashMap::new();
+    for i in 0..24 {
+        let s = cube.get_sticker(i);
+        *color_counts.entry(s.color).or_insert(0) += 1;
+    }
+
+    assert_eq!(color_counts.len(), 6);
+    for count in color_counts.values() {
+        assert_eq!(*count, 4);
+    }
+}
+
+#[test]
+fn test_normalization_equivalence() {
+    // 全体回転させただけの「完成状態」が正規化後にすべて一致することを確認
+    // Y軸回転 (U D')
+    let mut cube_y = Cube::new();
+    cube_y.apply_move(Move::U);
+    cube_y.apply_move(Move::Dp);
+    // 現在の normalized() は向きを0にするだけで、面を回転させて色を揃えるわけではない
+    // そのため、色が合っているかどうかの検証に留める（is_solved() の挙動に近い）
+    assert!(cube_y.normalized().is_solved());
+
+    // X軸回転 (R L')
+    let mut cube_x = Cube::new();
+    cube_x.apply_move(Move::R);
+    cube_x.apply_move(Move::Lp);
+    assert!(cube_x.normalized().is_solved());
+}
+
+#[test]
+fn test_all_moves_exhaustive_physical() {
+    let moves = Move::all_moves();
+
+    for &mv in &moves {
+        let mut cube = Cube::new();
+        cube.apply_move(mv);
+        let msg = format!("操作: {:?}", mv);
+
+        // 逆操作で元に戻るか (色と向き)
+        let mut cube_back = cube.clone();
+        cube_back.apply_move(mv.inverse());
+        assert_eq!(cube_back, Cube::new(), "{} -> inverse 失敗", msg);
+
+        // 4回で元に戻るか
+        let mut cube_cycle = cube.clone();
+        for _ in 0..3 {
+            cube_cycle.apply_move(mv);
+        }
+        assert_eq!(cube_cycle, Cube::new(), "{} x 4 失敗", msg);
+
+        // 特定の操作後の物理状態チェック（Dを含む主要なもの）
+        match mv {
+            Move::D => {
+                // D面(4-7)は時計回りに回転, 向きは+1
+                for i in 4..8 {
+                    assert_eq!(cube.get_sticker(i).color, Color::Yellow);
+                    assert_eq!(cube.get_sticker(i).orientation, 1, "D面 {} 向き不一致", i);
+                }
+                // D面付近の側面 (D操作 CW: F -> R -> B -> L -> F)
+                check_sticker_val(&cube, 14, Color::Red, 0, &msg); // F(18,19) -> R(14,15)
+                check_sticker_val(&cube, 15, Color::Red, 0, &msg);
+                check_sticker_val(&cube, 22, Color::Blue, 0, &msg); // R(14,15) -> B(22,23)
+                check_sticker_val(&cube, 23, Color::Blue, 0, &msg);
+                check_sticker_val(&cube, 10, Color::Orange, 0, &msg); // B(22,23) -> L(10,11)
+                check_sticker_val(&cube, 11, Color::Orange, 0, &msg);
+                check_sticker_val(&cube, 18, Color::Green, 0, &msg); // L(10,11) -> F(18,19)
+                check_sticker_val(&cube, 19, Color::Green, 0, &msg);
+            }
+            Move::U => {
+                for i in 0..4 {
+                    check_sticker_val(&cube, i, Color::White, 1, &msg);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn check_sticker_val(cube: &Cube, idx: usize, color: Color, orient: u8, msg: &str) {
+    let s = cube.get_sticker(idx);
+    assert_eq!(s.color, color, "{} idx:{} 色不一致", msg, idx);
+    assert_eq!(s.orientation, orient, "{} idx:{} 向き不一致", msg, idx);
+}

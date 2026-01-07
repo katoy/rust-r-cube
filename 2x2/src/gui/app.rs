@@ -214,8 +214,8 @@ impl CubeApp {
 
         thread::spawn(move || {
             // 向き無視: God's Number = 11
-            // 向きも揃える: より深い探索が必要なたも18に設定
-            let max_depth = if ignore_orientation { 11 } else { 20 };
+            // 向きも揃える: より深い探索が必要なため14に設定
+            let max_depth = if ignore_orientation { 11 } else { 14 };
             println!("ソルバー開始: 深度{}まで探索", max_depth);
             let solution = solver::solve_with_progress(
                 &cube_clone,

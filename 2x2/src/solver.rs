@@ -117,8 +117,11 @@ fn solve_internal(
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
-    let mut forward_dist: StateMap = FxHashMap::default();
-    let mut forward_queue: StateQueue = VecDeque::new();
+    // 深度dまでの状態数の概算: 12^d (12手 × 深度)
+    let estimated_states = 12_usize.pow(forward_depth as u32).min(100_000);
+    let mut forward_dist: StateMap =
+        FxHashMap::with_capacity_and_hasher(estimated_states, Default::default());
+    let mut forward_queue: StateQueue = VecDeque::with_capacity(estimated_states);
 
     let start_key = if ignore_orientation {
         start_cube.normalized()
@@ -126,7 +129,7 @@ fn solve_internal(
         start_cube.clone()
     };
     forward_queue.push_back(start_key.clone());
-    forward_dist.insert(start_key.clone(), (Move::R, None)); // marker
+    forward_dist.insert(start_key, (Move::R, None)); // marker
 
     // 順方向BFS
     let mut current_depth = 0;
@@ -136,10 +139,12 @@ fn solve_internal(
             break;
         }
 
-        // 進捗送信（順方向探索）
+        // 進捗送信（順方向探索） - 深度が4の倍数の時だけ送信
         if let Some(ref tx) = progress_tx {
-            let progress = (current_depth as f32) / (total_depth as f32);
-            let _ = tx.send(progress);
+            if current_depth % 4 == 0 {
+                let progress = (current_depth as f32) / (total_depth as f32);
+                let _ = tx.send(progress);
+            }
         }
 
         for _ in 0..level_size {
@@ -163,9 +168,11 @@ fn solve_internal(
                     next
                 };
 
-                if !forward_dist.contains_key(&next_key) {
-                    forward_dist.insert(next_key.clone(), (mv, Some(curr.clone())));
-                    forward_queue.push_back(next_key);
+                use std::collections::hash_map::Entry;
+                if let Entry::Vacant(e) = forward_dist.entry(next_key) {
+                    let key_clone = e.key().clone();
+                    e.insert((mv, Some(curr.clone())));
+                    forward_queue.push_back(key_clone);
                 }
             }
         }
@@ -173,8 +180,10 @@ fn solve_internal(
     }
 
     // --- 逆方向探索 ---
-    let mut backward_queue: StateQueue = VecDeque::new();
-    let mut backward_map: StateMap = FxHashMap::default();
+    let estimated_backward_states = 12_usize.pow(backward_depth as u32).min(100_000);
+    let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
+    let mut backward_map: StateMap =
+        FxHashMap::with_capacity_and_hasher(estimated_backward_states, Default::default());
 
     // 向き無視の場合も向きも揃える場合も、24通りの完成状態すべてを使用
     // ただし、キーの取り方が異なる
@@ -203,10 +212,12 @@ fn solve_internal(
     while !backward_queue.is_empty() && current_depth <= backward_depth {
         let level_size = backward_queue.len();
 
-        // 進捗送信（逆方向探索）
+        // 進捗送信（逆方向探索） - 深度が4の倍数の時だけ送信
         if let Some(ref tx) = progress_tx {
-            let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
-            let _ = tx.send(progress);
+            if current_depth % 4 == 0 {
+                let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
+                let _ = tx.send(progress);
+            }
         }
 
         for _ in 0..level_size {
@@ -244,9 +255,11 @@ fn solve_internal(
                     next
                 };
 
-                if !backward_map.contains_key(&next_key) {
-                    backward_map.insert(next_key.clone(), (mv, Some(curr.clone())));
-                    backward_queue.push_back(next_key);
+                use std::collections::hash_map::Entry;
+                if let Entry::Vacant(e) = backward_map.entry(next_key) {
+                    let key_clone = e.key().clone();
+                    e.insert((mv, Some(curr.clone())));
+                    backward_queue.push_back(key_clone);
                 }
             }
         }

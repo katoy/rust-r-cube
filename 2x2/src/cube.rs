@@ -231,25 +231,17 @@ impl Cube {
     fn rotate_r(&mut self) {
         self.rotate_face_cw(12); // Right face
 
-        let mut temp0 = self.stickers[1];
-        temp0.rotate_cw();
-        let mut temp1 = self.stickers[3];
-        temp1.rotate_cw();
+        let temp0 = self.stickers[1];
+        let temp1 = self.stickers[3];
 
         self.stickers[1] = self.stickers[17];
-        self.stickers[1].rotate_cw();
         self.stickers[3] = self.stickers[19];
-        self.stickers[3].rotate_cw();
 
         self.stickers[17] = self.stickers[5];
-        self.stickers[17].rotate_cw();
         self.stickers[19] = self.stickers[7];
-        self.stickers[19].rotate_cw();
 
         self.stickers[5] = self.stickers[22];
-        self.stickers[5].rotate_cw();
         self.stickers[7] = self.stickers[20];
-        self.stickers[7].rotate_cw();
 
         self.stickers[22] = temp0;
         self.stickers[20] = temp1;
@@ -259,25 +251,17 @@ impl Cube {
     fn rotate_rp(&mut self) {
         self.rotate_face_ccw(12); // Right face
 
-        let mut temp0 = self.stickers[1];
-        temp0.rotate_ccw();
-        let mut temp1 = self.stickers[3];
-        temp1.rotate_ccw();
+        let temp0 = self.stickers[1];
+        let temp1 = self.stickers[3];
 
         self.stickers[1] = self.stickers[22];
-        self.stickers[1].rotate_ccw();
         self.stickers[3] = self.stickers[20];
-        self.stickers[3].rotate_ccw();
 
         self.stickers[22] = self.stickers[5];
-        self.stickers[22].rotate_ccw();
         self.stickers[20] = self.stickers[7];
-        self.stickers[20].rotate_ccw();
 
         self.stickers[5] = self.stickers[17];
-        self.stickers[5].rotate_ccw();
         self.stickers[7] = self.stickers[19];
-        self.stickers[7].rotate_ccw();
 
         self.stickers[17] = temp0;
         self.stickers[19] = temp1;
@@ -443,25 +427,17 @@ impl Cube {
     fn rotate_fp(&mut self) {
         self.rotate_face_ccw(16); // Front face
 
-        let mut temp0 = self.stickers[2];
-        temp0.rotate_ccw();
-        let mut temp1 = self.stickers[3];
-        temp1.rotate_ccw();
+        let temp0 = self.stickers[2];
+        let temp1 = self.stickers[3];
 
         self.stickers[2] = self.stickers[12];
-        self.stickers[2].rotate_ccw();
         self.stickers[3] = self.stickers[14];
-        self.stickers[3].rotate_ccw();
 
         self.stickers[12] = self.stickers[4];
-        self.stickers[12].rotate_ccw();
         self.stickers[14] = self.stickers[5];
-        self.stickers[14].rotate_ccw();
 
         self.stickers[4] = self.stickers[11];
-        self.stickers[4].rotate_ccw();
         self.stickers[5] = self.stickers[9];
-        self.stickers[5].rotate_ccw();
 
         self.stickers[11] = temp0;
         self.stickers[9] = temp1;

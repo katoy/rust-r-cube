@@ -116,16 +116,49 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
 
     // 解法ステップ操作
     if app.solution.is_some() {
-        let solution_len = app.solution.as_ref().unwrap().len();
+        let solution = app.solution.as_ref().unwrap();
+        let solution_len = solution.len();
         ui.add_space(10.0);
         ui.label("解法ステップ操作:");
 
         // 現在のステップ表示
         ui.label(format!("ステップ: {}/{}", app.solution_step, solution_len));
 
+        // 全操作内容を表示
+        if !solution.is_empty() {
+            ui.add_space(5.0);
+            ui.label("操作内容:");
+
+            // 操作内容を複数行で表示（1行あたり最大10個）
+            let moves_per_line = 10;
+            for (i, chunk) in solution.chunks(moves_per_line).enumerate() {
+                ui.horizontal(|ui| {
+                    for (j, &mv) in chunk.iter().enumerate() {
+                        let global_idx = i * moves_per_line + j;
+                        let move_text = format!("{}", mv);
+
+                        // 現在のステップを強調表示
+                        if global_idx == app.solution_step && app.solution_step < solution_len {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 200, 0),
+                                format!("[{}]", move_text),
+                            );
+                        } else if global_idx < app.solution_step {
+                            // 実行済みのステップは薄く表示
+                            ui.colored_label(egui::Color32::GRAY, move_text);
+                        } else {
+                            // 未実行のステップは通常表示
+                            ui.label(move_text);
+                        }
+                    }
+                });
+            }
+        }
+
         // 現在のステップの動き表示
+        ui.add_space(5.0);
         if app.solution_step < solution_len {
-            let next_move = app.solution.as_ref().unwrap()[app.solution_step];
+            let next_move = solution[app.solution_step];
             ui.label(format!("次の動き: {}", next_move));
         } else if app.solution_step == solution_len {
             ui.colored_label(egui::Color32::GREEN, "完了!");

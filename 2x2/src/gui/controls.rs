@@ -114,8 +114,8 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
         ui.label(&app.solution_text);
     }
 
-    // 解法ステップ操作
-    if app.solution.is_some() {
+    // 解法ステップ操作（探索中は非表示）
+    if !app.solving && app.solution.is_some() {
         let solution = app.solution.as_ref().unwrap();
         let solution_len = solution.len();
         ui.add_space(10.0);

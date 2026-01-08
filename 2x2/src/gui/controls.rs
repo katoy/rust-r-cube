@@ -77,19 +77,6 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut app.animation_speed, 0.0..=5.0).text("秒"));
     });
 
-    ui.horizontal(|ui| {
-        if ui
-            .button(if app.is_paused {
-                "再開"
-            } else {
-                "一時停止"
-            })
-            .clicked()
-        {
-            app.is_paused = !app.is_paused;
-        }
-    });
-
     ui.add_space(10.0);
 
     // ソルバー

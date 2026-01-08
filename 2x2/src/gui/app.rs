@@ -86,7 +86,6 @@ pub struct CubeApp {
     animation: Option<AnimationState>,
     move_queue: Vec<Move>,
     pub animation_speed: f32, // seconds per move
-    pub is_paused: bool,
     pub solution: Option<Vec<Move>>,
     pub solving: bool,
     pub solver_progress: f32,
@@ -121,7 +120,6 @@ impl Default for CubeApp {
             animation: None,
             move_queue: Vec::new(),
             animation_speed: DEFAULT_ANIMATION_DURATION,
-            is_paused: false,
             solution: None,
             solving: false,
             solver_progress: 0.0,
@@ -249,10 +247,6 @@ impl CubeApp {
 
     /// アニメーション更新
     fn update_animation(&mut self) {
-        if self.is_paused {
-            return;
-        }
-
         if let Some(ref mut anim) = self.animation {
             if anim.update() {
                 // アニメーション完了

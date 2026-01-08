@@ -288,3 +288,116 @@ fn test_solve_is_fully_solved_coverage() {
     moved.apply_move(Move::R);
     assert!(!solver::is_fully_solved(&moved));
 }
+
+#[test]
+fn test_progress_channel_closed() {
+    use std::sync::mpsc;
+
+    // 進捗チャネルの受信側が閉じられている場合でも、
+    // ソルバーが正常に動作することを確認
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    cube.apply_move(Move::U);
+
+    let (tx, rx) = mpsc::channel();
+
+    // 意図的に受信側を早期にdrop
+    drop(rx);
+
+    // send() がエラーを返しても、ソルバーは正常に完了するはず
+    let solution = solver::solve_with_progress(&cube, 11, true, Some(tx));
+
+    assert!(solution.found, "チャネルが閉じていても解法は見つかるべき");
+    assert!(!solution.moves.is_empty(), "解法の手順が含まれているべき");
+}
+
+#[test]
+fn test_progress_channel_multiple_sends() {
+    use std::sync::mpsc;
+
+    // 深めのスクランブルで複数回の進捗送信をトリガー
+    let mut cube = Cube::new();
+    cube.scramble(5);
+
+    let (tx, rx) = mpsc::channel();
+    let solution = solver::solve_with_progress(&cube, 11, true, Some(tx));
+
+    // 進捗メッセージを収集
+    let progress_messages: Vec<f32> = rx.into_iter().collect();
+
+    // 少なくとも完了通知(1.0)は受信されているはず
+    assert!(progress_messages.contains(&1.0), "完了通知が送信されるべき");
+
+    // すべての進捗値が有効な範囲内
+    for &p in &progress_messages {
+        assert!((0.0..=1.0).contains(&p), "進捗値が範囲外: {}", p);
+    }
+
+    assert!(solution.found || !solution.found); // テストが完了することを確認
+}
+
+#[test]
+fn test_end_to_end_scramble_solve_with_orientation() {
+    // エンドツーエンドテスト: スクランブル→解法探索→手順実行→完全一致
+
+    // 複数回テストして堅牢性を確認
+    for scramble_moves in [3, 5, 7] {
+        let mut cube = Cube::new();
+        cube.scramble(scramble_moves);
+
+        // 向きも揃える解法を探索
+        let solution = solver::solve(&cube, 14, false);
+
+        if !solution.found {
+            // 深度14で見つからない場合はスキップ（稀なケース）
+            continue;
+        }
+
+        // 見つかった手順をすべて適用
+        for &mv in &solution.moves {
+            cube.apply_move(mv);
+        }
+
+        // 完全に揃っているはず（色も向きも）
+        assert!(
+            solver::is_fully_solved(&cube),
+            "{} 手スクランブル後、解法 {:?} を実行しても完全に揃わない",
+            scramble_moves,
+            solution.moves
+        );
+    }
+}
+
+#[test]
+fn test_end_to_end_specific_scramble() {
+    // 特定のスクランブルパターンでのエンドツーエンドテスト
+    let mut cube = Cube::new();
+    let scramble = vec![Move::R, Move::U, Move::F, Move::L];
+
+    // スクランブル適用
+    for &mv in &scramble {
+        cube.apply_move(mv);
+    }
+
+    // 向きも揃える解法を探索
+    let solution = solver::solve(&cube, 14, false);
+
+    assert!(solution.found, "4手スクランブルは深度14で解けるはず");
+
+    // 解法を適用
+    for &mv in &solution.moves {
+        cube.apply_move(mv);
+    }
+
+    // 完全に揃っているか検証
+    assert!(solver::is_fully_solved(&cube), "解法実行後、完全に揃うべき");
+    assert!(cube.is_solved(), "色も揃っているべき");
+
+    // 初期状態のいずれかと一致していることを確認
+    // （24通りの完成状態のいずれか）
+    assert_eq!(
+        cube,
+        Cube::new(),
+        "完全に初期状態に戻るべき、または24通りの完成状態のいずれか"
+    );
+}

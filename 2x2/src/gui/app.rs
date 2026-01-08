@@ -108,6 +108,10 @@ pub struct CubeApp {
 
     // 解決設定
     pub ignore_orientation: bool,
+
+    // 探索時間計測
+    pub solving_start_time: Option<Instant>,
+    pub last_solve_duration: Option<f32>, // 秒単位
 }
 
 impl Default for CubeApp {
@@ -130,6 +134,8 @@ impl Default for CubeApp {
             solution_cube_state: None,
             pending_solution_update: None,
             ignore_orientation: true,
+            solving_start_time: None,
+            last_solve_duration: None,
         }
     }
 }
@@ -200,6 +206,7 @@ impl CubeApp {
         self.solving = true;
         self.solver_progress = 0.0;
         self.solution_text = "探索中...".to_string();
+        self.solving_start_time = Some(Instant::now()); // 開始時刻を記録
 
         // 解法開始時の状態を保存
         self.solution_cube_state = Some(self.cube.clone());
@@ -277,9 +284,21 @@ impl CubeApp {
                 self.solver_receiver = None;
                 self.progress_receiver = None;
 
+                // 所要時間を計算
+                if let Some(start_time) = self.solving_start_time.take() {
+                    let duration = start_time.elapsed().as_secs_f32();
+                    self.last_solve_duration = Some(duration);
+                }
+
                 if solution.found {
                     self.solution = Some(solution.moves.clone());
-                    self.solution_text = format!("解法: {} 手", solution.moves.len());
+                    let duration_text = if let Some(d) = self.last_solve_duration {
+                        format!(" ({:.2}秒)", d)
+                    } else {
+                        String::new()
+                    };
+                    self.solution_text =
+                        format!("解法: {} 手{}", solution.moves.len(), duration_text);
                     self.solution_step = 0;
                     // 自動実行はしない（ステップ操作で手動実行）
                 } else {

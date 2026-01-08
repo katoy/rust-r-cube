@@ -100,8 +100,14 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
     });
 
     if app.solving {
-        // 探索中: プログレスバーを表示
+        // 探索中: プログレスバーと経過時間を表示
         ui.add(egui::ProgressBar::new(app.solver_progress));
+
+        // 経過時間を表示
+        if let Some(start_time) = app.solving_start_time {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            ui.label(format!("経過: {:.1}秒", elapsed));
+        }
     } else {
         // 探索中でない: ボタンを表示
         if ui.button("解法を探す").clicked() {

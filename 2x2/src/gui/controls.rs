@@ -103,10 +103,12 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
         // 探索中: プログレスバーと経過時間を表示
         ui.add(egui::ProgressBar::new(app.solver_progress));
 
-        // 経過時間を表示
+        // 経過時間を表示（0.2秒ごとに更新）
         if let Some(start_time) = app.solving_start_time {
             let elapsed = start_time.elapsed().as_secs_f32();
-            ui.label(format!("経過: {:.1}秒", elapsed));
+            // 0.2秒単位で切り捨て
+            let elapsed_display = (elapsed / 0.2).floor() * 0.2;
+            ui.label(format!("経過: {:.1}秒", elapsed_display));
         }
     } else {
         // 探索中でない: ボタンを表示

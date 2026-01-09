@@ -353,14 +353,15 @@ fn test_end_to_end_scramble_solve_with_orientation() {
             continue;
         }
 
-        // 見つかった手順をすべて適用
+        // クローンを作成して解法を適用
+        let mut solved_cube = cube.clone();
         for &mv in &solution.moves {
-            cube.apply_move(mv);
+            solved_cube.apply_move(mv);
         }
 
         // 完全に揃っているはず（色も向きも）
         assert!(
-            solver::is_fully_solved(&cube),
+            solver::is_fully_solved(&solved_cube),
             "{} 手スクランブル後、解法 {:?} を実行しても完全に揃わない",
             scramble_moves,
             solution.moves
@@ -384,19 +385,23 @@ fn test_end_to_end_specific_scramble() {
 
     assert!(solution.found, "4手スクランブルは深度14で解けるはず");
 
-    // 解法を適用
+    // クローンを作成して解法を適用
+    let mut solved_cube = cube.clone();
     for &mv in &solution.moves {
-        cube.apply_move(mv);
+        solved_cube.apply_move(mv);
     }
 
     // 完全に揃っているか検証
-    assert!(solver::is_fully_solved(&cube), "解法実行後、完全に揃うべき");
-    assert!(cube.is_solved(), "色も揃っているべき");
+    assert!(
+        solver::is_fully_solved(&solved_cube),
+        "解法実行後、完全に揃うべき"
+    );
+    assert!(solved_cube.is_solved(), "色も揃っているべき");
 
     // 初期状態のいずれかと一致していることを確認
     // （24通りの完成状態のいずれか）
     assert_eq!(
-        cube,
+        solved_cube,
         Cube::new(),
         "完全に初期状態に戻るべき、または24通りの完成状態のいずれか"
     );

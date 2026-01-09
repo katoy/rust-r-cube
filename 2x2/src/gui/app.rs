@@ -1,4 +1,4 @@
-use crate::cube::{Cube, Move};
+use crate::cube::{Color, Cube, Move};
 use crate::gui::renderer_3d::{draw_cube_3d, View3D};
 use crate::solver;
 use std::sync::mpsc::{channel, Receiver};
@@ -38,6 +38,15 @@ pub enum ViewMode {
     TwoD,
     ThreeD,
     Both,
+}
+
+/// 入力状態
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputState {
+    Normal,
+    Scanning {
+        face_index: usize, // 0-5 (U, D, L, R, F, B)
+    },
 }
 
 /// アニメーション状態
@@ -111,6 +120,15 @@ pub struct CubeApp {
     // 探索時間計測
     pub solving_start_time: Option<Instant>,
     pub last_solve_duration: Option<f32>, // 秒単位
+
+    // 6面スキャン入力モード
+    pub input_state: InputState,
+    pub input_buffer: [Option<Color>; 24],
+    pub selected_input_color: Color,
+    pub input_error_message: String,
+
+    // デバッグオプション
+    pub skip_parity_check: bool,
 }
 
 impl Default for CubeApp {
@@ -134,6 +152,11 @@ impl Default for CubeApp {
             ignore_orientation: true,
             solving_start_time: None,
             last_solve_duration: None,
+            input_state: InputState::Normal,
+            input_buffer: [None; 24],
+            selected_input_color: Color::White,
+            input_error_message: String::new(),
+            skip_parity_check: false,
         }
     }
 }
@@ -218,9 +241,9 @@ impl CubeApp {
         let ignore_orientation = self.ignore_orientation;
 
         thread::spawn(move || {
-            // 向き無視: God's Number = 11
+            // 向き無視でも実物のキューブでは12手以上必要な場合があるため14に設定
             // 向きも揃える: より深い探索が必要なため14に設定
-            let max_depth = if ignore_orientation { 11 } else { 14 };
+            let max_depth = 14;
             println!("ソルバー開始: 深度{}まで探索", max_depth);
             let solution = solver::solve_with_progress(
                 &cube_clone,
@@ -315,6 +338,46 @@ impl CubeApp {
     /// キューブの状態を取得
     pub fn cube(&self) -> &Cube {
         &self.cube
+    }
+
+    /// 描画に使用するキューブを取得
+    ///
+    /// スキャンモード中は入力バッファから一時キューブを生成して返し、
+    /// 通常モードは実際のキューブを返します。
+    pub fn display_cube(&self) -> Cube {
+        match &self.input_state {
+            InputState::Scanning { .. } => {
+                // スキャンモード中: 入力バッファから一時キューブを生成
+                // 未入力のステッカーはデフォルトの色（グレー風）にする
+                let mut colors = [Color::White; 24];
+
+                for (i, maybe_color) in self.input_buffer.iter().enumerate() {
+                    if let Some(color) = maybe_color {
+                        colors[i] = *color;
+                    } else {
+                        // 未入力のステッカーはグレーで表示
+                        colors[i] = Color::Gray;
+                    }
+                }
+
+                Cube::from_colors(&colors)
+            }
+            InputState::Normal => {
+                // 通常モード: 実際のキューブを返す
+                self.cube.clone()
+            }
+        }
+    }
+
+    /// 編集中の面のインデックスを取得（ハイライト表示用）
+    ///
+    /// スキャンモード中は現在編集中の面のインデックス（0-5）を返し、
+    /// 通常モードはNoneを返します。
+    pub fn editing_face_index(&self) -> Option<usize> {
+        match &self.input_state {
+            InputState::Scanning { face_index } => Some(*face_index),
+            InputState::Normal => None,
+        }
     }
 
     /// アニメーション状態を取得
@@ -436,7 +499,16 @@ impl CubeApp {
             }
         }
 
-        draw_cube_3d(ui, rect, &self.cube, self.animation.as_ref(), &self.view_3d);
+        let display_cube = self.display_cube();
+        let highlight_face = self.editing_face_index();
+        draw_cube_3d(
+            ui,
+            rect,
+            &display_cube,
+            self.animation.as_ref(),
+            &self.view_3d,
+            highlight_face,
+        );
 
         // ヘルプテキストを描画
         let help_text = "ドラッグで回転、ホイールでズーム";
@@ -458,7 +530,181 @@ impl CubeApp {
         let (rect, _response) =
             ui.allocate_exact_size(egui::vec2(available.x, size), egui::Sense::hover());
 
-        crate::gui::renderer::draw_cube(ui, rect, &self.cube, self.animation.as_ref());
+        let display_cube = self.display_cube();
+        let highlight_face = self.editing_face_index();
+        crate::gui::renderer::draw_cube(
+            ui,
+            rect,
+            &display_cube,
+            self.animation.as_ref(),
+            highlight_face,
+        );
+    }
+
+    // ============ 6面スキャン入力モード用メソッド ============
+
+    /// スキャンモードを開始
+    pub fn start_scanning_mode(&mut self) {
+        self.input_state = InputState::Scanning { face_index: 0 };
+        self.input_buffer = [None; 24];
+        self.selected_input_color = Color::White;
+        self.input_error_message.clear();
+    }
+
+    /// スキャンモードをキャンセル
+    pub fn cancel_scanning_mode(&mut self) {
+        self.input_state = InputState::Normal;
+        self.input_buffer = [None; 24];
+        self.input_error_message.clear();
+    }
+
+    /// 次の面へ進む
+    pub fn next_face(&mut self) {
+        if let InputState::Scanning { face_index } = self.input_state {
+            if face_index < 5 {
+                self.input_state = InputState::Scanning {
+                    face_index: face_index + 1,
+                };
+            }
+        }
+    }
+
+    /// 前の面へ戻る
+    pub fn prev_face(&mut self) {
+        if let InputState::Scanning { face_index } = self.input_state {
+            if face_index > 0 {
+                self.input_state = InputState::Scanning {
+                    face_index: face_index - 1,
+                };
+            }
+        }
+    }
+
+    /// 現在の面のステッカーに色を設定
+    /// position: 面内の位置 0-3 (左上、右上、左下、右下)
+    pub fn set_current_face_sticker(&mut self, position: usize, color: Color) {
+        if let InputState::Scanning { face_index } = self.input_state {
+            let global_index = face_index * 4 + position;
+            if global_index < 24 {
+                self.input_buffer[global_index] = Some(color);
+            }
+        }
+    }
+
+    /// 現在の面の指定位置のステッカー色を取得
+    pub fn get_current_face_sticker(&self, position: usize) -> Option<Color> {
+        if let InputState::Scanning { face_index } = self.input_state {
+            let global_index = face_index * 4 + position;
+            if global_index < 24 {
+                return self.input_buffer[global_index];
+            }
+        }
+        None
+    }
+
+    /// 現在の面の名前を取得
+    pub fn get_current_face_name(&self) -> &str {
+        if let InputState::Scanning { face_index } = self.input_state {
+            match face_index {
+                0 => "Up (上面)",
+                1 => "Down (下面)",
+                2 => "Left (左面)",
+                3 => "Right (右面)",
+                4 => "Front (前面)",
+                5 => "Back (背面)",
+                _ => "不明",
+            }
+        } else {
+            "不明"
+        }
+    }
+
+    /// 現在の面が全て入力済みかチェック
+    pub fn is_current_face_complete(&self) -> bool {
+        if let InputState::Scanning { face_index } = self.input_state {
+            let start = face_index * 4;
+            let end = start + 4;
+            return self.input_buffer[start..end].iter().all(|c| c.is_some());
+        }
+        false
+    }
+
+    /// スキャン完了（キューブに反映）
+    pub fn finish_scanning(&mut self) {
+        // 全てのステッカーが入力されているかチェック
+        if self.input_buffer.iter().any(|c| c.is_none()) {
+            self.input_error_message = "全ての面を入力してください".to_string();
+            return;
+        }
+
+        // Option<Color>をColorに変換
+        let colors: [Color; 24] = self
+            .input_buffer
+            .iter()
+            .map(|c| c.expect("全ての色が入力されています"))
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("配列は24要素です");
+
+        // 妥当性チェック
+        if let Err(e) = Cube::validate_colors(&colors) {
+            self.input_error_message = e;
+            return;
+        }
+
+        // キューブに反映
+        let new_cube = Cube::from_colors(&colors);
+
+        // パリティチェック（物理的に可能な配置かチェック）
+        if !self.skip_parity_check {
+            if let Err(e) = new_cube.is_valid_state() {
+                self.input_error_message = format!("無効なキューブ状態: {}", e);
+                return;
+            }
+        }
+
+        self.cube = new_cube;
+        self.input_state = InputState::Normal;
+        self.input_buffer = [None; 24];
+        self.input_error_message.clear();
+
+        // 解法やアニメーションをクリア
+        self.solution = None;
+        self.solution_text.clear();
+        self.animation = None;
+        self.move_queue.clear();
+    }
+
+    /// キューブの状態をファイルに保存
+    pub fn save_to_file(&self, path: &str) -> Result<(), String> {
+        let content = self.cube.to_file_format();
+        std::fs::write(path, content).map_err(|e| format!("ファイルの保存に失敗しました: {}", e))
+    }
+
+    /// ファイルからキューブの状態を読み込み
+    pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
+
+        let new_cube = Cube::from_file_format(&content)?;
+
+        // パリティチェック（skip_parity_checkフラグで制御）
+        if !self.skip_parity_check {
+            new_cube.is_valid_state()?;
+        }
+
+        self.cube = new_cube;
+        self.solution = None;
+        self.solution_text.clear();
+        self.animation = None;
+        self.move_queue.clear();
+
+        // スキャンモードを終了
+        self.input_state = InputState::Normal;
+        self.input_buffer = [None; 24];
+        self.input_error_message.clear();
+
+        Ok(())
     }
 
     /// キーボード入力を処理

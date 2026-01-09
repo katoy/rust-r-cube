@@ -11,6 +11,7 @@ fn color_to_color32(color: Color) -> Color32 {
         Color::Blue => Color32::from_rgb(0, 100, 255),
         Color::Red => Color32::from_rgb(255, 50, 50),
         Color::Orange => Color32::from_rgb(255, 165, 0),
+        Color::Gray => Color32::from_rgb(180, 180, 180), // 未設定用グレー
     }
 }
 
@@ -295,7 +296,13 @@ fn rotate_point(p: Pos2, center: Pos2, angle_degrees: f32) -> Pos2 {
 }
 
 /// キューブを展開図として描画
-pub fn draw_cube(ui: &mut egui::Ui, rect: Rect, cube: &Cube, animation: Option<&AnimationState>) {
+pub fn draw_cube(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    cube: &Cube,
+    animation: Option<&AnimationState>,
+    highlight_face_index: Option<usize>,
+) {
     let painter = ui.painter();
 
     let grid_cols = 8.0;
@@ -458,6 +465,39 @@ pub fn draw_cube(ui: &mut egui::Ui, rect: Rect, cube: &Cube, animation: Option<&
         if !drawn {
             draw_sticker(painter, screen_pos, sticker_size, sticker, rotation, 1.0);
         }
+    }
+
+    // 編集中の面をハイライト表示
+    if let Some(face_idx) = highlight_face_index {
+        let start_idx = face_idx * 4;
+        let face_grid_rect = get_face_grid_rect(start_idx);
+
+        // 面の左上セルと右下セルの中心を取得
+        // face_grid_rect.maxは排他的（範囲の外側）なので、実際の最後のセルはmax-1
+        let top_left_cell_center = to_screen(face_grid_rect.min);
+        let bottom_right_cell_center = to_screen(Pos2::new(
+            face_grid_rect.max.x - 1.0,
+            face_grid_rect.max.y - 1.0,
+        ));
+
+        // セルの中心から面全体の境界を計算
+        // 左上はセルの中心から-grid_size/2、右下はセルの中心から+grid_size/2
+        let top_left = top_left_cell_center - Vec2::splat(grid_size * 0.5);
+        let bottom_right = bottom_right_cell_center + Vec2::splat(grid_size * 0.5);
+
+        // 少し余白を持たせる
+        let padding = grid_size * 0.05;
+        let highlight_rect = Rect::from_min_max(
+            top_left - Vec2::splat(padding),
+            bottom_right + Vec2::splat(padding),
+        );
+
+        // 太いオレンジの枠線で囲む
+        painter.rect_stroke(
+            highlight_rect,
+            5.0,
+            Stroke::new(4.0, Color32::from_rgb(255, 140, 0)),
+        );
     }
 
     if let Some(anim) = animation {

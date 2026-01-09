@@ -40,6 +40,7 @@ fn color_to_color32(color: Color) -> Color32 {
         Color::Blue => Color32::from_rgb(0, 100, 255),
         Color::Red => Color32::from_rgb(255, 50, 50),
         Color::Orange => Color32::from_rgb(255, 165, 0),
+        Color::Gray => Color32::from_rgb(180, 180, 180), // 未設定用グレー
     }
 }
 
@@ -208,6 +209,7 @@ pub fn draw_cube_3d(
     cube: &Cube,
     animation: Option<&AnimationState>,
     view: &View3D,
+    highlight_face_index: Option<usize>,
 ) {
     let painter = ui.painter();
 
@@ -359,6 +361,19 @@ pub fn draw_cube_3d(
                 face.color,
                 Stroke::new(1.0, Color32::BLACK), // 枠線
             ));
+
+            // 編集中の面をハイライト表示
+            if let Some(face_idx) = highlight_face_index {
+                let start_idx = face_idx * 4;
+                if face.sticker_index >= start_idx && face.sticker_index < start_idx + 4 {
+                    // 太いオレンジの枠線で囲む
+                    painter.add(egui::Shape::convex_polygon(
+                        face.points.clone(),
+                        Color32::TRANSPARENT,
+                        Stroke::new(3.0, Color32::from_rgb(255, 140, 0)),
+                    ));
+                }
+            }
 
             // ステッカーの向きを示す矢印を描画
             let sticker_data = cube.get_sticker(face.sticker_index);

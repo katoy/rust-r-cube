@@ -209,14 +209,19 @@ impl CubeApp {
     /// リセット
     pub fn reset(&mut self) {
         self.cube = Cube::new();
-        self.solution = None;
-        self.solution_text.clear();
-        self.move_queue.clear();
+        self.cancel_solve();
         self.animation = None;
         self.pending_solution_update = None;
-        // ソルバー実行中ならキャンセルできないが、結果を無視するようにフラグをクリアする
+    }
+
+    /// ソルバーの探索を中止
+    pub fn cancel_solve(&mut self) {
         self.solving = false;
+        self.solution = None;
+        self.solution_text.clear();
         self.solver_receiver = None;
+        self.progress_receiver = None;
+        self.move_queue.clear();
     }
 
     /// ソルバー実行

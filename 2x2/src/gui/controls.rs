@@ -247,12 +247,21 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
     // ソルバー
     ui.label("ソルバー:");
     ui.horizontal(|ui| {
-        ui.radio_value(&mut app.ignore_orientation, true, "向き無視");
-        ui.radio_value(&mut app.ignore_orientation, false, "向きも揃える");
+        ui.add_enabled_ui(!app.solving, |ui| {
+            ui.radio_value(&mut app.ignore_orientation, true, "向き無視");
+            ui.radio_value(&mut app.ignore_orientation, false, "向きも揃える");
+        });
     });
 
     if app.solving {
         // 探索中: プログレスバーと経過時間を表示
+        ui.horizontal(|ui| {
+            ui.label("探索中...");
+            if ui.button("中止").clicked() {
+                app.cancel_solve();
+            }
+        });
+
         ui.add(egui::ProgressBar::new(app.solver_progress));
 
         // 経過時間を表示（0.2秒ごとに更新）

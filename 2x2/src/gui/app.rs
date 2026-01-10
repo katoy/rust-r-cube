@@ -1,6 +1,7 @@
 use crate::cube::{Color, Cube, Move};
 use crate::gui::renderer_3d::{draw_cube_3d, View3D};
 use crate::solver;
+use crate::statistics::Statistics;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
@@ -132,6 +133,9 @@ pub struct CubeApp {
 
     // ソルバータスクの種類
     pub solver_task: SolverTask,
+
+    // 統計情報
+    pub statistics: Statistics,
 }
 
 /// ソルバーのタスク種類
@@ -168,6 +172,7 @@ impl Default for CubeApp {
             input_error_message: String::new(),
             skip_parity_check: false,
             solver_task: SolverTask::Normal,
+            statistics: Statistics::new(),
         }
     }
 }
@@ -199,6 +204,7 @@ impl CubeApp {
     /// 回転操作をキューに追加
     pub fn queue_move(&mut self, mv: Move) {
         self.move_queue.push(mv);
+        self.statistics.record_manual_move();
     }
 
     /// 複数の回転操作をキューに追加

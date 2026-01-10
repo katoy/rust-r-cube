@@ -432,6 +432,11 @@ fn test_all_moves_exhaustive_physical() {
             msg
         );
 
+        // コーナー整合性チェックも行う
+        if let Err(e) = check_corners_integrity(&cube) {
+            panic!("Corner integrity failed for {}: {}", msg, e);
+        }
+
         // 特定の操作後の物理状態チェック（Dを含む主要なもの）
         match mv {
             Move::D => {
@@ -473,6 +478,106 @@ fn test_all_moves_exhaustive_physical() {
                 check_sticker_val(&cube, 3, Color::White, 3, &msg);
             }
             _ => {}
+        }
+    }
+}
+
+// === コーナー整合性チェック（実装バグ検出用） ===
+
+/// コーナーキューブの整合性をチェックするヘルパー関数
+fn check_corners_integrity(cube: &Cube) -> Result<(), String> {
+    let corners = vec![
+        ("ULF", vec![2, 9, 16]),  // Up-Left-Front
+        ("URF", vec![3, 12, 17]), // Up-Right-Front
+        ("ULB", vec![0, 8, 21]),  // Up-Left-Back
+        ("URB", vec![1, 13, 20]), // Up-Right-Back
+        ("DLF", vec![4, 11, 18]), // Down-Left-Front
+        ("DRF", vec![5, 14, 19]), // Down-Right-Front
+        ("DLB", vec![6, 10, 23]), // Down-Left-Back
+        ("DRB", vec![7, 15, 22]), // Down-Right-Back
+    ];
+
+    for (name, indices) in corners {
+        let colors: Vec<String> = indices
+            .iter()
+            .map(|&i| format!("{:?}", cube.get_sticker(i).color))
+            .collect();
+        let unique: HashSet<&String> = colors.iter().collect();
+
+        if unique.len() != 3 {
+            return Err(format!(
+                "{}: 異なる色が{}個しかありません {:?} (indices: {:?})",
+                name,
+                unique.len(),
+                colors,
+                indices
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_all_moves_preserve_corner_integrity() {
+    let moves = Move::all_moves();
+    for mv in moves {
+        let mut cube = Cube::new();
+        cube.apply_move(mv);
+        if let Err(e) = check_corners_integrity(&cube) {
+            panic!("Move {:?} broke corner integrity: {}", mv, e);
+        }
+    }
+}
+
+#[test]
+fn test_specific_sequence_corner_integrity() {
+    // ユーザー報告の特定のバグ手順（過去に失敗していたもの）
+    let sequence = vec![
+        Move::Bp,
+        Move::Lp,
+        Move::Bp,
+        Move::Lp,
+        Move::Fp,
+        Move::D,
+        Move::F,
+        Move::U,
+        Move::F,
+        Move::R,
+        Move::B,
+        Move::Up,
+    ];
+    let mut cube = Cube::new();
+    for (i, &mv) in sequence.iter().enumerate() {
+        cube.apply_move(mv);
+        if let Err(e) = check_corners_integrity(&cube) {
+            panic!("Step {} ({:?}) broke corner integrity: {}", i + 1, mv, e);
+        }
+    }
+}
+
+#[test]
+fn test_random_scramble_corner_integrity() {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let all_moves = Move::all_moves();
+
+    // 100回試行
+    for i in 0..100 {
+        let mut cube = Cube::new();
+        let num_moves = rng.gen_range(10..30);
+        let mut history = Vec::new();
+
+        for _ in 0..num_moves {
+            let mv = all_moves[rng.gen_range(0..all_moves.len())];
+            cube.apply_move(mv);
+            history.push(mv);
+
+            if let Err(e) = check_corners_integrity(&cube) {
+                panic!(
+                    "Random test failed (trial {}): {}\nHistory: {:?}",
+                    i, e, history
+                );
+            }
         }
     }
 }

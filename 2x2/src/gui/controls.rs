@@ -8,238 +8,242 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     // 6面スキャン入力モード
-    if let InputState::Scanning { face_index } = app.input_state {
-        // スキャンモード中
-        ui.separator();
-        ui.heading("🎯 実物のキューブを入力中");
-        ui.add_space(10.0);
+    ui.add_enabled_ui(!app.solving, |ui| {
+        if let InputState::Scanning { face_index } = app.input_state {
+            // スキャンモード中
+            ui.separator();
+            ui.heading("🎯 実物のキューブを入力中");
+            ui.add_space(10.0);
 
-        // 進捗表示
-        let progress = (face_index as f32 + 1.0) / 6.0;
-        ui.add(egui::ProgressBar::new(progress).text(format!("{}/6 面", face_index + 1)));
-        ui.add_space(5.0);
-
-        // 現在の面
-        ui.label(format!("現在の面: {}", app.get_current_face_name()));
-        ui.add_space(10.0);
-
-        // 色選択パレット
-        ui.label("色を選択:");
-        ui.horizontal(|ui| {
-            let colors = [
-                (Color::White, "白", egui::Color32::from_rgb(255, 255, 255)),
-                (Color::Yellow, "黄", egui::Color32::from_rgb(255, 255, 0)),
-                (Color::Green, "緑", egui::Color32::from_rgb(0, 200, 0)),
-                (Color::Blue, "青", egui::Color32::from_rgb(0, 100, 255)),
-                (Color::Red, "赤", egui::Color32::from_rgb(255, 0, 0)),
-                (Color::Orange, "橙", egui::Color32::from_rgb(255, 140, 0)),
-            ];
-
-            for (color, label, rgb) in colors {
-                let is_selected = app.selected_input_color == color;
-                let button = egui::Button::new(label)
-                    .fill(rgb)
-                    .stroke(if is_selected {
-                        egui::Stroke::new(3.0, egui::Color32::BLACK)
-                    } else {
-                        egui::Stroke::new(1.0, egui::Color32::GRAY)
-                    })
-                    .min_size(egui::vec2(35.0, 30.0));
-
-                if ui.add(button).clicked() {
-                    app.selected_input_color = color;
-                }
-            }
-        });
-        ui.add_space(10.0);
-
-        // ステッカーグリッド (2x2)
-        ui.label("この面のステッカー:");
-        ui.label("(クリックして選択した色を設定)");
-        ui.add_space(5.0);
-
-        egui::Grid::new("sticker_grid")
-            .spacing([5.0, 5.0])
-            .show(ui, |ui| {
-                for row in 0..2 {
-                    for col in 0..2 {
-                        let position = row * 2 + col;
-                        let current_color = app.get_current_face_sticker(position);
-
-                        let button_color = if let Some(color) = current_color {
-                            match color {
-                                Color::White => egui::Color32::from_rgb(255, 255, 255),
-                                Color::Yellow => egui::Color32::from_rgb(255, 255, 0),
-                                Color::Green => egui::Color32::from_rgb(0, 200, 0),
-                                Color::Blue => egui::Color32::from_rgb(0, 100, 255),
-                                Color::Red => egui::Color32::from_rgb(255, 0, 0),
-                                Color::Orange => egui::Color32::from_rgb(255, 140, 0),
-                                Color::Gray => egui::Color32::from_rgb(180, 180, 180),
-                            }
-                        } else {
-                            egui::Color32::from_rgb(200, 200, 200) // 未設定
-                        };
-
-                        let button = egui::Button::new("")
-                            .fill(button_color)
-                            .stroke(egui::Stroke::new(2.0, egui::Color32::BLACK))
-                            .min_size(egui::vec2(50.0, 50.0));
-
-                        if ui.add(button).clicked() {
-                            app.set_current_face_sticker(position, app.selected_input_color);
-                        }
-                    }
-                    ui.end_row();
-                }
-            });
-
-        ui.add_space(10.0);
-
-        // エラーメッセージ表示
-        if !app.input_error_message.is_empty() {
-            ui.colored_label(egui::Color32::RED, &app.input_error_message);
+            // 進捗表示
+            let progress = (face_index as f32 + 1.0) / 6.0;
+            ui.add(egui::ProgressBar::new(progress).text(format!("{}/6 面", face_index + 1)));
             ui.add_space(5.0);
-        }
 
-        // ナビゲーションボタン
-        ui.horizontal(|ui| {
-            // 前の面へ
-            ui.add_enabled_ui(face_index > 0, |ui| {
-                if ui.button("◀ 前の面").clicked() {
-                    app.prev_face();
+            // 現在の面
+            ui.label(format!("現在の面: {}", app.get_current_face_name()));
+            ui.add_space(10.0);
+
+            // 色選択パレット
+            ui.label("色を選択:");
+            ui.horizontal(|ui| {
+                let colors = [
+                    (Color::White, "白", egui::Color32::from_rgb(255, 255, 255)),
+                    (Color::Yellow, "黄", egui::Color32::from_rgb(255, 255, 0)),
+                    (Color::Green, "緑", egui::Color32::from_rgb(0, 200, 0)),
+                    (Color::Blue, "青", egui::Color32::from_rgb(0, 100, 255)),
+                    (Color::Red, "赤", egui::Color32::from_rgb(255, 0, 0)),
+                    (Color::Orange, "橙", egui::Color32::from_rgb(255, 140, 0)),
+                ];
+
+                for (color, label, rgb) in colors {
+                    let is_selected = app.selected_input_color == color;
+                    let button = egui::Button::new(label)
+                        .fill(rgb)
+                        .stroke(if is_selected {
+                            egui::Stroke::new(3.0, egui::Color32::BLACK)
+                        } else {
+                            egui::Stroke::new(1.0, egui::Color32::GRAY)
+                        })
+                        .min_size(egui::vec2(35.0, 30.0));
+
+                    if ui.add(button).clicked() {
+                        app.selected_input_color = color;
+                    }
+                }
+            });
+            ui.add_space(10.0);
+
+            // ステッカーグリッド (2x2)
+            ui.label("この面のステッカー:");
+            ui.label("(クリックして選択した色を設定)");
+            ui.add_space(5.0);
+
+            egui::Grid::new("sticker_grid")
+                .spacing([5.0, 5.0])
+                .show(ui, |ui| {
+                    for row in 0..2 {
+                        for col in 0..2 {
+                            let position = row * 2 + col;
+                            let current_color = app.get_current_face_sticker(position);
+
+                            let button_color = if let Some(color) = current_color {
+                                match color {
+                                    Color::White => egui::Color32::from_rgb(255, 255, 255),
+                                    Color::Yellow => egui::Color32::from_rgb(255, 255, 0),
+                                    Color::Green => egui::Color32::from_rgb(0, 200, 0),
+                                    Color::Blue => egui::Color32::from_rgb(0, 100, 255),
+                                    Color::Red => egui::Color32::from_rgb(255, 0, 0),
+                                    Color::Orange => egui::Color32::from_rgb(255, 140, 0),
+                                    Color::Gray => egui::Color32::from_rgb(180, 180, 180),
+                                }
+                            } else {
+                                egui::Color32::from_rgb(200, 200, 200) // 未設定
+                            };
+
+                            let button = egui::Button::new("")
+                                .fill(button_color)
+                                .stroke(egui::Stroke::new(2.0, egui::Color32::BLACK))
+                                .min_size(egui::vec2(50.0, 50.0));
+
+                            if ui.add(button).clicked() {
+                                app.set_current_face_sticker(position, app.selected_input_color);
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
+
+            ui.add_space(10.0);
+
+            // エラーメッセージ表示
+            if !app.input_error_message.is_empty() {
+                ui.colored_label(egui::Color32::RED, &app.input_error_message);
+                ui.add_space(5.0);
+            }
+
+            // ナビゲーションボタン
+            ui.horizontal(|ui| {
+                // 前の面へ
+                ui.add_enabled_ui(face_index > 0, |ui| {
+                    if ui.button("◀ 前の面").clicked() {
+                        app.prev_face();
+                    }
+                });
+
+                // キャンセル
+                if ui.button("❌ キャンセル").clicked() {
+                    app.cancel_scanning_mode();
+                }
+
+                // 次の面へ / 完了
+                if face_index < 5 {
+                    let can_proceed = app.is_current_face_complete();
+                    ui.add_enabled_ui(can_proceed, |ui| {
+                        if ui.button("次の面 ▶").clicked() {
+                            app.next_face();
+                        }
+                    });
+                } else {
+                    // 最後の面
+                    let can_finish = app.is_current_face_complete();
+                    ui.add_enabled_ui(can_finish, |ui| {
+                        if ui.button("✅ 完了").clicked() {
+                            app.finish_scanning();
+                        }
+                    });
                 }
             });
 
-            // キャンセル
-            if ui.button("❌ キャンセル").clicked() {
-                app.cancel_scanning_mode();
+            ui.separator();
+            ui.add_space(10.0);
+        } else {
+            // 通常モード: 6面スキャンボタンを表示
+            if ui.button("📸 6面スキャン入力").clicked() {
+                app.start_scanning_mode();
             }
+            ui.add_space(10.0);
+        }
+    });
 
-            // 次の面へ / 完了
-            if face_index < 5 {
-                let can_proceed = app.is_current_face_complete();
-                ui.add_enabled_ui(can_proceed, |ui| {
-                    if ui.button("次の面 ▶").clicked() {
-                        app.next_face();
-                    }
-                });
-            } else {
-                // 最後の面
-                let can_finish = app.is_current_face_complete();
-                ui.add_enabled_ui(can_finish, |ui| {
-                    if ui.button("✅ 完了").clicked() {
-                        app.finish_scanning();
-                    }
-                });
+    // 基本操作ボタンなど（探索中は無効化）
+    ui.add_enabled_ui(!app.solving, |ui| {
+        ui.label("基本操作:");
+        ui.horizontal(|ui| {
+            if ui.button("スクランブル").clicked() {
+                app.scramble();
+            }
+            if ui.button("リセット").clicked() {
+                app.reset();
             }
         });
 
-        ui.separator();
         ui.add_space(10.0);
-    } else {
-        // 通常モード: 6面スキャンボタンを表示
-        if ui.button("📸 6面スキャン入力").clicked() {
-            app.start_scanning_mode();
-        }
-        ui.add_space(10.0);
-    }
 
-    // 基本操作ボタン
-    ui.label("基本操作:");
-    ui.horizontal(|ui| {
-        if ui.button("スクランブル").clicked() {
-            app.scramble();
-        }
-        if ui.button("リセット").clicked() {
-            app.reset();
-        }
-    });
+        // ファイル保存・読み込み
+        ui.label("ファイル:");
 
-    ui.add_space(10.0);
-
-    // ファイル保存・読み込み
-    ui.label("ファイル:");
-
-    ui.horizontal(|ui| {
-        if ui.button("💾 保存").clicked() {
-            match app.save_to_file("cube_state.txt") {
-                Ok(_) => {
-                    app.input_error_message = "保存しました: cube_state.txt".to_string();
-                }
-                Err(e) => {
-                    app.input_error_message = format!("保存エラー: {}", e);
+        ui.horizontal(|ui| {
+            if ui.button("💾 保存").clicked() {
+                match app.save_to_file("cube_state.txt") {
+                    Ok(_) => {
+                        app.input_error_message = "保存しました: cube_state.txt".to_string();
+                    }
+                    Err(e) => {
+                        app.input_error_message = format!("保存エラー: {}", e);
+                    }
                 }
             }
-        }
-        if ui.button("📂 読み込み").clicked() {
-            match app.load_from_file("cube_state.txt") {
-                Ok(_) => {
-                    app.input_error_message = "読み込みました: cube_state.txt".to_string();
-                }
-                Err(e) => {
-                    app.input_error_message = format!("読み込みエラー: {}", e);
+            if ui.button("📂 読み込み").clicked() {
+                match app.load_from_file("cube_state.txt") {
+                    Ok(_) => {
+                        app.input_error_message = "読み込みました: cube_state.txt".to_string();
+                    }
+                    Err(e) => {
+                        app.input_error_message = format!("読み込みエラー: {}", e);
+                    }
                 }
             }
-        }
-    });
+        });
 
-    ui.add_space(10.0);
+        ui.add_space(10.0);
 
-    // 回転ボタン
-    ui.label("回転操作:");
+        // 回転ボタン
+        ui.label("回転操作:");
 
-    ui.horizontal(|ui| {
-        if ui.button("R").clicked() {
-            app.queue_move(Move::R);
-        }
-        if ui.button("R'").clicked() {
-            app.queue_move(Move::Rp);
-        }
-        if ui.button("L").clicked() {
-            app.queue_move(Move::L);
-        }
-        if ui.button("L'").clicked() {
-            app.queue_move(Move::Lp);
-        }
-    });
+        ui.horizontal(|ui| {
+            if ui.button("R").clicked() {
+                app.queue_move(Move::R);
+            }
+            if ui.button("R'").clicked() {
+                app.queue_move(Move::Rp);
+            }
+            if ui.button("L").clicked() {
+                app.queue_move(Move::L);
+            }
+            if ui.button("L'").clicked() {
+                app.queue_move(Move::Lp);
+            }
+        });
 
-    ui.horizontal(|ui| {
-        if ui.button("U").clicked() {
-            app.queue_move(Move::U);
-        }
-        if ui.button("U'").clicked() {
-            app.queue_move(Move::Up);
-        }
-        if ui.button("D").clicked() {
-            app.queue_move(Move::D);
-        }
-        if ui.button("D'").clicked() {
-            app.queue_move(Move::Dp);
-        }
-    });
+        ui.horizontal(|ui| {
+            if ui.button("U").clicked() {
+                app.queue_move(Move::U);
+            }
+            if ui.button("U'").clicked() {
+                app.queue_move(Move::Up);
+            }
+            if ui.button("D").clicked() {
+                app.queue_move(Move::D);
+            }
+            if ui.button("D'").clicked() {
+                app.queue_move(Move::Dp);
+            }
+        });
 
-    ui.horizontal(|ui| {
-        if ui.button("F").clicked() {
-            app.queue_move(Move::F);
-        }
-        if ui.button("F'").clicked() {
-            app.queue_move(Move::Fp);
-        }
-        if ui.button("B").clicked() {
-            app.queue_move(Move::B);
-        }
-        if ui.button("B'").clicked() {
-            app.queue_move(Move::Bp);
-        }
-    });
+        ui.horizontal(|ui| {
+            if ui.button("F").clicked() {
+                app.queue_move(Move::F);
+            }
+            if ui.button("F'").clicked() {
+                app.queue_move(Move::Fp);
+            }
+            if ui.button("B").clicked() {
+                app.queue_move(Move::B);
+            }
+            if ui.button("B'").clicked() {
+                app.queue_move(Move::Bp);
+            }
+        });
 
-    ui.add_space(10.0);
+        ui.add_space(10.0);
 
-    // アニメーション制御
-    ui.label("アニメーション:");
-    ui.horizontal(|ui| {
-        ui.label("速度:");
-        ui.add(egui::Slider::new(&mut app.animation_speed, 0.0..=5.0).text("秒"));
+        // アニメーション制御
+        ui.label("アニメーション:");
+        ui.horizontal(|ui| {
+            ui.label("速度:");
+            ui.add(egui::Slider::new(&mut app.animation_speed, 0.0..=5.0).text("秒"));
+        });
     });
 
     ui.add_space(10.0);

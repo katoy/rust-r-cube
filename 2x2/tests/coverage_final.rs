@@ -16,8 +16,8 @@ fn test_apply_orientation_solution_error() {
     /* apply_orientation_solution is in mod.rs and public */
     let result = cube.apply_orientation_solution(&solution);
     assert!(result.is_err());
-    let msg = result.unwrap_err();
-    assert!(msg.contains("内部エラー"));
+    let msg_str = result.unwrap_err().to_string();
+    assert!(msg_str.contains("内部エラー"));
 }
 
 #[test]

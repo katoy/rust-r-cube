@@ -704,7 +704,7 @@ impl CubeApp {
 
         // 妥当性チェック
         if let Err(e) = Cube::validate_colors(&colors) {
-            self.input_error_message = e;
+            self.input_error_message = e.to_string();
             return;
         }
 
@@ -751,7 +751,7 @@ impl CubeApp {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
 
-        let new_cube = Cube::from_file_format(&content)?;
+        let new_cube = Cube::from_file_format(&content).map_err(|e| e.to_string())?;
 
         let mut warning = String::new();
 

@@ -98,7 +98,7 @@ impl Cube {
     }
 
     /// 24個の色配列から新しいキューブを作成します。
-    pub fn from_colors(colors: &[Color; 24]) -> Result<Self, String> {
+    pub fn from_colors(colors: &[Color; 24]) -> crate::error::Result<Self> {
         let mut stickers = [Sticker::new(Color::White); 24];
         for (i, &color) in colors.iter().enumerate() {
             stickers[i] = Sticker {
@@ -116,12 +116,12 @@ impl Cube {
     }
 
     /// 色配列の妥当性をチェックします。
-    pub fn validate_colors(colors: &[Color; 24]) -> Result<(), String> {
+    pub fn validate_colors(colors: &[Color; 24]) -> crate::error::Result<()> {
         validation::validate_colors(colors)
     }
 
     /// キューブの状態が有効かどうかを判定
-    pub fn is_valid_state(&self) -> Result<(), String> {
+    pub fn is_valid_state(&self) -> crate::error::Result<()> {
         validation::is_valid_state(self)
     }
 
@@ -131,7 +131,7 @@ impl Cube {
     }
 
     /// ファイル形式の文字列からキューブを作成
-    pub fn from_file_format(s: &str) -> Result<Self, String> {
+    pub fn from_file_format(s: &str) -> crate::error::Result<Self> {
         io::from_file_format(s)
     }
 
@@ -149,7 +149,7 @@ impl Cube {
     pub fn apply_orientation_solution(
         &mut self,
         solution: &crate::solver::Solution,
-    ) -> Result<(), String> {
+    ) -> crate::error::Result<()> {
         // Solved状態から逆操作を適用して、現在の色配置を再現
         let mut reference_cube = Cube::new();
         // 解の手順: Current -> Solved
@@ -163,10 +163,10 @@ impl Cube {
             let ref_sticker = reference_cube.stickers[i];
             if sticker.color != ref_sticker.color {
                 // これが起きるのはソルバーにバグがあるか、スレッド競合等の異常事態
-                return Err(format!(
-                    "内部エラー: ソルバーによる復元で色が不一致です。Index: {}",
+                return Err(crate::error::CubeError::Internal(format!(
+                    "ソルバーによる復元で色が不一致です。Index: {}",
                     i
-                ));
+                )));
             }
             sticker.orientation = ref_sticker.orientation;
         }

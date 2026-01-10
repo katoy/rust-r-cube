@@ -1,5 +1,5 @@
 use super::{Color, Cube};
-// from_colorsはmod.rsにあるのでCube::from_colorsで呼べる
+use crate::error::{CubeError, Result};
 
 /// キューブの状態をファイル形式の文字列に変換
 pub fn to_file_format(cube: &Cube) -> String {
@@ -46,15 +46,18 @@ pub fn to_file_format(cube: &Cube) -> String {
 }
 
 /// ファイル形式の文字列からキューブを作成
-pub fn from_file_format(s: &str) -> Result<Cube, String> {
+pub fn from_file_format(s: &str) -> Result<Cube> {
     let lines: Vec<&str> = s.lines().collect();
 
     if lines.len() != 3 {
-        return Err(format!("3行必要ですが{}行しかありません", lines.len()));
+        return Err(CubeError::InvalidFormat(format!(
+            "3行必要ですが{}行しかありません",
+            lines.len()
+        )));
     }
 
     // 色を解析
-    let parse_colors = |s: &str| -> Result<Vec<Color>, String> {
+    let parse_colors = |s: &str| -> Result<Vec<Color>> {
         s.chars()
             .filter(|c| !c.is_whitespace())
             .map(|c| match c.to_ascii_uppercase() {
@@ -64,7 +67,7 @@ pub fn from_file_format(s: &str) -> Result<Cube, String> {
                 'B' => Ok(Color::Blue),
                 'R' => Ok(Color::Red),
                 'O' => Ok(Color::Orange),
-                _ => Err(format!("無効な色文字: {}", c)),
+                _ => Err(CubeError::InvalidColorChar(c)),
             })
             .collect()
     };
@@ -76,22 +79,22 @@ pub fn from_file_format(s: &str) -> Result<Cube, String> {
 
     // 検証
     if line1_colors.len() != 4 {
-        return Err(format!(
+        return Err(CubeError::InvalidFormat(format!(
             "1行目: 4文字必要ですが{}文字です",
             line1_colors.len()
-        ));
+        )));
     }
     if line2_colors.len() != 16 {
-        return Err(format!(
+        return Err(CubeError::InvalidFormat(format!(
             "2行目: 16文字必要ですが{}文字です",
             line2_colors.len()
-        ));
+        )));
     }
     if line3_colors.len() != 4 {
-        return Err(format!(
+        return Err(CubeError::InvalidFormat(format!(
             "3行目: 4文字必要ですが{}文字です",
             line3_colors.len()
-        ));
+        )));
     }
 
     // 24色の配列を作成（内部順序: Up, Down, Left, Right, Front, Back）
@@ -117,7 +120,7 @@ pub fn from_file_format(s: &str) -> Result<Cube, String> {
 
     let colors_array: [Color; 24] = colors
         .try_into()
-        .map_err(|_| "色の数が24個ではありません".to_string())?;
+        .map_err(|_| CubeError::Internal("色の数が24個ではありません".to_string()))?;
 
     // 妥当性チェック
     use super::validation;

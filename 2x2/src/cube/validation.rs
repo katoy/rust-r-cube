@@ -1,10 +1,11 @@
 use super::{Color, Cube};
+use crate::error::{CubeError, Result};
 use std::collections::HashMap;
 
 /// 色配列の妥当性をチェックします。
 ///
 /// 各色が正確に4つずつ存在するかを確認します。
-pub fn validate_colors(colors: &[Color; 24]) -> Result<(), String> {
+pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
     let mut counts = HashMap::new();
     for &color in colors {
         *counts.entry(color).or_insert(0) += 1;
@@ -24,12 +25,12 @@ pub fn validate_colors(colors: &[Color; 24]) -> Result<(), String> {
         match counts.get(color) {
             Some(&4) => {}
             Some(&count) => {
-                return Err(format!(
+                return Err(CubeError::InvalidColors(format!(
                     "{color:?}の数が{count}個です（4個である必要があります）"
-                ));
+                )));
             }
             None => {
-                return Err(format!("{:?}が見つかりません", color));
+                return Err(CubeError::ColorNotFound(format!("{:?}", color)));
             }
         }
     }
@@ -43,7 +44,7 @@ pub fn validate_colors(colors: &[Color; 24]) -> Result<(), String> {
 /// - 各色が4つずつあるか
 /// - コーナーの位置パリティが正しいか（偶置換）
 /// - コーナーの向きパリティが正しいか（向きの合計が3の倍数）
-pub fn is_valid_state(cube: &Cube) -> Result<(), String> {
+pub fn is_valid_state(cube: &Cube) -> Result<()> {
     // まず色数のチェック
     let mut colors_array = [Color::White; 24];
     for (i, color) in colors_array.iter_mut().enumerate() {
@@ -61,7 +62,7 @@ pub fn is_valid_state(cube: &Cube) -> Result<(), String> {
 ///
 /// TODO: 現在のロジックにバグがあるため、一時的に無効化しています
 /// 正しいパリティチェックを後で実装する必要があります
-pub fn check_corner_parity(_cube: &Cube) -> Result<(), String> {
+pub fn check_corner_parity(_cube: &Cube) -> Result<()> {
     // 一時的に無効化：常に有効とみなす
     Ok(())
 

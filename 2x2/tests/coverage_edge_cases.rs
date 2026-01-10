@@ -78,7 +78,8 @@ fn test_validate_colors_all_wrong() {
     assert!(result.is_err());
     // エラーメッセージに"が見つかりません"が含まれることを確認
     if let Err(msg) = result {
-        assert!(msg.contains("が見つかりません") || msg.contains("個必要ですが"));
+        let msg_str = msg.to_string();
+        assert!(msg_str.contains("が見つかりません") || msg_str.contains("個必要ですが"));
     }
 }
 

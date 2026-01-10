@@ -973,38 +973,45 @@ impl Cube {
         t0.rotate_ccw();
         let mut t1 = temp1;
         t1.rotate_ccw();
-        self.stickers[11] = t1; // Correct index: U[3] moves to L-BL=11
-        self.stickers[9] = t0; // Correct index: U[2] moves to L-TL=9
+        self.stickers[9] = t1; // U[3] moves to L-TL=9
+        self.stickers[11] = t0; // U[2] moves to L-BL=11
     }
 
     /// B面を時計回りに回転
     fn rotate_b(&mut self) {
         self.rotate_face_cw(20, 1); // Back face (orient +1)
 
-        let mut temp0 = self.stickers[0];
-        let mut temp1 = self.stickers[1];
+        let temp0 = self.stickers[0];
+        let temp1 = self.stickers[1];
 
-        // U -> L -> D -> R -> U (CW from back)
-        // B CW: idx 13->0 (R->U) orient 3. idx 0->10 (U->L) orient 1. idx 10->7 (L->D) orient 3. idx 7->13 (D->R) orient 1.
+        // U -> R -> D -> L -> U (CW from back)
+        // rotate_bpの逆操作
+        // Bp: U<-L(3), L<-D(1), D<-R(3), R<-U(1)
+        // B:  U<-R(1), R<-D(3), D<-L(1), L<-U(3)
+
+        // U <- R (+1)
         self.stickers[0] = self.stickers[13];
-        self.stickers[0].rotate_ccw(); // U <- R (+3)
+        self.stickers[0].rotate_cw();
         self.stickers[1] = self.stickers[15];
-        self.stickers[1].rotate_ccw(); // U <- R (+3)
+        self.stickers[1].rotate_cw();
 
+        // R <- D (+3)
         self.stickers[13] = self.stickers[7];
-        self.stickers[13].rotate_cw(); // R <- D (+1)
+        self.stickers[13].rotate_ccw();
         self.stickers[15] = self.stickers[6];
-        self.stickers[15].rotate_cw(); // R <- D (+1)
+        self.stickers[15].rotate_ccw();
 
+        // D <- L (+1)
         self.stickers[7] = self.stickers[10];
-        self.stickers[7].rotate_ccw(); // D <- L (+3)
+        self.stickers[7].rotate_cw();
         self.stickers[6] = self.stickers[8];
-        self.stickers[6].rotate_ccw(); // D <- L (+3)
+        self.stickers[6].rotate_cw();
 
-        temp0.rotate_cw(); // L <- U (+1)
-        temp1.rotate_cw(); // L <- U (+1)
+        // L <- U (+3)
         self.stickers[10] = temp0;
+        self.stickers[10].rotate_ccw();
         self.stickers[8] = temp1;
+        self.stickers[8].rotate_ccw();
     }
 
     /// B面を反時計回りに回転

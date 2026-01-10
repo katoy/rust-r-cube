@@ -34,3 +34,25 @@ fn test_coverage_gap_solver_backward_visited_collision() {
     let sol = solver::solve(&cube, 11, false);
     assert!(sol.found);
 }
+
+#[test]
+fn test_coverage_gap_solver_not_found_with_progress() {
+    use rubiks_cube_2x2::cube::{Cube, Move};
+    use rubiks_cube_2x2::solver;
+    use std::sync::mpsc;
+
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    cube.apply_move(Move::U);
+
+    // 深度1では解けないプログレス付き探索
+    // これにより solve_internal の最後の failure path (progress_tx.send(1.0)) が実行される
+    let (tx, rx) = mpsc::channel();
+    let solution = solver::solve_with_progress(&cube, 1, false, Some(tx));
+
+    assert!(!solution.found);
+
+    // 完了通知(1.0)が送られているはず
+    let progress: Vec<f32> = rx.into_iter().collect();
+    assert!(progress.contains(&1.0));
+}

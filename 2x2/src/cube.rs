@@ -988,29 +988,29 @@ impl Cube {
         // Bp: U<-L(3), L<-D(1), D<-R(3), R<-U(1)
         // B:  U<-R(1), R<-D(3), D<-L(1), L<-U(3)
 
-        // U <- R (+1)
+        // U <- R (+3)
         self.stickers[0] = self.stickers[13];
-        self.stickers[0].rotate_cw();
+        self.stickers[0].rotate_ccw();
         self.stickers[1] = self.stickers[15];
-        self.stickers[1].rotate_cw();
+        self.stickers[1].rotate_ccw();
 
-        // R <- D (+3)
+        // R <- D (+1)
         self.stickers[13] = self.stickers[7];
-        self.stickers[13].rotate_ccw();
+        self.stickers[13].rotate_cw();
         self.stickers[15] = self.stickers[6];
-        self.stickers[15].rotate_ccw();
+        self.stickers[15].rotate_cw();
 
-        // D <- L (+1)
+        // D <- L (+3)
         self.stickers[7] = self.stickers[10];
-        self.stickers[7].rotate_cw();
+        self.stickers[7].rotate_ccw();
         self.stickers[6] = self.stickers[8];
-        self.stickers[6].rotate_cw();
+        self.stickers[6].rotate_ccw();
 
-        // L <- U (+3)
+        // L <- U (+1)
         self.stickers[10] = temp0;
-        self.stickers[10].rotate_ccw();
+        self.stickers[10].rotate_cw();
         self.stickers[8] = temp1;
-        self.stickers[8].rotate_ccw();
+        self.stickers[8].rotate_cw();
     }
 
     /// B面を反時計回りに回転

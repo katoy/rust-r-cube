@@ -2,6 +2,12 @@
 name = "rubiks-cube-2x2"
 version = "0.1.0"
 edition = "2021"
+authors = ["katoy <youichikato@gmail.com>"]
+description = "高速双方向BFSソルバー搭載の2x2ルービックキューブGUIアプリ"
+repository = "https://github.com/katoy/rust-r-cube"
+license = "MIT"
+keywords = ["rubiks-cube", "solver", "gui", "game"]
+categories = ["games", "visualization"]
 
 [dependencies]
 egui = "0.29"

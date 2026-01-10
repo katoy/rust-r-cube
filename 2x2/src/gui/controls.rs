@@ -176,8 +176,12 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
             }
             if ui.button("📂 読み込み").clicked() {
                 match app.load_from_file("cube_state.txt") {
-                    Ok(_) => {
-                        app.input_error_message = "読み込みました: cube_state.txt".to_string();
+                    Ok(warning) => {
+                        if warning.is_empty() {
+                            app.input_error_message = "読み込みました: cube_state.txt".to_string();
+                        } else {
+                            app.input_error_message = format!("読み込み完了: {}", warning);
+                        }
                     }
                     Err(e) => {
                         app.input_error_message = format!("読み込みエラー: {}", e);

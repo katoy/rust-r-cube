@@ -129,6 +129,16 @@ pub struct CubeApp {
 
     // デバッグオプション
     pub skip_parity_check: bool,
+
+    // ソルバータスクの種類
+    pub solver_task: SolverTask,
+}
+
+/// ソルバーのタスク種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SolverTask {
+    Normal,             // 通常の解法探索
+    RestoreOrientation, // 向きの自動復元
 }
 
 impl Default for CubeApp {
@@ -149,7 +159,7 @@ impl Default for CubeApp {
             solution_step: 0,
             solution_cube_state: None,
             pending_solution_update: None,
-            ignore_orientation: true,
+            ignore_orientation: false,
             solving_start_time: None,
             last_solve_duration: None,
             input_state: InputState::Normal,
@@ -157,6 +167,7 @@ impl Default for CubeApp {
             selected_input_color: Color::White,
             input_error_message: String::new(),
             skip_parity_check: false,
+            solver_task: SolverTask::Normal,
         }
     }
 }
@@ -224,14 +235,30 @@ impl CubeApp {
         self.move_queue.clear();
     }
 
-    /// ソルバー実行
+    /// ソルバー実行（通常）
     pub fn solve(&mut self) {
+        self.start_solver_internal(SolverTask::Normal, self.ignore_orientation);
+    }
+
+    /// 向きの自動復元を開始（非同期）
+    pub fn start_restore_orientation(&mut self) {
+        self.start_solver_internal(SolverTask::RestoreOrientation, true);
+    }
+
+    /// ソルバー実行の内部処理
+    fn start_solver_internal(&mut self, task: SolverTask, ignore_orientation: bool) {
         if self.solving {
             return;
         }
         self.solving = true;
+        self.solver_task = task;
         self.solver_progress = 0.0;
-        self.solution_text = "探索中...".to_string();
+
+        match task {
+            SolverTask::Normal => self.solution_text = "探索中...".to_string(),
+            SolverTask::RestoreOrientation => self.solution_text = "向きを修復中...".to_string(),
+        }
+
         self.solving_start_time = Some(Instant::now()); // 開始時刻を記録
 
         // 解法開始時の状態を保存
@@ -243,13 +270,15 @@ impl CubeApp {
         let (progress_tx, progress_rx) = channel();
         self.solver_receiver = Some(rx);
         self.progress_receiver = Some(progress_rx);
-        let ignore_orientation = self.ignore_orientation;
 
         thread::spawn(move || {
             // 向き無視でも実物のキューブでは12手以上必要な場合があるため14に設定
             // 向きも揃える: より深い探索が必要なため14に設定
             let max_depth = 14;
-            println!("ソルバー開始: 深度{}まで探索", max_depth);
+            println!(
+                "ソルバー開始: 深度{}まで探索 (タスク: {:?})",
+                max_depth, task
+            );
             let solution = solver::solve_with_progress(
                 &cube_clone,
                 max_depth,
@@ -313,19 +342,41 @@ impl CubeApp {
                 }
 
                 if solution.found {
-                    self.solution = Some(solution.moves.clone());
-                    let duration_text = if let Some(d) = self.last_solve_duration {
-                        format!(" ({:.2}秒)", d)
-                    } else {
-                        String::new()
-                    };
-                    self.solution_text =
-                        format!("解法: {} 手{}", solution.moves.len(), duration_text);
-                    self.solution_step = 0;
-                    // 自動実行はしない（ステップ操作で手動実行）
+                    match self.solver_task {
+                        SolverTask::Normal => {
+                            self.solution = Some(solution.moves.clone());
+                            let duration_text = if let Some(d) = self.last_solve_duration {
+                                format!(" ({:.2}秒)", d)
+                            } else {
+                                String::new()
+                            };
+                            self.solution_text =
+                                format!("解法: {} 手{}", solution.moves.len(), duration_text);
+                            self.solution_step = 0;
+                            // 自動実行はしない（ステップ操作で手動実行）
+                        }
+                        SolverTask::RestoreOrientation => {
+                            // 復元処理
+                            if let Err(e) = self.cube.apply_orientation_solution(&solution) {
+                                self.solution_text = format!("復元失敗: {}", e);
+                            } else {
+                                self.solution_text = "向きを復元しました".to_string();
+                            }
+                            // 完了後、少し待ってからメッセージを消すなどの処理があればいいが、
+                            // とりあえず solution_text に残す。
+                            // モードはNormalに戻さないと操作できないので solving = falseでOK。
+                        }
+                    }
                 } else {
                     self.solution = None;
-                    self.solution_text = "解が見つかりませんでした".to_string();
+                    match self.solver_task {
+                        SolverTask::Normal => {
+                            self.solution_text = "解が見つかりませんでした".to_string()
+                        }
+                        SolverTask::RestoreOrientation => {
+                            self.solution_text = "向きを復元できませんでした".to_string()
+                        }
+                    }
                 }
             }
         }
@@ -679,6 +730,9 @@ impl CubeApp {
         self.input_buffer = [None; 24];
         self.input_error_message.clear();
 
+        // 向きの自動復元を開始（非同期）
+        self.start_restore_orientation();
+
         // 解法やアニメーションをクリア
         self.solution = None;
         self.solution_text.clear();
@@ -693,15 +747,19 @@ impl CubeApp {
     }
 
     /// ファイルからキューブの状態を読み込み
-    pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
+    pub fn load_from_file(&mut self, path: &str) -> Result<String, String> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
 
         let new_cube = Cube::from_file_format(&content)?;
 
+        let mut warning = String::new();
+
         // パリティチェック（skip_parity_checkフラグで制御）
         if !self.skip_parity_check {
-            new_cube.is_valid_state()?;
+            if let Err(e) = new_cube.is_valid_state() {
+                warning = format!("警告: 無効なキューブ状態です ({})", e);
+            }
         }
 
         self.cube = new_cube;
@@ -713,9 +771,12 @@ impl CubeApp {
         // スキャンモードを終了
         self.input_state = InputState::Normal;
         self.input_buffer = [None; 24];
-        self.input_error_message.clear();
+        self.input_error_message.clear(); // コントロール側で上書きされるが念のため
 
-        Ok(())
+        // 向きの自動復元を開始（非同期）
+        self.start_restore_orientation();
+
+        Ok(warning)
     }
 
     /// キーボード入力を処理

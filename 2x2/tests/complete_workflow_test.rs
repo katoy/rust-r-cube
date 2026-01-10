@@ -5,7 +5,7 @@ use rubiks_cube_2x2::solver::solve_with_progress;
 fn test_specific_cube_file_operations() {
     // ユーザー指定のキューブ状態（物理的に無効な可能性がある）
     let input_content = r#"     WWWW
-OOOO GGGR RRBG BBRB
+GGGG RRRR BBBB OOOO
      YYYY
 "#;
 

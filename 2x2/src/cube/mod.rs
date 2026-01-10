@@ -145,6 +145,35 @@ impl Cube {
         rotation::scramble(self, moves);
     }
 
+    /// ソリューション（向き無視で解いたもの）を使って、現在のキューブの正しい向きを復元します。
+    pub fn apply_orientation_solution(
+        &mut self,
+        solution: &crate::solver::Solution,
+    ) -> Result<(), String> {
+        // Solved状態から逆操作を適用して、現在の色配置を再現
+        let mut reference_cube = Cube::new();
+        // 解の手順: Current -> Solved
+        // 逆手順: Solved -> Current
+        for mv in solution.moves.iter().rev() {
+            reference_cube.apply_move(mv.inverse());
+        }
+
+        // Orientationのみコピー
+        for (i, sticker) in self.stickers.iter_mut().enumerate() {
+            let ref_sticker = reference_cube.stickers[i];
+            if sticker.color != ref_sticker.color {
+                // これが起きるのはソルバーにバグがあるか、スレッド競合等の異常事態
+                return Err(format!(
+                    "内部エラー: ソルバーによる復元で色が不一致です。Index: {}",
+                    i
+                ));
+            }
+            sticker.orientation = ref_sticker.orientation;
+        }
+
+        Ok(())
+    }
+
     /// 色情報のみ比較するために、向き情報をリセットしたキューブを返します。
     pub fn normalized(&self) -> Self {
         let mut new_cube = self.clone();

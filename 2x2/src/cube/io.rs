@@ -125,19 +125,3 @@ pub fn from_file_format(s: &str) -> Result<Cube, String> {
 
     Cube::from_colors(&colors_array)
 }
-
-/// 配列スライスへのコピーヘルパー（標準ライブラリにあるが明示的に使用）
-trait CopySlice<T> {
-    fn copy_from_slice(&mut self, src: &[T])
-    where
-        T: Copy;
-}
-
-impl<T> CopySlice<T> for [T] {
-    fn copy_from_slice(&mut self, src: &[T])
-    where
-        T: Copy,
-    {
-        self.copy_from_slice(src)
-    }
-}

@@ -1,4 +1,3 @@
-use rubiks_cube_2x2::cube::Cube;
 use rubiks_cube_2x2::solver;
 
 fn main() {

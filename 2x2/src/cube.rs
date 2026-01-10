@@ -293,9 +293,9 @@ impl Cube {
         let clockwise_pattern = [1, 2, 0, 3];
 
         for face_start in (0..24).step_by(4) {
-            for offset in 0..4 {
+            for (offset, &pattern) in clockwise_pattern.iter().enumerate() {
                 let idx = face_start + offset;
-                new_cube.stickers[idx].orientation = clockwise_pattern[offset];
+                new_cube.stickers[idx].orientation = pattern;
             }
         }
 

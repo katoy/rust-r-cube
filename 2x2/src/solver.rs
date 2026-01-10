@@ -24,7 +24,7 @@ pub struct Solution {
 static SOLVED_STATES: OnceLock<Vec<Cube>> = OnceLock::new();
 
 /// 全24通りの向きの完成状態を取得（キャッシュ）
-fn get_solved_states() -> &'static [Cube] {
+pub fn get_solved_states() -> &'static [Cube] {
     SOLVED_STATES.get_or_init(generate_all_solved_states)
 }
 
@@ -60,7 +60,11 @@ fn generate_all_solved_states() -> Vec<Cube> {
             }
         }
     }
+    // 全ての完成状態のorientationを時計回りパターンにリセット
     states
+        .iter()
+        .map(|cube| cube.with_clockwise_orientations())
+        .collect()
 }
 
 /// キューブが（向きも含めて）完全に解けているか判定します。

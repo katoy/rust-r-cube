@@ -274,6 +274,34 @@ impl Cube {
         self.stickers[index].orientation = 0;
     }
 
+    /// 色を保持したまま、全てのステッカーのorientationを時計回りパターンにリセットします。
+    ///
+    /// 時計回りパターン: 各面の4つのステッカー（左上、右上、左下、右下）に
+    /// orientation [1, 2, 0, 3] を設定します。
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::Cube;
+    ///
+    /// let cube = Cube::new();
+    /// let clockwise_cube = cube.with_clockwise_orientations();
+    /// ```
+    #[must_use]
+    pub fn with_clockwise_orientations(&self) -> Self {
+        let mut new_cube = self.clone();
+        let clockwise_pattern = [1, 2, 0, 3];
+
+        for face_start in (0..24).step_by(4) {
+            for offset in 0..4 {
+                let idx = face_start + offset;
+                new_cube.stickers[idx].orientation = clockwise_pattern[offset];
+            }
+        }
+
+        new_cube
+    }
+
     /// 24個の色配列から新しいキューブを作成します。
     ///
     /// # 引数

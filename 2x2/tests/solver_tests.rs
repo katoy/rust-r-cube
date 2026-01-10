@@ -320,7 +320,7 @@ fn test_progress_channel_multiple_sends() {
     cube.scramble(5);
 
     let (tx, rx) = mpsc::channel();
-    let solution = solver::solve_with_progress(&cube, 11, true, Some(tx));
+    let _solution = solver::solve_with_progress(&cube, 11, true, Some(tx));
 
     // 進捗メッセージを収集
     let progress_messages: Vec<f32> = rx.into_iter().collect();
@@ -333,7 +333,7 @@ fn test_progress_channel_multiple_sends() {
         assert!((0.0..=1.0).contains(&p), "進捗値が範囲外: {}", p);
     }
 
-    assert!(solution.found || !solution.found); // テストが完了することを確認
+    // テストが完了することを確認（タイムアウトしないことを確認）
 }
 
 #[test]

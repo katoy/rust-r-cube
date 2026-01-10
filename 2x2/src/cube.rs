@@ -326,17 +326,23 @@ impl Cube {
     /// let cube = Cube::from_colors(&colors);
     /// ```
     #[must_use]
-    pub fn from_colors(colors: &[Color; 24]) -> Self {
-        let stickers: [Sticker; 24] = colors
-            .iter()
-            .map(|&color| Sticker::new(color))
-            .collect::<Vec<_>>()
-            .try_into()
-            .expect("配列は24要素である必要があります");
+    pub fn from_colors(colors: &[Color; 24]) -> Result<Self, String> {
+        // Changed return type to String for consistency with validate_colors
+        let mut stickers = [Sticker::new(Color::White); 24];
+        for (i, &color) in colors.iter().enumerate() {
+            stickers[i] = Sticker {
+                color,
+                orientation: 0, // 一時的に0で初期化
+            };
+        }
 
-        Self { stickers }
+        let cube = Cube { stickers };
+        // Call the static validate_colors method
+        Self::validate_colors(colors)?;
+
+        // 時計回りパターンに設定
+        Ok(cube.with_clockwise_orientations())
     }
-
     /// 色配列の妥当性をチェックします。
     ///
     /// 各色が正確に4つずつ存在するかを確認します。
@@ -563,7 +569,7 @@ impl Cube {
         // 妥当性チェック
         Self::validate_colors(&colors_array)?;
 
-        Ok(Self::from_colors(&colors_array))
+        Ok(Self::from_colors(&colors_array)?)
     }
 
     /// コーナーのパリティをチェック

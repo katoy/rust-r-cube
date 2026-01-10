@@ -360,7 +360,7 @@ impl CubeApp {
                     }
                 }
 
-                Cube::from_colors(&colors)
+                Cube::from_colors(&colors).unwrap_or_else(|_| Cube::new())
             }
             InputState::Normal => {
                 // 通常モード: 実際のキューブを返す
@@ -653,7 +653,13 @@ impl CubeApp {
         }
 
         // キューブに反映
-        let new_cube = Cube::from_colors(&colors);
+        let new_cube = match Cube::from_colors(&colors) {
+            Ok(cube) => cube,
+            Err(e) => {
+                self.input_error_message = format!("キューブの作成に失敗: {}", e);
+                return;
+            }
+        };
 
         // パリティチェック（物理的に可能な配置かチェック）
         if !self.skip_parity_check {

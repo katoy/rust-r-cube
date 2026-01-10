@@ -335,7 +335,7 @@ pub fn draw_cube(
 
     // 全ステッカーを描画
     for i in 0..24 {
-        let sticker = cube.get_sticker(i);
+        let mut sticker = cube.get_sticker(i);
         let grid_pos = get_grid_coords(i);
         let mut rotation = 0.0;
         let mut screen_pos = to_screen(grid_pos);
@@ -343,6 +343,78 @@ pub fn draw_cube(
         let mut drawn = false;
 
         if let Some(anim) = animation {
+            // アニメーション中の操作に応じてorientationを調整
+
+            // 1. 回転する面のステッカー: 最終的なorientationを設定
+            if let Some((face_start, _angle)) = anim_face_rot {
+                if i >= face_start && i < face_start + 4 {
+                    let orientation_delta = match anim.current_move {
+                        Move::R | Move::L | Move::F | Move::B => 1, // 時計回り: +1
+                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // 反時計回り: +3
+                        Move::U | Move::D => 1,                     // Up/Down: +1
+                        Move::Up | Move::Dp => 3,                   // Up'/Down': +3
+                    };
+                    sticker.orientation = (sticker.orientation + orientation_delta) % 4;
+                }
+            }
+
+            // 2. 移動するステッカーのorientation調整
+            if let Some((_, _target_idx)) = anim_mapping.iter().find(|(src, _)| *src == i) {
+                let orientation_delta = match anim.current_move {
+                    Move::R | Move::Rp => {
+                        // U面の右列 (1, 3) → Back面へ: +2
+                        // B面の右列 (22, 20) → Down面へ: +2
+                        if i == 1 || i == 3 || i == 22 || i == 20 {
+                            2
+                        } else {
+                            0
+                        }
+                    }
+                    Move::L | Move::Lp => {
+                        // U面の左列 (0, 2) → Front面へ: +2
+                        // F面の左列 (16, 18) → Down面へ: 変更なし
+                        // D面の左列 (4, 6) → Back面へ: 変更なし
+                        // B面の左列 (21, 23) → Up面へ: +2
+                        if i == 0 || i == 2 || i == 21 || i == 23 {
+                            2
+                        } else {
+                            0
+                        }
+                    }
+                    Move::F | Move::Fp => {
+                        // U面の下列 (2, 3) → Left面へ: +3
+                        // L面の右列 (9, 11) → Down面へ: +1
+                        // D面の上列 (4, 5) → Right面へ: +3
+                        // R面の左列 (12, 14) → Up面へ: +1
+                        match i {
+                            2 | 3 => 3,
+                            9 | 11 => 1,
+                            4 | 5 => 3,
+                            12 | 14 => 1,
+                            _ => 0,
+                        }
+                    }
+                    Move::B | Move::Bp => {
+                        // U面の上列 (0, 1) → Right面へ: +1
+                        // R面の右列 (13, 15) → Down面へ: +3
+                        // D面の下列 (6, 7) → Left面へ: +1
+                        // L面の左列 (8, 10) → Up面へ: +3
+                        match i {
+                            0 | 1 => 1,
+                            13 | 15 => 3,
+                            6 | 7 => 1,
+                            8 | 10 => 3,
+                            _ => 0,
+                        }
+                    }
+                    _ => 0,
+                };
+
+                if orientation_delta > 0 {
+                    sticker.orientation = (sticker.orientation + orientation_delta) % 4;
+                }
+            }
+
             // 面回転の処理
             if let Some((face_start, angle)) = anim_face_rot {
                 if i >= face_start && i < face_start + 4 {
@@ -355,7 +427,19 @@ pub fn draw_cube(
 
                     let current_angle = angle * anim.eased_progress();
                     screen_pos = rotate_point(screen_pos, center_screen, current_angle);
-                    rotation = current_angle;
+
+                    // rotationを計算
+                    // orientation変化分の相殺は一時的に無効化
+                    // orientationの変化分を差し引いて、矢印が物理的な回転と一致するようにする
+                    let orientation_delta = match anim.current_move {
+                        Move::R | Move::L | Move::F | Move::B => 1, // +1 = +90度
+                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // +3 = +270度 = -90度
+                        Move::U | Move::D => 1,
+                        Move::Up | Move::Dp => 3,
+                    };
+                    // orientation変化分を相殺：+1なら-90度、+3なら-270度
+                    let orientation_change_deg = -(orientation_delta as f32 * 90.0);
+                    rotation = current_angle + orientation_change_deg;
                 }
             }
 

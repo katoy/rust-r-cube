@@ -119,7 +119,7 @@ fn get_initial_stickers() -> Vec<Sticker3D> {
             index: 8 + i,
             center: Vec3::new(-1.0, y, z),
             normal: -Vec3::X,
-            u_vec: -Vec3::Z * size,
+            u_vec: Vec3::Z * size, // 修正: -Vec3::Z から Vec3::Z
             v_vec: -Vec3::Y * size,
         });
     }
@@ -134,7 +134,7 @@ fn get_initial_stickers() -> Vec<Sticker3D> {
             index: 12 + i,
             center: Vec3::new(1.0, y, z),
             normal: Vec3::X,
-            u_vec: Vec3::Z * size,
+            u_vec: -Vec3::Z * size, // 修正: Vec3::Z から -Vec3::Z
             v_vec: -Vec3::Y * size,
         });
     }

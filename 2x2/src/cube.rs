@@ -30,6 +30,7 @@ pub struct Sticker {
 }
 
 impl Sticker {
+    #[must_use]
     pub fn new(color: Color) -> Self {
         Self {
             color,
@@ -67,6 +68,7 @@ pub enum Move {
 
 impl Move {
     /// すべての回転操作を取得
+    #[must_use]
     pub fn all_moves() -> Vec<Move> {
         vec![
             Move::R,
@@ -85,6 +87,7 @@ impl Move {
     }
 
     /// 逆操作を取得
+    #[must_use]
     pub fn inverse(self) -> Move {
         match self {
             Move::R => Move::Rp,
@@ -119,7 +122,7 @@ impl std::fmt::Display for Move {
             Move::B => "B",
             Move::Bp => "B'",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -152,6 +155,7 @@ impl Cube {
     /// let cube = Cube::new();
     /// assert!(cube.is_solved());
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         let mut stickers = [Sticker::new(Color::White); 24];
 
@@ -207,6 +211,7 @@ impl Cube {
     /// cube.apply_move(Move::Rp);
     /// assert!(cube.is_solved());
     /// ```
+    #[must_use]
     pub fn is_solved(&self) -> bool {
         for face_start in (0..24).step_by(4) {
             let color = self.stickers[face_start].color;
@@ -234,6 +239,7 @@ impl Cube {
     /// # 戻り値
     ///
     /// 指定されたインデックスのステッカー（色と向き情報を含む）
+    #[must_use]
     pub fn get_sticker(&self, index: usize) -> Sticker {
         self.stickers[index]
     }
@@ -258,11 +264,16 @@ impl Cube {
     ///
     /// # 引数
     ///
-    /// - `colors`: 24個の色の配列（インデックスはget_stickerと同じ）
+    /// - `colors`: 24個の色の配列（インデックスは `get_sticker` と同じ）
     ///
     /// # 戻り値
     ///
     /// 指定された色配列で初期化されたキューブ（すべての向きは0）
+    ///
+    /// # Panics
+    ///
+    /// 配列の要素数が24でない場合にパニックします。
+    /// 通常の使用では発生しません。
     ///
     /// # 例
     ///
@@ -272,6 +283,7 @@ impl Cube {
     /// let colors = [Color::White; 24];
     /// let cube = Cube::from_colors(&colors);
     /// ```
+    #[must_use]
     pub fn from_colors(colors: &[Color; 24]) -> Self {
         let stickers: [Sticker; 24] = colors
             .iter()
@@ -295,11 +307,17 @@ impl Cube {
     ///
     /// - `Ok(())`: 妥当な色配列
     /// - `Err(String)`: エラーメッセージ
+    ///
+    /// # Errors
+    ///
+    /// 次の場合にエラーを返します：
+    /// - いずれかの色が4個でない場合
+    /// - 必要な色が見つからない場合
     pub fn validate_colors(colors: &[Color; 24]) -> Result<(), String> {
         use std::collections::HashMap;
 
         let mut counts = HashMap::new();
-        for &color in colors.iter() {
+        for &color in colors {
             *counts.entry(color).or_insert(0) += 1;
         }
 
@@ -313,13 +331,12 @@ impl Cube {
             Color::Orange,
         ];
 
-        for color in expected_colors.iter() {
+        for color in &expected_colors {
             match counts.get(color) {
                 Some(&4) => {}
                 Some(&count) => {
                     return Err(format!(
-                        "{:?}の数が{}個です（4個である必要があります）",
-                        color, count
+                        "{color:?}の数が{count}個です（4個である必要があります）"
                     ));
                 }
                 None => {

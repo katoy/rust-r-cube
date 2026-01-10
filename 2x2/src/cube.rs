@@ -159,29 +159,43 @@ impl Cube {
     pub fn new() -> Self {
         let mut stickers = [Sticker::new(Color::White); 24];
 
+        // 時計回りのorientation パターン
+        // 各面の4つのステッカー（左上、右上、左下、右下）の矢印を時計回りに配置
+        // 位置0（左上）: orientation = 1 （右向き）
+        // 位置1（右上）: orientation = 2 （下向き）
+        // 位置2（左下）: orientation = 0 （上向き）
+        // 位置3（右下）: orientation = 3 （左向き）
+        let clockwise_pattern = [1, 2, 0, 3];
+
         // Up face (White)
-        for sticker in stickers.iter_mut().take(4) {
+        for (i, sticker) in stickers.iter_mut().take(4).enumerate() {
             *sticker = Sticker::new(Color::White);
+            sticker.orientation = clockwise_pattern[i];
         }
         // Down face (Yellow)
-        for sticker in stickers.iter_mut().take(8).skip(4) {
+        for (i, sticker) in stickers.iter_mut().take(8).skip(4).enumerate() {
             *sticker = Sticker::new(Color::Yellow);
+            sticker.orientation = clockwise_pattern[i];
         }
         // Left face (Green)
-        for sticker in stickers.iter_mut().take(12).skip(8) {
+        for (i, sticker) in stickers.iter_mut().take(12).skip(8).enumerate() {
             *sticker = Sticker::new(Color::Green);
+            sticker.orientation = clockwise_pattern[i];
         }
         // Right face (Blue)
-        for sticker in stickers.iter_mut().take(16).skip(12) {
+        for (i, sticker) in stickers.iter_mut().take(16).skip(12).enumerate() {
             *sticker = Sticker::new(Color::Blue);
+            sticker.orientation = clockwise_pattern[i];
         }
         // Front face (Red)
-        for sticker in stickers.iter_mut().take(20).skip(16) {
+        for (i, sticker) in stickers.iter_mut().take(20).skip(16).enumerate() {
             *sticker = Sticker::new(Color::Red);
+            sticker.orientation = clockwise_pattern[i];
         }
         // Back face (Orange)
-        for sticker in stickers.iter_mut().skip(20) {
+        for (i, sticker) in stickers.iter_mut().skip(20).enumerate() {
             *sticker = Sticker::new(Color::Orange);
+            sticker.orientation = clockwise_pattern[i];
         }
 
         Self { stickers }

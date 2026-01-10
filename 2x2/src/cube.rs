@@ -325,7 +325,6 @@ impl Cube {
     /// let colors = [Color::White; 24];
     /// let cube = Cube::from_colors(&colors);
     /// ```
-    #[must_use]
     pub fn from_colors(colors: &[Color; 24]) -> Result<Self, String> {
         // Changed return type to String for consistency with validate_colors
         let mut stickers = [Sticker::new(Color::White); 24];
@@ -569,7 +568,7 @@ impl Cube {
         // 妥当性チェック
         Self::validate_colors(&colors_array)?;
 
-        Ok(Self::from_colors(&colors_array)?)
+        Self::from_colors(&colors_array)
     }
 
     /// コーナーのパリティをチェック

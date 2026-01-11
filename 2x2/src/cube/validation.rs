@@ -1,14 +1,16 @@
 use super::{Color, Cube};
 use crate::error::{CubeError, Result};
-use std::collections::HashMap;
 
 /// 色配列の妥当性をチェックします。
 ///
 /// 各色が正確に4つずつ存在するかを確認します。
 pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
-    let mut counts = HashMap::new();
+    let mut counts = [0usize; 7]; // Color Enum の数に合わせて7 (Grayを含む)
     for &color in colors {
-        *counts.entry(color).or_insert(0) += 1;
+        let idx = color as usize;
+        if idx < 7 {
+            counts[idx] += 1;
+        }
     }
 
     // 各色が4つずつあるかチェック
@@ -21,16 +23,15 @@ pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
         Color::Orange,
     ];
 
-    for color in &expected_colors {
-        match counts.get(color) {
-            Some(&4) => {}
-            Some(&count) => {
+    for &color in &expected_colors {
+        let count = counts[color as usize];
+        if count != 4 {
+            if count == 0 {
+                return Err(CubeError::ColorNotFound(format!("{color:?}")));
+            } else {
                 return Err(CubeError::InvalidColors(format!(
                     "{color:?}の数が{count}個です（4個である必要があります）"
                 )));
-            }
-            None => {
-                return Err(CubeError::ColorNotFound(format!("{:?}", color)));
             }
         }
     }
@@ -58,10 +59,6 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
     Ok(())
 }
 
-/// コーナーのパリティをチェック
-///
-/// TODO: 現在のロジックにバグがあるため、一時的に無効化しています
-/// 正しいパリティチェックを後で実装する必要があります
 /// コーナーの構成ステッカーのインデックス定義 (PrimaryFace(U/D) -> CW1 -> CW2)
 pub const CORNER_STICKERS: [[usize; 3]; 8] = [
     [2, 9, 16],  // UFL: U2, L1, F0

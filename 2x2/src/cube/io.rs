@@ -98,29 +98,17 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
     }
 
     // 24色の配列を作成（内部順序: Up, Down, Left, Right, Front, Back）
-    let mut colors = vec![Color::White; 24];
+    let mut colors = [Color::White; 24];
 
-    // Up (0-3)
-    colors[0..4].copy_from_slice(&line1_colors);
+    // 各面の配置ルール: (面、ソースとなる色のスライス)
+    colors[0..4].copy_from_slice(&line1_colors); // Up
+    colors[4..8].copy_from_slice(&line3_colors); // Down
+    colors[8..12].copy_from_slice(&line2_colors[0..4]); // Left
+    colors[12..16].copy_from_slice(&line2_colors[8..12]); // Right
+    colors[16..20].copy_from_slice(&line2_colors[4..8]); // Front
+    colors[20..24].copy_from_slice(&line2_colors[12..16]); // Back
 
-    // Down (4-7)
-    colors[4..8].copy_from_slice(&line3_colors);
-
-    // Left (8-11)
-    colors[8..12].copy_from_slice(&line2_colors[0..4]);
-
-    // Right (12-15)
-    colors[12..16].copy_from_slice(&line2_colors[8..12]);
-
-    // Front (16-19)
-    colors[16..20].copy_from_slice(&line2_colors[4..8]);
-
-    // Back (20-23)
-    colors[20..24].copy_from_slice(&line2_colors[12..16]);
-
-    let colors_array: [Color; 24] = colors
-        .try_into()
-        .map_err(|_| CubeError::Internal("色の数が24個ではありません".to_string()))?;
+    let colors_array = colors;
 
     // 妥当性チェック
     use super::validation;

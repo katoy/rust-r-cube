@@ -1,36 +1,85 @@
 use super::{Cube, Move};
 
+struct MoveData {
+    face_idx: usize,
+    orientation_delta: u8,
+    cycle: [usize; 8],
+    rotations: [u8; 8],
+}
+
+const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
+    (
+        Move::U,
+        MoveData {
+            face_idx: 0,
+            orientation_delta: 1,
+            cycle: [16, 17, 12, 13, 20, 21, 8, 9],
+            rotations: [0, 0, 0, 0, 0, 0, 0, 0],
+        },
+    ),
+    (
+        Move::D,
+        MoveData {
+            face_idx: 4,
+            orientation_delta: 1,
+            cycle: [18, 19, 10, 11, 22, 23, 14, 15],
+            rotations: [0, 0, 0, 0, 0, 0, 0, 0],
+        },
+    ),
+    (
+        Move::L,
+        MoveData {
+            face_idx: 8,
+            orientation_delta: 3,
+            cycle: [0, 2, 23, 21, 4, 6, 16, 18],
+            rotations: [2, 2, 2, 2, 0, 0, 0, 0],
+        },
+    ),
+    (
+        Move::R,
+        MoveData {
+            face_idx: 12,
+            orientation_delta: 3,
+            cycle: [1, 3, 17, 19, 5, 7, 22, 20],
+            rotations: [0, 0, 0, 0, 2, 2, 2, 2],
+        },
+    ),
+    (
+        Move::F,
+        MoveData {
+            face_idx: 16,
+            orientation_delta: 1,
+            cycle: [2, 3, 11, 9, 5, 4, 12, 14],
+            rotations: [1, 1, 3, 3, 1, 1, 3, 3],
+        },
+    ),
+    (
+        Move::B,
+        MoveData {
+            face_idx: 20,
+            orientation_delta: 1,
+            cycle: [0, 1, 13, 15, 7, 6, 10, 8],
+            rotations: [3, 3, 1, 1, 3, 3, 1, 1],
+        },
+    ),
+];
+
 /// 回転操作を実行
 pub fn apply_move(cube: &mut Cube, mv: Move) {
-    let (face, od, cycle, rot) = match mv {
-        Move::U | Move::Up | Move::U2 => (
-            0,
-            1,
-            [16, 17, 12, 13, 20, 21, 8, 9],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-        ),
-        Move::D | Move::Dp | Move::D2 => (
-            4,
-            1,
-            [18, 19, 10, 11, 22, 23, 14, 15],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-        ),
-        Move::L | Move::Lp | Move::L2 => {
-            (8, 3, [0, 2, 23, 21, 4, 6, 16, 18], [2, 2, 2, 2, 0, 0, 0, 0])
-        }
-        Move::R | Move::Rp | Move::R2 => (
-            12,
-            3,
-            [1, 3, 17, 19, 5, 7, 22, 20],
-            [0, 0, 0, 0, 2, 2, 2, 2],
-        ),
-        Move::F | Move::Fp | Move::F2 => {
-            (16, 1, [2, 3, 11, 9, 5, 4, 12, 14], [1, 1, 3, 3, 1, 1, 3, 3])
-        }
-        Move::B | Move::Bp | Move::B2 => {
-            (20, 1, [0, 1, 13, 15, 7, 6, 10, 8], [3, 3, 1, 1, 3, 3, 1, 1])
-        }
+    let base_move = match mv {
+        Move::U | Move::Up | Move::U2 => Move::U,
+        Move::D | Move::Dp | Move::D2 => Move::D,
+        Move::L | Move::Lp | Move::L2 => Move::L,
+        Move::R | Move::Rp | Move::R2 => Move::R,
+        Move::F | Move::Fp | Move::F2 => Move::F,
+        Move::B | Move::Bp | Move::B2 => Move::B,
     };
+
+    let data = MOVE_DATA_TABLE
+        .iter()
+        .find(|(m, _)| *m == base_move)
+        .map(|(_, d)| d)
+        .expect("All moves should be in the table");
 
     let repeat = match mv {
         Move::U | Move::D | Move::L | Move::R | Move::F | Move::B => 1,
@@ -39,7 +88,13 @@ pub fn apply_move(cube: &mut Cube, mv: Move) {
     };
 
     for _ in 0..repeat {
-        rotate_internal(cube, face, od, &cycle, &rot);
+        rotate_internal(
+            cube,
+            data.face_idx,
+            data.orientation_delta,
+            &data.cycle,
+            &data.rotations,
+        );
     }
 }
 

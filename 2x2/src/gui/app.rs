@@ -145,8 +145,7 @@ pub struct CubeApp {
 /// ソルバーのタスク種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SolverTask {
-    Normal,             // 通常の解法探索
-    RestoreOrientation, // 向きの自動復元
+    Normal, // 通常の解法探索
 }
 
 impl Default for CubeApp {
@@ -267,9 +266,11 @@ impl CubeApp {
         self.start_solver_internal(SolverTask::Normal, self.ignore_orientation);
     }
 
-    /// 向きの自動復元を開始（非同期）
+    /// 向きの自動復元を開始（即時）
     pub fn start_restore_orientation(&mut self) {
-        self.start_solver_internal(SolverTask::RestoreOrientation, true);
+        if let Err(e) = self.cube.restore_orientation_instantly() {
+            self.input_error_message = format!("向きの復元に失敗しました: {}", e);
+        }
     }
 
     /// ソルバー実行の内部処理
@@ -283,7 +284,6 @@ impl CubeApp {
 
         match task {
             SolverTask::Normal => self.solution_text = "探索中...".to_string(),
-            SolverTask::RestoreOrientation => self.solution_text = "向きを修復中...".to_string(),
         }
 
         self.solving_start_time = Some(Instant::now()); // 開始時刻を記録
@@ -381,26 +381,12 @@ impl CubeApp {
                             self.solution_step = 0;
                             // 自動実行はしない（ステップ操作で手動実行）
                         }
-                        SolverTask::RestoreOrientation => {
-                            // 復元処理
-                            if let Err(e) = self.cube.apply_orientation_solution(&solution) {
-                                self.solution_text = format!("復元失敗: {}", e);
-                            } else {
-                                self.solution_text = "向きを復元しました".to_string();
-                            }
-                            // 完了後、少し待ってからメッセージを消すなどの処理があればいいが、
-                            // とりあえず solution_text に残す。
-                            // モードはNormalに戻さないと操作できないので solving = falseでOK。
-                        }
                     }
                 } else {
                     self.solution = None;
                     match self.solver_task {
                         SolverTask::Normal => {
                             self.solution_text = "解が見つかりませんでした".to_string()
-                        }
-                        SolverTask::RestoreOrientation => {
-                            self.solution_text = "向きを復元できませんでした".to_string()
                         }
                     }
                 }
@@ -756,8 +742,10 @@ impl CubeApp {
         self.input_buffer = [None; 24];
         self.input_error_message.clear();
 
-        // 向きの自動復元を開始（非同期）
-        self.start_restore_orientation();
+        // 向きの自動復元（即時）
+        if let Err(e) = self.cube.restore_orientation_instantly() {
+            self.input_error_message = format!("警告: 向きの復元に失敗しました ({})", e);
+        }
 
         // 解法やアニメーションをクリア
         self.solution = None;
@@ -793,6 +781,11 @@ impl CubeApp {
         self.solution_text.clear();
         self.animation = None;
         self.move_queue.clear();
+
+        // 向きの自動復元（即時）
+        if let Err(e) = self.cube.restore_orientation_instantly() {
+            warning = format!("警告: 向きの復元に失敗しました ({})", e);
+        }
 
         // スキャンモードを終了
         self.input_state = InputState::Normal;

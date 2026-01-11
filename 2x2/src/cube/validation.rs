@@ -62,68 +62,111 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
 ///
 /// TODO: 現在のロジックにバグがあるため、一時的に無効化しています
 /// 正しいパリティチェックを後で実装する必要があります
-pub fn check_corner_parity(_cube: &Cube) -> Result<()> {
-    // 一時的に無効化：常に有効とみなす
-    Ok(())
+/// コーナーの構成ステッカーのインデックス定義 (PrimaryFace(U/D) -> CW1 -> CW2)
+pub const CORNER_STICKERS: [[usize; 3]; 8] = [
+    [2, 9, 16],  // UFL: U2, L1, F0
+    [3, 17, 12], // UFR: U3, F1, R0
+    [1, 13, 20], // UBR: U1, R1, B0
+    [0, 21, 8],  // UBL: U0, B1, L0
+    [4, 18, 11], // DFL: D0, F2, L3
+    [5, 14, 19], // DFR: D1, R2, F3
+    [7, 22, 15], // DBR: D3, B2, R3
+    [6, 10, 23], // DBL: D2, L2, B3
+];
 
-    /* 元のコード（バグあり）
-    let solved = Cube::new();
-    let corner_positions = [
-        [2, 9, 16],  // Corner 0: Up-Left-Front
-        [3, 12, 17], // Corner 1: Up-Right-Front
-        [0, 8, 21],  // Corner 2: Up-Left-Back
-        [1, 13, 20], // Corner 3: Up-Right-Back
-        [6, 11, 18], // Corner 4: Down-Left-Front
-        [7, 14, 19], // Corner 5: Down-Right-Front
-        [4, 10, 23], // Corner 6: Down-Left-Back
-        [5, 15, 22], // Corner 7: Down-Right-Back
-    ];
-    let mut current_corners = Vec::new();
-    let mut solved_corners = Vec::new();
-    for positions in &corner_positions {
-        let mut curr: Vec<Color> = positions.iter().map(|&i| _cube.stickers[i].color).collect();
-        let mut solv: Vec<Color> = positions
-            .iter()
-            .map(|&i| solved.stickers[i].color)
-            .collect();
-        curr.sort_by_key(|c| format!("{:?}", c));
-        solv.sort_by_key(|c| format!("{:?}", c));
-        current_corners.push(curr);
-        solved_corners.push(solv);
+/// 対面色かどうかを判定
+fn is_opposite(c1: Color, c2: Color) -> bool {
+    matches!(
+        (c1, c2),
+        (Color::White, Color::Yellow)
+            | (Color::Yellow, Color::White)
+            | (Color::Red, Color::Orange)
+            | (Color::Orange, Color::Red)
+            | (Color::Green, Color::Blue)
+            | (Color::Blue, Color::Green)
+    )
+}
+
+/// コーナーのパリティをチェック
+pub fn check_corner_parity(cube: &Cube) -> Result<()> {
+    // 1. 各コーナーピースの色の組み合わせが妥当かチェック
+    let mut corner_pieces = Vec::new();
+
+    for sticker_indices in &CORNER_STICKERS {
+        let colors = [
+            cube.stickers[sticker_indices[0]].color,
+            cube.stickers[sticker_indices[1]].color,
+            cube.stickers[sticker_indices[2]].color,
+        ];
+
+        // 同じ色が2つ以上ないか
+        if colors[0] == colors[1] || colors[1] == colors[2] || colors[0] == colors[2] {
+            return Err(CubeError::InvalidState(
+                "コーナーに同じ色が複数含まれています。".to_string(),
+            ));
+        }
+
+        // 対面色が同じコーナーに含まれていないか
+        if is_opposite(colors[0], colors[1])
+            || is_opposite(colors[1], colors[2])
+            || is_opposite(colors[0], colors[2])
+        {
+            return Err(CubeError::InvalidState(
+                "コーナーに存在しえない色の組み合わせ（対面色）が含まれています。".to_string(),
+            ));
+        }
+
+        let mut sorted_colors = colors;
+        sorted_colors.sort_by_key(|c| format!("{:?}", c));
+        corner_pieces.push(sorted_colors);
     }
-    let mut permutation = Vec::new();
-    for current in &current_corners {
-        match solved_corners.iter().position(|solved| solved == current) {
-            Some(pos) => permutation.push(pos),
-            None => return Err("無効なコーナーの色の組み合わせが見つかりました。\nキューブを分解して組み立て直していませんか？".to_string()),
+
+    // 2. 8つのコーナーが互いにユニークであるか（標準的な8個の組み合わせか）をチェック
+    let mut sorted_pieces = corner_pieces.clone();
+    sorted_pieces.sort_by_key(|p| format!("{:?}", p));
+    for i in 0..7 {
+        if sorted_pieces[i] == sorted_pieces[i + 1] {
+            return Err(CubeError::InvalidState(
+                "重複するコーナーピースが存在します。".to_string(),
+            ));
         }
     }
-    let mut parity = 0;
-    for i in 0..8 {
-        for j in (i + 1)..8 {
-            if permutation[i] > permutation[j] {
-                parity += 1;
-            }
-        }
-    }
-    if parity % 2 != 0 {
-        return Err("コーナーの配置が無効です（位置パリティエラー）。\nこの配置は回転操作では実現できません。\nキューブを分解して組み立て直した可能性があります。".to_string());
-    }
-    let mut orientation_sum = 0;
-    for i in 0..8 {
-        let positions = &corner_positions[i];
-        let solved_idx = permutation[i];
-        let solved_positions = &corner_positions[solved_idx];
-        let base_color = solved.stickers[solved_positions[0]].color;
-        let orientation = positions
+
+    // 3. 向き（TWIST）のパリティチェック
+    // 各パーツが「正しい向きからどれだけ捻られているか」を計算
+    // 白または黄色を基準面とする
+    let mut total_twist = 0;
+    for sticker_indices in CORNER_STICKERS.iter() {
+        let colors = [
+            cube.stickers[sticker_indices[0]].color,
+            cube.stickers[sticker_indices[1]].color,
+            cube.stickers[sticker_indices[2]].color,
+        ];
+
+        // 白または黄色のステッカーを探す
+        let twist = if let Some(pos) = colors
             .iter()
-            .position(|&idx| _cube.stickers[idx].color == base_color)
-            .unwrap_or(0);
-        orientation_sum += orientation;
+            .position(|&c| c == Color::White || c == Color::Yellow)
+        {
+            // 上面/底面(index 0)にあれば 0
+            // 時計回りにずれていれば 1, 反時計回りなら 2
+            // コーナーによって時計回りの定義が異なるが、
+            // 2x2では隣接するコーナー間で「基準面に向かう方向」が逆転するため
+            // スロットのインデックス順 (Up/Down -> SideA -> SideB) を一貫して使えば合計は0 mod 3になる
+            pos
+        } else {
+            return Err(CubeError::InvalidState(
+                "不正な色のコーナーです".to_string(),
+            ));
+        };
+        total_twist += twist;
     }
-    if orientation_sum % 3 != 0 {
-        return Err("コーナーの向きが無効です（向きパリティエラー）。\nこの配置は回転操作では実現できません。\nキューブを分解して組み立て直した可能性があります。".to_string());
+
+    if total_twist % 3 != 0 {
+        return Err(CubeError::InvalidState(
+            "コーナーの向きが無効です（捻じれパリティエラー）。\n一つ以上のコーナーが物理的に回転してしまっている可能性があります。".to_string(),
+        ));
     }
+
     Ok(())
-    */
 }

@@ -23,7 +23,18 @@ fn draw_sticker(
     sticker: Sticker,
     rotation_offset_deg: f32,
     alpha: f32,
+    shadow_offset: Vec2,
 ) {
+    let color = color_to_color32(sticker.color).linear_multiply(alpha);
+    let stroke_color = Color32::BLACK.linear_multiply(alpha);
+
+    // 影の描画 (もしあれば)
+    if shadow_offset.length() > 0.1 {
+        let shadow_color = Color32::from_black_alpha((100.0 * alpha) as u8);
+        let shadow_rect = Rect::from_center_size(center + shadow_offset, Vec2::splat(size * 0.95));
+        painter.rect_filled(shadow_rect, 3.0, shadow_color);
+    }
+
     // ステッカーの背景を描画
     let rect = Rect::from_center_size(center, Vec2::splat(size * 0.95));
 
@@ -53,20 +64,12 @@ fn draw_sticker(
 
         painter.add(egui::Shape::convex_polygon(
             rotated_corners.clone(),
-            color_to_color32(sticker.color).linear_multiply(alpha),
-            Stroke::new(2.0, Color32::BLACK.linear_multiply(alpha)),
+            color,
+            Stroke::new(2.0, stroke_color),
         ));
     } else {
-        painter.rect_filled(
-            rect,
-            3.0,
-            color_to_color32(sticker.color).linear_multiply(alpha),
-        );
-        painter.rect_stroke(
-            rect,
-            3.0,
-            Stroke::new(2.0, Color32::BLACK.linear_multiply(alpha)),
-        );
+        painter.rect_filled(rect, 3.0, color);
+        painter.rect_stroke(rect, 3.0, Stroke::new(2.0, stroke_color));
     }
 
     // 矢印を描画（向きを示す）
@@ -399,6 +402,27 @@ pub fn draw_cube(
         (vec![], None)
     };
 
+    // 0. 回転面の強調表示 (Face Overlay)
+    if let Some(anim) = animation {
+        let (_, anim_face_rot) = get_animation_info(anim.current_move);
+        if let Some((face_start, _angle)) = anim_face_rot {
+            let face_grid_rect = get_face_grid_rect(face_start);
+            let top_left = to_screen(face_grid_rect.min) - Vec2::splat(grid_size * 0.5);
+            let bottom_right = to_screen(Pos2::new(
+                face_grid_rect.max.x - 1.0,
+                face_grid_rect.max.y - 1.0,
+            )) + Vec2::splat(grid_size * 0.5);
+            let highlight_rect = Rect::from_min_max(top_left, bottom_right);
+
+            // 淡い色で塗りつぶし
+            painter.rect_filled(
+                highlight_rect.expand(2.0),
+                5.0,
+                Color32::from_rgba_premultiplied(255, 255, 255, 30),
+            );
+        }
+    }
+
     // 全ステッカーを描画
     for i in 0..24 {
         let mut sticker = cube.get_sticker(i);
@@ -409,7 +433,7 @@ pub fn draw_cube(
         let mut drawn = false;
 
         if let Some(anim) = animation {
-            // アニメーション中の操作に応じてorientationを調整
+            let progress = anim.eased_progress();
 
             // 1. 回転する面のステッカー: 最終的なorientationを設定
             if let Some((face_start, _angle)) = anim_face_rot {
@@ -429,8 +453,6 @@ pub fn draw_cube(
             if let Some((_, _target_idx)) = anim_mapping.iter().find(|(src, _)| *src == i) {
                 let orientation_delta = match anim.current_move {
                     Move::R | Move::Rp => {
-                        // U面の右列 (1, 3) → Back面へ: +2
-                        // B面の右列 (22, 20) → Down面へ: +2
                         if i == 1 || i == 3 || i == 22 || i == 20 {
                             2
                         } else {
@@ -438,47 +460,29 @@ pub fn draw_cube(
                         }
                     }
                     Move::L | Move::Lp => {
-                        // U面の左列 (0, 2) → Front面へ: +2
-                        // F面の左列 (16, 18) → Down面へ: 変更なし
-                        // D面の左列 (4, 6) → Back面へ: 変更なし
-                        // B面の左列 (21, 23) → Up面へ: +2
                         if i == 0 || i == 2 || i == 21 || i == 23 {
                             2
                         } else {
                             0
                         }
                     }
-                    Move::F | Move::Fp => {
-                        // U面の下列 (2, 3) → Left面へ: +3
-                        // L面の右列 (9, 11) → Down面へ: +1
-                        // D面の上列 (4, 5) → Right面へ: +3
-                        // R面の左列 (12, 14) → Up面へ: +1
-                        match i {
-                            2 | 3 => 3,
-                            9 | 11 => 1,
-                            4 | 5 => 3,
-                            12 | 14 => 1,
-                            _ => 0,
-                        }
-                    }
-                    Move::B | Move::Bp => {
-                        // U面の上列 (0, 1) → Right面へ: +1
-                        // R面の右列 (13, 15) → Down面へ: +3
-                        // D面の下列 (6, 7) → Left面へ: +1
-                        // L面の左列 (8, 10) → Up面へ: +3
-                        match i {
-                            0 | 1 => 1,
-                            13 | 15 => 3,
-                            6 | 7 => 1,
-                            8 | 10 => 3,
-                            _ => 0,
-                        }
-                    }
-                    // 180度回転の場合、移動するステッカーのorientationは2だけ変化
+                    Move::F | Move::Fp => match i {
+                        2 | 3 => 3,
+                        9 | 11 => 1,
+                        4 | 5 => 3,
+                        12 | 14 => 1,
+                        _ => 0,
+                    },
+                    Move::B | Move::Bp => match i {
+                        0 | 1 => 1,
+                        13 | 15 => 3,
+                        6 | 7 => 1,
+                        8 | 10 => 3,
+                        _ => 0,
+                    },
                     Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
                     _ => 0,
                 };
-
                 if orientation_delta > 0 {
                     sticker.orientation = (sticker.orientation + orientation_delta) % 4;
                 }
@@ -487,27 +491,21 @@ pub fn draw_cube(
             // 面回転の処理
             if let Some((face_start, angle)) = anim_face_rot {
                 if i >= face_start && i < face_start + 4 {
-                    // 面の中心
                     let center_grid_idx = face_start;
                     let center_grid_base = get_grid_coords(center_grid_idx);
-                    // 2x2の中心は (col+0.5, row+0.5)
                     let center_grid = Pos2::new(center_grid_base.x + 0.5, center_grid_base.y + 0.5);
                     let center_screen = to_screen(center_grid);
 
-                    let current_angle = angle * anim.eased_progress();
+                    let current_angle = angle * progress;
                     screen_pos = rotate_point(screen_pos, center_screen, current_angle);
 
-                    // rotationを計算
-                    // orientation変化分の相殺は一時的に無効化
-                    // orientationの変化分を差し引いて、矢印が物理的な回転と一致するようにする
                     let orientation_delta = match anim.current_move {
-                        Move::R | Move::L | Move::F | Move::B => 1, // +1 = +90度
-                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // +3 = +270度 = -90度
+                        Move::R | Move::L | Move::F | Move::B => 1,
+                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3,
                         Move::U | Move::D => 1,
                         Move::Up | Move::Dp => 3,
-                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2, // +2 = +180度
+                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
                     };
-                    // orientation変化分を相殺：+1なら-90度、+3なら-270度、+2なら-180度
                     let orientation_change_deg = -(orientation_delta as f32 * 90.0);
                     rotation = current_angle + orientation_change_deg;
                 }
@@ -516,108 +514,109 @@ pub fn draw_cube(
             // 移動の処理
             if let Some((_, target_idx)) = anim_mapping.iter().find(|(src, _)| *src == i) {
                 let target_grid_pos = get_grid_coords(*target_idx);
+                let dist = grid_pos.distance(target_grid_pos);
 
-                // ワープ回避：距離が遠すぎる場合はラップアラウンドアニメーション
-                // 閾値を3.0に設定（F回転の距離2.23は通常移動。裏側への移動など距離3.0以上のみワープ）
-                if grid_pos.distance(target_grid_pos) < 3.0 {
-                    let src_screen = screen_pos; // 回転なしの場合の初期位置
-                    let dst_screen = to_screen(target_grid_pos);
+                let start_screen = to_screen(grid_pos);
+                let end_screen = to_screen(target_grid_pos);
 
-                    screen_pos = Pos2::new(
-                        src_screen.x + (dst_screen.x - src_screen.x) * anim.eased_progress(),
-                        src_screen.y + (dst_screen.y - src_screen.y) * anim.eased_progress(),
-                    );
+                // 基本的な移動ベクトル
+                let move_vec = end_screen - start_screen;
+
+                // --- 円弧移動と演出の計算 ---
+                let mut current_sticker_size = sticker_size;
+                let mut current_alpha = 1.0;
+                let shadow_offset;
+
+                if dist < 3.0 {
+                    // 隣接面移動: わずかな膨らみ、浮き上がり、影
+                    let bulge = 0.2 * grid_size;
+                    let ortho = Vec2::new(-move_vec.y, move_vec.x).normalized() * bulge;
+                    let arc_offset = ortho * (progress * std::f32::consts::PI).sin();
+
+                    screen_pos = start_screen + move_vec * progress + arc_offset;
+
+                    // 浮き上がり (中心で1.1倍)
+                    let lift = 1.0 + 0.1 * (progress * std::f32::consts::PI).sin();
+                    current_sticker_size *= lift;
+
+                    // 影 (進行方向と逆にわずかにずらす)
+                    shadow_offset = Vec2::new(5.0, 5.0) * (progress * std::f32::consts::PI).sin();
                 } else {
-                    // ラップアラウンド
-                    let diff = target_grid_pos - grid_pos;
-
-                    // 最適なラップ方向を探す
-                    // 展開図サイズは 横8, 縦6
-                    // 対角方向のショートカットも含めて探索することで、より自然な隣接点を見つける
-                    let candidates = [
-                        Vec2::new(8.0, 0.0),
-                        Vec2::new(-8.0, 0.0),
-                        Vec2::new(0.0, 6.0),
-                        Vec2::new(0.0, -6.0),
-                        Vec2::new(4.0, 3.0),
-                        Vec2::new(-4.0, -3.0),
-                        Vec2::new(4.0, -3.0),
-                        Vec2::new(-4.0, 3.0),
-                    ];
-
-                    let mut best_wrap = Vec2::ZERO;
-                    let mut min_len = f32::MAX;
-
-                    for wrap in candidates {
-                        let len = (diff - wrap).length();
-                        if len < min_len {
-                            min_len = len;
-                            best_wrap = wrap;
-                        }
+                    // 非隣接面（ジャンプ）: 大きな円弧、フェード、縮小
+                    let bulge = 1.5 * grid_size;
+                    let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
+                    // 展開図の端を跨ぐ場合は円弧の向きを調整
+                    if ortho.y.abs() < 0.1 {
+                        ortho.y = -ortho.y.abs();
                     }
 
-                    let wrap_vec_grid = best_wrap;
+                    let arc_offset = ortho * bulge * (progress * std::f32::consts::PI).sin();
 
-                    let progress = anim.eased_progress();
+                    screen_pos = start_screen + move_vec * progress + arc_offset;
 
-                    // 1. 去るアニメーション (src -> dst_wrapped)
-                    // dst_wrapped = dst - wrap_vec
-                    let dst_wrapped_grid = target_grid_pos - wrap_vec_grid;
-                    let dst_wrapped_screen = to_screen(dst_wrapped_grid);
-                    let src_screen = screen_pos; // 現在位置
+                    // フェード & 縮小 (中間地点で最小)
+                    let mid_factor = (progress * std::f32::consts::PI).sin();
+                    current_alpha = 1.0 - 0.5 * mid_factor;
+                    let scale_down = 1.0 - 0.3 * mid_factor;
+                    current_sticker_size *= scale_down;
 
-                    let pos_out = src_screen + (dst_wrapped_screen - src_screen) * progress;
-
-                    // クリッピング領域（移動元の面内のみ表示）
-                    let clip_grid_rect = get_face_grid_rect(i);
-                    // グリッド座標(中心)から矩形(左上〜右下)への変換補正
-                    let clip_rect_src = Rect::from_min_max(
-                        to_screen(clip_grid_rect.min) - Vec2::splat(grid_size * 0.5),
-                        to_screen(clip_grid_rect.max) - Vec2::splat(grid_size * 0.5),
-                    );
-
-                    let clipped_painter_src = painter.with_clip_rect(clip_rect_src);
-                    draw_sticker(
-                        &clipped_painter_src,
-                        pos_out,
-                        sticker_size,
-                        sticker,
-                        rotation,
-                        1.0,
-                    );
-
-                    // 2. 来るアニメーション (src_wrapped -> dst)
-                    // src_wrapped = src + wrap_vec
-                    let src_wrapped_grid = grid_pos + wrap_vec_grid;
-                    let src_wrapped_screen = to_screen(src_wrapped_grid);
-                    let dst_screen = to_screen(target_grid_pos);
-
-                    let pos_in = src_wrapped_screen + (dst_screen - src_wrapped_screen) * progress;
-
-                    // クリッピング領域（移動先の面内のみ表示）
-                    let clip_grid_rect_dst = get_face_grid_rect(*target_idx);
-                    let clip_rect_dst = Rect::from_min_max(
-                        to_screen(clip_grid_rect_dst.min) - Vec2::splat(grid_size * 0.5),
-                        to_screen(clip_grid_rect_dst.max) - Vec2::splat(grid_size * 0.5),
-                    );
-
-                    let clipped_painter_dst = painter.with_clip_rect(clip_rect_dst);
-                    draw_sticker(
-                        &clipped_painter_dst,
-                        pos_in,
-                        sticker_size,
-                        sticker,
-                        rotation,
-                        1.0,
-                    );
-
-                    drawn = true;
+                    // 影 (より高く浮いているように)
+                    shadow_offset = Vec2::new(10.0, 10.0) * mid_factor;
                 }
+
+                // モーショントレイル (オプション: 過去の数地点を描画)
+                for ghost_t in [0.05, 0.1] {
+                    let t = (progress - ghost_t).max(0.0);
+                    if t > 0.0 {
+                        // ゴースト位置の簡略計算 (直線的でも良いが、メインと同様のロジックを適用)
+                        let ghost_pos = start_screen + move_vec * t;
+                        // 円弧も考慮
+                        let bulge_val = if dist < 3.0 {
+                            0.2 * grid_size
+                        } else {
+                            1.5 * grid_size
+                        };
+                        let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
+                        if dist >= 3.0 && ortho.y.abs() < 0.1 {
+                            ortho.y = -ortho.y.abs();
+                        }
+                        let ghost_arc = ortho * bulge_val * (t * std::f32::consts::PI).sin();
+
+                        draw_sticker(
+                            painter,
+                            ghost_pos + ghost_arc,
+                            sticker_size * (1.0 - ghost_t * 2.0),
+                            sticker,
+                            rotation,
+                            0.3 * current_alpha * (1.0 - ghost_t * 5.0),
+                            Vec2::ZERO,
+                        );
+                    }
+                }
+
+                draw_sticker(
+                    painter,
+                    screen_pos,
+                    current_sticker_size,
+                    sticker,
+                    rotation,
+                    current_alpha,
+                    shadow_offset,
+                );
+                drawn = true;
             }
         }
 
         if !drawn {
-            draw_sticker(painter, screen_pos, sticker_size, sticker, rotation, 1.0);
+            draw_sticker(
+                painter,
+                screen_pos,
+                sticker_size,
+                sticker,
+                rotation,
+                1.0,
+                Vec2::ZERO,
+            );
         }
     }
 

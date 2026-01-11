@@ -125,14 +125,16 @@ GGGG RRRR BBBB OOOO
 > 90度回転のみを1手とし、180度回転を2手と数える基準を **QTM (Quarter Turn Metric)** と呼びます。QTMにおける2x2x2キューブの神の数は **14手** です。
 
 #### 難易度の例 (HTM基準)
-*   **最遠状態 (11手)**:
-    *   スクランブル: `F U' F2 R' U R2 U' R' F U' F'` (一例)
-    *   状態: `WGWG / GRWY BYBR ROBO YOBG / OYRW` ([cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2/cubes/cube_god.txt))
-*   **非常に難しい状態 (10手)**:
-    *   状態: `WWWW / OOOO GGGR RRBG BBRB / YYYY`
-    *   解法: `R2 B D' R' F2 R2 U' R' F R'`
+
+- **最遠状態 (11手)**:
+  - スクランブル: `F U' F2 R' U R2 U' R' F U' F'` (一例)
+  - 状態: `WGWG / GRWY BYBR ROBO YOBG / OYRW` ([cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2/cubes/cube_god.txt))
+- **非常に難しい状態 (10手)**:
+  - 状態: `WWWW / OOOO GGGR RRBG BBRB / YYYY`
+  - 解法: `R2 B D' R' F2 R2 U' R' F R'`
 
 #### R U パターンの周期性
+
 `R U`（右面回転 → 上面回転）を繰り返すと、8回（計16個の90度回転、またはHTMで最適化すると12手程度）で元の状態に戻ります。詳細は [ru_cycle_test.rs](file:///Users/katoy/github/study-rust/rust-r-cube/2x2/tests/ru_cycle_test.rs) を参照してください。
 
 ### テストケース

@@ -26,30 +26,24 @@ fn test_user_specified_state() {
         }
     }
 
-    // まず11手で探索
+    // 解法を探索（HTMでは最大11手で必ず解ける）
     println!("探索中 (最大11手)...");
     let solution = solver::solve(&cube, 11, true);
 
     if solution.found {
-        println!("✓ 11手以内で解法発見！");
+        println!("✓ 解法発見！");
         println!("解法手数: {} 手", solution.moves.len());
         println!("解法: {:?}", solution.moves);
-        return;
-    }
 
-    // 解けない場合は14手まで拡張（QTMの限界値や保険として）
-    println!("11手で見つかりませんでした。14手まで拡張して再探索中...");
-    let solution = solver::solve(&cube, 14, true);
-
-    if solution.found {
-        println!("✓ 解法発見（11手を超過）！");
-        println!("解法手数: {} 手", solution.moves.len());
-        println!("解法: {:?}", solution.moves);
-        println!("⚠️ 注意: 2x2の神の数は11手ですが、この状態は{}手必要でした。状態の記述かパリティを確認してください。", solution.moves.len());
+        // 解法の正当性確認
+        let mut check_cube = cube.clone();
+        for &mv in &solution.moves {
+            check_cube.apply_move(mv);
+        }
+        assert!(check_cube.is_solved(), "解法を適用しても完成しませんでした");
     } else {
-        println!("✗ 14手以内でも解法が見つかりませんでした。");
-        println!(
-            "この状態は有効と判定されましたが、到達不能（パリティエラー）の可能性があります。"
-        );
+        println!("✗ 11手以内に解法が見つかりませんでした。");
+        println!("2x2キューブは最大11手で解けることが証明されているため、");
+        println!("この状態は物理的に不可能なパリティエラーの可能性があります。");
     }
 }

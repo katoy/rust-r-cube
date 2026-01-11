@@ -299,9 +299,8 @@ impl CubeApp {
         self.progress_receiver = Some(progress_rx);
 
         thread::spawn(move || {
-            // 向き無視でも実物のキューブでは12手以上必要な場合があるため14に設定
-            // 向きも揃える: より深い探索が必要なため14に設定
-            let max_depth = 14;
+            // HTM対応により、向きの有無に関わらず最大11手で必ず解ける
+            let max_depth = solver::DEFAULT_MAX_DEPTH;
             println!(
                 "ソルバー開始: 深度{}まで探索 (タスク: {:?})",
                 max_depth, task

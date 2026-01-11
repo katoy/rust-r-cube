@@ -3,7 +3,7 @@ use crate::gui::app::AnimationState;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
 /// ステッカーの色をegui Color32に変換
-fn color_to_color32(color: Color) -> Color32 {
+pub fn color_to_color32(color: Color) -> Color32 {
     match color {
         Color::White => Color32::from_rgb(255, 255, 255),
         Color::Yellow => Color32::from_rgb(255, 255, 0),
@@ -445,51 +445,14 @@ pub fn draw_cube(
             // 1. 回転する面のステッカー: 最終的なorientationを設定
             if let Some((face_start, _angle)) = anim_face_rot {
                 if i >= face_start && i < face_start + 4 {
-                    let orientation_delta = match anim.current_move {
-                        Move::R | Move::L | Move::F | Move::B => 1, // 時計回り: +1
-                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // 反時計回り: +3
-                        Move::U | Move::D => 1,                     // Up/Down: +1
-                        Move::Up | Move::Dp => 3,                   // Up'/Down': +3
-                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2, // 180度回転: +2
-                    };
+                    let orientation_delta = get_face_orientation_delta(anim.current_move);
                     sticker.orientation = (sticker.orientation + orientation_delta) % 4;
                 }
             }
 
             // 2. 移動するステッカーのorientation調整
             if let Some((_, _target_idx)) = anim_mapping.iter().find(|(src, _)| *src == i) {
-                let orientation_delta = match anim.current_move {
-                    Move::R | Move::Rp => {
-                        if i == 1 || i == 3 || i == 22 || i == 20 {
-                            2
-                        } else {
-                            0
-                        }
-                    }
-                    Move::L | Move::Lp => {
-                        if i == 0 || i == 2 || i == 21 || i == 23 {
-                            2
-                        } else {
-                            0
-                        }
-                    }
-                    Move::F | Move::Fp => match i {
-                        2 | 3 => 3,
-                        9 | 11 => 1,
-                        4 | 5 => 3,
-                        12 | 14 => 1,
-                        _ => 0,
-                    },
-                    Move::B | Move::Bp => match i {
-                        0 | 1 => 1,
-                        13 | 15 => 3,
-                        6 | 7 => 1,
-                        8 | 10 => 3,
-                        _ => 0,
-                    },
-                    Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
-                    _ => 0,
-                };
+                let orientation_delta = get_moving_sticker_orientation_delta(anim.current_move, i);
                 if orientation_delta > 0 {
                     sticker.orientation = (sticker.orientation + orientation_delta) % 4;
                 }
@@ -673,6 +636,47 @@ pub fn draw_cube(
             egui::FontId::proportional(16.0),
             Color32::BLACK,
         );
+    }
+}
+
+/// 面の回転による向きの変更量を取得
+fn get_face_orientation_delta(mv: Move) -> u8 {
+    match mv {
+        Move::R | Move::L | Move::F | Move::B | Move::U | Move::D => 1,
+        Move::Rp | Move::Lp | Move::Fp | Move::Bp | Move::Up | Move::Dp => 3,
+        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
+    }
+}
+
+/// 移動するステッカーの向きの変更量を取得
+fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
+    match mv {
+        Move::R | Move::Rp => {
+            if matches!(src_idx, 1 | 3 | 20 | 22) {
+                2
+            } else {
+                0
+            }
+        }
+        Move::L | Move::Lp => {
+            if matches!(src_idx, 0 | 2 | 21 | 23) {
+                2
+            } else {
+                0
+            }
+        }
+        Move::F | Move::Fp => match src_idx {
+            2..=5 => 3,
+            9 | 11..=12 | 14 => 1,
+            _ => 0,
+        },
+        Move::B | Move::Bp => match src_idx {
+            0..=1 | 6..=7 => 1,
+            8 | 10 | 13 | 15 => 3,
+            _ => 0,
+        },
+        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
+        _ => 0,
     }
 }
 

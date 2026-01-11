@@ -417,14 +417,11 @@ impl CubeApp {
             InputState::Scanning { .. } => {
                 // スキャンモード中: 入力バッファから一時キューブを生成
                 // 未入力のステッカーはデフォルトの色（グレー風）にする
-                let mut colors = [Color::White; 24];
+                let mut colors = [Color::Gray; 24];
 
                 for (i, maybe_color) in self.input_buffer.iter().enumerate() {
                     if let Some(color) = maybe_color {
                         colors[i] = *color;
-                    } else {
-                        // 未入力のステッカーはグレーで表示
-                        colors[i] = Color::Gray;
                     }
                 }
 

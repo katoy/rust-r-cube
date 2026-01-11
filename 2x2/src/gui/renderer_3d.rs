@@ -76,97 +76,37 @@ fn project_point(
 /// ステッカーの初期3D配置を生成
 fn get_initial_stickers() -> Vec<Sticker3D> {
     let mut stickers = Vec::with_capacity(24);
-    let size = 0.45; // ステッカーのサイズ（少し小さくして境界を作る）
+    let size = 0.45;
 
-    // ヘルパー: 面ごとの生成
-    // U (Up): y = +1, index 0-3
-    for i in 0..4 {
-        let col = (i % 2) as f32; // 0, 1
-        let row = (i / 2) as f32; // 0, 1
-        let x = (col - 0.5) * 1.0;
-        let z = (row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: i,
-            center: Vec3::new(x, 1.0, z),
-            normal: Vec3::Y,
-            u_vec: Vec3::X * size,
-            v_vec: Vec3::Z * size,
-        });
-    }
+    // 各面の定義: (normal, center_base, u_axis, v_axis, flip_v)
+    let face_defs = [
+        (Vec3::Y, Vec3::Y, Vec3::X, Vec3::Z, false),   // U
+        (-Vec3::Y, -Vec3::Y, Vec3::X, Vec3::Z, true),  // D
+        (-Vec3::X, -Vec3::X, Vec3::Z, Vec3::Y, true),  // L
+        (Vec3::X, Vec3::X, -Vec3::Z, Vec3::Y, true),   // R
+        (Vec3::Z, Vec3::Z, Vec3::X, Vec3::Y, true),    // F
+        (-Vec3::Z, -Vec3::Z, -Vec3::X, Vec3::Y, true), // B
+    ];
 
-    // D (Down): y = -1, index 4-7
-    for i in 0..4 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let x = (col - 0.5) * 1.0;
-        let z = (1.0 - row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: 4 + i,
-            center: Vec3::new(x, -1.0, z),
-            normal: -Vec3::Y,
-            u_vec: Vec3::X * size,
-            v_vec: -Vec3::Z * size,
-        });
-    }
+    for (f_idx, (normal, center_base, u_axis, v_axis, flip_v)) in face_defs.iter().enumerate() {
+        for i in 0..4 {
+            let col = (i % 2) as f32;
+            let row = (i / 2) as f32;
+            let u_val = (col - 0.5) * 1.0;
+            let v_val = if *flip_v {
+                (1.0 - row - 0.5) * 1.0
+            } else {
+                (row - 0.5) * 1.0
+            };
 
-    // L (Left): x = -1, index 8-11
-    for i in 0..4 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let z = (col - 0.5) * 1.0;
-        let y = (1.0 - row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: 8 + i,
-            center: Vec3::new(-1.0, y, z),
-            normal: -Vec3::X,
-            u_vec: Vec3::Z * size, // 修正: -Vec3::Z から Vec3::Z
-            v_vec: -Vec3::Y * size,
-        });
-    }
-
-    // R (Right): x = +1, index 12-15
-    for i in 0..4 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let z = (1.0 - col - 0.5) * 1.0;
-        let y = (1.0 - row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: 12 + i,
-            center: Vec3::new(1.0, y, z),
-            normal: Vec3::X,
-            u_vec: -Vec3::Z * size, // 修正: Vec3::Z から -Vec3::Z
-            v_vec: -Vec3::Y * size,
-        });
-    }
-
-    // F (Front): z = +1, index 16-19
-    for i in 0..4 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let x = (col - 0.5) * 1.0;
-        let y = (1.0 - row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: 16 + i,
-            center: Vec3::new(x, y, 1.0),
-            normal: Vec3::Z,
-            u_vec: Vec3::X * size,
-            v_vec: -Vec3::Y * size,
-        });
-    }
-
-    // B (Back): z = -1, index 20-23
-    for i in 0..4 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let x = (1.0 - col - 0.5) * 1.0;
-        let y = (1.0 - row - 0.5) * 1.0;
-        stickers.push(Sticker3D {
-            index: 20 + i,
-            center: Vec3::new(x, y, -1.0),
-            normal: -Vec3::Z,
-            u_vec: -Vec3::X * size,
-            v_vec: -Vec3::Y * size,
-        });
+            stickers.push(Sticker3D {
+                index: f_idx * 4 + i,
+                center: *center_base + *u_axis * u_val + *v_axis * v_val,
+                normal: *normal,
+                u_vec: *u_axis * size,
+                v_vec: *v_axis * (if *flip_v { -size } else { size }),
+            });
+        }
     }
 
     stickers

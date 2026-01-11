@@ -202,11 +202,18 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
             if ui.button("R'").clicked() {
                 app.queue_move(Move::Rp);
             }
+            if ui.button("R2").clicked() {
+                app.queue_move(Move::R2);
+            }
+            ui.add_space(10.0);
             if ui.button("L").clicked() {
                 app.queue_move(Move::L);
             }
             if ui.button("L'").clicked() {
                 app.queue_move(Move::Lp);
+            }
+            if ui.button("L2").clicked() {
+                app.queue_move(Move::L2);
             }
         });
 
@@ -217,11 +224,18 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
             if ui.button("U'").clicked() {
                 app.queue_move(Move::Up);
             }
+            if ui.button("U2").clicked() {
+                app.queue_move(Move::U2);
+            }
+            ui.add_space(10.0);
             if ui.button("D").clicked() {
                 app.queue_move(Move::D);
             }
             if ui.button("D'").clicked() {
                 app.queue_move(Move::Dp);
+            }
+            if ui.button("D2").clicked() {
+                app.queue_move(Move::D2);
             }
         });
 
@@ -232,11 +246,18 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
             if ui.button("F'").clicked() {
                 app.queue_move(Move::Fp);
             }
+            if ui.button("F2").clicked() {
+                app.queue_move(Move::F2);
+            }
+            ui.add_space(10.0);
             if ui.button("B").clicked() {
                 app.queue_move(Move::B);
             }
             if ui.button("B'").clicked() {
                 app.queue_move(Move::Bp);
+            }
+            if ui.button("B2").clicked() {
+                app.queue_move(Move::B2);
             }
         });
 

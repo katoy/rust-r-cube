@@ -54,16 +54,22 @@ impl Sticker {
 pub enum Move {
     R,  // Right face clockwise
     Rp, // Right face counter-clockwise
+    R2, // Right face 180 degrees
     L,  // Left face clockwise
     Lp, // Left face counter-clockwise
+    L2, // Left face 180 degrees
     U,  // Up face clockwise
     Up, // Up face counter-clockwise
+    U2, // Up face 180 degrees
     D,  // Down face clockwise
     Dp, // Down face counter-clockwise
+    D2, // Down face 180 degrees
     F,  // Front face clockwise
     Fp, // Front face counter-clockwise
+    F2, // Front face 180 degrees
     B,  // Back face clockwise
     Bp, // Back face counter-clockwise
+    B2, // Back face 180 degrees
 }
 
 impl Move {
@@ -73,16 +79,22 @@ impl Move {
         vec![
             Move::R,
             Move::Rp,
+            Move::R2,
             Move::L,
             Move::Lp,
+            Move::L2,
             Move::U,
             Move::Up,
+            Move::U2,
             Move::D,
             Move::Dp,
+            Move::D2,
             Move::F,
             Move::Fp,
+            Move::F2,
             Move::B,
             Move::Bp,
+            Move::B2,
         ]
     }
 
@@ -92,16 +104,22 @@ impl Move {
         match self {
             Move::R => Move::Rp,
             Move::Rp => Move::R,
+            Move::R2 => Move::R2,
             Move::L => Move::Lp,
             Move::Lp => Move::L,
+            Move::L2 => Move::L2,
             Move::U => Move::Up,
             Move::Up => Move::U,
+            Move::U2 => Move::U2,
             Move::D => Move::Dp,
             Move::Dp => Move::D,
+            Move::D2 => Move::D2,
             Move::F => Move::Fp,
             Move::Fp => Move::F,
+            Move::F2 => Move::F2,
             Move::B => Move::Bp,
             Move::Bp => Move::B,
+            Move::B2 => Move::B2,
         }
     }
 }
@@ -111,16 +129,22 @@ impl std::fmt::Display for Move {
         let s = match self {
             Move::R => "R",
             Move::Rp => "R'",
+            Move::R2 => "R2",
             Move::L => "L",
             Move::Lp => "L'",
+            Move::L2 => "L2",
             Move::U => "U",
             Move::Up => "U'",
+            Move::U2 => "U2",
             Move::D => "D",
             Move::Dp => "D'",
+            Move::D2 => "D2",
             Move::F => "F",
             Move::Fp => "F'",
+            Move::F2 => "F2",
             Move::B => "B",
             Move::Bp => "B'",
+            Move::B2 => "B2",
         };
         write!(f, "{s}")
     }

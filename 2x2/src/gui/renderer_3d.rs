@@ -225,19 +225,36 @@ pub fn draw_cube_3d(
     // アニメーション情報取得
     let (anim_axis, anim_layer, anim_angle) = if let Some(anim) = animation {
         let progress = anim.eased_progress();
-        let angle = progress * 90.0f32.to_radians();
+        let base_angle = match anim.current_move {
+            Move::R2 | Move::L2 | Move::U2 | Move::D2 | Move::F2 | Move::B2 => {
+                180.0f32.to_radians()
+            }
+            _ => 90.0f32.to_radians(),
+        };
+        let angle = progress * base_angle;
         let angle = match anim.current_move {
-            Move::R | Move::L | Move::U | Move::D | Move::F | Move::B => angle,
+            Move::R
+            | Move::L
+            | Move::U
+            | Move::D
+            | Move::F
+            | Move::B
+            | Move::R2
+            | Move::L2
+            | Move::U2
+            | Move::D2
+            | Move::F2
+            | Move::B2 => angle,
             _ => -angle, // Prime moves
         };
 
         match anim.current_move {
-            Move::R | Move::Rp => (Vec3::X, 1, -angle), // Right is x > 0
-            Move::L | Move::Lp => (Vec3::X, -1, angle), // Left is x < 0
-            Move::U | Move::Up => (Vec3::Y, 1, -angle), // Up is y > 0
-            Move::D | Move::Dp => (Vec3::Y, -1, angle), // Down is y < 0
-            Move::F | Move::Fp => (Vec3::Z, 1, -angle), // Front is z > 0
-            Move::B | Move::Bp => (Vec3::Z, -1, angle), // Back is z < 0
+            Move::R | Move::Rp | Move::R2 => (Vec3::X, 1, -angle), // Right is x > 0
+            Move::L | Move::Lp | Move::L2 => (Vec3::X, -1, angle), // Left is x < 0
+            Move::U | Move::Up | Move::U2 => (Vec3::Y, 1, -angle), // Up is y > 0
+            Move::D | Move::Dp | Move::D2 => (Vec3::Y, -1, angle), // Down is y < 0
+            Move::F | Move::Fp | Move::F2 => (Vec3::Z, 1, -angle), // Front is z > 0
+            Move::B | Move::Bp | Move::B2 => (Vec3::Z, -1, angle), // Back is z < 0
         }
     } else {
         (Vec3::X, 0, 0.0)

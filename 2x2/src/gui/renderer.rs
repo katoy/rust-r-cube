@@ -264,21 +264,87 @@ fn get_animation_info(mv: Move) -> AnimationInfo {
             (13, 6),
             (15, 7),
         ],
+        Move::U2 => vec![
+            (16, 20),
+            (17, 21),
+            (8, 12),
+            (9, 13),
+            (20, 16),
+            (21, 17),
+            (12, 8),
+            (13, 9),
+        ],
+        Move::D2 => vec![
+            (18, 22),
+            (19, 23),
+            (11, 15),
+            (10, 14),
+            (22, 18),
+            (23, 19),
+            (15, 11),
+            (14, 10),
+        ],
+        Move::L2 => vec![
+            (16, 23),
+            (18, 21),
+            (0, 4),
+            (2, 6),
+            (23, 16),
+            (21, 18),
+            (4, 0),
+            (6, 2),
+        ],
+        Move::R2 => vec![
+            (17, 22),
+            (19, 20),
+            (1, 5),
+            (3, 7),
+            (22, 17),
+            (20, 19),
+            (5, 1),
+            (7, 3),
+        ],
+        Move::F2 => vec![
+            (2, 4),
+            (3, 5),
+            (10, 12),
+            (11, 13),
+            (4, 2),
+            (5, 3),
+            (12, 10),
+            (13, 11),
+        ],
+        Move::B2 => vec![
+            (0, 6),
+            (1, 7),
+            (14, 8),
+            (15, 9),
+            (6, 0),
+            (7, 1),
+            (8, 14),
+            (9, 15),
+        ],
     };
 
     let face_rotation = match mv {
         Move::U => Some((0, 90.0)),
         Move::Up => Some((0, -90.0)),
+        Move::U2 => Some((0, 180.0)),
         Move::D => Some((4, 90.0)),
         Move::Dp => Some((4, -90.0)),
+        Move::D2 => Some((4, 180.0)),
         Move::L => Some((8, 90.0)),
         Move::Lp => Some((8, -90.0)),
+        Move::L2 => Some((8, 180.0)),
         Move::R => Some((12, 90.0)),
         Move::Rp => Some((12, -90.0)),
+        Move::R2 => Some((12, 180.0)),
         Move::F => Some((16, 90.0)),
         Move::Fp => Some((16, -90.0)),
+        Move::F2 => Some((16, 180.0)),
         Move::B => Some((20, 90.0)),
         Move::Bp => Some((20, -90.0)),
+        Move::B2 => Some((20, 180.0)),
     };
 
     (mapping, face_rotation)
@@ -353,6 +419,7 @@ pub fn draw_cube(
                         Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // 反時計回り: +3
                         Move::U | Move::D => 1,                     // Up/Down: +1
                         Move::Up | Move::Dp => 3,                   // Up'/Down': +3
+                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2, // 180度回転: +2
                     };
                     sticker.orientation = (sticker.orientation + orientation_delta) % 4;
                 }
@@ -407,6 +474,8 @@ pub fn draw_cube(
                             _ => 0,
                         }
                     }
+                    // 180度回転の場合、移動するステッカーのorientationは2だけ変化
+                    Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
                     _ => 0,
                 };
 
@@ -436,8 +505,9 @@ pub fn draw_cube(
                         Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3, // +3 = +270度 = -90度
                         Move::U | Move::D => 1,
                         Move::Up | Move::Dp => 3,
+                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2, // +2 = +180度
                     };
-                    // orientation変化分を相殺：+1なら-90度、+3なら-270度
+                    // orientation変化分を相殺：+1なら-90度、+3なら-270度、+2なら-180度
                     let orientation_change_deg = -(orientation_delta as f32 * 90.0);
                     rotation = current_angle + orientation_change_deg;
                 }

@@ -5,16 +5,40 @@ pub fn apply_move(cube: &mut Cube, mv: Move) {
     match mv {
         Move::R => rotate_r(cube),
         Move::Rp => rotate_rp(cube),
+        Move::R2 => {
+            rotate_r(cube);
+            rotate_r(cube);
+        }
         Move::L => rotate_l(cube),
         Move::Lp => rotate_lp(cube),
+        Move::L2 => {
+            rotate_l(cube);
+            rotate_l(cube);
+        }
         Move::U => rotate_u(cube),
         Move::Up => rotate_up(cube),
+        Move::U2 => {
+            rotate_u(cube);
+            rotate_u(cube);
+        }
         Move::D => rotate_d(cube),
         Move::Dp => rotate_dp(cube),
+        Move::D2 => {
+            rotate_d(cube);
+            rotate_d(cube);
+        }
         Move::F => rotate_f(cube),
         Move::Fp => rotate_fp(cube),
+        Move::F2 => {
+            rotate_f(cube);
+            rotate_f(cube);
+        }
         Move::B => rotate_b(cube),
         Move::Bp => rotate_bp(cube),
+        Move::B2 => {
+            rotate_b(cube);
+            rotate_b(cube);
+        }
     }
 }
 

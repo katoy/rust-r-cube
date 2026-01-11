@@ -808,6 +808,7 @@ impl CubeApp {
     /// 保存ダイアログを表示して保存
     pub fn save_with_dialog(&mut self) {
         let task = rfd::FileDialog::new()
+            .set_directory(".")
             .add_filter("Text files", &["txt"])
             .set_file_name("cube_state.txt")
             .save_file();
@@ -831,6 +832,7 @@ impl CubeApp {
     /// 読込ダイアログを表示して読み込み
     pub fn load_with_dialog(&mut self) {
         let task = rfd::FileDialog::new()
+            .set_directory(".")
             .add_filter("Text files", &["txt"])
             .pick_file();
 

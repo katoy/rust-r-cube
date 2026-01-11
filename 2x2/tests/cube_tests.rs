@@ -228,9 +228,9 @@ fn test_hash_consistency() {
 
 #[test]
 fn test_all_moves_available() {
-    // Move::all_moves()が12個の動きを返すことを確認
+    // Move::all_moves()が18個の動きを返すことを確認
     let moves = Move::all_moves();
-    assert_eq!(moves.len(), 12);
+    assert_eq!(moves.len(), 18);
 
     // 重複がないことを確認
     let mut set = HashSet::new();

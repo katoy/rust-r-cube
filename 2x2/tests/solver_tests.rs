@@ -346,10 +346,10 @@ fn test_end_to_end_scramble_solve_with_orientation() {
         cube.scramble(scramble_moves);
 
         // 向きも揃える解法を探索
-        let solution = solver::solve(&cube, 14, false);
+        let solution = solver::solve(&cube, 11, false);
 
         if !solution.found {
-            // 深度14で見つからない場合はスキップ（稀なケース）
+            // 深度11で見つからない場合はスキップ（稀なケース）
             continue;
         }
 
@@ -381,7 +381,7 @@ fn test_end_to_end_specific_scramble() {
     }
 
     // 向きも揃える解法を探索
-    let solution = solver::solve(&cube, 14, false);
+    let solution = solver::solve(&cube, 11, false);
 
     assert!(solution.found, "4手スクランブルは深度14で解けるはず");
 

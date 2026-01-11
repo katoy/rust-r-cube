@@ -56,8 +56,8 @@ fn test_search_for_11_move_state() {
 
     println!("=== 11手必要な状態を探索中 ===");
 
-    // 試行回数を大幅に増やして11手を探す
-    for trial in 0..100 {
+    // 試行回数を減らして（100 -> 20）、デバッグビルドでも妥当な時間で終わるようにする
+    for trial in 0..20 {
         let mut cube = Cube::new();
         let mut scramble = Vec::new();
 

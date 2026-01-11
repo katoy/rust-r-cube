@@ -202,8 +202,8 @@ fn solve_internal(
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
-    // 深度dまでの状態数の概算: 12^d (12手 × 深度)
-    let estimated_states = 12_usize.pow(forward_depth as u32).min(100_000);
+    // 深度dまでの状態数の概算: N^d (N: 移動の種類数 × 深度)
+    let estimated_states = all_moves.len().pow(forward_depth as u32).min(1_000_000);
     let mut forward_dist: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_states, Default::default());
     let mut forward_queue: StateQueue = VecDeque::with_capacity(estimated_states);
@@ -265,7 +265,7 @@ fn solve_internal(
     }
 
     // --- 逆方向探索 ---
-    let estimated_backward_states = 12_usize.pow(backward_depth as u32).min(100_000);
+    let estimated_backward_states = all_moves.len().pow(backward_depth as u32).min(1_000_000);
     let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
     let mut backward_map: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_backward_states, Default::default());

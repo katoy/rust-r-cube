@@ -68,7 +68,7 @@ fn test_solve_with_orientation_regression() {
     cube1.apply_move(Move::U);
     cube1.apply_move(Move::F);
 
-    let solution1 = solver::solve(&cube1, 14, false);
+    let solution1 = solver::solve(&cube1, 6, false);
     assert!(
         solution1.found,
         "向きも揃える: 3手のスクランブル後に解が見つからない"
@@ -91,7 +91,7 @@ fn test_solve_with_orientation_regression() {
     cube2.apply_move(Move::R);
     cube2.apply_move(Move::U);
 
-    let solution2 = solver::solve(&cube2, 14, false);
+    let solution2 = solver::solve(&cube2, 6, false);
     assert!(
         solution2.found,
         "向きも揃える: 4手のスクランブル後に解が見つからない"

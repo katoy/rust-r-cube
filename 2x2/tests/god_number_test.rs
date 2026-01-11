@@ -44,7 +44,7 @@ fn test_ru_5_times_pattern() {
 
 #[test]
 fn test_search_for_11_move_state() {
-    // ランダムスクランブルで比較的長い手数を要する状態を探す
+    // ランダムスクランブルで11手必要な状態を探す
     use rand::seq::SliceRandom;
     use rand::thread_rng;
 
@@ -52,14 +52,18 @@ fn test_search_for_11_move_state() {
     let mut rng = thread_rng();
     let mut max_solution_length = 0;
     let mut hardest_scramble = Vec::new();
+    let mut hardest_cube_state = String::new();
 
-    // 複数回試行して長い解法が必要な状態を探す
-    for _ in 0..10 {
+    println!("=== 11手必要な状態を探索中 ===");
+
+    // 試行回数を大幅に増やして11手を探す
+    for trial in 0..100 {
         let mut cube = Cube::new();
         let mut scramble = Vec::new();
 
-        // 20手のランダムスクランブル
-        for _ in 0..20 {
+        // 20-30手のランダムスクランブル
+        let scramble_length = 20 + (trial % 10);
+        for _ in 0..scramble_length {
             let mv = *all_moves.choose(&mut rng).unwrap();
             cube.apply_move(mv);
             scramble.push(mv);
@@ -69,15 +73,31 @@ fn test_search_for_11_move_state() {
 
         if solution.found && solution.moves.len() > max_solution_length {
             max_solution_length = solution.moves.len();
-            hardest_scramble = scramble;
+            hardest_scramble = scramble.clone();
+            hardest_cube_state = cube.to_file_format();
+
+            if max_solution_length == 11 {
+                println!("✓ 11手必要な状態を発見！");
+                break;
+            }
         }
     }
 
     println!("見つかった最長解法: {} 手", max_solution_length);
     println!("スクランブル手順: {:?}", hardest_scramble);
+    println!("スクランブル後の状態:\n{}", hardest_cube_state);
 
     // 2x2の神の数は11なので、それ以下のはず
     assert!(max_solution_length <= 11, "解法手数は11手以下のはず");
+
+    if max_solution_length == 11 {
+        println!("🎉 神の数（11手）に到達！");
+    } else {
+        println!(
+            "⚠️  11手には到達しませんでした（最大: {}手）",
+            max_solution_length
+        );
+    }
 }
 
 #[test]

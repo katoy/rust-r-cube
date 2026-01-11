@@ -805,6 +805,55 @@ impl CubeApp {
         Ok(warning)
     }
 
+    /// 保存ダイアログを表示して保存
+    pub fn save_with_dialog(&mut self) {
+        let task = rfd::FileDialog::new()
+            .add_filter("Text files", &["txt"])
+            .set_file_name("cube_state.txt")
+            .save_file();
+
+        if let Some(path) = task {
+            let path_str = path.to_string_lossy();
+            match self.save_to_file(&path_str) {
+                Ok(_) => {
+                    self.input_error_message = format!(
+                        "保存しました: {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    );
+                }
+                Err(e) => {
+                    self.input_error_message = format!("保存エラー: {}", e);
+                }
+            }
+        }
+    }
+
+    /// 読込ダイアログを表示して読み込み
+    pub fn load_with_dialog(&mut self) {
+        let task = rfd::FileDialog::new()
+            .add_filter("Text files", &["txt"])
+            .pick_file();
+
+        if let Some(path) = task {
+            let path_str = path.to_string_lossy();
+            match self.load_from_file(&path_str) {
+                Ok(warning) => {
+                    if warning.is_empty() {
+                        self.input_error_message = format!(
+                            "読み込みました: {}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        );
+                    } else {
+                        self.input_error_message = format!("読み込み完了: {}", warning);
+                    }
+                }
+                Err(e) => {
+                    self.input_error_message = format!("読み込みエラー: {}", e);
+                }
+            }
+        }
+    }
+
     /// キーボード入力を処理
     fn handle_input(&mut self, ctx: &egui::Context) {
         // アニメーション中やソルブ中は入力を受け付けない（オプション）

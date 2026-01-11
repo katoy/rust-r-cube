@@ -240,6 +240,24 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
             }
         });
 
+        ui.add_space(5.0);
+
+        // Undo/Redo ボタン
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(app.history.can_undo(), egui::Button::new("↶ Undo"))
+                .clicked()
+            {
+                app.undo();
+            }
+            if ui
+                .add_enabled(app.history.can_redo(), egui::Button::new("↷ Redo"))
+                .clicked()
+            {
+                app.redo();
+            }
+        });
+
         ui.add_space(10.0);
 
         // アニメーション制御

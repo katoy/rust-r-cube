@@ -1,5 +1,6 @@
 use crate::cube::{Color, Cube, Move};
 use crate::gui::renderer_3d::{draw_cube_3d, View3D};
+use crate::history::History;
 use crate::solver;
 use crate::statistics::Statistics;
 use std::sync::mpsc::{channel, Receiver};
@@ -136,6 +137,9 @@ pub struct CubeApp {
 
     // 統計情報
     pub statistics: Statistics,
+
+    // 操作履歴
+    pub history: History,
 }
 
 /// ソルバーのタスク種類
@@ -173,6 +177,7 @@ impl Default for CubeApp {
             skip_parity_check: false,
             solver_task: SolverTask::Normal,
             statistics: Statistics::new(),
+            history: History::new(),
         }
     }
 }
@@ -205,6 +210,7 @@ impl CubeApp {
     pub fn queue_move(&mut self, mv: Move) {
         self.move_queue.push(mv);
         self.statistics.record_manual_move();
+        self.history.push(mv);
     }
 
     /// 複数の回転操作をキューに追加
@@ -219,8 +225,23 @@ impl CubeApp {
         self.solution = None;
         self.solution_text.clear();
         self.move_queue.clear();
+        self.history.clear();
         self.animation = None;
         self.pending_solution_update = None;
+    }
+
+    /// Undo: 最後の手動操作を取り消す
+    pub fn undo(&mut self) {
+        if let Some(inverse_move) = self.history.undo() {
+            self.move_queue.push(inverse_move);
+        }
+    }
+
+    /// Redo: 取り消した操作をやり直す  
+    pub fn redo(&mut self) {
+        if let Some(mv) = self.history.redo() {
+            self.move_queue.push(mv);
+        }
     }
 
     /// リセット

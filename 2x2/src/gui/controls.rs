@@ -177,71 +177,36 @@ pub fn draw_controls(app: &mut CubeApp, ui: &mut egui::Ui) {
         // 回転ボタン
         ui.label("回転操作:");
 
-        ui.horizontal(|ui| {
-            if ui.button("R").clicked() {
-                app.queue_move(Move::R);
-            }
-            if ui.button("R'").clicked() {
-                app.queue_move(Move::Rp);
-            }
-            if ui.button("R2").clicked() {
-                app.queue_move(Move::R2);
-            }
-            ui.add_space(10.0);
-            if ui.button("L").clicked() {
-                app.queue_move(Move::L);
-            }
-            if ui.button("L'").clicked() {
-                app.queue_move(Move::Lp);
-            }
-            if ui.button("L2").clicked() {
-                app.queue_move(Move::L2);
-            }
-        });
+        let move_groups = [
+            (
+                vec![Move::R, Move::Rp, Move::R2],
+                vec![Move::L, Move::Lp, Move::L2],
+            ),
+            (
+                vec![Move::U, Move::Up, Move::U2],
+                vec![Move::D, Move::Dp, Move::D2],
+            ),
+            (
+                vec![Move::F, Move::Fp, Move::F2],
+                vec![Move::B, Move::Bp, Move::B2],
+            ),
+        ];
 
-        ui.horizontal(|ui| {
-            if ui.button("U").clicked() {
-                app.queue_move(Move::U);
-            }
-            if ui.button("U'").clicked() {
-                app.queue_move(Move::Up);
-            }
-            if ui.button("U2").clicked() {
-                app.queue_move(Move::U2);
-            }
-            ui.add_space(10.0);
-            if ui.button("D").clicked() {
-                app.queue_move(Move::D);
-            }
-            if ui.button("D'").clicked() {
-                app.queue_move(Move::Dp);
-            }
-            if ui.button("D2").clicked() {
-                app.queue_move(Move::D2);
-            }
-        });
-
-        ui.horizontal(|ui| {
-            if ui.button("F").clicked() {
-                app.queue_move(Move::F);
-            }
-            if ui.button("F'").clicked() {
-                app.queue_move(Move::Fp);
-            }
-            if ui.button("F2").clicked() {
-                app.queue_move(Move::F2);
-            }
-            ui.add_space(10.0);
-            if ui.button("B").clicked() {
-                app.queue_move(Move::B);
-            }
-            if ui.button("B'").clicked() {
-                app.queue_move(Move::Bp);
-            }
-            if ui.button("B2").clicked() {
-                app.queue_move(Move::B2);
-            }
-        });
+        for (group1, group2) in move_groups {
+            ui.horizontal(|ui| {
+                for mv in group1 {
+                    if ui.button(format!("{}", mv)).clicked() {
+                        app.queue_move(mv);
+                    }
+                }
+                ui.add_space(10.0);
+                for mv in group2 {
+                    if ui.button(format!("{}", mv)).clicked() {
+                        app.queue_move(mv);
+                    }
+                }
+            });
+        }
 
         ui.add_space(5.0);
 

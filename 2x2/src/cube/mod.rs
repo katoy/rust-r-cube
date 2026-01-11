@@ -20,35 +20,22 @@ impl Cube {
         let mut stickers = [Sticker::new(Color::White); 24];
         let clockwise_pattern = [1, 2, 0, 3];
 
-        // Up face (White)
-        for (i, sticker) in stickers.iter_mut().take(4).enumerate() {
-            *sticker = Sticker::new(Color::White);
-            sticker.orientation = clockwise_pattern[i];
-        }
-        // Down face (Yellow)
-        for (i, sticker) in stickers.iter_mut().take(8).skip(4).enumerate() {
-            *sticker = Sticker::new(Color::Yellow);
-            sticker.orientation = clockwise_pattern[i];
-        }
-        // Left face (Green)
-        for (i, sticker) in stickers.iter_mut().take(12).skip(8).enumerate() {
-            *sticker = Sticker::new(Color::Green);
-            sticker.orientation = clockwise_pattern[i];
-        }
-        // Right face (Blue)
-        for (i, sticker) in stickers.iter_mut().take(16).skip(12).enumerate() {
-            *sticker = Sticker::new(Color::Blue);
-            sticker.orientation = clockwise_pattern[i];
-        }
-        // Front face (Red)
-        for (i, sticker) in stickers.iter_mut().take(20).skip(16).enumerate() {
-            *sticker = Sticker::new(Color::Red);
-            sticker.orientation = clockwise_pattern[i];
-        }
-        // Back face (Orange)
-        for (i, sticker) in stickers.iter_mut().skip(20).enumerate() {
-            *sticker = Sticker::new(Color::Orange);
-            sticker.orientation = clockwise_pattern[i];
+        let faces = [
+            (Color::White, 0..4),  // Up
+            (Color::Yellow, 4..8), // Down
+            (Color::Green, 8..12), // Left
+            (Color::Blue, 12..16), // Right
+            (Color::Red, 16..20),  // Front
+            (Color::Orange, 20..24), // Back
+        ];
+
+        for (color, range) in faces {
+            for (i, sticker_idx) in range.enumerate() {
+                stickers[sticker_idx] = Sticker {
+                    color,
+                    orientation: clockwise_pattern[i],
+                };
+            }
         }
 
         Self { stickers }

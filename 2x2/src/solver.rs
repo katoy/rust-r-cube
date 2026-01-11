@@ -202,7 +202,6 @@ fn solve_internal(
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
-    // 深度dまでの状態数の概算: N^d (N: 移動の種類数 × 深度)
     let estimated_states = all_moves.len().pow(forward_depth as u32).min(1_000_000);
     let mut forward_dist: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_states, Default::default());
@@ -216,15 +215,13 @@ fn solve_internal(
     forward_queue.push_back(start_key.clone());
     forward_dist.insert(start_key, (Move::R, None)); // marker
 
-    // 順方向BFS
     let mut current_depth = 0;
     while current_depth < forward_depth {
-        let level_size = forward_queue.len();
-        if level_size == 0 {
+        if forward_queue.is_empty() {
             break;
         }
 
-        // 進捗送信（順方向探索） - 一定間隔で送信
+        // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
                 let progress = (current_depth as f32) / (total_depth as f32);
@@ -232,35 +229,12 @@ fn solve_internal(
             }
         }
 
-        for _ in 0..level_size {
-            let curr = forward_queue
-                .pop_front()
-                .expect("forward_queue should not be empty during BFS iteration");
-
-            for &mv in &all_moves {
-                // 枝刈り：直前の逆操作を回避
-                if let Some(&(last_mv, ref parent)) = forward_dist.get(&curr) {
-                    if parent.is_some() && last_mv == mv.inverse() {
-                        continue;
-                    }
-                }
-
-                let mut next = curr.clone();
-                next.apply_move(mv);
-                let next_key = if ignore_orientation {
-                    next.normalized()
-                } else {
-                    next
-                };
-
-                use std::collections::hash_map::Entry;
-                if let Entry::Vacant(e) = forward_dist.entry(next_key) {
-                    let key_clone = e.key().clone();
-                    e.insert((mv, Some(curr.clone())));
-                    forward_queue.push_back(key_clone);
-                }
-            }
-        }
+        expand_layer(
+            &mut forward_queue,
+            &mut forward_dist,
+            &all_moves,
+            ignore_orientation,
+        );
         current_depth += 1;
     }
 
@@ -270,8 +244,6 @@ fn solve_internal(
     let mut backward_map: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_backward_states, Default::default());
 
-    // 向き無視の場合も向きも揃える場合も、24通りの完成状態すべてを使用
-    // ただし、キーの取り方が異なる
     for solved in get_solved_states() {
         let s_key = if ignore_orientation {
             solved.normalized()
@@ -295,9 +267,7 @@ fn solve_internal(
 
     let mut current_depth = 0;
     while !backward_queue.is_empty() && current_depth <= backward_depth {
-        let level_size = backward_queue.len();
-
-        // 進捗送信（逆方向探索） - 一定間隔で送信
+        // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
                 let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
@@ -305,49 +275,29 @@ fn solve_internal(
             }
         }
 
-        for _ in 0..level_size {
-            let curr = backward_queue
-                .pop_front()
-                .expect("backward_queue should not be empty during BFS iteration");
-
-            // 衝突判定
-            if forward_dist.contains_key(&curr) {
-                let mut moves = reconstruct_path_forward(&forward_dist, &curr);
-                let rev_moves = reconstruct_path_backward(&backward_map, &curr);
+        // 衝突判定
+        for curr in &backward_queue {
+            if forward_dist.contains_key(curr) {
+                let mut moves = reconstruct_path_forward(&forward_dist, curr);
+                let rev_moves = reconstruct_path_backward(&backward_map, curr);
                 moves.extend(rev_moves);
                 if let Some(ref tx) = progress_tx {
                     let _ = tx.send(1.0);
                 }
                 return Solution { moves, found: true };
             }
-
-            if current_depth == backward_depth {
-                continue;
-            }
-
-            for &mv in &all_moves {
-                if let Some(&(last_mv, ref parent)) = backward_map.get(&curr) {
-                    if parent.is_some() && last_mv == mv.inverse() {
-                        continue;
-                    }
-                }
-
-                let mut next = curr.clone();
-                next.apply_move(mv);
-                let next_key = if ignore_orientation {
-                    next.normalized()
-                } else {
-                    next
-                };
-
-                use std::collections::hash_map::Entry;
-                if let Entry::Vacant(e) = backward_map.entry(next_key) {
-                    let key_clone = e.key().clone();
-                    e.insert((mv, Some(curr.clone())));
-                    backward_queue.push_back(key_clone);
-                }
-            }
         }
+
+        if current_depth == backward_depth {
+            break;
+        }
+
+        expand_layer(
+            &mut backward_queue,
+            &mut backward_map,
+            &all_moves,
+            ignore_orientation,
+        );
         current_depth += 1;
     }
 
@@ -358,6 +308,40 @@ fn solve_internal(
     Solution {
         moves: vec![],
         found: false,
+    }
+}
+
+/// BFSの一つの層を展開します。
+fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move], ignore_orientation: bool) {
+    let level_size = queue.len();
+    for _ in 0..level_size {
+        let curr = queue
+            .pop_front()
+            .expect("queue should not be empty during BFS iteration");
+
+        for &mv in all_moves {
+            // 枝刈り：直前の逆操作を回避
+            if let Some(&(last_mv, ref parent)) = dist.get(&curr) {
+                if parent.is_some() && last_mv == mv.inverse() {
+                    continue;
+                }
+            }
+
+            let mut next = curr.clone();
+            next.apply_move(mv);
+            let next_key = if ignore_orientation {
+                next.normalized()
+            } else {
+                next
+            };
+
+            use std::collections::hash_map::Entry;
+            if let Entry::Vacant(e) = dist.entry(next_key) {
+                let key_clone = e.key().clone();
+                e.insert((mv, Some(curr.clone())));
+                queue.push_back(key_clone);
+            }
+        }
     }
 }
 

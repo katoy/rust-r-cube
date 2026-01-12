@@ -587,3 +587,14 @@ fn check_sticker_val(cube: &Cube, idx: usize, color: Color, orient: u8, msg: &st
     assert_eq!(s.color, color, "{} idx:{} 色不一致", msg, idx);
     assert_eq!(s.orientation, orient, "{} idx:{} 向き不一致", msg, idx);
 }
+
+#[test]
+fn test_ru_cycle() {
+    // R U の繰り返しの周期性を確認 (105回で元に戻る)
+    let mut cube = Cube::new();
+    for _ in 0..105 {
+        cube.apply_move(Move::R);
+        cube.apply_move(Move::U);
+    }
+    assert!(cube.is_solved());
+}

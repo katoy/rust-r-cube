@@ -6,8 +6,6 @@ fn test_strict_physical_consistency_all_moves() {
     let base_moves = Move::all_moves();
     
     for mv in base_moves {
-        println!("Verifying move: {:?}", mv);
-        
         // 1. 理想的な方位 (全面 [1, 2, 0, 3]) から開始
         let mut cube = Cube::new().with_clockwise_orientations();
         
@@ -15,8 +13,6 @@ fn test_strict_physical_consistency_all_moves() {
         cube.apply_move(mv);
         
         // 3. この状態からソルバー（向き考慮）で解決を試みる
-        // もし回転ロジックが「理想的な解決状態」の定義と物理的に矛盾していれば、
-        // 逆操作をしても「理想的な解決状態」のいずれにもヒットしない。
         let solution = solver::solve(&cube, 1, false);
         
         assert!(
@@ -41,5 +37,17 @@ fn test_strict_physical_consistency_all_moves() {
                 face, mv
             );
         }
+    }
+}
+
+#[test]
+fn test_move_identity_4_times() {
+    // 任意の操作を4回繰り返すと、向きも含めて完全に元に戻ることを確認
+    for mv in Move::all_moves() {
+        let mut cube = Cube::new();
+        for _ in 0..4 {
+            cube.apply_move(mv);
+        }
+        assert!(cube.is_solved_with_orientation());
     }
 }

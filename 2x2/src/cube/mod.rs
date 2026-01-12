@@ -57,6 +57,24 @@ impl Cube {
         true
     }
 
+    /// キューブが完成しているか判定します（色と向きの両方）。
+    #[must_use]
+    pub fn is_solved_with_orientation(&self) -> bool {
+        if !self.is_solved() {
+            return false;
+        }
+        let clockwise_pattern = [1, 2, 0, 3];
+        for face in Face::all() {
+            let start = face.start_index();
+            for i in 0..4 {
+                if self.stickers[start + i].orientation != clockwise_pattern[i] {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// 指定したインデックスのステッカーを取得します。
     #[must_use]
     pub fn get_sticker(&self, index: usize) -> Sticker {

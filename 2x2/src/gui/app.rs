@@ -236,7 +236,7 @@ impl CubeApp {
         }
     }
 
-    /// Redo: 取り消した操作をやり直す  
+    /// Redo: 取り消した操作をやり直す
     pub fn redo(&mut self) {
         if let Some(mv) = self.history.redo() {
             self.move_queue.push(mv);
@@ -753,7 +753,8 @@ impl CubeApp {
 
     /// キューブの状態をファイルに保存
     pub fn save_to_file(&self, path: &str) -> Result<(), String> {
-        let content = self.cube.to_file_format();
+        // 現在表示されているキューブ（スキャン中なら入力バッファベース）を保存
+        let content = self.display_cube().to_file_format();
         std::fs::write(path, content).map_err(|e| format!("ファイルの保存に失敗しました: {}", e))
     }
 
@@ -762,35 +763,55 @@ impl CubeApp {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
 
-        let new_cube = Cube::from_file_format(&content).map_err(|e| e.to_string())?;
+        let loaded_cube = Cube::from_file_format(&content).map_err(|e| e.to_string())?;
 
         let mut warning = String::new();
 
-        // パリティチェック（skip_parity_checkフラグで制御）
-        if !self.skip_parity_check {
-            if let Err(e) = new_cube.is_valid_state() {
-                warning = format!("警告: 無効なキューブ状態です ({})", e);
+        // 読み込んだキューブに Gray (未設定) が含まれているかチェック
+        let has_gray = loaded_cube.stickers.iter().any(|s| s.color == Color::Gray);
+
+        if has_gray {
+            // スキャンモードとして復元
+            self.input_state = InputState::Scanning { face_index: 0 };
+            for (i, sticker) in loaded_cube.stickers.iter().enumerate() {
+                self.input_buffer[i] = if sticker.color == Color::Gray {
+                    None
+                } else {
+                    Some(sticker.color)
+                };
             }
+            self.cube = Cube::new(); // 内部状態はリセット
+            warning = "スキャン途中の状態を読み込みました".to_string();
+        } else {
+            // 通常のキューブとして復元
+            let mut new_cube = loaded_cube;
+
+            // 全ての向きが0（旧形式またはリセット直後）の場合のみ、向きの自動復元を試みる
+            let all_zero_orientation = new_cube.stickers.iter().all(|s| s.orientation == 0);
+            if all_zero_orientation {
+                if let Err(e) = new_cube.restore_orientation_instantly() {
+                    warning = format!("警告: 向きの復元に失敗しました ({})", e);
+                }
+            }
+
+            // パリティチェック（skip_parity_checkフラグで制御）
+            if !self.skip_parity_check {
+                if let Err(e) = new_cube.is_valid_state() {
+                    let parity_warning = format!("警告: 無効なキューブ状態です ({})", e);
+                    warning = if warning.is_empty() { parity_warning } else { format!("{}\n{}", warning, parity_warning) };
+                }
+            }
+
+            self.cube = new_cube;
+            self.input_state = InputState::Normal;
+            self.input_buffer = [None; 24];
         }
 
-        self.cube = new_cube;
         self.solution = None;
         self.solution_text.clear();
         self.animation = None;
         self.move_queue.clear();
-
-        // 向きの自動復元（即時）
-        if let Err(e) = self.cube.restore_orientation_instantly() {
-            warning = format!("警告: 向きの復元に失敗しました ({})", e);
-        }
-
-        // スキャンモードを終了
-        self.input_state = InputState::Normal;
-        self.input_buffer = [None; 24];
-        self.input_error_message.clear(); // コントロール側で上書きされるが念のため
-
-        // 向きの自動復元を開始（非同期）
-        self.start_restore_orientation();
+        self.input_error_message.clear();
 
         Ok(warning)
     }

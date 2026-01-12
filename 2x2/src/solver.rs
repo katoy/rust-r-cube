@@ -321,7 +321,8 @@ fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move],
     let current_nodes: Vec<Cube> = queue.drain(..).collect();
 
     // 並列に次の層を生成
-    let next_entries: Vec<Vec<(Cube, (Option<Move>, Option<Cube>))>> = current_nodes
+    type SearchEntry = (Cube, (Option<Move>, Option<Cube>));
+    let next_entries: Vec<Vec<SearchEntry>> = current_nodes
         .par_iter()
         .map(|curr| {
             let mut results = Vec::new();

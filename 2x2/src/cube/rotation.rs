@@ -30,7 +30,7 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
         Move::L,
         MoveData {
             face_idx: 8,
-            orientation_delta: 3,
+            orientation_delta: 1,
             cycle: [0, 2, 23, 21, 4, 6, 16, 18],
             rotations: [2, 2, 2, 2, 0, 0, 0, 0],
         },
@@ -39,7 +39,7 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
         Move::R,
         MoveData {
             face_idx: 12,
-            orientation_delta: 3,
+            orientation_delta: 1,
             cycle: [1, 3, 17, 19, 5, 7, 22, 20],
             rotations: [0, 0, 0, 0, 2, 2, 2, 2],
         },
@@ -50,7 +50,7 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
             face_idx: 16,
             orientation_delta: 1,
             cycle: [2, 3, 11, 9, 5, 4, 12, 14],
-            rotations: [1, 1, 3, 3, 1, 1, 3, 3],
+            rotations: [1, 1, 1, 1, 1, 1, 1, 1],
         },
     ),
     (
@@ -59,7 +59,7 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
             face_idx: 20,
             orientation_delta: 1,
             cycle: [0, 1, 13, 15, 7, 6, 10, 8],
-            rotations: [3, 3, 1, 1, 3, 3, 1, 1],
+            rotations: [3, 3, 3, 3, 3, 3, 3, 3],
         },
     ),
 ];

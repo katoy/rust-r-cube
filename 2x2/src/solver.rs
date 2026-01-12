@@ -60,7 +60,9 @@ fn generate_all_solved_states() -> Vec<Cube> {
             }
         }
     }
-    // 全ての完成状態のorientationを時計回りパターンにリセット
+    // 回転操作によって得られた物理的な向きを、
+    // 方位によらず標準パターン [1, 2, 0, 3] にリセットする。
+    // (rotation.rs が物理的に整合したため、これら24状態はすべて解決状態として有効)
     states
         .iter()
         .map(|cube| cube.with_clockwise_orientations())

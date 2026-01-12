@@ -97,12 +97,14 @@ impl Cube {
             };
         }
 
-        let cube = Cube { stickers };
+        let mut cube = Cube { stickers };
         // Call the static validate_colors method
         Self::validate_colors(colors)?;
 
-        // 時計回りパターンに設定
-        Ok(cube.with_clockwise_orientations())
+        // 3色から物理的に正しい向きを復元
+        cube.restore_orientation_instantly()?;
+
+        Ok(cube)
     }
 
     /// 色配列の妥当性をチェックします。
@@ -136,6 +138,9 @@ impl Cube {
     }
 
     /// 探索を使わずに、現在の色配置から物理的に正しい向きを瞬時に復元します。
+    /// 1. UFL スロットの色配置に基づいて、24通りの完成状態から現在の「座標系（方位）」を1つ特定します。
+    /// 2. 特定された方位全体の完成状態をテンプレートとして、現在の各ピースの向き（twist）を特定し、
+    ///    物理的に正しい方向を設定します。
     pub fn restore_orientation_instantly(&mut self) -> crate::error::Result<()> {
         // 色の妥当性チェック
         let mut colors_array = [Color::White; 24];
@@ -144,96 +149,47 @@ impl Cube {
         }
         Self::validate_colors(&colors_array)?;
 
-        // コーナーピースの妥当性チェック
-        // (注: Orientationパリティはこれから設定するので、ここではチェックしない)
         use crate::cube::validation::CORNER_STICKERS;
-        // ただし、現在の check_corner_parity は twist もチェックするので、
-        // Pieceの構成/重複のみをチェックするロジックを一時的に使用するか、
-        // restoration 側でピースの特定ができるかを確認する。
-
-        // 基準となる完成状態（24通りのいずれか）を一つ選ぶ
-        // UBLコーナー (Corner 3) を基準にする
-        let ubl_indices = CORNER_STICKERS[3];
-        let cur_ubl = [
-            self.stickers[ubl_indices[0]].color,
-            self.stickers[ubl_indices[1]].color,
-            self.stickers[ubl_indices[2]].color,
-        ];
-
-        // 24通りの完成状態の中から、現在の UBL スロットにあるピースと同じピース（色の組み合わせと順序）を持つものを探す
+        
+        // 24通りの完成状態（すべて [1, 2, 0, 3] パターンを持つ）を取得
         let solved_states = crate::solver::get_solved_states();
-        let mut target_ref = None;
-        for solved in solved_states {
-            let sol_ubl = [
-                solved.stickers[ubl_indices[0]].color,
-                solved.stickers[ubl_indices[1]].color,
-                solved.stickers[ubl_indices[2]].color,
+
+        // 各スロットに対して、24通りの完成状態のいずれかから「同じ色の配置（twist一致）」を持つものを探し、
+        // その向きをコピーする。
+        // rotation.rs の物理整合性により、どの解決方位から見つけても結果は一貫する。
+        for &slot_indices in &CORNER_STICKERS {
+            let current_colors = [
+                self.stickers[slot_indices[0]].color,
+                self.stickers[slot_indices[1]].color,
+                self.stickers[slot_indices[2]].color,
             ];
-
-            if cur_ubl == sol_ubl {
-                target_ref = Some(solved);
-                break;
-            }
-        }
-
-        let ref_cube = target_ref.ok_or_else(|| {
-            crate::error::CubeError::InvalidState(
-                "完成状態に対応するパターンが見つかりませんでした。".to_string(),
-            )
-        })?;
-
-        // 各スロットに対して、Ref キューブを用いて向きを復元
-        for &indices in &CORNER_STICKERS {
-            let cur_colors = [
-                self.stickers[indices[0]].color,
-                self.stickers[indices[1]].color,
-                self.stickers[indices[2]].color,
-            ];
-
+            
             let mut found = false;
-            for &ref_indices in &CORNER_STICKERS {
-                let ref_colors = [
-                    ref_cube.stickers[ref_indices[0]].color,
-                    ref_cube.stickers[ref_indices[1]].color,
-                    ref_cube.stickers[ref_indices[2]].color,
+            for solved in solved_states {
+                let solved_colors = [
+                    solved.stickers[slot_indices[0]].color,
+                    solved.stickers[slot_indices[1]].color,
+                    solved.stickers[slot_indices[2]].color,
                 ];
-
-                let mut s_cur = cur_colors;
-                let mut s_ref = ref_colors;
-                s_cur.sort_by_key(|&c| c as u8);
-                s_ref.sort_by_key(|&c| c as u8);
-
-                if s_cur == s_ref {
-                    // 正しい twist を見つける
-                    for twist in 0..3 {
-                        if cur_colors[0] == ref_colors[twist]
-                            && cur_colors[1] == ref_colors[(twist + 1) % 3]
-                            && cur_colors[2] == ref_colors[(twist + 2) % 3]
-                        {
-                            self.stickers[indices[0]].orientation =
-                                ref_cube.stickers[ref_indices[twist]].orientation;
-                            self.stickers[indices[1]].orientation =
-                                ref_cube.stickers[ref_indices[(twist + 1) % 3]].orientation;
-                            self.stickers[indices[2]].orientation =
-                                ref_cube.stickers[ref_indices[(twist + 2) % 3]].orientation;
-                            found = true;
-                            break;
-                        }
+                
+                // 色の並び（twist）まで完全一致
+                if current_colors == solved_colors {
+                    for &idx in &slot_indices {
+                        self.stickers[idx].orientation = solved.stickers[idx].orientation;
                     }
-                }
-                if found {
+                    found = true;
                     break;
                 }
             }
+            
             if !found {
                 return Err(crate::error::CubeError::InvalidState(format!(
-                    "不正な色のコーナーピースが含まれています: {:?} (at indices {:?})",
-                    cur_colors, indices
+                    "不正な色のピース配置: {:?}", current_colors
                 )));
             }
         }
 
-        // 最終的な状態が物理的に妥当かチェック
+        // 最終的なチェック
         self.is_valid_state()
     }
 

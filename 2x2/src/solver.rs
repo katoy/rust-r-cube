@@ -313,35 +313,48 @@ fn solve_internal(
     }
 }
 
-/// BFSの一つの層を展開します。
+/// BFSの一つの層を展開します（Rayonによる並列化版）。
 fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move], ignore_orientation: bool) {
-    let level_size = queue.len();
-    for _ in 0..level_size {
-        let curr = queue
-            .pop_front()
-            .expect("queue should not be empty during BFS iteration");
+    use rayon::prelude::*;
 
-        for &mv in all_moves {
-            // 枝刈り：直前の逆操作を回避
-            if let Some(&(Some(last_mv), _)) = dist.get(&curr) {
-                if last_mv == mv.inverse() {
-                    continue;
+    // 現在の層の全ノードをベクタに取り出す（並列処理のため）
+    let current_nodes: Vec<Cube> = queue.drain(..).collect();
+
+    // 並列に次の層を生成
+    let next_entries: Vec<Vec<(Cube, (Option<Move>, Option<Cube>))>> = current_nodes
+        .par_iter()
+        .map(|curr| {
+            let mut results = Vec::new();
+            for &mv in all_moves {
+                // 枝刈り：直前の逆操作を回避
+                if let Some(&(Some(last_mv), _)) = dist.get(curr) {
+                    if last_mv == mv.inverse() {
+                        continue;
+                    }
                 }
+
+                let mut next = curr.clone();
+                next.apply_move(mv);
+                let next_key = if ignore_orientation {
+                    next.normalized()
+                } else {
+                    next
+                };
+
+                // ここではまだ dist に追加せず、候補として保持
+                results.push((next_key, (Some(mv), Some(curr.clone()))));
             }
+            results
+        })
+        .collect();
 
-            let mut next = curr.clone();
-            next.apply_move(mv);
-            let next_key = if ignore_orientation {
-                next.normalized()
-            } else {
-                next
-            };
-
-            use std::collections::hash_map::Entry;
-            if let Entry::Vacant(e) = dist.entry(next_key) {
-                let key_clone = e.key().clone();
-                e.insert((Some(mv), Some(curr.clone())));
-                queue.push_back(key_clone);
+    // 生成されたエントリを逐次的に dist に追加
+    // (重複チェックが必要なため、ここからはメインスレッドで実行)
+    for results in next_entries {
+        for (next_key, val) in results {
+            if !dist.contains_key(&next_key) {
+                dist.insert(next_key.clone(), val);
+                queue.push_back(next_key);
             }
         }
     }

@@ -1,4 +1,4 @@
-use crate::cube::{Color, Cube, Move};
+use crate::cube::{Cube, Move};
 use crate::gui::app::AnimationState;
 use egui::{Color32, Pos2, Rect, Stroke};
 use glam::{Mat4, Vec3};
@@ -29,19 +29,6 @@ struct Sticker3D {
     normal: Vec3,
     u_vec: Vec3, // ステッカーの「右」方向
     v_vec: Vec3, // ステッカーの「下」方向
-}
-
-/// 色変換
-fn color_to_color32(color: Color) -> Color32 {
-    match color {
-        Color::White => Color32::from_rgb(255, 255, 255),
-        Color::Yellow => Color32::from_rgb(255, 255, 0),
-        Color::Green => Color32::from_rgb(0, 200, 0),
-        Color::Blue => Color32::from_rgb(0, 100, 255),
-        Color::Red => Color32::from_rgb(255, 50, 50),
-        Color::Orange => Color32::from_rgb(255, 165, 0),
-        Color::Gray => Color32::from_rgb(180, 180, 180), // 未設定用グレー
-    }
 }
 
 /// 描画用の頂点データ
@@ -75,7 +62,7 @@ fn project_point(
 
 /// ステッカーの初期3D配置を生成
 fn get_initial_stickers() -> Vec<Sticker3D> {
-    let mut stickers = Vec::with_capacity(24);
+    let mut stickers = Vec::with_capacity(crate::cube::NUM_STICKERS);
     let size = 0.45;
 
     // 各面の定義: (normal, center_base, u_axis, v_axis, flip_v)
@@ -89,7 +76,7 @@ fn get_initial_stickers() -> Vec<Sticker3D> {
     ];
 
     for (f_idx, (normal, center_base, u_axis, v_axis, flip_v)) in face_defs.iter().enumerate() {
-        for i in 0..4 {
+        for i in 0..crate::cube::STICKERS_PER_FACE {
             let col = (i % 2) as f32;
             let row = (i / 2) as f32;
             let u_val = (col - 0.5) * 1.0;
@@ -100,7 +87,7 @@ fn get_initial_stickers() -> Vec<Sticker3D> {
             };
 
             stickers.push(Sticker3D {
-                index: f_idx * 4 + i,
+                index: f_idx * crate::cube::STICKERS_PER_FACE + i,
                 center: *center_base + *u_axis * u_val + *v_axis * v_val,
                 normal: *normal,
                 u_vec: *u_axis * size,
@@ -162,42 +149,36 @@ pub fn draw_cube_3d(
     let rotation = Mat4::from_rotation_x(view.pitch) * Mat4::from_rotation_y(view.yaw);
     let view_mat = rotation; // カメラ位置は固定、オブジェクトを回転させるイメージ
 
-    // アニメーション情報取得
-    let (anim_axis, anim_layer, anim_angle) = if let Some(anim) = animation {
-        let progress = anim.eased_progress();
-        let base_angle = match anim.current_move {
-            Move::R2 | Move::L2 | Move::U2 | Move::D2 | Move::F2 | Move::B2 => {
-                180.0f32.to_radians()
-            }
-            _ => 90.0f32.to_radians(),
-        };
-        let angle = progress * base_angle;
-        let angle = match anim.current_move {
-            Move::R
-            | Move::L
-            | Move::U
-            | Move::D
-            | Move::F
-            | Move::B
-            | Move::R2
-            | Move::L2
-            | Move::U2
-            | Move::D2
-            | Move::F2
-            | Move::B2 => angle,
-            _ => -angle, // Prime moves
-        };
-
+    // アニメーション情報取得: (軸, レイヤー(1 or -1), 基本角度(正負込))
+    let (anim_axis, anim_layer, anim_full_angle) = if let Some(anim) = animation {
         match anim.current_move {
-            Move::R | Move::Rp | Move::R2 => (Vec3::X, 1, -angle), // Right is x > 0
-            Move::L | Move::Lp | Move::L2 => (Vec3::X, -1, angle), // Left is x < 0
-            Move::U | Move::Up | Move::U2 => (Vec3::Y, 1, -angle), // Up is y > 0
-            Move::D | Move::Dp | Move::D2 => (Vec3::Y, -1, angle), // Down is y < 0
-            Move::F | Move::Fp | Move::F2 => (Vec3::Z, 1, -angle), // Front is z > 0
-            Move::B | Move::Bp | Move::B2 => (Vec3::Z, -1, angle), // Back is z < 0
+            Move::R => (Vec3::X, 1, -90.0_f32.to_radians()),
+            Move::Rp => (Vec3::X, 1, 90.0_f32.to_radians()),
+            Move::R2 => (Vec3::X, 1, -180.0_f32.to_radians()),
+            Move::L => (Vec3::X, -1, 90.0_f32.to_radians()),
+            Move::Lp => (Vec3::X, -1, -90.0_f32.to_radians()),
+            Move::L2 => (Vec3::X, -1, 180.0_f32.to_radians()),
+            Move::U => (Vec3::Y, 1, -90.0_f32.to_radians()),
+            Move::Up => (Vec3::Y, 1, 90.0_f32.to_radians()),
+            Move::U2 => (Vec3::Y, 1, -180.0_f32.to_radians()),
+            Move::D => (Vec3::Y, -1, 90.0_f32.to_radians()),
+            Move::Dp => (Vec3::Y, -1, -90.0_f32.to_radians()),
+            Move::D2 => (Vec3::Y, -1, 180.0_f32.to_radians()),
+            Move::F => (Vec3::Z, 1, -90.0_f32.to_radians()),
+            Move::Fp => (Vec3::Z, 1, 90.0_f32.to_radians()),
+            Move::F2 => (Vec3::Z, 1, -180.0_f32.to_radians()),
+            Move::B => (Vec3::Z, -1, 90.0_f32.to_radians()),
+            Move::Bp => (Vec3::Z, -1, -90.0_f32.to_radians()),
+            Move::B2 => (Vec3::Z, -1, 180.0_f32.to_radians()),
         }
     } else {
         (Vec3::X, 0, 0.0)
+    };
+
+    let anim_angle = if let Some(anim) = animation {
+        anim_full_angle * anim.eased_progress()
+    } else {
+        0.0
     };
 
     let initial_stickers = get_initial_stickers();
@@ -206,7 +187,7 @@ pub fn draw_cube_3d(
     for sticker_def in initial_stickers {
         // 現在のステッカーの状態（色）を取得
         let sticker_data = cube.get_sticker(sticker_def.index);
-        let color = color_to_color32(sticker_data.color);
+        let color = crate::gui::renderer::color_to_color32(sticker_data.color);
 
         // アニメーション回転の適用
         let mut model_mat = Mat4::IDENTITY;
@@ -321,8 +302,8 @@ pub fn draw_cube_3d(
 
             // 編集中の面をハイライト表示
             if let Some(face_idx) = highlight_face_index {
-                let start_idx = face_idx * 4;
-                if face.sticker_index >= start_idx && face.sticker_index < start_idx + 4 {
+                let start_idx = face_idx * crate::cube::STICKERS_PER_FACE;
+                if face.sticker_index >= start_idx && face.sticker_index < start_idx + crate::cube::STICKERS_PER_FACE {
                     // 太いオレンジの枠線で囲む
                     painter.add(egui::Shape::convex_polygon(
                         face.points.clone(),

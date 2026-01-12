@@ -1,4 +1,4 @@
-use crate::cube::{Color, Cube, Move, Sticker};
+use crate::cube::{Color, Cube, Face, Move, Sticker, STICKERS_PER_FACE};
 use crate::gui::app::AnimationState;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
@@ -115,28 +115,27 @@ fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha
 /// インデックスに対応するグリッド座標 (col, row) を取得
 fn get_grid_coords(index: usize) -> Pos2 {
     let (col, row) = match index {
-        0..=3 => (2.0 + (index % 2) as f32, 0.0 + (index / 2) as f32), // U
-        4..=7 => (
-            2.0 + ((index - 4) % 2) as f32,
-            4.0 + ((index - 4) / 2) as f32,
+        i if i < Face::Down.start_index() => (2.0 + (i % 2) as f32, 0.0 + (i / 2) as f32), // U
+        i if i < Face::Left.start_index() => (
+            2.0 + ((i - 4) % 2) as f32,
+            4.0 + ((i - 4) / 2) as f32,
         ), // D
-        8..=11 => (
-            0.0 + ((index - 8) % 2) as f32,
-            2.0 + ((index - 8) / 2) as f32,
+        i if i < Face::Right.start_index() => (
+            0.0 + ((i - 8) % 2) as f32,
+            2.0 + ((i - 8) / 2) as f32,
         ), // L
-        12..=15 => (
-            4.0 + ((index - 12) % 2) as f32,
-            2.0 + ((index - 12) / 2) as f32,
+        i if i < Face::Front.start_index() => (
+            4.0 + ((i - 12) % 2) as f32,
+            2.0 + ((i - 12) / 2) as f32,
         ), // R
-        16..=19 => (
-            2.0 + ((index - 16) % 2) as f32,
-            2.0 + ((index - 16) / 2) as f32,
+        i if i < Face::Back.start_index() => (
+            2.0 + ((i - 16) % 2) as f32,
+            2.0 + ((i - 16) / 2) as f32,
         ), // F
-        20..=23 => (
+        _ => (
             6.0 + ((index - 20) % 2) as f32,
             2.0 + ((index - 20) / 2) as f32,
         ), // B
-        _ => (0.0, 0.0),
     };
     Pos2::new(col, row)
 }
@@ -431,7 +430,7 @@ pub fn draw_cube(
     }
 
     // 全ステッカーを描画
-    for i in 0..24 {
+    for i in 0..crate::cube::NUM_STICKERS {
         let mut sticker = cube.get_sticker(i);
         let grid_pos = get_grid_coords(i);
         let mut rotation = 0.0;
@@ -444,7 +443,7 @@ pub fn draw_cube(
 
             // 1. 回転する面のステッカー: 最終的なorientationを設定
             if let Some((face_start, _angle)) = anim_face_rot {
-                if i >= face_start && i < face_start + 4 {
+                if i >= face_start && i < face_start + STICKERS_PER_FACE {
                     let orientation_delta = get_face_orientation_delta(anim.current_move);
                     sticker.orientation = (sticker.orientation + orientation_delta) % 4;
                 }
@@ -460,7 +459,7 @@ pub fn draw_cube(
 
             // 面回転の処理
             if let Some((face_start, angle)) = anim_face_rot {
-                if i >= face_start && i < face_start + 4 {
+                if i >= face_start && i < face_start + STICKERS_PER_FACE {
                     let center_grid_idx = face_start;
                     let center_grid_base = get_grid_coords(center_grid_idx);
                     let center_grid = Pos2::new(center_grid_base.x + 0.5, center_grid_base.y + 0.5);
@@ -592,7 +591,7 @@ pub fn draw_cube(
 
     // 編集中の面をハイライト表示
     if let Some(face_idx) = highlight_face_index {
-        let start_idx = face_idx * 4;
+        let start_idx = face_idx * STICKERS_PER_FACE;
         let face_grid_rect = get_face_grid_rect(start_idx);
 
         // 面の左上セルと右下セルの中心を取得
@@ -683,12 +682,12 @@ fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
 /// インデックスに対応する面全体のグリッド領域を取得
 fn get_face_grid_rect(index: usize) -> Rect {
     let (min_col, min_row) = match index {
-        0..=3 => (2.0, 0.0),   // U
-        4..=7 => (2.0, 4.0),   // D
-        8..=11 => (0.0, 2.0),  // L
-        12..=15 => (4.0, 2.0), // R
-        16..=19 => (2.0, 2.0), // F
-        20..=23 => (6.0, 2.0), // B
+        i if i == Face::Up.start_index() => (2.0, 0.0),    // U
+        i if i == Face::Down.start_index() => (2.0, 4.0),  // D
+        i if i == Face::Left.start_index() => (0.0, 2.0),  // L
+        i if i == Face::Right.start_index() => (4.0, 2.0), // R
+        i if i == Face::Front.start_index() => (2.0, 2.0), // F
+        i if i == Face::Back.start_index() => (6.0, 2.0),  // B
         _ => (0.0, 0.0),
     };
     // 2x2なのでサイズは2.0x2.0

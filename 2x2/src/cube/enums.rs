@@ -1,13 +1,39 @@
 /// キューブの面を表す列挙型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Face {
-    Up,
-    Down,
-    Left,
-    Right,
-    Front,
-    Back,
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3,
+    Front = 4,
+    Back = 5,
 }
+
+impl Face {
+    /// 面の開始インデックスを取得 (0, 4, 8, 12, 16, 20)
+    #[must_use]
+    pub const fn start_index(self) -> usize {
+        (self as usize) * STICKERS_PER_FACE
+    }
+
+    /// すべての面を取得
+    #[must_use]
+    pub fn all() -> [Face; 6] {
+        [
+            Face::Up,
+            Face::Down,
+            Face::Left,
+            Face::Right,
+            Face::Front,
+            Face::Back,
+        ]
+    }
+}
+
+/// ステッカーの総数
+pub const NUM_STICKERS: usize = 24;
+/// 1面あたりのステッカー数
+pub const STICKERS_PER_FACE: usize = 4;
 
 /// ステッカーの色
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

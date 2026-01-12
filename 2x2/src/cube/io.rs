@@ -7,8 +7,8 @@ pub fn to_file_format(cube: &Cube) -> String {
 
     // ヘルパー関数：面の4文字を取得
     let get_face = |face_idx: usize| -> String {
-        let start = face_idx * 4;
-        (0..4)
+        let start = face_idx * crate::cube::STICKERS_PER_FACE;
+        (0..crate::cube::STICKERS_PER_FACE)
             .map(|i| match cube.stickers[start + i].color {
                 Color::White => 'W',
                 Color::Yellow => 'Y',
@@ -98,15 +98,18 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
     }
 
     // 24色の配列を作成（内部順序: Up, Down, Left, Right, Front, Back）
-    let mut colors = [Color::White; 24];
+    let mut colors = [Color::White; crate::cube::NUM_STICKERS];
 
     // 各面の配置ルール: (面、ソースとなる色のスライス)
-    colors[0..4].copy_from_slice(&line1_colors); // Up
-    colors[4..8].copy_from_slice(&line3_colors); // Down
-    colors[8..12].copy_from_slice(&line2_colors[0..4]); // Left
-    colors[12..16].copy_from_slice(&line2_colors[8..12]); // Right
-    colors[16..20].copy_from_slice(&line2_colors[4..8]); // Front
-    colors[20..24].copy_from_slice(&line2_colors[12..16]); // Back
+    const SPF: usize = crate::cube::STICKERS_PER_FACE;
+    use crate::cube::Face;
+
+    colors[Face::Up.start_index()..Face::Up.start_index() + SPF].copy_from_slice(&line1_colors);
+    colors[Face::Down.start_index()..Face::Down.start_index() + SPF].copy_from_slice(&line3_colors);
+    colors[Face::Left.start_index()..Face::Left.start_index() + SPF].copy_from_slice(&line2_colors[0..4]);
+    colors[Face::Right.start_index()..Face::Right.start_index() + SPF].copy_from_slice(&line2_colors[8..12]);
+    colors[Face::Front.start_index()..Face::Front.start_index() + SPF].copy_from_slice(&line2_colors[4..8]);
+    colors[Face::Back.start_index()..Face::Back.start_index() + SPF].copy_from_slice(&line2_colors[12..16]);
 
     let colors_array = colors;
 

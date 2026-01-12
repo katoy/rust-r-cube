@@ -8,8 +8,8 @@ use std::sync::OnceLock;
 pub const DEFAULT_MAX_DEPTH: usize = 11;
 const PROGRESS_UPDATE_INTERVAL: usize = 4;
 
-/// BFS探索で使用する状態マップ: 状態 → (到達した手, 親の状態)
-type StateMap = FxHashMap<Cube, (Move, Option<Cube>)>;
+/// BFS探索で使用する状態マップ: 状態 → (その状態に到達した操作, 親の状態)
+type StateMap = FxHashMap<Cube, (Option<Move>, Option<Cube>)>;
 
 /// BFS探索で使用する状態キュー
 type StateQueue = VecDeque<Cube>;
@@ -213,7 +213,7 @@ fn solve_internal(
         start_cube.clone()
     };
     forward_queue.push_back(start_key.clone());
-    forward_dist.insert(start_key, (Move::R, None)); // marker
+    forward_dist.insert(start_key, (None, None));
 
     let mut current_depth = 0;
     while current_depth < forward_depth {
@@ -260,7 +260,7 @@ fn solve_internal(
                     found: true,
                 };
             }
-            backward_map.insert(s_key.clone(), (Move::R, None));
+            backward_map.insert(s_key.clone(), (None, None));
             backward_queue.push_back(s_key);
         }
     }
@@ -321,8 +321,8 @@ fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move],
 
         for &mv in all_moves {
             // 枝刈り：直前の逆操作を回避
-            if let Some(&(last_mv, ref parent)) = dist.get(&curr) {
-                if parent.is_some() && last_mv == mv.inverse() {
+            if let Some(&(Some(last_mv), _)) = dist.get(&curr) {
+                if last_mv == mv.inverse() {
                     continue;
                 }
             }
@@ -338,7 +338,7 @@ fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move],
             use std::collections::hash_map::Entry;
             if let Entry::Vacant(e) = dist.entry(next_key) {
                 let key_clone = e.key().clone();
-                e.insert((mv, Some(curr.clone())));
+                e.insert((Some(mv), Some(curr.clone())));
                 queue.push_back(key_clone);
             }
         }
@@ -348,8 +348,8 @@ fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move],
 fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {
     let mut path = Vec::new();
     let mut curr = target;
-    while let Some(&(mv, ref parent_opt)) = dist.get(curr) {
-        if let Some(ref p) = *parent_opt {
+    while let Some(&(maybe_mv, ref parent_opt)) = dist.get(curr) {
+        if let (Some(mv), Some(ref p)) = (maybe_mv, parent_opt) {
             path.push(mv);
             curr = p;
         } else {
@@ -363,8 +363,8 @@ fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {
 fn reconstruct_path_backward(dist: &StateMap, target: &Cube) -> Vec<Move> {
     let mut path = Vec::new();
     let mut curr = target;
-    while let Some(&(mv, ref parent_opt)) = dist.get(curr) {
-        if let Some(ref p) = *parent_opt {
+    while let Some(&(maybe_mv, ref parent_opt)) = dist.get(curr) {
+        if let (Some(mv), Some(ref p)) = (maybe_mv, parent_opt) {
             path.push(mv.inverse());
             curr = p;
         } else {

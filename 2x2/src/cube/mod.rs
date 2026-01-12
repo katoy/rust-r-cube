@@ -3,7 +3,7 @@ pub mod io;
 pub mod rotation;
 pub mod validation;
 
-pub use self::enums::{Color, Face, Move, Sticker};
+pub use self::enums::{Color, Face, Move, Sticker, NUM_STICKERS, STICKERS_PER_FACE};
 
 /// 2x2 ルービックキューブ
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -17,21 +17,22 @@ impl Cube {
     /// 完成状態のキューブを作成します。
     #[must_use]
     pub fn new() -> Self {
-        let mut stickers = [Sticker::new(Color::White); 24];
+        let mut stickers = [Sticker::new(Color::White); NUM_STICKERS];
         let clockwise_pattern = [1, 2, 0, 3];
 
         let faces = [
-            (Color::White, 0..4),  // Up
-            (Color::Yellow, 4..8), // Down
-            (Color::Green, 8..12), // Left
-            (Color::Blue, 12..16), // Right
-            (Color::Red, 16..20),  // Front
-            (Color::Orange, 20..24), // Back
+            (Color::White, Face::Up),
+            (Color::Yellow, Face::Down),
+            (Color::Green, Face::Left),
+            (Color::Blue, Face::Right),
+            (Color::Red, Face::Front),
+            (Color::Orange, Face::Back),
         ];
 
-        for (color, range) in faces {
-            for (i, sticker_idx) in range.enumerate() {
-                stickers[sticker_idx] = Sticker {
+        for (color, face) in faces {
+            let start = face.start_index();
+            for i in 0..STICKERS_PER_FACE {
+                stickers[start + i] = Sticker {
                     color,
                     orientation: clockwise_pattern[i],
                 };
@@ -44,9 +45,10 @@ impl Cube {
     /// キューブが完成しているか判定します（色のみ、向きは無視）。
     #[must_use]
     pub fn is_solved(&self) -> bool {
-        for face_start in (0..24).step_by(4) {
+        for face in Face::all() {
+            let face_start = face.start_index();
             let color = self.stickers[face_start].color;
-            for i in 1..4 {
+            for i in 1..STICKERS_PER_FACE {
                 if self.stickers[face_start + i].color != color {
                     return false;
                 }
@@ -74,7 +76,8 @@ impl Cube {
         let mut new_cube = self.clone();
         let clockwise_pattern = [1, 2, 0, 3];
 
-        for face_start in (0..24).step_by(4) {
+        for face in Face::all() {
+            let face_start = face.start_index();
             for (offset, &pattern) in clockwise_pattern.iter().enumerate() {
                 let idx = face_start + offset;
                 new_cube.stickers[idx].orientation = pattern;

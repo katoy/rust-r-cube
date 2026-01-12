@@ -4,7 +4,7 @@ use crate::error::{CubeError, Result};
 /// 色配列の妥当性をチェックします。
 ///
 /// 各色が正確に4つずつ存在するかを確認します。
-pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
+pub fn validate_colors(colors: &[Color; crate::cube::NUM_STICKERS]) -> Result<()> {
     let mut counts = [0usize; 7]; // Color Enum の数に合わせて7 (Grayを含む)
     for &color in colors {
         let idx = color as usize;
@@ -25,12 +25,13 @@ pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
 
     for &color in &expected_colors {
         let count = counts[color as usize];
-        if count != 4 {
+        if count != crate::cube::STICKERS_PER_FACE {
             if count == 0 {
                 return Err(CubeError::ColorNotFound(format!("{color:?}")));
             } else {
                 return Err(CubeError::InvalidColors(format!(
-                    "{color:?}の数が{count}個です（4個である必要があります）"
+                    "{color:?}の数が{count}個です（{}個である必要があります）",
+                    crate::cube::STICKERS_PER_FACE
                 )));
             }
         }
@@ -47,7 +48,7 @@ pub fn validate_colors(colors: &[Color; 24]) -> Result<()> {
 /// - コーナーの向きパリティが正しいか（向きの合計が3の倍数）
 pub fn is_valid_state(cube: &Cube) -> Result<()> {
     // まず色数のチェック
-    let mut colors_array = [Color::White; 24];
+    let mut colors_array = [Color::White; crate::cube::NUM_STICKERS];
     for (i, color) in colors_array.iter_mut().enumerate() {
         *color = cube.stickers[i].color;
     }

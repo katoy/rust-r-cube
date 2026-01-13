@@ -530,8 +530,6 @@ pub fn draw_cube(
                     } else {
                         // その他の移動 (R, L, U, D または長距離ジャンプ)
                         let mid_p = (p * std::f32::consts::PI).sin();
-                        let angle = anim_face_rot.map(|(_, a)| a).unwrap_or(0.0);
-
                         let face_idx = i / STICKERS_PER_FACE;
                         let is_rl_move = matches!(
                             anim.current_move,

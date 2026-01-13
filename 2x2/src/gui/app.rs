@@ -51,6 +51,14 @@ pub enum InputState {
     },
 }
 
+/// イージングモード
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EasingMode {
+    EaseInOut, // 通常 (加速してから減速)
+    EaseIn,    // 前半向き (加速のみ)
+    EaseOut,   // 後半向き (減速のみ)
+}
+
 /// アニメーション状態
 #[derive(Debug, Clone)]
 pub struct AnimationState {
@@ -58,6 +66,7 @@ pub struct AnimationState {
     pub progress: f32, // 0.0 to 1.0
     pub start_time: Instant,
     pub duration: f32, // seconds
+    pub easing: EasingMode,
 }
 
 impl AnimationState {
@@ -67,6 +76,17 @@ impl AnimationState {
             progress: 0.0,
             start_time: Instant::now(),
             duration,
+            easing: EasingMode::EaseInOut,
+        }
+    }
+
+    pub fn with_easing(mv: Move, duration: f32, easing: EasingMode) -> Self {
+        Self {
+            current_move: mv,
+            progress: 0.0,
+            start_time: Instant::now(),
+            duration,
+            easing,
         }
     }
 
@@ -80,13 +100,19 @@ impl AnimationState {
         self.progress >= 1.0
     }
 
-    /// イージング関数 (ease-in-out)
+    /// イージング関数
     pub fn eased_progress(&self) -> f32 {
         let t = self.progress;
-        if t < 0.5 {
-            2.0 * t * t
-        } else {
-            -1.0 + (4.0 - 2.0 * t) * t
+        match self.easing {
+            EasingMode::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    -1.0 + (4.0 - 2.0 * t) * t
+                }
+            }
+            EasingMode::EaseIn => t * t, // 加速のみ (速度は 2*t, 終端で速度2)
+            EasingMode::EaseOut => 1.0 - (1.0 - t) * (1.0 - t), // 減速のみ (速度は 2*(1-t), 始端で速度2)
         }
     }
 }
@@ -95,7 +121,7 @@ impl AnimationState {
 pub struct CubeApp {
     cube: Cube,
     animation: Option<AnimationState>,
-    move_queue: Vec<Move>,
+    move_queue: Vec<(Move, Option<EasingMode>, Option<f32>)>,
     pub animation_speed: f32, // seconds per move
     pub solution: Option<Vec<Move>>,
     pub solving: bool,
@@ -207,14 +233,16 @@ impl CubeApp {
 
     /// 回転操作をキューに追加
     pub fn queue_move(&mut self, mv: Move) {
-        self.move_queue.push(mv);
+        self.move_queue.push((mv, None, None));
         self.statistics.record_manual_move();
         self.history.push(mv);
     }
 
     /// 複数の回転操作をキューに追加
     pub fn queue_moves(&mut self, moves: Vec<Move>) {
-        self.move_queue.extend(moves);
+        for mv in moves {
+            self.move_queue.push((mv, None, None));
+        }
     }
 
     /// スクランブル
@@ -232,14 +260,14 @@ impl CubeApp {
     /// Undo: 最後の手動操作を取り消す
     pub fn undo(&mut self) {
         if let Some(inverse_move) = self.history.undo() {
-            self.move_queue.push(inverse_move);
+            self.move_queue.push((inverse_move, None, None));
         }
     }
 
     /// Redo: 取り消した操作をやり直す
     pub fn redo(&mut self) {
         if let Some(mv) = self.history.redo() {
-            self.move_queue.push(mv);
+            self.move_queue.push((mv, None, None));
         }
     }
 
@@ -346,10 +374,36 @@ impl CubeApp {
                     self.pending_solution_update = None;
                 }
             }
-        } else if let Some(mv) = self.move_queue.first().copied() {
+        } else if let Some((mv, easing_override, duration_override)) =
+            self.move_queue.first().copied()
+        {
             // 次の操作を開始
             self.move_queue.remove(0);
-            self.animation = Some(AnimationState::new(mv, self.animation_speed));
+
+            if let Some(easing) = easing_override {
+                // 指定されたイージングで実行 (分割後半など)
+                let duration = duration_override.unwrap_or(self.animation_speed);
+                self.animation = Some(AnimationState::with_easing(mv, duration, easing));
+            } else if let Some(single_mv) = mv.split_to_single() {
+                // 180度回転の場合、90度回転2回に分割する
+                // F2をF1枚分の時間で終わらせるため、各アニメーションの長さは半分
+                let half_duration = self.animation_speed * 0.5;
+
+                // 1回目の90度回転 (加速のみ)
+                self.animation = Some(AnimationState::with_easing(
+                    single_mv,
+                    half_duration,
+                    EasingMode::EaseIn,
+                ));
+                // 2回目の90度回転 (減速のみ) をキューの先頭に挿入
+                self.move_queue.insert(
+                    0,
+                    (single_mv, Some(EasingMode::EaseOut), Some(half_duration)),
+                );
+            } else {
+                // 通常の90度回転
+                self.animation = Some(AnimationState::new(mv, self.animation_speed));
+            }
         }
     }
 
@@ -452,13 +506,13 @@ impl CubeApp {
 
     /// 解法の次のステップへ進む
     pub fn solution_step_forward(&mut self) {
-        if self.animation.is_some() {
+        if self.animation.is_some() || !self.move_queue.is_empty() {
             return;
         }
         if let Some(solution) = &self.solution {
             if self.solution_step < solution.len() {
                 let mv = solution[self.solution_step];
-                self.animation = Some(AnimationState::new(mv, self.animation_speed));
+                self.move_queue.push((mv, None, None));
                 self.pending_solution_update = Some(1);
             }
         }
@@ -466,14 +520,14 @@ impl CubeApp {
 
     /// 解法の前のステップへ戻る
     pub fn solution_step_backward(&mut self) {
-        if self.animation.is_some() {
+        if self.animation.is_some() || !self.move_queue.is_empty() {
             return;
         }
         if let Some(solution) = &self.solution {
             if self.solution_step > 0 {
                 let mv = solution[self.solution_step - 1];
                 let inverse_mv = mv.inverse();
-                self.animation = Some(AnimationState::new(inverse_mv, self.animation_speed));
+                self.move_queue.push((inverse_mv, None, None));
                 self.pending_solution_update = Some(-1);
             }
         }
@@ -798,7 +852,11 @@ impl CubeApp {
             if !self.skip_parity_check {
                 if let Err(e) = new_cube.is_valid_state() {
                     let parity_warning = format!("警告: 無効なキューブ状態です ({})", e);
-                    warning = if warning.is_empty() { parity_warning } else { format!("{}\n{}", warning, parity_warning) };
+                    warning = if warning.is_empty() {
+                        parity_warning
+                    } else {
+                        format!("{}\n{}", warning, parity_warning)
+                    };
                 }
             }
 

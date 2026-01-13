@@ -148,6 +148,20 @@ impl Move {
             Move::B2 => Move::B2,
         }
     }
+
+    /// 180度回転操作を90度回転操作2回に分割するための、1回目の操作を取得
+    #[must_use]
+    pub fn split_to_single(self) -> Option<Move> {
+        match self {
+            Move::R2 => Some(Move::R),
+            Move::L2 => Some(Move::L),
+            Move::U2 => Some(Move::U),
+            Move::D2 => Some(Move::D),
+            Move::F2 => Some(Move::F),
+            Move::B2 => Some(Move::B),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Move {

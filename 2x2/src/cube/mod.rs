@@ -66,8 +66,8 @@ impl Cube {
         let clockwise_pattern = [1, 2, 0, 3];
         for face in Face::all() {
             let start = face.start_index();
-            for i in 0..4 {
-                if self.stickers[start + i].orientation != clockwise_pattern[i] {
+            for (i, &expected_orientation) in clockwise_pattern.iter().enumerate() {
+                if self.stickers[start + i].orientation != expected_orientation {
                     return false;
                 }
             }
@@ -168,7 +168,7 @@ impl Cube {
         Self::validate_colors(&colors_array)?;
 
         use crate::cube::validation::CORNER_STICKERS;
-        
+
         // 24通りの完成状態（すべて [1, 2, 0, 3] パターンを持つ）を取得
         let solved_states = crate::solver::get_solved_states();
 
@@ -181,7 +181,7 @@ impl Cube {
                 self.stickers[slot_indices[1]].color,
                 self.stickers[slot_indices[2]].color,
             ];
-            
+
             let mut found = false;
             for solved in solved_states {
                 let solved_colors = [
@@ -189,7 +189,7 @@ impl Cube {
                     solved.stickers[slot_indices[1]].color,
                     solved.stickers[slot_indices[2]].color,
                 ];
-                
+
                 // 色の並び（twist）まで完全一致
                 if current_colors == solved_colors {
                     for &idx in &slot_indices {
@@ -199,10 +199,11 @@ impl Cube {
                     break;
                 }
             }
-            
+
             if !found {
                 return Err(crate::error::CubeError::InvalidState(format!(
-                    "不正な色のピース配置: {:?}", current_colors
+                    "不正な色のピース配置: {:?}",
+                    current_colors
                 )));
             }
         }

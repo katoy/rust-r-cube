@@ -116,22 +116,18 @@ fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha
 fn get_grid_coords(index: usize) -> Pos2 {
     let (col, row) = match index {
         i if i < Face::Down.start_index() => (2.0 + (i % 2) as f32, 0.0 + (i / 2) as f32), // U
-        i if i < Face::Left.start_index() => (
-            2.0 + ((i - 4) % 2) as f32,
-            4.0 + ((i - 4) / 2) as f32,
-        ), // D
-        i if i < Face::Right.start_index() => (
-            0.0 + ((i - 8) % 2) as f32,
-            2.0 + ((i - 8) / 2) as f32,
-        ), // L
-        i if i < Face::Front.start_index() => (
-            4.0 + ((i - 12) % 2) as f32,
-            2.0 + ((i - 12) / 2) as f32,
-        ), // R
-        i if i < Face::Back.start_index() => (
-            2.0 + ((i - 16) % 2) as f32,
-            2.0 + ((i - 16) / 2) as f32,
-        ), // F
+        i if i < Face::Left.start_index() => {
+            (2.0 + ((i - 4) % 2) as f32, 4.0 + ((i - 4) / 2) as f32)
+        } // D
+        i if i < Face::Right.start_index() => {
+            (0.0 + ((i - 8) % 2) as f32, 2.0 + ((i - 8) / 2) as f32)
+        } // L
+        i if i < Face::Front.start_index() => {
+            (4.0 + ((i - 12) % 2) as f32, 2.0 + ((i - 12) / 2) as f32)
+        } // R
+        i if i < Face::Back.start_index() => {
+            (2.0 + ((i - 16) % 2) as f32, 2.0 + ((i - 16) / 2) as f32)
+        } // F
         _ => (
             6.0 + ((index - 20) % 2) as f32,
             2.0 + ((index - 20) / 2) as f32,
@@ -287,14 +283,14 @@ const MOVE_MAPPING_TABLE: [[(usize, usize); 8]; 18] = [
         (9, 5),
     ], // Fp
     [
-        (2, 4),
-        (3, 5),
-        (10, 12),
-        (11, 13),
-        (4, 2),
-        (5, 3),
-        (12, 10),
-        (13, 11),
+        (2, 5),
+        (3, 4),
+        (11, 14),
+        (9, 12),
+        (5, 2),
+        (4, 3),
+        (14, 11),
+        (12, 9),
     ], // F2
     [
         (13, 0),
@@ -317,14 +313,14 @@ const MOVE_MAPPING_TABLE: [[(usize, usize); 8]; 18] = [
         (15, 7),
     ], // Bp
     [
-        (0, 6),
-        (1, 7),
-        (14, 8),
-        (15, 9),
-        (6, 0),
-        (7, 1),
-        (8, 14),
-        (9, 15),
+        (0, 7),
+        (1, 6),
+        (13, 10),
+        (15, 8),
+        (7, 0),
+        (6, 1),
+        (10, 13),
+        (8, 15),
     ], // B2
 ];
 
@@ -409,24 +405,21 @@ pub fn draw_cube(
     };
 
     // 0. 回転面の強調表示 (Face Overlay)
-    if let Some(anim) = animation {
-        let (_, anim_face_rot) = get_animation_info(anim.current_move);
-        if let Some((face_start, _angle)) = anim_face_rot {
-            let face_grid_rect = get_face_grid_rect(face_start);
-            let top_left = to_screen(face_grid_rect.min) - Vec2::splat(grid_size * 0.5);
-            let bottom_right = to_screen(Pos2::new(
-                face_grid_rect.max.x - 1.0,
-                face_grid_rect.max.y - 1.0,
-            )) + Vec2::splat(grid_size * 0.5);
-            let highlight_rect = Rect::from_min_max(top_left, bottom_right);
+    if let Some((face_start, _angle)) = anim_face_rot {
+        let face_grid_rect = get_face_grid_rect(face_start);
+        let top_left = to_screen(face_grid_rect.min) - Vec2::splat(grid_size * 0.5);
+        let bottom_right = to_screen(Pos2::new(
+            face_grid_rect.max.x - 1.0,
+            face_grid_rect.max.y - 1.0,
+        )) + Vec2::splat(grid_size * 0.5);
+        let highlight_rect = Rect::from_min_max(top_left, bottom_right);
 
-            // 淡い色で塗りつぶし
-            painter.rect_filled(
-                highlight_rect.expand(2.0),
-                5.0,
-                Color32::from_rgba_premultiplied(255, 255, 255, 30),
-            );
-        }
+        // 淡い色で塗りつぶし
+        painter.rect_filled(
+            highlight_rect.expand(2.0),
+            5.0,
+            Color32::from_rgba_premultiplied(255, 255, 255, 30),
+        );
     }
 
     // 全ステッカーを描画
@@ -483,81 +476,96 @@ pub fn draw_cube(
             // 移動の処理
             if let Some((_, target_idx)) = anim_mapping.iter().find(|(src, _)| *src == i) {
                 let target_grid_pos = get_grid_coords(*target_idx);
-                let dist = grid_pos.distance(target_grid_pos);
+                let start_grid_pos = grid_pos;
+                let dist = start_grid_pos.distance(target_grid_pos);
 
-                let start_screen = to_screen(grid_pos);
+                let start_screen = to_screen(start_grid_pos);
                 let end_screen = to_screen(target_grid_pos);
 
-                // 基本的な移動ベクトル
-                let move_vec = end_screen - start_screen;
+                // アニメーション状態計算用のクロージャ
+                let calc_state = |p: f32| {
+                    let mut pos = start_screen + (end_screen - start_screen) * p;
+                    let mut rot = 0.0;
+                    let mut alpha = 1.0;
+                    let mut size_scale = 1.0;
+                    let mut shadow = Vec2::ZERO;
 
-                // --- 円弧移動と演出の計算 ---
-                let mut current_sticker_size = sticker_size;
-                let mut current_alpha = 1.0;
-                let shadow_offset;
+                    // FまたはB操作の場合はF面の中心を軸に回転させる（距離に関わらず）
+                    if matches!(anim.current_move, Move::F | Move::Fp | Move::F2)
+                        || matches!(anim.current_move, Move::B | Move::Bp | Move::B2)
+                    {
+                        if let Some((_face_start, angle)) = anim_face_rot {
+                            let f_face_start = 16;
+                            let center_grid_base = get_grid_coords(f_face_start);
+                            let center_grid =
+                                Pos2::new(center_grid_base.x + 0.5, center_grid_base.y + 0.5);
+                            let center_screen = to_screen(center_grid);
 
-                if dist < 3.0 {
-                    // 隣接面移動: わずかな膨らみ、浮き上がり、影
-                    let bulge = 0.2 * grid_size;
-                    let ortho = Vec2::new(-move_vec.y, move_vec.x).normalized() * bulge;
-                    let arc_offset = ortho * (progress * std::f32::consts::PI).sin();
+                            // B操作の場合は回転方向を反転（前面から見ると反時計回り）
+                            let final_angle =
+                                if matches!(anim.current_move, Move::B | Move::Bp | Move::B2) {
+                                    -angle
+                                } else {
+                                    angle
+                                };
 
-                    screen_pos = start_screen + move_vec * progress + arc_offset;
+                            let current_angle = final_angle * p;
+                            pos = rotate_point(start_screen, center_screen, current_angle);
 
-                    // 浮き上がり (中心で1.1倍)
-                    let lift = 1.0 + 0.1 * (progress * std::f32::consts::PI).sin();
-                    current_sticker_size *= lift;
+                            // 傾き（矢印向き）の補正
+                            let orientation_delta =
+                                get_moving_sticker_orientation_delta(anim.current_move, i);
+                            let orientation_change_deg = -(orientation_delta as f32 * 90.0);
+                            rot = current_angle + orientation_change_deg;
 
-                    // 影 (進行方向と逆にわずかにずらす)
-                    shadow_offset = Vec2::new(5.0, 5.0) * (progress * std::f32::consts::PI).sin();
-                } else {
-                    // 非隣接面（ジャンプ）: 大きな円弧、フェード、縮小
-                    let bulge = 1.5 * grid_size;
-                    let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
-                    // 展開図の端を跨ぐ場合は円弧の向きを調整
-                    if ortho.y.abs() < 0.1 {
-                        ortho.y = -ortho.y.abs();
+                            // 放射状の膨らみ（B と Bp の軌道を一致させる）
+                            let bulge = 0.2 * grid_size;
+                            let mid_p = (p * std::f32::consts::PI).sin();
+                            let radial_vec = (pos - center_screen).normalized();
+                            pos += radial_vec * bulge * mid_p;
+                            shadow = Vec2::new(5.0, 5.0) * mid_p;
+                        }
+                    } else if dist < 3.0 {
+                        // その他の隣接面移動 (R, L, U, D)
+                        let bulge = 0.2 * grid_size;
+                        let mid_p = (p * std::f32::consts::PI).sin();
+                        let move_dir = (end_screen - start_screen).normalized();
+                        let ortho = Vec2::new(-move_dir.y, move_dir.x) * bulge * mid_p;
+                        pos += ortho;
+                        size_scale = 1.0 + 0.1 * mid_p;
+                        shadow = Vec2::new(5.0, 5.0) * mid_p;
+                    } else {
+                        // 非隣接面（ジャンプ）
+                        let bulge = 1.5 * grid_size;
+                        let mid_p = (p * std::f32::consts::PI).sin();
+                        let move_vec = end_screen - start_screen;
+                        let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
+                        if ortho.y.abs() < 0.1 {
+                            ortho.y = -ortho.y.abs();
+                        }
+                        pos += ortho * bulge * mid_p;
+                        alpha = 1.0 - 0.5 * mid_p;
+                        size_scale = 1.0 - 0.3 * mid_p;
+                        shadow = Vec2::new(10.0, 10.0) * mid_p;
                     }
+                    (pos, rot, size_scale, alpha, shadow)
+                };
 
-                    let arc_offset = ortho * bulge * (progress * std::f32::consts::PI).sin();
+                // メインのステッカーを描画
+                let (p_pos, p_rot, p_scale, p_alpha, p_shadow) = calc_state(progress);
 
-                    screen_pos = start_screen + move_vec * progress + arc_offset;
-
-                    // フェード & 縮小 (中間地点で最小)
-                    let mid_factor = (progress * std::f32::consts::PI).sin();
-                    current_alpha = 1.0 - 0.5 * mid_factor;
-                    let scale_down = 1.0 - 0.3 * mid_factor;
-                    current_sticker_size *= scale_down;
-
-                    // 影 (より高く浮いているように)
-                    shadow_offset = Vec2::new(10.0, 10.0) * mid_factor;
-                }
-
-                // モーショントレイル (オプション: 過去の数地点を描画)
+                // モーショントレイルを描画
                 for ghost_t in [0.05, 0.1] {
                     let t = (progress - ghost_t).max(0.0);
                     if t > 0.0 {
-                        // ゴースト位置の簡略計算 (直線的でも良いが、メインと同様のロジックを適用)
-                        let ghost_pos = start_screen + move_vec * t;
-                        // 円弧も考慮
-                        let bulge_val = if dist < 3.0 {
-                            0.2 * grid_size
-                        } else {
-                            1.5 * grid_size
-                        };
-                        let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
-                        if dist >= 3.0 && ortho.y.abs() < 0.1 {
-                            ortho.y = -ortho.y.abs();
-                        }
-                        let ghost_arc = ortho * bulge_val * (t * std::f32::consts::PI).sin();
-
+                        let (g_pos, g_rot, g_scale, g_alpha, _) = calc_state(t);
                         draw_sticker(
                             painter,
-                            ghost_pos + ghost_arc,
-                            sticker_size * (1.0 - ghost_t * 2.0),
+                            g_pos,
+                            sticker_size * g_scale * (1.0 - ghost_t * 2.0),
                             sticker,
-                            rotation,
-                            0.3 * current_alpha * (1.0 - ghost_t * 5.0),
+                            g_rot,
+                            0.3 * g_alpha * p_alpha * (1.0 - ghost_t * 5.0),
                             Vec2::ZERO,
                         );
                     }
@@ -565,12 +573,12 @@ pub fn draw_cube(
 
                 draw_sticker(
                     painter,
-                    screen_pos,
-                    current_sticker_size,
+                    p_pos,
+                    sticker_size * p_scale,
                     sticker,
-                    rotation,
-                    current_alpha,
-                    shadow_offset,
+                    p_rot,
+                    p_alpha,
+                    p_shadow,
                 );
                 drawn = true;
             }
@@ -649,32 +657,39 @@ fn get_face_orientation_delta(mv: Move) -> u8 {
 
 /// 移動するステッカーの向きの変更量を取得
 fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
-    match mv {
-        Move::R | Move::Rp => {
-            if matches!(src_idx, 1 | 3 | 20 | 22) {
-                2
-            } else {
-                0
-            }
-        }
-        Move::L | Move::Lp => {
-            if matches!(src_idx, 0 | 2 | 21 | 23) {
-                2
-            } else {
-                0
-            }
-        }
-        Move::F | Move::Fp => match src_idx {
-            2..=5 => 3,
-            9 | 11..=12 | 14 => 1,
-            _ => 0,
-        },
-        Move::B | Move::Bp => match src_idx {
-            0..=1 | 6..=7 => 1,
-            8 | 10 | 13 | 15 => 3,
-            _ => 0,
-        },
+    let repeat = match mv {
+        Move::U | Move::D | Move::L | Move::R | Move::F | Move::B => 1,
         Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
+        Move::Up | Move::Dp | Move::Lp | Move::Rp | Move::Fp | Move::Bp => 3,
+    };
+
+    match mv {
+        Move::R | Move::Rp | Move::R2 => {
+            // rotations: [0,0,0,0, 2,2,2,2]
+            // cycle [1, 3, 17, 19, 5, 7, 22, 20]
+            let base_rot = match src_idx {
+                1 | 3 | 22 | 20 => 2,
+                _ => 0,
+            };
+            (base_rot * repeat) % 4
+        }
+        Move::L | Move::Lp | Move::L2 => {
+            // rotations: [2,2,2,2, 0,0,0,0]
+            // cycle [0, 2, 23, 21, 4, 6, 16, 18]
+            let base_rot = match src_idx {
+                23 | 21 | 4 | 6 => 2,
+                _ => 0,
+            };
+            (base_rot * repeat) % 4
+        }
+        Move::F | Move::Fp | Move::F2 => {
+            // rotation.rs では一律 1
+            repeat % 4
+        }
+        Move::B | Move::Bp | Move::B2 => {
+            // rotation.rs では一律 3
+            (3 * repeat) % 4
+        }
         _ => 0,
     }
 }
@@ -682,12 +697,12 @@ fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
 /// インデックスに対応する面全体のグリッド領域を取得
 fn get_face_grid_rect(index: usize) -> Rect {
     let (min_col, min_row) = match index {
-        i if i == Face::Up.start_index() => (2.0, 0.0),    // U
-        i if i == Face::Down.start_index() => (2.0, 4.0),  // D
-        i if i == Face::Left.start_index() => (0.0, 2.0),  // L
+        i if i == Face::Up.start_index() => (2.0, 0.0),   // U
+        i if i == Face::Down.start_index() => (2.0, 4.0), // D
+        i if i == Face::Left.start_index() => (0.0, 2.0), // L
         i if i == Face::Right.start_index() => (4.0, 2.0), // R
         i if i == Face::Front.start_index() => (2.0, 2.0), // F
-        i if i == Face::Back.start_index() => (6.0, 2.0),  // B
+        i if i == Face::Back.start_index() => (6.0, 2.0), // B
         _ => (0.0, 0.0),
     };
     // 2x2なのでサイズは2.0x2.0

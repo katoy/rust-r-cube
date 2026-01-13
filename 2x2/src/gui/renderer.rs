@@ -490,6 +490,10 @@ pub fn draw_cube(
                     let mut size_scale = 1.0;
                     let mut shadow = Vec2::ZERO;
 
+                    let orientation_delta =
+                        get_moving_sticker_orientation_delta(anim.current_move, i);
+                    let physical_delta_deg = orientation_delta as f32 * 90.0;
+
                     // FまたはB操作の場合はF面の中心を軸に回転させる（距離に関わらず）
                     if matches!(anim.current_move, Move::F | Move::Fp | Move::F2)
                         || matches!(anim.current_move, Move::B | Move::Bp | Move::B2)
@@ -512,9 +516,7 @@ pub fn draw_cube(
                             let current_angle = final_angle * p;
                             pos = rotate_point(start_screen, center_screen, current_angle);
 
-                            // 傾き（矢印向き）の補正
-                            let orientation_delta =
-                                get_moving_sticker_orientation_delta(anim.current_move, i);
+                            // 傾き（矢印向き）の補正: 前回の向きから今の向きへアニメーション
                             let orientation_change_deg = -(orientation_delta as f32 * 90.0);
                             rot = current_angle + orientation_change_deg;
 
@@ -525,28 +527,72 @@ pub fn draw_cube(
                             pos += radial_vec * bulge * mid_p;
                             shadow = Vec2::new(5.0, 5.0) * mid_p;
                         }
-                    } else if dist < 3.0 {
-                        // その他の隣接面移動 (R, L, U, D)
-                        let bulge = 0.2 * grid_size;
-                        let mid_p = (p * std::f32::consts::PI).sin();
-                        let move_dir = (end_screen - start_screen).normalized();
-                        let ortho = Vec2::new(-move_dir.y, move_dir.x) * bulge * mid_p;
-                        pos += ortho;
-                        size_scale = 1.0 + 0.1 * mid_p;
-                        shadow = Vec2::new(5.0, 5.0) * mid_p;
                     } else {
-                        // 非隣接面（ジャンプ）
-                        let bulge = 1.5 * grid_size;
+                        // その他の移動 (R, L, U, D または長距離ジャンプ)
                         let mid_p = (p * std::f32::consts::PI).sin();
-                        let move_vec = end_screen - start_screen;
-                        let mut ortho = Vec2::new(-move_vec.y, move_vec.x).normalized();
-                        if ortho.y.abs() < 0.1 {
-                            ortho.y = -ortho.y.abs();
+                        let angle = anim_face_rot.map(|(_, a)| a).unwrap_or(0.0);
+
+                        let face_idx = i / STICKERS_PER_FACE;
+                        let is_rl_move = matches!(
+                            anim.current_move,
+                            Move::R | Move::Rp | Move::R2 | Move::L | Move::Lp | Move::L2
+                        );
+                        // R/L操作での特別な制御
+                        let is_u_face = is_rl_move && face_idx == Face::Up as usize;
+                        let is_fd_vertical = is_rl_move
+                            && (face_idx == Face::Front as usize
+                                || face_idx == Face::Down as usize)
+                            && (start_screen.x - end_screen.x).abs() < 1.0;
+
+                        // 自転の計算
+                        if is_u_face {
+                            // 白色（U面）は時計回りに「転がる」ように見せる
+                            // 物理的deltaに従い、必ず + 方向（時計回り）に回るようにする
+                            // (p-1)を掛けることで 0からphysical_deltaへ +方向にアニメーション
+                            rot = -physical_delta_deg * (1.0 - p);
+                        } else if is_fd_vertical {
+                            // 赤・黄の垂直移動は自転なし（スライドのみ）
+                            // ユーザー要望により物理回転(delta)も無視して 0 固定にする
+                            rot = 0.0;
+                        } else {
+                            // その他は物理的な向きの変化のみを補正してジャンプを防ぐ
+                            rot = -physical_delta_deg * (1.0 - p);
                         }
-                        pos += ortho * bulge * mid_p;
-                        alpha = 1.0 - 0.5 * mid_p;
-                        size_scale = 1.0 - 0.3 * mid_p;
-                        shadow = Vec2::new(10.0, 10.0) * mid_p;
+
+                        // 座標をソートして基準法線を決める (RとRpで逆にならないように)
+                        let (p1, p2) = if start_screen.x < end_screen.x
+                            || (start_screen.x == end_screen.x && start_screen.y < end_screen.y)
+                        {
+                            (start_screen, end_screen)
+                        } else {
+                            (end_screen, start_screen)
+                        };
+                        let sorted_vec = p2 - p1;
+                        let ortho_fixed = Vec2::new(-sorted_vec.y, sorted_vec.x).normalized();
+
+                        if dist < 3.0 {
+                            // 隣接面移動
+                            let mut bulge_val = 0.2 * grid_size;
+                            if is_fd_vertical {
+                                // 赤・黄の垂直移動は膨らみなし（直線移動）
+                                bulge_val = 0.0;
+                            }
+                            pos += ortho_fixed * bulge_val * mid_p;
+                            size_scale = 1.0 + 0.1 * mid_p;
+                            shadow = Vec2::new(5.0, 5.0) * mid_p;
+                        } else {
+                            // 非隣接面（ジャンプ）
+                            let bulge_val = 1.5 * grid_size;
+                            // 展開図の端を跨ぐ場合の調整
+                            let mut adjusted_ortho = ortho_fixed;
+                            if adjusted_ortho.y.abs() < 0.1 {
+                                adjusted_ortho.y = -adjusted_ortho.y.abs();
+                            }
+                            pos += adjusted_ortho * bulge_val * mid_p;
+                            alpha = 1.0 - 0.5 * mid_p;
+                            size_scale = 1.0 - 0.3 * mid_p;
+                            shadow = Vec2::new(10.0, 10.0) * mid_p;
+                        }
                     }
                     (pos, rot, size_scale, alpha, shadow)
                 };
@@ -657,39 +703,35 @@ fn get_face_orientation_delta(mv: Move) -> u8 {
 
 /// 移動するステッカーの向きの変更量を取得
 fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
-    let repeat = match mv {
-        Move::U | Move::D | Move::L | Move::R | Move::F | Move::B => 1,
-        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
-        Move::Up | Move::Dp | Move::Lp | Move::Rp | Move::Fp | Move::Bp => 3,
-    };
-
     match mv {
-        Move::R | Move::Rp | Move::R2 => {
-            // rotations: [0,0,0,0, 2,2,2,2]
-            // cycle [1, 3, 17, 19, 5, 7, 22, 20]
-            let base_rot = match src_idx {
-                1 | 3 | 22 | 20 => 2,
-                _ => 0,
-            };
-            (base_rot * repeat) % 4
-        }
-        Move::L | Move::Lp | Move::L2 => {
-            // rotations: [2,2,2,2, 0,0,0,0]
-            // cycle [0, 2, 23, 21, 4, 6, 16, 18]
-            let base_rot = match src_idx {
-                23 | 21 | 4 | 6 => 2,
-                _ => 0,
-            };
-            (base_rot * repeat) % 4
-        }
-        Move::F | Move::Fp | Move::F2 => {
-            // rotation.rs では一律 1
-            repeat % 4
-        }
-        Move::B | Move::Bp | Move::B2 => {
-            // rotation.rs では一律 3
-            (3 * repeat) % 4
-        }
+        Move::R => match src_idx {
+            1 | 3 | 22 | 20 => 2,
+            _ => 0,
+        },
+        Move::Rp => match src_idx {
+            22 | 20 | 5 | 7 => 2,
+            _ => 0,
+        },
+        Move::R2 => match src_idx {
+            5 | 7 | 1 | 3 | 17 | 19 | 22 | 20 => 2,
+            _ => 0,
+        },
+        Move::L => match src_idx {
+            23 | 21 | 4 | 6 => 2,
+            _ => 0,
+        },
+        Move::Lp => match src_idx {
+            4 | 6 | 0 | 2 => 2,
+            _ => 0,
+        },
+        Move::L2 => match src_idx {
+            0 | 2 | 23 | 21 | 4 | 6 | 16 | 18 => 2,
+            _ => 0,
+        },
+        Move::F | Move::Fp => 1,
+        Move::F2 => 2,
+        Move::B | Move::Bp => 3,
+        Move::B2 => 2,
         _ => 0,
     }
 }

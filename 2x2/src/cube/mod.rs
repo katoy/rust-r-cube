@@ -5,6 +5,9 @@ pub mod validation;
 
 pub use self::enums::{Color, Face, Move, Sticker, NUM_STICKERS, STICKERS_PER_FACE};
 
+/// 完成状態における標準的なステッカーの向きパターン。
+pub const CLOCKWISE_ORIENTATION_PATTERN: [u8; 4] = [1, 2, 0, 3];
+
 /// 2x2 ルービックキューブ（ポケットキューブ）を表す構造体。
 ///
 /// 24枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
@@ -39,7 +42,6 @@ impl Cube {
     #[must_use]
     pub fn new() -> Self {
         let mut stickers = [Sticker::new(Color::White); NUM_STICKERS];
-        let clockwise_pattern = [1, 2, 0, 3];
 
         let faces = [
             (Color::White, Face::Up),
@@ -55,7 +57,7 @@ impl Cube {
             for i in 0..STICKERS_PER_FACE {
                 stickers[start + i] = Sticker {
                     color,
-                    orientation: clockwise_pattern[i],
+                    orientation: CLOCKWISE_ORIENTATION_PATTERN[i],
                 };
             }
         }
@@ -94,10 +96,9 @@ impl Cube {
         if !self.is_solved() {
             return false;
         }
-        let clockwise_pattern = [1, 2, 0, 3];
         for face in Face::all() {
             let start = face.start_index();
-            for (i, &expected_orientation) in clockwise_pattern.iter().enumerate() {
+            for (i, &expected_orientation) in CLOCKWISE_ORIENTATION_PATTERN.iter().enumerate() {
                 if self.stickers[start + i].orientation != expected_orientation {
                     return false;
                 }
@@ -127,11 +128,10 @@ impl Cube {
     #[must_use]
     pub fn with_clockwise_orientations(&self) -> Self {
         let mut new_cube = self.clone();
-        let clockwise_pattern = [1, 2, 0, 3];
 
         for face in Face::all() {
             let face_start = face.start_index();
-            for (offset, &pattern) in clockwise_pattern.iter().enumerate() {
+            for (offset, &pattern) in CLOCKWISE_ORIENTATION_PATTERN.iter().enumerate() {
                 let idx = face_start + offset;
                 new_cube.stickers[idx].orientation = pattern;
             }

@@ -1,8 +1,8 @@
 use crate::cube::{Cube, Move};
 use crate::gui::app::AnimationState;
+use crate::gui::constants::*;
 use egui::{Color32, Pos2, Rect, Stroke};
 use glam::{Mat4, Vec3};
-use std::f32::consts::PI;
 
 /// 3D描画の設定
 pub struct View3D {
@@ -14,9 +14,9 @@ pub struct View3D {
 impl Default for View3D {
     fn default() -> Self {
         Self {
-            yaw: PI / 4.0,
-            pitch: PI / 6.0,
-            scale: 1.0,
+            yaw: VIEW3D_DEFAULT_YAW,
+            pitch: VIEW3D_DEFAULT_PITCH,
+            scale: VIEW3D_DEFAULT_SCALE,
         }
     }
 }
@@ -52,8 +52,8 @@ fn project_point(
 ) -> Pos2 {
     let world = model_mat.transform_point3(p);
     let view = view_mat.transform_point3(world);
-    let distance = 5.0 - view.z;
-    let perspective = 5.0 / distance;
+    let distance = VIEW3D_CAMERA_DISTANCE - view.z;
+    let perspective = VIEW3D_CAMERA_DISTANCE / distance;
     Pos2::new(
         screen_center.x + view.x * scale * perspective,
         screen_center.y - view.y * scale * perspective,
@@ -63,7 +63,7 @@ fn project_point(
 /// ステッカーの初期3D配置を生成
 fn get_initial_stickers() -> Vec<Sticker3D> {
     let mut stickers = Vec::with_capacity(crate::cube::NUM_STICKERS);
-    let size = 0.45;
+    let size = VIEW3D_STICKER_SIZE;
 
     // 各面の定義: (normal, center_base, u_axis, v_axis, flip_v)
     let face_defs = [
@@ -114,7 +114,7 @@ fn draw_arrow_3d(painter: &egui::Painter, center: Pos2, target: Pos2, color: Col
     painter.line_segment([center, arrow_end], Stroke::new(width, color));
 
     // 矢印の先端（三角形）
-    let arrow_head_size = arrow_length * 0.6;
+    let arrow_head_size = arrow_length * VIEW3D_ARROW_HEAD_RATIO;
     let perpendicular = egui::vec2(-dir_normalized.y, dir_normalized.x);
 
     let tip = arrow_end;
@@ -143,7 +143,7 @@ pub fn draw_cube_3d(
     // カメラ設定
     let center = rect.center();
     let min_dim = rect.width().min(rect.height());
-    let scale = min_dim * 0.3 * view.scale;
+    let scale = min_dim * VIEW3D_PROJECTION_SCALE * view.scale;
 
     // ビュー行列 (Orbit camera)
     let rotation = Mat4::from_rotation_x(view.pitch) * Mat4::from_rotation_y(view.yaw);
@@ -231,15 +231,15 @@ pub fn draw_cube_3d(
 
         // バックフェイスカリング（簡易）
         // view_matで変換した結果、Zが正ならカメラに向いている
-        if normal_transformed.z > 0.2 {
+        if normal_transformed.z > VIEW3D_BACKFACE_CULLING_THRESHOLD {
             // 少し余裕を持たせる
             for p in corners {
                 let p_world = model_mat.transform_point3(p);
                 let p_view = view_mat.transform_point3(p_world);
 
                 // 透視投影っぽい効果 (Zに応じてスケール)
-                let distance = 5.0 - p_view.z; // カメラ距離
-                let perspective = 5.0 / distance;
+                let distance = VIEW3D_CAMERA_DISTANCE - p_view.z; // カメラ距離
+                let perspective = VIEW3D_CAMERA_DISTANCE / distance;
 
                 let x = center.x + p_view.x * scale * perspective;
                 let y = center.y - p_view.y * scale * perspective; // Y-up to Y-down screen
@@ -255,14 +255,14 @@ pub fn draw_cube_3d(
             // U方向とV方向のベクトルを計算（2D投影後）
             // ベクトルの先端を計算してから差分を取る
             let u_end_2d = project_point(
-                sticker_def.center + sticker_def.u_vec * 0.6,
+                sticker_def.center + sticker_def.u_vec * VIEW3D_ARROW_VEC_SCALE,
                 &model_mat,
                 &view_mat,
                 scale,
                 center,
             );
             let v_end_2d = project_point(
-                sticker_def.center + sticker_def.v_vec * 0.6,
+                sticker_def.center + sticker_def.v_vec * VIEW3D_ARROW_VEC_SCALE,
                 &model_mat,
                 &view_mat,
                 scale,
@@ -303,7 +303,9 @@ pub fn draw_cube_3d(
             // 編集中の面をハイライト表示
             if let Some(face_idx) = highlight_face_index {
                 let start_idx = face_idx * crate::cube::STICKERS_PER_FACE;
-                if face.sticker_index >= start_idx && face.sticker_index < start_idx + crate::cube::STICKERS_PER_FACE {
+                if face.sticker_index >= start_idx
+                    && face.sticker_index < start_idx + crate::cube::STICKERS_PER_FACE
+                {
                     // 太いオレンジの枠線で囲む
                     painter.add(egui::Shape::convex_polygon(
                         face.points.clone(),
@@ -332,7 +334,7 @@ pub fn draw_cube_3d(
                 face.center_2d,
                 face.center_2d + arrow_vec,
                 Color32::BLACK,
-                6.0,
+                VIEW3D_ARROW_WIDTH,
             );
         }
     }

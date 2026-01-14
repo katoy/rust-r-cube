@@ -1,12 +1,13 @@
 use crate::gui::app::CubeApp;
+use crate::gui::constants::*;
 
 pub fn draw_statistics(app: &CubeApp, ui: &mut egui::Ui) {
     ui.heading("📊 統計情報");
-    ui.add_space(5.0);
+    ui.add_space(UI_SPACING_SMALL);
 
     egui::Grid::new("statistics_grid")
         .num_columns(2)
-        .spacing([10.0, 5.0])
+        .spacing([UI_SPACING_LARGE, UI_SPACING_SMALL])
         .show(ui, |ui| {
             ui.label("総解法回数:");
             ui.label(format!(

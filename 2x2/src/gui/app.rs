@@ -1,4 +1,5 @@
 use crate::cube::{Color, Cube, Move};
+use crate::gui::constants::*;
 use crate::gui::renderer_3d::{draw_cube_3d, View3D};
 use crate::history::History;
 use crate::solver;
@@ -252,15 +253,15 @@ impl CubeApp {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.text_styles.insert(
             egui::TextStyle::Body,
-            egui::FontId::new(14.0, egui::FontFamily::Proportional),
+            egui::FontId::new(UI_BODY_FONT_SIZE, egui::FontFamily::Proportional),
         );
         style.text_styles.insert(
             egui::TextStyle::Button,
-            egui::FontId::new(14.0, egui::FontFamily::Proportional),
+            egui::FontId::new(UI_BODY_FONT_SIZE, egui::FontFamily::Proportional),
         );
         style.text_styles.insert(
             egui::TextStyle::Heading,
-            egui::FontId::new(18.0, egui::FontFamily::Proportional),
+            egui::FontId::new(UI_HEADING_FONT_SIZE, egui::FontFamily::Proportional),
         );
         cc.egui_ctx.set_style(style);
 
@@ -672,7 +673,7 @@ impl CubeApp {
             help_pos,
             egui::Align2::LEFT_TOP,
             help_text,
-            egui::FontId::proportional(12.0),
+            egui::FontId::proportional(UI_HELP_TEXT_SIZE),
             egui::Color32::from_rgba_premultiplied(255, 255, 255, 200),
         );
     }

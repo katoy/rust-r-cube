@@ -26,6 +26,7 @@ impl History {
     }
 
     /// 指定サイズで新しい履歴を作成
+    #[must_use]
     pub fn with_capacity(max_size: usize) -> Self {
         Self {
             undo_stack: Vec::new(),
@@ -70,11 +71,13 @@ impl History {
     }
 
     /// Undoが可能かどうか
+    #[must_use]
     pub fn can_undo(&self) -> bool {
         !self.undo_stack.is_empty()
     }
 
     /// Redoが可能かどうか
+    #[must_use]
     pub fn can_redo(&self) -> bool {
         !self.redo_stack.is_empty()
     }
@@ -86,6 +89,7 @@ impl History {
     }
 
     /// Undo可能な操作数
+    #[must_use]
     pub fn undo_count(&self) -> usize {
         self.undo_stack.len()
     }

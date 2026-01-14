@@ -37,6 +37,7 @@ impl Default for Statistics {
 
 impl Statistics {
     /// 新しい統計情報を作成
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -67,6 +68,7 @@ impl Statistics {
     }
 
     /// 平均解法時間を計算
+    #[must_use]
     pub fn avg_solve_time(&self) -> Option<Duration> {
         if self.successful_solves > 0 {
             Some(self.total_solve_time / self.successful_solves as u32)
@@ -76,6 +78,7 @@ impl Statistics {
     }
 
     /// 成功率を計算（0.0 ~ 1.0）
+    #[must_use]
     pub fn success_rate(&self) -> f64 {
         if self.total_solves > 0 {
             self.successful_solves as f64 / self.total_solves as f64
@@ -85,6 +88,7 @@ impl Statistics {
     }
 
     /// セッション時間を取得
+    #[must_use]
     pub fn session_duration(&self) -> Duration {
         SystemTime::now()
             .duration_since(self.session_start)

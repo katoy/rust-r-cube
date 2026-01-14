@@ -206,7 +206,7 @@ fn solve_internal(
     // --- 順方向探索 ---
     let estimated_states = all_moves.len().pow(forward_depth as u32).min(1_000_000);
     let mut forward_dist: StateMap =
-        FxHashMap::with_capacity_and_hasher(estimated_states, Default::default());
+        FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
     let mut forward_queue: StateQueue = VecDeque::with_capacity(estimated_states);
 
     let start_key = if ignore_orientation {
@@ -244,7 +244,7 @@ fn solve_internal(
     let estimated_backward_states = all_moves.len().pow(backward_depth as u32).min(1_000_000);
     let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
     let mut backward_map: StateMap =
-        FxHashMap::with_capacity_and_hasher(estimated_backward_states, Default::default());
+        FxHashMap::with_capacity_and_hasher(estimated_backward_states, rustc_hash::FxBuildHasher);
 
     for solved in get_solved_states() {
         let s_key = if ignore_orientation {
@@ -314,7 +314,12 @@ fn solve_internal(
 }
 
 /// BFSの一つの層を展開します（Rayonによる並列化版）。
-fn expand_layer(queue: &mut StateQueue, dist: &mut StateMap, all_moves: &[Move], ignore_orientation: bool) {
+fn expand_layer(
+    queue: &mut StateQueue,
+    dist: &mut StateMap,
+    all_moves: &[Move],
+    ignore_orientation: bool,
+) {
     use rayon::prelude::*;
 
     // 現在の層の全ノードをベクタに取り出す（並列処理のため）

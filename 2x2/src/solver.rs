@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 /// デフォルトの最大探索深度
 pub const DEFAULT_MAX_DEPTH: usize = 11;
 const PROGRESS_UPDATE_INTERVAL: usize = 4;
+const ESTIMATED_STATES_MAX: usize = 1_000_000;
 
 /// BFS探索で使用する状態マップ: 状態 → (その状態に到達した操作, 親の状態)
 type StateMap = FxHashMap<Cube, (Option<Move>, Option<Cube>)>;
@@ -209,7 +210,10 @@ fn solve_internal(
     // --- 順方向探索 ---
     // forward_depthは最大11なのu32へのキャストは安全
     #[allow(clippy::cast_possible_truncation)]
-    let estimated_states = all_moves.len().pow(forward_depth as u32).min(1_000_000);
+    let estimated_states = all_moves
+        .len()
+        .pow(forward_depth as u32)
+        .min(ESTIMATED_STATES_MAX);
     let mut forward_dist: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
     let mut forward_queue: StateQueue = VecDeque::with_capacity(estimated_states);
@@ -250,7 +254,10 @@ fn solve_internal(
     // --- 逆方向探索 ---
     // backward_depthは最大11なのu32へのキャストは安全
     #[allow(clippy::cast_possible_truncation)]
-    let estimated_backward_states = all_moves.len().pow(backward_depth as u32).min(1_000_000);
+    let estimated_backward_states = all_moves
+        .len()
+        .pow(backward_depth as u32)
+        .min(ESTIMATED_STATES_MAX);
     let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
     let mut backward_map: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_backward_states, rustc_hash::FxBuildHasher);

@@ -33,7 +33,7 @@ const MIN_ZOOM_SCALE: f32 = 0.5;
 const MAX_ZOOM_SCALE: f32 = 3.0;
 
 /// ズーム変化率
-const ZOOM_FACTOR: f32 = 1.1;
+// ZOOM_FACTOR is now in constants.rs
 
 /// キューブの表示モードを定義します。
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -424,7 +424,7 @@ impl CubeApp {
             } else if let Some(single_mv) = mv.split_to_single() {
                 // 180度回転の場合、90度回転2回に分割する
                 // F2をF1枚分の時間で終わらせるため、各アニメーションの長さは半分
-                let half_duration = self.animation_speed * 0.5;
+                let half_duration = self.animation_speed * ANIMATION_SPLIT_DURATION_FACTOR;
 
                 // 1回目の90度回転 (加速のみ)
                 self.animation = Some(AnimationState::with_easing(
@@ -633,13 +633,13 @@ impl CubeApp {
         // 3Dビュー操作
         if response.dragged() {
             let delta = response.drag_delta();
-            self.view_3d.yaw += delta.x * 0.01;
-            self.view_3d.pitch += delta.y * 0.01;
+            self.view_3d.yaw += delta.x * MOUSE_SENSITIVITY;
+            self.view_3d.pitch += delta.y * MOUSE_SENSITIVITY;
 
             // Pitch制限
             self.view_3d.pitch = self.view_3d.pitch.clamp(
-                -std::f32::consts::FRAC_PI_2 + 0.1,
-                std::f32::consts::FRAC_PI_2 - 0.1,
+                -std::f32::consts::FRAC_PI_2 + VIEW3D_PITCH_LIMIT_MARGIN,
+                std::f32::consts::FRAC_PI_2 - VIEW3D_PITCH_LIMIT_MARGIN,
             );
         }
         // ズーム操作
@@ -668,7 +668,7 @@ impl CubeApp {
 
         // ヘルプテキストを描画
         let help_text = "ドラッグで回転、ホイールでズーム";
-        let help_pos = rect.min + egui::vec2(10.0, 10.0);
+        let help_pos = rect.min + egui::vec2(UI_SPACING_LARGE, UI_SPACING_LARGE);
         ui.painter().text(
             help_pos,
             egui::Align2::LEFT_TOP,
@@ -1024,12 +1024,12 @@ impl eframe::App for CubeApp {
 
         // 右側のサイドパネル (コントロールパネル)
         egui::SidePanel::right("control_panel")
-            .min_width(250.0)
-            .default_width(250.0)
+            .min_width(UI_SIDE_PANEL_WIDTH)
+            .default_width(UI_SIDE_PANEL_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.add_space(10.0);
+                    ui.add_space(UI_SPACING_LARGE);
                     crate::gui::controls::draw_controls(self, ui);
                 });
             });
@@ -1044,7 +1044,7 @@ impl eframe::App for CubeApp {
                     ui.selectable_value(&mut self.view_mode, ViewMode::TwoD, "2Dのみ");
                 });
             });
-            ui.add_space(10.0);
+            ui.add_space(UI_SPACING_LARGE);
 
             // キューブ表示領域
             ui.group(|ui| {

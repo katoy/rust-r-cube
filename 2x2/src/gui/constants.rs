@@ -42,6 +42,9 @@ pub const VIEW3D_ARROW_WIDTH: f32 = 6.0;
 pub const VIEW3D_ARROW_HEAD_RATIO: f32 = 0.6;
 pub const VIEW3D_PITCH_LIMIT_MARGIN: f32 = 0.1;
 
+pub const MOUSE_SENSITIVITY: f32 = 0.01;
+pub const ZOOM_FACTOR: f32 = 1.1;
+
 /// UIレイアウト定数
 pub const UI_SPACING_LARGE: f32 = 10.0;
 pub const UI_SPACING_SMALL: f32 = 5.0;
@@ -49,6 +52,7 @@ pub const UI_HEADING_FONT_SIZE: f32 = 18.0;
 pub const UI_BODY_FONT_SIZE: f32 = 14.0;
 pub const UI_HELP_TEXT_SIZE: f32 = 12.0;
 pub const UI_SOLVE_STEP_FONT_SIZE: f32 = 16.0;
+pub const UI_SIDE_PANEL_WIDTH: f32 = 250.0;
 
 pub const INPUT_PALETTE_BUTTON_SIZE: [f32; 2] = [35.0, 30.0];
 pub const INPUT_STICKER_BUTTON_SIZE: [f32; 2] = [50.0, 50.0];
@@ -65,6 +69,7 @@ pub const ANIMATION_TRAIL_ALPHA_FACTOR: f32 = 0.3;
 pub const ANIMATION_BULGE_MID_FACTOR: f32 = 0.1; // 1.0 + 0.1 * mid_p
 pub const ANIMATION_JUMP_SIZE_FACTOR: f32 = 0.3; // 1.0 - 0.3 * mid_p
 pub const ANIMATION_JUMP_ALPHA_FACTOR: f32 = 0.5; // 1.0 - 0.5 * mid_p
+pub const ANIMATION_SPLIT_DURATION_FACTOR: f32 = 0.5;
 
 /// ハイライト設定
 pub const HIGHLIGHT_STROKE_WIDTH: f32 = 4.0;

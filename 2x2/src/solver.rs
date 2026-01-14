@@ -29,14 +29,15 @@ pub fn get_solved_states() -> &'static [Cube] {
 }
 
 fn generate_all_solved_states() -> Vec<Cube> {
+    use rustc_hash::FxHashSet;
     let base = Cube::new();
     let mut states = Vec::new();
     let mut queue = VecDeque::new();
-    let mut visited = FxHashMap::default();
+    let mut visited: FxHashSet<Cube> = FxHashSet::default();
 
     let base_norm = base.normalized();
     queue.push_back(base.clone());
-    visited.insert(base_norm, ());
+    visited.insert(base_norm);
     states.push(base);
 
     let rotations = vec![
@@ -53,8 +54,7 @@ fn generate_all_solved_states() -> Vec<Cube> {
             }
 
             let next_norm = next.normalized();
-            if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(next_norm) {
-                e.insert(());
+            if visited.insert(next_norm) {
                 states.push(next.clone());
                 queue.push_back(next);
             }
@@ -65,7 +65,7 @@ fn generate_all_solved_states() -> Vec<Cube> {
     // (rotation.rs が物理的に整合したため、これら24状態はすべて解決状態として有効)
     states
         .iter()
-        .map(|cube| cube.with_clockwise_orientations())
+        .map(Cube::with_clockwise_orientations)
         .collect()
 }
 
@@ -92,6 +92,7 @@ fn generate_all_solved_states() -> Vec<Cube> {
 /// let cube = Cube::new();
 /// assert!(is_fully_solved(&cube));
 /// ```
+#[must_use]
 pub fn is_fully_solved(cube: &Cube) -> bool {
     get_solved_states().contains(cube)
 }
@@ -126,6 +127,7 @@ pub fn is_fully_solved(cube: &Cube) -> bool {
 /// let solution = solve_with_progress(&cube, 11, true, Some(tx));
 /// assert!(solution.found);
 /// ```
+#[must_use]
 pub fn solve_with_progress(
     start_cube: &Cube,
     max_depth: usize,
@@ -165,6 +167,7 @@ pub fn solve_with_progress(
 /// assert!(solution.found);
 /// println!("解法: {} 手", solution.moves.len());
 /// ```
+#[must_use]
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
     solve_internal(start_cube, max_depth, ignore_orientation, None)
 }

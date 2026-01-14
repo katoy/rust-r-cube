@@ -21,6 +21,7 @@ impl Default for History {
 
 impl History {
     /// デフォルトサイズ（100件）で新しい履歴を作成
+    #[must_use]
     pub fn new() -> Self {
         Self::with_capacity(100)
     }
@@ -95,6 +96,7 @@ impl History {
     }
 
     /// Redo可能な操作数
+    #[must_use]
     pub fn redo_count(&self) -> usize {
         self.redo_stack.len()
     }

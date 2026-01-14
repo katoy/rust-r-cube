@@ -34,42 +34,57 @@ const MAX_ZOOM_SCALE: f32 = 3.0;
 /// ズーム変化率
 const ZOOM_FACTOR: f32 = 1.1;
 
-/// 表示モード
+/// キューブの表示モードを定義します。
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ViewMode {
+    /// 2D 展開図のみ表示
     TwoD,
+    /// 3D ビューのみ表示
     ThreeD,
+    /// 2D と 3D を両方表示
     Both,
 }
 
-/// 入力状態
+/// ユーザーの入力状態を定義します。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputState {
+    /// 通常の状態
     Normal,
+    /// 6面スキャン入力モード
     Scanning {
-        face_index: usize, // 0-5 (U, D, L, R, F, B)
+        /// 現在入力中の面のインデックス (0-5: U, D, L, R, F, B)
+        face_index: usize,
     },
 }
 
-/// イージングモード
+/// アニメーションのイージング（加減速）モードを定義します。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EasingMode {
-    EaseInOut, // 通常 (加速してから減速)
-    EaseIn,    // 前半向き (加速のみ)
-    EaseOut,   // 後半向き (減速のみ)
+    /// 通常 (加速してから減速)
+    EaseInOut,
+    /// 前半部分 (加速のみ、180度回転の分割前半などで使用)
+    EaseIn,
+    /// 後半部分 (減速のみ、180度回転の分割後半などで使用)
+    EaseOut,
 }
 
-/// アニメーション状態
+/// 現在実行中のアニメーションの状態を管理する構造体。
 #[derive(Debug, Clone)]
 pub struct AnimationState {
+    /// 実行中の操作
     pub current_move: Move,
-    pub progress: f32, // 0.0 to 1.0
+    /// 進捗率 (0.0 から 1.0)
+    pub progress: f32,
+    /// アニメーション開始時刻
     pub start_time: Instant,
-    pub duration: f32, // seconds
+    /// アニメーションの総時間（秒）
+    pub duration: f32,
+    /// 使用するイージングモード
     pub easing: EasingMode,
 }
 
 impl AnimationState {
+    /// 新しいアニメーション状態を作成します（標準の EaseInOut）。
     pub fn new(mv: Move, duration: f32) -> Self {
         Self {
             current_move: mv,
@@ -80,6 +95,7 @@ impl AnimationState {
         }
     }
 
+    /// イージングモードを指定して、新しいアニメーション状態を作成します。
     pub fn with_easing(mv: Move, duration: f32, easing: EasingMode) -> Self {
         Self {
             current_move: mv,
@@ -90,6 +106,11 @@ impl AnimationState {
         }
     }
 
+    /// 経過時間に基づいて進捗率を更新します。
+    ///
+    /// # 戻り値
+    ///
+    /// アニメーションが完了した（1.0 に達した）場合は `true` を返します。
     pub fn update(&mut self) -> bool {
         if self.duration <= 0.001 {
             self.progress = 1.0;
@@ -100,7 +121,7 @@ impl AnimationState {
         self.progress >= 1.0
     }
 
-    /// イージング関数
+    /// イージングモードに基づいた現在の進捗率（計算値）を取得します。
     pub fn eased_progress(&self) -> f32 {
         let t = self.progress;
         match self.easing {
@@ -111,60 +132,75 @@ impl AnimationState {
                     -1.0 + (4.0 - 2.0 * t) * t
                 }
             }
-            EasingMode::EaseIn => t * t, // 加速のみ (速度は 2*t, 終端で速度2)
-            EasingMode::EaseOut => 1.0 - (1.0 - t) * (1.0 - t), // 減速のみ (速度は 2*(1-t), 始端で速度2)
+            EasingMode::EaseIn => t * t,
+            EasingMode::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
         }
     }
 }
 
-/// メインアプリケーション
+/// アプリケーションのメイン状態を保持する構造体。
 pub struct CubeApp {
+    /// 現在のキューブの状態
     cube: Cube,
+    /// 現在実行中のアニメーション（実行されていない場合は `None`）
     animation: Option<AnimationState>,
+    /// 未実行の操作キュー
     move_queue: Vec<(Move, Option<EasingMode>, Option<f32>)>,
-    pub animation_speed: f32, // seconds per move
+    /// アニメーションの速度（1手あたりの秒数）
+    pub animation_speed: f32,
+    /// ソルバーが見つけた解決手順（見つかっていない場合は `None`）
     pub solution: Option<Vec<Move>>,
+    /// 現在ソルバーが探索中かどうか
     pub solving: bool,
+    /// ソルバーの現在の探索進捗率 (0.0 - 1.0)
     pub solver_progress: f32,
+    /// ソルバーの状態テキスト（「探索中...」など）
     pub solution_text: String,
 
-    // 表示設定
+    /// 現在の表示モード（2D, 3D, Both）
     pub view_mode: ViewMode,
+    /// 3Dビューのカメラ・倍率設定
     pub view_3d: View3D,
 
-    // ソルバー通信用
+    /// ソルバーからの結果受信用レシーバ
     solver_receiver: Option<Receiver<solver::Solution>>,
+    /// ソルバーからの進捗受信用レシーバ
     progress_receiver: Option<Receiver<f32>>,
 
-    // 解法ステップ管理
+    /// 解法手順をたどる際の現在のステップ番号
     pub solution_step: usize,
+    /// 解法開始前のキューブの状態（リセット用）
     pub solution_cube_state: Option<Cube>,
-    // アニメーション完了後にsolution_stepを更新するための保留値 (+1 or -1)
+    /// アニメーション完了後にステップ番号を更新するための保留値
     pending_solution_update: Option<isize>,
 
-    // 解決設定
+    /// ソルバーがステッカーの向きを無視するかどうか
     pub ignore_orientation: bool,
 
-    // 探索時間計測
+    /// 探索開始時刻
     pub solving_start_time: Option<Instant>,
-    pub last_solve_duration: Option<f32>, // 秒単位
+    /// 前回の探索にかかった時間（秒）
+    pub last_solve_duration: Option<f32>,
 
-    // 6面スキャン入力モード
+    /// モードに応じた入力状態（通常、スキャンモード）
     pub input_state: InputState,
+    /// 6面スキャン入力中の色データ一時保持用
     pub input_buffer: [Option<Color>; 24],
+    /// 入力パネルで選択されている色
     pub selected_input_color: Color,
+    /// 入力中のエラーメッセージ（不正なパリティなど）
     pub input_error_message: String,
 
-    // デバッグオプション
+    /// 開発者用オプション：パリティチェック（物理的妥当性）をスキップするか
     pub skip_parity_check: bool,
 
-    // ソルバータスクの種類
+    /// 現在実行中のソルバータスクの種類
     pub solver_task: SolverTask,
 
-    // 統計情報
+    /// 解法時間などの統計情報
     pub statistics: Statistics,
 
-    // 操作履歴
+    /// 手動操作の履歴 (Undo/Redo用)
     pub history: History,
 }
 

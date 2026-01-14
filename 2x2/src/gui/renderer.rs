@@ -2,7 +2,16 @@ use crate::cube::{Color, Cube, Face, Move, Sticker, STICKERS_PER_FACE};
 use crate::gui::app::AnimationState;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
-/// ステッカーの色をegui Color32に変換
+/// キューブのステッカー色（[`Color`]）を egui の [`Color32`] に変換します。
+///
+/// # 引数
+///
+/// - `color` - 変換元のステッカー色
+///
+/// # 戻り値
+///
+/// egui で描画可能な Color32 値
+#[must_use]
 pub fn color_to_color32(color: Color) -> Color32 {
     match color {
         Color::White => Color32::from_rgb(255, 255, 255),
@@ -15,7 +24,9 @@ pub fn color_to_color32(color: Color) -> Color32 {
     }
 }
 
-/// ステッカーを描画
+/// 単一のステッカーを描画します。
+///
+/// 指定された回転角度や透明度を適用して、正方形のステッカーとその上の向きを示す矢印を描画します。
 fn draw_sticker(
     painter: &Painter,
     center: Pos2,
@@ -77,7 +88,7 @@ fn draw_sticker(
     draw_arrow(painter, center, size * 0.3, arrow_rotation, alpha);
 }
 
-/// 矢印を描画
+/// ステッカーの向き（orientation）を示す矢印を描画します。
 fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha: f32) {
     let cos = rotation.cos();
     let sin = rotation.sin();
@@ -366,7 +377,18 @@ fn rotate_point(p: Pos2, center: Pos2, angle_degrees: f32) -> Pos2 {
     )
 }
 
-/// キューブを展開図として描画
+/// キューブを展開図（2D）として指定された領域に描画します。
+///
+/// 現在のアニメーション状態（[`AnimationState`]）がある場合は、
+/// 回転や移動の演出を適用して描画します。
+///
+/// # 引数
+///
+/// - `ui` - egui の Ui コンテキスト
+/// - `rect` - 描画先の矩形領域
+/// - `cube` - 描画対象のキューブ
+/// - `animation` - 現在実行中のアニメーション状態（任意）
+/// - `highlight_face_index` - ハイライト表示する面のインデックス（任意、0-5）
 pub fn draw_cube(
     ui: &mut egui::Ui,
     rect: Rect,

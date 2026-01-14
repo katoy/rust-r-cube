@@ -64,7 +64,33 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
     ),
 ];
 
-/// 回転操作を実行
+/// 指定された回転操作をキューブに適用します。
+///
+/// この関数は2x2ルービックキューブの6つの面（U, D, L, R, F, B）に対する
+/// 回転操作を実行します。90度回転、逆回転（90度反時計回り）、
+/// 180度回転の3種類がサポートされています。
+///
+/// # 引数
+///
+/// - `cube` - 操作対象のキューブへの可変参照
+/// - `mv` - 実行する回転操作（Move enum）
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::{Cube, Move};
+/// use rubiks_cube_2x2::cube::rotation::apply_move;
+///
+/// let mut cube = Cube::new();
+/// apply_move(&mut cube, Move::R);  // R面を90度時計回り
+/// apply_move(&mut cube, Move::Up); // U面を90度反時計回り
+/// ```
+///
+/// # 実装詳細
+///
+/// - 90度回転（R, L, U, D, F, B）: 基本回転を1回実行
+/// - 180度回転（R2, L2, U2, D2, F2, B2）: 基本回転を2回実行
+/// - 逆回転（Rp, Lp, Up, Dp, Fp, Bp）: 基本回転を3回実行
 pub fn apply_move(cube: &mut Cube, mv: Move) {
     let base_move = match mv {
         Move::U | Move::Up | Move::U2 => Move::U,
@@ -129,7 +155,32 @@ fn rotate_internal(cube: &mut Cube, face: usize, od: u8, cycle: &[usize; 8], rot
     }
 }
 
-/// ランダムなスクランブルを生成します。
+/// ランダムなスクランブルを生成してキューブに適用します。
+///
+/// 指定された手数分のランダムな回転操作を実行し、キューブをスクランブル状態にします。
+/// 各手は18種類の可能な操作（R, Rp, R2, L, Lp, L2, ...）からランダムに選択されます。
+///
+/// # 引数
+///
+/// - `cube` - スクランブルするキューブへの可変参照
+/// - `moves` - 実行するランダム操作の回数
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::Cube;
+/// use rubiks_cube_2x2::cube::rotation::scramble;
+///
+/// let mut cube = Cube::new();
+/// scramble(&mut cube, 10);  // 10手のランダムスクランブル
+/// assert!(!cube.is_solved()); // ほぼ確実に未完成状態
+/// ```
+///
+/// # 注意
+///
+/// - 連続する手で互いに逆操作になる可能性があります（例: R直後にRp）
+/// - より複雑なスクランブル（逆操作を避けるなど）が必要な場合は、
+///   別途カスタムロジックを実装してください
 pub fn scramble(cube: &mut Cube, moves: usize) {
     use rand::Rng;
     let mut rng = rand::thread_rng();

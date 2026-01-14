@@ -1,22 +1,43 @@
-/// キューブの面を表す列挙型
+/// 2x2ルービックキューブの6つの面を表します。
+///
+/// 内部的には0から5の整数値にマップされており、
+/// 各面のステッカー配列の開始インデックスを計算するために使用されます。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Face {
+    /// 上面 (Whiteが標準)
     Up = 0,
+    /// 下面 (Yellowが標準)
     Down = 1,
+    /// 左面 (Greenが標準)
     Left = 2,
+    /// 右面 (Blueが標準)
     Right = 3,
+    /// 前面 (Redが標準)
     Front = 4,
+    /// 背面 (Orangeが標準)
     Back = 5,
 }
 
 impl Face {
-    /// 面の開始インデックスを取得 (0, 4, 8, 12, 16, 20)
+    /// この面のステッカー配列における開始インデックスを取得します。
+    ///
+    /// 2x2キューブでは各面4枚のステッカーがあるため、
+    /// インデックスは (面の番号 * 4) となります。
     #[must_use]
     pub const fn start_index(self) -> usize {
         (self as usize) * STICKERS_PER_FACE
     }
 
-    /// すべての面を取得
+    /// すべての面を列挙した配列を返します。
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::Face;
+    /// for face in Face::all() {
+    ///     println!("{:?}", face);
+    /// }
+    /// ```
     #[must_use]
     pub fn all() -> [Face; 6] {
         [
@@ -35,27 +56,41 @@ pub const NUM_STICKERS: usize = 24;
 /// 1面あたりのステッカー数
 pub const STICKERS_PER_FACE: usize = 4;
 
-/// ステッカーの色
+/// ステッカーの色の定義です。
+///
+/// 標準的なルービックキューブの6色に加えて、
+/// 未設定状態を表す `Gray` を含みます。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
+    /// 白 (通常は上面)
     White,
+    /// 黄 (通常は下面)
     Yellow,
+    /// 緑 (通常は左面)
     Green,
+    /// 青 (通常は右面)
     Blue,
+    /// 赤 (通常は前面)
     Red,
+    /// 橙 (通常は背面)
     Orange,
-    Gray, // 未設定のセル用
+    /// 灰色 (未設定・無効な色)
+    Gray,
 }
 
-/// ステッカー（色と向き情報を持つ）
+/// 1枚のステッカーを表す構造体。
+///
+/// 色情報（[`Color`]）と、そのステッカーの現在の向き（[`orientation`](Self::orientation)）を保持します。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Sticker {
+    /// ステッカーの色
     pub color: Color,
-    /// 向き（0-3の値で、90度単位の回転を表す）
+    /// 向き（0-3の値で、90度単位の物理的な回転状態を表す。0が初期状態）
     pub orientation: u8,
 }
 
 impl Sticker {
+    /// 指定された色で、向きが0（初期状態）のステッカーを作成します。
     #[must_use]
     pub fn new(color: Color) -> Self {
         Self {
@@ -64,42 +99,63 @@ impl Sticker {
         }
     }
 
-    /// 時計回りに90度回転
+    /// ステッカーを時計回りに90度回転させます（向き情報を更新）。
     pub fn rotate_cw(&mut self) {
         self.orientation = (self.orientation + 1) % 4;
     }
 
-    /// 反時計回りに90度回転
+    /// ステッカーを反時計回りに90度回転させます（向き情報を更新）。
     pub fn rotate_ccw(&mut self) {
         self.orientation = (self.orientation + 3) % 4;
     }
 }
 
-/// 回転操作
+/// キューブに対する単一の回転操作を定義します。
+///
+/// 各文字（R, L, U, D, F, B）は操作する面を表し、
+/// 接尾辞（なし, p, 2）は回転の量と方向を表します。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Move {
-    R,  // Right face clockwise
-    Rp, // Right face counter-clockwise
-    R2, // Right face 180 degrees
-    L,  // Left face clockwise
-    Lp, // Left face counter-clockwise
-    L2, // Left face 180 degrees
-    U,  // Up face clockwise
-    Up, // Up face counter-clockwise
-    U2, // Up face 180 degrees
-    D,  // Down face clockwise
-    Dp, // Down face counter-clockwise
-    D2, // Down face 180 degrees
-    F,  // Front face clockwise
-    Fp, // Front face counter-clockwise
-    F2, // Front face 180 degrees
-    B,  // Back face clockwise
-    Bp, // Back face counter-clockwise
-    B2, // Back face 180 degrees
+    /// 右面 時計回り 90度
+    R,
+    /// 右面 反時計回り 90度 (Prime)
+    Rp,
+    /// 右面 180度
+    R2,
+    /// 左面 時計回り 90度
+    L,
+    /// 左面 反時計回り 90度
+    Lp,
+    /// 左面 180度
+    L2,
+    /// 上面 時計回り 90度
+    U,
+    /// 上面 反時計回り 90度
+    Up,
+    /// 上面 180度
+    U2,
+    /// 下面 時計回り 90度
+    D,
+    /// 下面 反時計回り 90度
+    Dp,
+    /// 下面 180度
+    D2,
+    /// 前面 時計回り 90度
+    F,
+    /// 前面 反時計回り 90度
+    Fp,
+    /// 前面 180度
+    F2,
+    /// 背面 時計回り 90度
+    B,
+    /// 背面 反時計回り 90度
+    Bp,
+    /// 背面 180度
+    B2,
 }
 
 impl Move {
-    /// すべての回転操作を取得
+    /// 利用可能なすべての回転操作（18種類）を一覧したベクタを返します。
     #[must_use]
     pub fn all_moves() -> Vec<Move> {
         vec![
@@ -124,7 +180,9 @@ impl Move {
         ]
     }
 
-    /// 逆操作を取得
+    /// 指定された操作の逆操作（反対方向の回転）を返します。
+    ///
+    /// 180度回転（2）の逆操作は、便宜上同じ180度回転を返します。
     #[must_use]
     pub fn inverse(self) -> Move {
         match self {
@@ -149,7 +207,9 @@ impl Move {
         }
     }
 
-    /// 180度回転操作を90度回転操作2回に分割するための、1回目の操作を取得
+    /// 180度回転操作を90度回転操作2回に分割するための、1回分の操作を取得します。
+    ///
+    /// 90度回転（なし/p）の場合は `None` を返します。
     #[must_use]
     pub fn split_to_single(self) -> Option<Move> {
         match self {

@@ -5,16 +5,37 @@ pub mod validation;
 
 pub use self::enums::{Color, Face, Move, Sticker, NUM_STICKERS, STICKERS_PER_FACE};
 
-/// 2x2 ルービックキューブ
+/// 2x2 ルービックキューブ（ポケットキューブ）を表す構造体。
+///
+/// 24枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
+/// 内部構造は面の順序と各面内のインデックスによって定義されます。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Cube {
-    /// 各面のステッカー（各面4つ）
-    /// インデックス: 0-3 (Up), 4-7 (Down), 8-11 (Left), 12-15 (Right), 16-19 (Front), 20-23 (Back)
+    /// 全ステッカーの配列（総数24）。
+    ///
+    /// インデックスの割り当て:
+    /// - 0-3:   上面 (Up)
+    /// - 4-7:   下面 (Down)
+    /// - 8-11:  左面 (Left)
+    /// - 12-15: 右面 (Right)
+    /// - 16-19: 前面 (Front)
+    /// - 20-23: 背面 (Back)
     pub stickers: [Sticker; 24],
 }
 
 impl Cube {
-    /// 完成状態のキューブを作成します。
+    /// 完成した状態の新しいキューブを作成します。
+    ///
+    /// 各面は標準的な配色（白・黄・緑・青・赤・橙）で塗り分けられ、
+    /// ステッカーの向きは標準的な時計回りパターン `[1, 2, 0, 3]` に設定されます。
+    ///
+    /// # 例
+    ///
+    /// ```
+    /// use rubiks_cube_2x2::cube::Cube;
+    /// let cube = Cube::new();
+    /// assert!(cube.is_solved_with_orientation());
+    /// ```
     #[must_use]
     pub fn new() -> Self {
         let mut stickers = [Sticker::new(Color::White); NUM_STICKERS];
@@ -42,7 +63,13 @@ impl Cube {
         Self { stickers }
     }
 
-    /// キューブが完成しているか判定します（色のみ、向きは無視）。
+    /// 各面のステッカーの色がすべて一致しているか（完成しているか）を判定します。
+    ///
+    /// ステッカー自体の向き（矢印などの方向）は無視されます。
+    ///
+    /// # 戻り値
+    ///
+    /// すべての面が単色であれば `true` を返します。
     #[must_use]
     pub fn is_solved(&self) -> bool {
         for face in Face::all() {
@@ -57,7 +84,11 @@ impl Cube {
         true
     }
 
-    /// キューブが完成しているか判定します（色と向きの両方）。
+    /// 色が揃っており、かつステッカーの向きも初期状態と同じであるかを判定します。
+    ///
+    /// # 戻り値
+    ///
+    /// 色と向きの両方が初期状態と一致していれば `true` を返します。
     #[must_use]
     pub fn is_solved_with_orientation(&self) -> bool {
         if !self.is_solved() {
@@ -75,20 +106,24 @@ impl Cube {
         true
     }
 
-    /// 指定したインデックスのステッカーを取得します。
+    /// 指定した絶対インデックス（0-23）のステッカーを取得します。
     #[must_use]
     pub fn get_sticker(&self, index: usize) -> Sticker {
         self.stickers[index]
     }
 
-    /// 指定したインデックスのステッカーの色を設定します。
+    /// 指定した絶対インデックスのステッカーの色を設定します。
+    ///
+    /// 色を変更すると、そのステッカーの向き（orientation）は 0 にリセットされます。
     pub fn set_sticker_color(&mut self, index: usize, color: Color) {
         self.stickers[index].color = color;
         // 向きはリセット（手動入力時は向きを0にする）
         self.stickers[index].orientation = 0;
     }
 
-    /// 色を保持したまま、全てのステッカーのorientationを時計回りパターンにリセットします。
+    /// 各ステッカーの色を維持したまま、向き情報のみを標準的な時計回りパターンにリセットした新しいキューブを返します。
+    ///
+    /// ソルバーで色のみを解いた後に、物理的に正しい向きを再設定する場合などに使用されます。
     #[must_use]
     pub fn with_clockwise_orientations(&self) -> Self {
         let mut new_cube = self.clone();
@@ -105,7 +140,9 @@ impl Cube {
         new_cube
     }
 
-    /// 24個の色配列から新しいキューブを作成します。
+    /// 24個の色配列から新しいキューブを作成します（物理的な向きを自動復元）。
+    ///
+    /// 色の配置が物理的に可能でない（コーナーピースの色構成が不正など）場合はエラーを返します。
     pub fn from_colors(colors: &[Color; 24]) -> crate::error::Result<Self> {
         let mut stickers = [Sticker::new(Color::White); 24];
         for (i, &color) in colors.iter().enumerate() {
@@ -125,40 +162,45 @@ impl Cube {
         Ok(cube)
     }
 
-    /// 色配列の妥当性をチェックします。
+    /// 指定された色配列（24要素）がキューブとして妥当であるかを検証します。
     pub fn validate_colors(colors: &[Color; 24]) -> crate::error::Result<()> {
         validation::validate_colors(colors)
     }
 
-    /// キューブの状態が有効かどうかを判定
+    /// キューブの現在の状態（色と向きの組み合わせ）が、物理的に到達可能な有効な状態であるかを判定します。
     pub fn is_valid_state(&self) -> crate::error::Result<()> {
         validation::is_valid_state(self)
     }
 
-    /// キューブの状態をファイル形式の文字列に変換
+    /// キューブの現在の内容を、ファイル保存用のテキスト形式に変換します。
     pub fn to_file_format(&self) -> String {
         io::to_file_format(self)
     }
 
-    /// ファイル形式の文字列からキューブを作成
+    /// ファイル保存形式の文字列をパースして、新しいキューブを作成します。
     pub fn from_file_format(s: &str) -> crate::error::Result<Self> {
         io::from_file_format(s)
     }
 
-    /// 回転操作を実行
+    /// 回転操作を適用します。
     pub fn apply_move(&mut self, mv: Move) {
         rotation::apply_move(self, mv);
     }
 
-    /// ランダムなスクランブルを生成します。
+    /// 指定回数のランダムな回転操作を適用します。
     pub fn scramble(&mut self, moves: usize) {
         rotation::scramble(self, moves);
     }
 
-    /// 探索を使わずに、現在の色配置から物理的に正しい向きを瞬時に復元します。
-    /// 1. UFL スロットの色配置に基づいて、24通りの完成状態から現在の「座標系（方位）」を1つ特定します。
-    /// 2. 特定された方位全体の完成状態をテンプレートとして、現在の各ピースの向き（twist）を特定し、
-    ///    物理的に正しい方向を設定します。
+    /// 現在の色配置に基づいて、物理的に正しいステッカー向（twist）を瞬時に復元します。
+    ///
+    /// 各コーナーピースの3色の配置を、24通りの完成状態のいずれかと照合することで、
+    /// 探索を行わずに正しい向きを特定します。
+    ///
+    /// # エラー
+    ///
+    /// コーナーピースの色の組み合わせが物理的に存在しない（例：白と黄が隣接している）
+    /// 場合などは `CubeError::InvalidState` を返します。
     pub fn restore_orientation_instantly(&mut self) -> crate::error::Result<()> {
         // 色の妥当性チェック
         let mut colors_array = [Color::White; 24];
@@ -212,8 +254,7 @@ impl Cube {
         self.is_valid_state()
     }
 
-    /// ソリューション（向き無視で解いたもの）を使って、現在のキューブの正しい向きを復元します。
-    /// 旧方式のソルバーベースの復元（非推奨）ですが、互換性のために残し、内部で即時復元を呼び出すように変更します。
+    /// ソルバーで見つかった解を利用して向きを復元します（現在は内部で `restore_orientation_instantly` を呼び出します）。
     pub fn apply_orientation_solution(
         &mut self,
         _solution: &crate::solver::Solution,
@@ -221,7 +262,10 @@ impl Cube {
         self.restore_orientation_instantly()
     }
 
-    /// 色情報のみ比較するために、向き情報をリセットしたキューブを返します。
+    /// 各ステッカーの向き情報をリセット（0に設定）したキューブの複製を返します。
+    ///
+    /// ハッシュマップやセットで、向きによらず「色の配置」のみで状態を管理したい場合に使用します。
+    #[must_use]
     pub fn normalized(&self) -> Self {
         let mut new_cube = self.clone();
         for sticker in &mut new_cube.stickers {

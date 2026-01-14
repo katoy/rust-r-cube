@@ -204,6 +204,8 @@ fn solve_internal(
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
+    // forward_depthは最大11なのu32へのキャストは安全
+    #[allow(clippy::cast_possible_truncation)]
     let estimated_states = all_moves.len().pow(forward_depth as u32).min(1_000_000);
     let mut forward_dist: StateMap =
         FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
@@ -226,6 +228,8 @@ fn solve_internal(
         // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
+                // current_depthとtotal_depthは最大11程度なのf32で十分
+                #[allow(clippy::cast_precision_loss)]
                 let progress = (current_depth as f32) / (total_depth as f32);
                 let _ = tx.send(progress);
             }
@@ -241,6 +245,8 @@ fn solve_internal(
     }
 
     // --- 逆方向探索 ---
+    // backward_depthは最大11なのu32へのキャストは安全
+    #[allow(clippy::cast_possible_truncation)]
     let estimated_backward_states = all_moves.len().pow(backward_depth as u32).min(1_000_000);
     let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
     let mut backward_map: StateMap =
@@ -272,6 +278,8 @@ fn solve_internal(
         // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
+                // forward_depthとcurrent_depthは最大11程度なのf32で十分
+                #[allow(clippy::cast_precision_loss)]
                 let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
                 let _ = tx.send(progress);
             }

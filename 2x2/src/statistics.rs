@@ -71,7 +71,10 @@ impl Statistics {
     #[must_use]
     pub fn avg_solve_time(&self) -> Option<Duration> {
         if self.successful_solves > 0 {
-            Some(self.total_solve_time / self.successful_solves as u32)
+            // successful_solvesは実用上数百程度なu32へのキャストは安全
+            #[allow(clippy::cast_possible_truncation)]
+            let count_u32 = self.successful_solves as u32;
+            Some(self.total_solve_time / count_u32)
         } else {
             None
         }
@@ -81,7 +84,11 @@ impl Statistics {
     #[must_use]
     pub fn success_rate(&self) -> f64 {
         if self.total_solves > 0 {
-            self.successful_solves as f64 / self.total_solves as f64
+            // 統計値は実用上f64の52bit精度で十分
+            #[allow(clippy::cast_precision_loss)]
+            {
+                self.successful_solves as f64 / self.total_solves as f64
+            }
         } else {
             0.0
         }

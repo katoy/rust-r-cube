@@ -1,4 +1,4 @@
-use rubiks_cube_2x2::gui::CubeApp;
+use rubiks_cube_2x2::gui::app::CubeApp;
 
 fn main() -> eframe::Result<()> {
     // ロギングの初期化

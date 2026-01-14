@@ -1,5 +1,6 @@
 use crate::cube::{Color, Cube, Face, Move, Sticker, STICKERS_PER_FACE};
 use crate::gui::app::AnimationState;
+use crate::gui::constants::*;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
 /// キューブのステッカー色（[`Color`]）を egui の [`Color32`] に変換します。
@@ -14,13 +15,13 @@ use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 #[must_use]
 pub fn color_to_color32(color: Color) -> Color32 {
     match color {
-        Color::White => Color32::from_rgb(255, 255, 255),
-        Color::Yellow => Color32::from_rgb(255, 255, 0),
-        Color::Green => Color32::from_rgb(0, 200, 0),
-        Color::Blue => Color32::from_rgb(0, 100, 255),
-        Color::Red => Color32::from_rgb(255, 50, 50),
-        Color::Orange => Color32::from_rgb(255, 165, 0),
-        Color::Gray => Color32::from_rgb(180, 180, 180), // 未設定用グレー
+        Color::White => COLOR_WHITE,
+        Color::Yellow => COLOR_YELLOW,
+        Color::Green => COLOR_GREEN,
+        Color::Blue => COLOR_BLUE,
+        Color::Red => COLOR_RED,
+        Color::Orange => COLOR_ORANGE,
+        Color::Gray => COLOR_GRAY,
     }
 }
 
@@ -42,12 +43,15 @@ fn draw_sticker(
     // 影の描画 (もしあれば)
     if shadow_offset.length() > 0.1 {
         let shadow_color = Color32::from_black_alpha((100.0 * alpha) as u8);
-        let shadow_rect = Rect::from_center_size(center + shadow_offset, Vec2::splat(size * 0.95));
-        painter.rect_filled(shadow_rect, 3.0, shadow_color);
+        let shadow_rect = Rect::from_center_size(
+            center + shadow_offset,
+            Vec2::splat(size * STICKER_SIZE_RATIO),
+        );
+        painter.rect_filled(shadow_rect, STICKER_ROUNDING, shadow_color);
     }
 
     // ステッカーの背景を描画
-    let rect = Rect::from_center_size(center, Vec2::splat(size * 0.95));
+    let rect = Rect::from_center_size(center, Vec2::splat(size * STICKER_SIZE_RATIO));
 
     // 回転を適用した矩形を描画するために、頂点を計算して回転させる
     if rotation_offset_deg.abs() > 0.1 {
@@ -55,7 +59,7 @@ fn draw_sticker(
         let cos = angle.cos();
         let sin = angle.sin();
 
-        let half = size * 0.95 / 2.0;
+        let half = size * STICKER_SIZE_RATIO / 2.0;
         let corners = [
             Pos2::new(-half, -half),
             Pos2::new(half, -half),
@@ -76,16 +80,26 @@ fn draw_sticker(
         painter.add(egui::Shape::convex_polygon(
             rotated_corners.clone(),
             color,
-            Stroke::new(2.0, stroke_color),
+            Stroke::new(STICKER_STROKE_WIDTH, stroke_color),
         ));
     } else {
-        painter.rect_filled(rect, 3.0, color);
-        painter.rect_stroke(rect, 3.0, Stroke::new(2.0, stroke_color));
+        painter.rect_filled(rect, STICKER_ROUNDING, color);
+        painter.rect_stroke(
+            rect,
+            STICKER_ROUNDING,
+            Stroke::new(STICKER_STROKE_WIDTH, stroke_color),
+        );
     }
 
     // 矢印を描画（向きを示す）
     let arrow_rotation = (sticker.orientation as f32 * 90.0 + rotation_offset_deg).to_radians();
-    draw_arrow(painter, center, size * 0.3, arrow_rotation, alpha);
+    draw_arrow(
+        painter,
+        center,
+        size * ARROW_LENGTH_RATIO,
+        arrow_rotation,
+        alpha,
+    );
 }
 
 /// ステッカーの向き（orientation）を示す矢印を描画します。
@@ -97,11 +111,14 @@ fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha
     let tip = Pos2::new(center.x + length * sin, center.y - length * cos);
 
     // 矢印の根元
-    let base = Pos2::new(center.x - length * 0.3 * sin, center.y + length * 0.3 * cos);
+    let base = Pos2::new(
+        center.x - length * ARROW_BASE_RATIO * sin,
+        center.y + length * ARROW_BASE_RATIO * cos,
+    );
 
     // 矢印の羽
-    let wing_length = length * 0.4;
-    let wing_angle = 30.0_f32.to_radians();
+    let wing_length = length * ARROW_WING_RATIO;
+    let wing_angle = ARROW_WING_ANGLE_DEG.to_radians();
 
     let left_wing = Pos2::new(
         tip.x - wing_length * (rotation + wing_angle).sin(),
@@ -117,7 +134,10 @@ fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha
     // Color32::from_black_alpha(180) は alpha=180/255 相当。
     // alpha引数を反映させるため、Color32::BLACK.linear_multiply(alpha)をベースに調整してもいいが、
     // ここでは単純に linear_multiply を使う
-    let stroke = Stroke::new(2.0, Color32::from_black_alpha(180).linear_multiply(alpha));
+    let stroke = Stroke::new(
+        ARROW_WIDTH,
+        Color32::from_black_alpha(ARROW_ALPHA).linear_multiply(alpha),
+    );
     painter.line_segment([base, tip], stroke);
     painter.line_segment([tip, left_wing], stroke);
     painter.line_segment([tip, right_wing], stroke);
@@ -398,12 +418,12 @@ pub fn draw_cube(
 ) {
     let painter = ui.painter();
 
-    let grid_cols = 8.0;
-    let grid_rows = 6.0;
+    let grid_cols = GRID_COLS;
+    let grid_rows = GRID_ROWS;
 
     // グリッドサイズ計算
-    let grid_size = (rect.width() / grid_cols).min(rect.height() / grid_rows) * 0.95;
-    let sticker_size = grid_size * 0.85;
+    let grid_size = (rect.width() / grid_cols).min(rect.height() / grid_rows) * GRID_PADDING_RATIO;
+    let sticker_size = grid_size * STICKER_SIZE_IN_GRID;
 
     let total_width = grid_size * grid_cols;
     let total_height = grid_size * grid_rows;
@@ -440,7 +460,7 @@ pub fn draw_cube(
         painter.rect_filled(
             highlight_rect.expand(2.0),
             5.0,
-            Color32::from_rgba_premultiplied(255, 255, 255, 30),
+            Color32::from_rgba_premultiplied(255, 255, 255, ANIMATION_FACE_HIGHLIGHT_ALPHA),
         );
     }
 
@@ -543,11 +563,12 @@ pub fn draw_cube(
                             rot = current_angle + orientation_change_deg;
 
                             // 放射状の膨らみ（B と Bp の軌道を一致させる）
-                            let bulge = 0.2 * grid_size;
+                            let bulge = ANIMATION_BULGE_RATIO * grid_size;
                             let mid_p = (p * std::f32::consts::PI).sin();
                             let radial_vec = (pos - center_screen).normalized();
                             pos += radial_vec * bulge * mid_p;
-                            shadow = Vec2::new(5.0, 5.0) * mid_p;
+                            shadow =
+                                Vec2::new(ANIMATION_SHADOW_OFFSET, ANIMATION_SHADOW_OFFSET) * mid_p;
                         }
                     } else {
                         // その他の移動 (R, L, U, D または長距離ジャンプ)
@@ -592,17 +613,18 @@ pub fn draw_cube(
 
                         if dist < 3.0 {
                             // 隣接面移動
-                            let mut bulge_val = 0.2 * grid_size;
+                            let mut bulge_val = ANIMATION_BULGE_RATIO * grid_size;
                             if is_fd_vertical {
                                 // 赤・黄の垂直移動は膨らみなし（直線移動）
                                 bulge_val = 0.0;
                             }
                             pos += ortho_fixed * bulge_val * mid_p;
                             size_scale = 1.0 + 0.1 * mid_p;
-                            shadow = Vec2::new(5.0, 5.0) * mid_p;
+                            shadow =
+                                Vec2::new(ANIMATION_SHADOW_OFFSET, ANIMATION_SHADOW_OFFSET) * mid_p;
                         } else {
                             // 非隣接面（ジャンプ）
-                            let bulge_val = 1.5 * grid_size;
+                            let bulge_val = ANIMATION_JUMP_BULGE_RATIO * grid_size;
                             // 展開図の端を跨ぐ場合の調整
                             let mut adjusted_ortho = ortho_fixed;
                             if adjusted_ortho.y.abs() < 0.1 {
@@ -611,7 +633,10 @@ pub fn draw_cube(
                             pos += adjusted_ortho * bulge_val * mid_p;
                             alpha = 1.0 - 0.5 * mid_p;
                             size_scale = 1.0 - 0.3 * mid_p;
-                            shadow = Vec2::new(10.0, 10.0) * mid_p;
+                            shadow = Vec2::new(
+                                ANIMATION_JUMP_SHADOW_OFFSET,
+                                ANIMATION_JUMP_SHADOW_OFFSET,
+                            ) * mid_p;
                         }
                     }
                     (pos, rot, size_scale, alpha, shadow)
@@ -631,7 +656,10 @@ pub fn draw_cube(
                             sticker_size * g_scale * (1.0 - ghost_t * 2.0),
                             sticker,
                             g_rot,
-                            0.3 * g_alpha * p_alpha * (1.0 - ghost_t * 5.0),
+                            ANIMATION_TRAIL_ALPHA_FACTOR
+                                * g_alpha
+                                * p_alpha
+                                * (1.0 - ghost_t * 5.0),
                             Vec2::ZERO,
                         );
                     }
@@ -682,7 +710,7 @@ pub fn draw_cube(
         let bottom_right = bottom_right_cell_center + Vec2::splat(grid_size * 0.5);
 
         // 少し余白を持たせる
-        let padding = grid_size * 0.05;
+        let padding = grid_size * HIGHLIGHT_PADDING_RATIO;
         let highlight_rect = Rect::from_min_max(
             top_left - Vec2::splat(padding),
             bottom_right + Vec2::splat(padding),
@@ -692,7 +720,7 @@ pub fn draw_cube(
         painter.rect_stroke(
             highlight_rect,
             5.0,
-            Stroke::new(4.0, Color32::from_rgb(255, 140, 0)),
+            Stroke::new(HIGHLIGHT_STROKE_WIDTH, HIGHLIGHT_COLOR),
         );
     }
 

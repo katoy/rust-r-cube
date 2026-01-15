@@ -1,0 +1,17 @@
+[build]
+# ビルドターゲット
+target = "index.html"
+
+# デスクトップフィーチャーを無効化（Web版のみビルド）
+[build.rust]
+no_default_features = true
+
+[watch]
+# ファイル変更を監視するパターン
+ignore = ["./dist"]
+
+[serve]
+# 開発サーバーの設定
+address = "127.0.0.1"
+port = 8080
+open = true

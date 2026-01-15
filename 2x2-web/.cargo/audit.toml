@@ -1,0 +1,15 @@
+# cargo-audit 設定ファイル
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
+[advisories]
+# 特定のアドバイザリを無視
+ignore = [
+    # paste 1.0.15 - unmaintained warning
+    # ビルド時のみ使用されるマクロヘルパークレート
+    # eframe の間接依存として含まれる
+    # 代替手段: eframe/wgpu のアップデートを待つ
+    "RUSTSEC-2024-0436",
+]
+
+# 情報レベルの警告を表示
+informational_warnings = ["unmaintained", "unsound", "notice"]

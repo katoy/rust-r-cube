@@ -346,6 +346,8 @@ fn expand_layer(
         // デスクトップ環境: Rayonで並列処理
         use rayon::prelude::*;
 
+        type SearchEntry = (Cube, (Option<Move>, Option<Cube>));
+
         let next_entries: Vec<Vec<SearchEntry>> = current_nodes
             .par_iter()
             .map(|curr| generate_next_states(curr, all_moves, dist, ignore_orientation))

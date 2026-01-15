@@ -32,9 +32,6 @@ const MIN_ZOOM_SCALE: f32 = 0.5;
 /// ズーム倍率の最大値
 const MAX_ZOOM_SCALE: f32 = 3.0;
 
-/// ズーム変化率
-// ZOOM_FACTOR is now in constants.rs
-
 /// キューブの表示モードを定義します。
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ViewMode {

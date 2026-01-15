@@ -341,8 +341,6 @@ fn expand_layer(
     // 現在の層の全ノードをベクタに取り出す
     let current_nodes: Vec<Cube> = queue.drain(..).collect();
 
-    type SearchEntry = (Cube, (Option<Move>, Option<Cube>));
-
     #[cfg(not(target_arch = "wasm32"))]
     {
         // デスクトップ環境: Rayonで並列処理

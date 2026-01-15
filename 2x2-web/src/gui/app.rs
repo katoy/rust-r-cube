@@ -5,6 +5,8 @@ use crate::history::History;
 use crate::solver;
 use crate::statistics::Statistics;
 use std::sync::mpsc::{channel, Receiver};
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 
 #[cfg(not(target_arch = "wasm32"))]

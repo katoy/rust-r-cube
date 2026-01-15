@@ -176,3 +176,24 @@ jobs:
           name: ${{ matrix.artifact }}
           path: |
             target/${{ matrix.target }}/release/rubiks-cube-2x2${{ runner.os == 'Windows' && '.exe' || '' }}
+
+  wasm-test:
+    name: WASM Browser Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      
+      - name: Run WASM tests (Firefox)
+        run: wasm-pack test --headless --firefox
+      
+      - name: Run WASM tests (Chrome)
+        run: wasm-pack test --headless --chrome

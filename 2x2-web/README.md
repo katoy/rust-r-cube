@@ -278,6 +278,22 @@ MIT License
 # 開発ビルド
 cargo build
 
+# テスト実行
+cargo test
+
+# WASMブラウザテスト（wasm-packが必要）
+# インストール: cargo install wasm-pack
+wasm-pack test --headless --firefox  # Firefoxでテスト
+wasm-pack test --headless --chrome   # Chromeでテスト
+
+# コードカバレッジ
+cargo install cargo-llvm-cov
+cargo llvm-cov --html
+
+# Clippy（静的解析）
+cargo clippy -- -D warnings
+```
+
 # テスト (高速化の成果を確認できます)
 cargo test
 

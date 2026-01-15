@@ -54,6 +54,9 @@ rfd = "0.17"
 default = ["desktop"]
 desktop = []
 
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 [profile.release]
 opt-level = 3
 lto = true

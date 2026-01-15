@@ -132,6 +132,9 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,6 +143,7 @@ jobs:
         uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: 2x2
 
   build-release:
     name: Build Release

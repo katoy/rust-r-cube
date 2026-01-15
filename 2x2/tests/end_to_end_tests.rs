@@ -44,11 +44,11 @@ fn test_user_specified_state_solvability() {
     // ユーザー指定の状態: WWWW / OOOO GGGR RRBG BBRB / YYYY
     let state = "     WWWW\nOOOO GGGR RRBG BBRB\n     YYYY";
     let cube = Cube::from_file_format(state).expect("状態の読み込みに失敗");
-    
+
     if cube.is_valid_state().is_ok() {
         let solution = solver::solve(&cube, 11, true);
         assert!(solution.found, "有効な状態なら解けるはず");
-        
+
         let mut check_cube = cube.clone();
         for &mv in &solution.moves {
             check_cube.apply_move(mv);
@@ -71,7 +71,20 @@ fn test_difficult_patterns_god_number() {
 
     // 6 Spot パターン
     let mut cube2 = Cube::new();
-    let pattern = vec![Move::R, Move::U, Move::U, Move::R, Move::R, Move::U, Move::U, Move::R, Move::U, Move::U, Move::R, Move::R];
+    let pattern = vec![
+        Move::R,
+        Move::U,
+        Move::U,
+        Move::R,
+        Move::R,
+        Move::U,
+        Move::U,
+        Move::R,
+        Move::U,
+        Move::U,
+        Move::R,
+        Move::R,
+    ];
     for mv in &pattern {
         cube2.apply_move(*mv);
     }

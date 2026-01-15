@@ -36,8 +36,12 @@ fn test_file_format_scrambled() {
 fn test_validate_colors_valid() {
     let mut colors = [Color::White; 24];
     let faces = [
-        (Color::White, 0), (Color::Yellow, 4), (Color::Green, 8),
-        (Color::Blue, 12), (Color::Red, 16), (Color::Orange, 20)
+        (Color::White, 0),
+        (Color::Yellow, 4),
+        (Color::Green, 8),
+        (Color::Blue, 12),
+        (Color::Red, 16),
+        (Color::Orange, 20),
     ];
     for (color, start) in faces {
         for i in 0..4 {

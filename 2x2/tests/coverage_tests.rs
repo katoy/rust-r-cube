@@ -31,12 +31,30 @@ fn test_from_file_format_line3_too_short() {
 fn test_validate_colors_missing_color() {
     // すべての色が欠けているケース
     let colors = [
-        Color::White, Color::White, Color::White, Color::White,
-        Color::Yellow, Color::Yellow, Color::Yellow, Color::Yellow,
-        Color::Green, Color::Green, Color::Green, Color::Gray, // Greenが1つ少ない
-        Color::Blue, Color::Blue, Color::Blue, Color::Blue,
-        Color::Red, Color::Red, Color::Red, Color::Red,
-        Color::Orange, Color::Orange, Color::Orange, Color::Orange,
+        Color::White,
+        Color::White,
+        Color::White,
+        Color::White,
+        Color::Yellow,
+        Color::Yellow,
+        Color::Yellow,
+        Color::Yellow,
+        Color::Green,
+        Color::Green,
+        Color::Green,
+        Color::Gray, // Greenが1つ少ない
+        Color::Blue,
+        Color::Blue,
+        Color::Blue,
+        Color::Blue,
+        Color::Red,
+        Color::Red,
+        Color::Red,
+        Color::Red,
+        Color::Orange,
+        Color::Orange,
+        Color::Orange,
+        Color::Orange,
     ];
     let result = Cube::validate_colors(&colors);
     assert!(result.is_err());
@@ -98,7 +116,10 @@ fn test_apply_orientation_solution_error() {
     cube.stickers[9] = c2;
     cube.stickers[16] = c0;
 
-    let solution = Solution { moves: vec![], found: true };
+    let solution = Solution {
+        moves: vec![],
+        found: true,
+    };
     let result = cube.apply_orientation_solution(&solution);
     assert!(result.is_err());
 }

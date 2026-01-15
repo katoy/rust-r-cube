@@ -10,8 +10,14 @@ GGGG RRRR BBBB OOOO
     let cube = Cube::from_file_format(input_content).expect("ファイルフォーマットエラー");
     let output_content = cube.to_file_format();
 
-    let input_normalized: String = input_content.chars().filter(|c| !c.is_whitespace()).collect();
-    let output_normalized: String = output_content.chars().filter(|c| !c.is_whitespace()).collect();
+    let input_normalized: String = input_content
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let output_normalized: String = output_content
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
     assert_eq!(input_normalized, output_normalized);
 }
 
@@ -24,7 +30,8 @@ fn test_valid_cube_complete_workflow() {
     }
 
     let saved_content = cube.to_file_format();
-    let cube_from_file = Cube::from_file_format(&saved_content).expect("ファイルフォーマットエラー");
+    let cube_from_file =
+        Cube::from_file_format(&saved_content).expect("ファイルフォーマットエラー");
 
     let (tx, _rx) = std::sync::mpsc::channel();
     let mut cube_clone = cube_from_file.clone();
@@ -38,7 +45,10 @@ fn test_valid_cube_complete_workflow() {
     for face_start in [0, 4, 8, 12, 16, 20] {
         let first_color = cube_clone.get_sticker(face_start).color;
         for offset in 1..4 {
-            assert_eq!(cube_clone.get_sticker(face_start + offset).color, first_color);
+            assert_eq!(
+                cube_clone.get_sticker(face_start + offset).color,
+                first_color
+            );
         }
     }
 }

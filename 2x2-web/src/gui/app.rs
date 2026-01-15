@@ -15,6 +15,35 @@ use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
 use instant::Instant;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsValue;
+
+// WASM環境でsetTimeoutを使ってソルバーを実行
+// DOM更新を保証するため、一度イベントループに制御を返す
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(inline_js = "
+    export function run_solver_delayed(callback) {
+        // プログレスバーを表示
+        if (window.showSolverProgress) {
+            window.showSolverProgress();
+        }
+        // 50ms遅延してソルバーを実行（DOM更新を保証）
+        setTimeout(() => {
+            callback();
+            // プログレスバーを非表示
+            if (window.hideSolverProgress) {
+                window.hideSolverProgress();
+            }
+        }, 50);
+    }
+")]
+extern "C" {
+    fn run_solver_delayed(callback: &JsValue);
+}
+
 /// スクランブルの最小手数
 #[allow(dead_code)]
 const MIN_SCRAMBLE_MOVES: usize = 5;
@@ -402,7 +431,7 @@ impl CubeApp {
         #[cfg(target_arch = "wasm32")]
         {
             // WASM環境: メインスレッドで同期実行
-            // （UIがフリーズするが、スレッドが使えないため）
+            // 注意: UIがフリーズします（5-15秒）
             let max_depth = solver::DEFAULT_MAX_DEPTH;
             let solution = solver::solve_with_progress(
                 &cube_clone,

@@ -281,10 +281,22 @@ cargo build
 # テスト実行
 cargo test
 
-# WASMブラウザテスト（wasm-packが必要）
-# インストール: cargo install wasm-pack
-wasm-pack test --headless --firefox  # Firefoxでテスト
-wasm-pack test --headless --chrome   # Chromeでテスト
+# WASMブラウザテスト
+# wasm-packが必要です
+cargo install wasm-pack
+
+# Firefoxでテスト（推奨）
+wasm-pack test --headless --firefox
+
+# Chromeでテスト
+wasm-pack test --headless --chrome
+
+> [!NOTE]
+> **WASMテストに関する注意**
+> - `wasm-pack`がPATHに含まれていることを確認してください
+> - Firefoxまたは Chrome/Chromium がシステムにインストールされている必要があります
+> - ChromeDriverやGeckoDriverが自動的にダウンロードされます
+> - テスト実行時にブラウザが一時的に起動します（headlessモード）
 
 # コードカバレッジ
 cargo install cargo-llvm-cov

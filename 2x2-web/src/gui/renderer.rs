@@ -456,11 +456,11 @@ pub fn draw_cube(
         )) + Vec2::splat(grid_size * 0.5);
         let highlight_rect = Rect::from_min_max(top_left, bottom_right);
 
-        // 淡い色で塗りつぶし
+        // グレーの淡い色で塗りつぶし（ライトモードでも見やすい）
         painter.rect_filled(
             highlight_rect.expand(2.0),
             5.0,
-            Color32::from_rgba_premultiplied(255, 255, 255, ANIMATION_FACE_HIGHLIGHT_ALPHA),
+            Color32::from_rgba_premultiplied(128, 128, 128, ANIMATION_FACE_HIGHLIGHT_ALPHA),
         );
     }
 

@@ -331,57 +331,81 @@ fn solve_internal(
     }
 }
 
-/// BFSの一つの層を展開します（Rayonによる並列化版）。
+/// BFSの一つの層を展開します（並列化版、WASM環境ではシングルスレッド）。
 fn expand_layer(
     queue: &mut StateQueue,
     dist: &mut StateMap,
     all_moves: &[Move],
     ignore_orientation: bool,
 ) {
-    use rayon::prelude::*;
-
-    // 現在の層の全ノードをベクタに取り出す（並列処理のため）
+    // 現在の層の全ノードをベクタに取り出す
     let current_nodes: Vec<Cube> = queue.drain(..).collect();
 
-    // 並列に次の層を生成
     type SearchEntry = (Cube, (Option<Move>, Option<Cube>));
-    let next_entries: Vec<Vec<SearchEntry>> = current_nodes
-        .par_iter()
-        .map(|curr| {
-            let mut results = Vec::new();
-            for &mv in all_moves {
-                // 枝刈り：直前の逆操作を回避
-                if let Some(&(Some(last_mv), _)) = dist.get(curr) {
-                    if last_mv == mv.inverse() {
-                        continue;
-                    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // デスクトップ環境: Rayonで並列処理
+        use rayon::prelude::*;
+
+        let next_entries: Vec<Vec<SearchEntry>> = current_nodes
+            .par_iter()
+            .map(|curr| generate_next_states(curr, all_moves, dist, ignore_orientation))
+            .collect();
+
+        // 生成されたエントリを逐次的に dist に追加
+        for results in next_entries {
+            for (next_key, val) in results {
+                if !dist.contains_key(&next_key) {
+                    dist.insert(next_key.clone(), val);
+                    queue.push_back(next_key);
                 }
-
-                let mut next = curr.clone();
-                next.apply_move(mv);
-                let next_key = if ignore_orientation {
-                    next.normalized()
-                } else {
-                    next
-                };
-
-                // ここではまだ dist に追加せず、候補として保持
-                results.push((next_key, (Some(mv), Some(curr.clone()))));
-            }
-            results
-        })
-        .collect();
-
-    // 生成されたエントリを逐次的に dist に追加
-    // (重複チェックが必要なため、ここからはメインスレッドで実行)
-    for results in next_entries {
-        for (next_key, val) in results {
-            if !dist.contains_key(&next_key) {
-                dist.insert(next_key.clone(), val);
-                queue.push_back(next_key);
             }
         }
     }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        // WASM環境: シングルスレッドで処理
+        for curr in &current_nodes {
+            let results = generate_next_states(curr, all_moves, dist, ignore_orientation);
+            for (next_key, val) in results {
+                if !dist.contains_key(&next_key) {
+                    dist.insert(next_key.clone(), val);
+                    queue.push_back(next_key);
+                }
+            }
+        }
+    }
+}
+
+/// 現在の状態から次の状態を生成
+fn generate_next_states(
+    curr: &Cube,
+    all_moves: &[Move],
+    dist: &StateMap,
+    ignore_orientation: bool,
+) -> Vec<(Cube, (Option<Move>, Option<Cube>))> {
+    let mut results = Vec::new();
+    for &mv in all_moves {
+        // 枝刈り：直前の逆操作を回避
+        if let Some(&(Some(last_mv), _)) = dist.get(curr) {
+            if last_mv == mv.inverse() {
+                continue;
+            }
+        }
+
+        let mut next = curr.clone();
+        next.apply_move(mv);
+        let next_key = if ignore_orientation {
+            next.normalized()
+        } else {
+            next
+        };
+
+        results.push((next_key, (Some(mv), Some(curr.clone()))));
+    }
+    results
 }
 
 fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {

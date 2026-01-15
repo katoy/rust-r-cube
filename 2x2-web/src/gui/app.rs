@@ -6,7 +6,12 @@ use crate::solver;
 use crate::statistics::Statistics;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+use instant::Instant;
 
 /// スクランブルの最小手数
 #[allow(dead_code)]
@@ -360,34 +365,55 @@ impl CubeApp {
         self.solver_receiver = Some(rx);
         self.progress_receiver = Some(progress_rx);
 
-        thread::spawn(move || {
-            // HTM対応により、向きの有無に関わらず最大11手で必ず解ける
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            // デスクトップ環境: 別スレッドで実行（UIをブロックしない）
+            thread::spawn(move || {
+                let max_depth = solver::DEFAULT_MAX_DEPTH;
+                println!(
+                    "ソルバー開始: 深度{}まで探索 (タスク: {:?})",
+                    max_depth, task
+                );
+                let solution = solver::solve_with_progress(
+                    &cube_clone,
+                    max_depth,
+                    ignore_orientation,
+                    Some(progress_tx),
+                );
+                println!(
+                    "ソルバー完了: 解が{}",
+                    if solution.found {
+                        "見つかりました"
+                    } else {
+                        "見つかりませんでした"
+                    }
+                );
+                if solution.found {
+                    println!("解の手数: {}", solution.moves.len());
+                }
+                if let Err(e) = tx.send(solution) {
+                    eprintln!("ソルバー結果の送信に失敗しました: {:?}", e);
+                }
+            });
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            // WASM環境: メインスレッドで同期実行
+            // （UIがフリーズするが、スレッドが使えないため）
             let max_depth = solver::DEFAULT_MAX_DEPTH;
-            println!(
-                "ソルバー開始: 深度{}まで探索 (タスク: {:?})",
-                max_depth, task
-            );
             let solution = solver::solve_with_progress(
                 &cube_clone,
                 max_depth,
                 ignore_orientation,
                 Some(progress_tx),
             );
-            println!(
-                "ソルバー完了: 解が{}",
-                if solution.found {
-                    "見つかりました"
-                } else {
-                    "見つかりませんでした"
-                }
-            );
-            if solution.found {
-                println!("解の手数: {}", solution.moves.len());
-            }
+
+            // 結果を即座に送信
             if let Err(e) = tx.send(solution) {
                 eprintln!("ソルバー結果の送信に失敗しました: {:?}", e);
             }
-        });
+        }
     }
 
     /// アニメーション更新

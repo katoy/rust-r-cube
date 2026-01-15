@@ -2,7 +2,10 @@
 
 Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速な双方向BFSソルバー機能を搭載しています。
 
+![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
+![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ## スクリーンショット
 

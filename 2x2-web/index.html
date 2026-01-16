@@ -158,6 +158,7 @@
     <div id="solver-overlay">
         <div class="solver-progress-container">
             <h2>🧩 解法を探索中...</h2>
+            <div class="solver-elapsed-time" id="solver-elapsed-time">経過時間: 0.0秒</div>
             <div class="solver-status-text">お待ちください（通常5〜15秒かかります）</div>
         </div>
     </div>
@@ -165,15 +166,38 @@
     <canvas id="the_canvas_id"></canvas>
 
     <script>
-        // シンプルなソルバープログレス表示（静的メッセージ）
+        // ソルバープログレス表示（経過時間付き）
+        let solverStartTime = null;
+        let solverElapsedInterval = null;
+
         window.showSolverProgress = function () {
             const overlay = document.getElementById('solver-overlay');
+            const elapsedText = document.getElementById('solver-elapsed-time');
+
+            // オーバーレイを表示
             overlay.classList.add('active');
+
+            // 経過時間の計測開始
+            solverStartTime = Date.now();
+            elapsedText.textContent = '経過時間: 0.0秒';
+
+            // 100msごとに経過時間を更新
+            solverElapsedInterval = setInterval(() => {
+                const elapsed = (Date.now() - solverStartTime) / 1000;
+                elapsedText.textContent = `経過時間: ${elapsed.toFixed(1)}秒`;
+            }, 100);
         };
 
         window.hideSolverProgress = function () {
             const overlay = document.getElementById('solver-overlay');
-            // 少し遅延してから非表示
+
+            // インターバルをクリア
+            if (solverElapsedInterval) {
+                clearInterval(solverElapsedInterval);
+                solverElapsedInterval = null;
+            }
+
+            // オーバーレイを非表示
             setTimeout(() => {
                 overlay.classList.remove('active');
             }, 300);

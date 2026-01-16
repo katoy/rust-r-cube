@@ -9,6 +9,8 @@ export function start(canvas_id) {
     const ret = wasm.start(ptr0, len0);
     return ret;
 }
+import * as import1 from "./snippets/rubiks-cube-2x2-b7de590f2ad053bb/inline0.js"
+import * as import2 from "./snippets/rubiks-cube-2x2-b7de590f2ad053bb/inline0.js"
 
 function __wbg_get_imports() {
     const import0 = {
@@ -1347,6 +1349,8 @@ function __wbg_get_imports() {
     return {
         __proto__: null,
         "./rubiks-cube-2x2_bg.js": import0,
+        "./snippets/rubiks-cube-2x2-b7de590f2ad053bb/inline0.js": import1,
+        "./snippets/rubiks-cube-2x2-b7de590f2ad053bb/inline0.js": import2,
     };
 }
 

@@ -26,22 +26,31 @@ use wasm_bindgen::JsValue;
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(inline_js = "
     export function run_solver_delayed(callback) {
-        // プログレスバーを表示
         if (window.showSolverProgress) {
             window.showSolverProgress();
         }
-        // 50ms遅延してソルバーを実行（DOM更新を保証）
         setTimeout(() => {
             callback();
-            // プログレスバーを非表示
             if (window.hideSolverProgress) {
                 window.hideSolverProgress();
             }
         }, 50);
     }
+    export function show_solver_progress() {
+        if (window.showSolverProgress) {
+            window.showSolverProgress();
+        }
+    }
+    export function hide_solver_progress() {
+        if (window.hideSolverProgress) {
+            window.hideSolverProgress();
+        }
+    }
 ")]
 extern "C" {
     fn run_solver_delayed(callback: &JsValue);
+    fn show_solver_progress();
+    fn hide_solver_progress();
 }
 
 /// スクランブルの最小手数
@@ -431,7 +440,9 @@ impl CubeApp {
         #[cfg(target_arch = "wasm32")]
         {
             // WASM環境: メインスレッドで同期実行
-            // 注意: UIがフリーズします（5-15秒）
+            // ダイアログ表示
+            show_solver_progress();
+
             let max_depth = solver::DEFAULT_MAX_DEPTH;
             let solution = solver::solve_with_progress(
                 &cube_clone,
@@ -439,6 +450,9 @@ impl CubeApp {
                 ignore_orientation,
                 Some(progress_tx),
             );
+
+            // ダイアログ非表示
+            hide_solver_progress();
 
             // 結果を即座に送信
             if let Err(e) = tx.send(solution) {

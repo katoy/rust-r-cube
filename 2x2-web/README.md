@@ -199,6 +199,7 @@ cargo test test_difficult_patterns_god_number --release -- --nocapture
 
 解法が見つかると、一歩ずつ進めたり戻したりできるコントローラーが表示されます。
 
+```text
 ```
 
 ## アーキテクチャ

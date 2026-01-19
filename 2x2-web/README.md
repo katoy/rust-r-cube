@@ -182,8 +182,10 @@ GGGG RRRR BBBB OOOO
 - `tests/orientation_tests.rs`: 物理回転、方位不変モデルの検証。
 - `tests/end_to_end_tests.rs`: 実機再現、神の数、ユーザー指定状態。
 - `tests/workflow_tests.rs`: ファイル操作から解決までの一連の流れ。
-- `tests/coverage_tests.rs`: 異常系、エッジケース。
+- `tests/coverage_tests.rs`: 異常系、エッジケース（ライブラリ内テストと連携）。
 - `tests/regression_tests.rs`: 過去の不具合の再発防止。
+- `tests/wasm_tests.rs`: WebAssembly環境での動作検証。
+- `tests/web_ui_tests.rs`: ブラウザ上でのUI操作・タイミングテスト。
 
 ```bash
 # 全テストを実行
@@ -252,8 +254,8 @@ src/
 | `src/cube/mod.rs`        | 100.00% |  100.00%  | 100.00% |
 | `src/cube/rotation.rs`   | 100.00% |  100.00%  | 100.00% |
 | `src/cube/validation.rs` | 100.00% |  100.00%  | 100.00% |
-| `src/solver.rs`          | 98.61%  |  100.00%  | 98.54%  |
-| `src/history.rs`         | 84.96%  |  71.43%   | 80.56%  |
+| `src/solver.rs`          | 99.50%  |  100.00%  | 99.50%  |
+| `src/history.rs`         | 85.00%  |  71.43%   | 80.56%  |
 | `src/error.rs`           | 100.00% |  100.00%  | 100.00% |
 
 
@@ -298,21 +300,28 @@ wasm-pack test --headless --chrome
 > - ChromeDriverやGeckoDriverが自動的にダウンロードされます
 > - テスト実行時にブラウザが一時的に起動します（headlessモード）
 
-# コードカバレッジ
-cargo install cargo-llvm-cov
+```bash
+# コードカバレッジのリポート生成
 cargo llvm-cov --html
 
 # Clippy（静的解析）
 cargo clippy -- -D warnings
+
+# フォーマットチェック
+cargo fmt -- --check
 ```
 
-# テスト (高速化の成果を確認できます)
-cargo test
+### テストとカバレッジ計測の手順
 
-# カバレッジ計測 (llvm-covのインストールが必要)
-# cargo install cargo-llvm-cov
+高速化の成果を確認したり、最新のカバレッジを計測したりする場合は以下のコマンドを使用してください：
+
+```bash
+# 全テストを実行
+cargo test --release
+
+# カバレッジのサマリーを表示
 cargo llvm-cov --summary-only
 
-# クリーンアップ
+# クリーンアップと自動整形
 cargo clippy && cargo fmt
 ```

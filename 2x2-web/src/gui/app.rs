@@ -4,8 +4,10 @@ use crate::gui::renderer_3d::{draw_cube_3d, View3D};
 use crate::history::History;
 use crate::solver;
 use crate::statistics::Statistics;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::Receiver;
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::mpsc::channel;
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 
@@ -18,39 +20,33 @@ use instant::Instant;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsValue;
-
-// WASM環境でsetTimeoutを使ってソルバーを実行
-// DOM更新を保証するため、一度イベントループに制御を返す
+// WASM環境で確認ダイアログとUI更新後のコールバック実行
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(inline_js = "
-    export function run_solver_delayed(callback) {
-        if (window.showSolverProgress) {
-            window.showSolverProgress();
-        }
-        setTimeout(() => {
-            callback();
-            if (window.hideSolverProgress) {
-                window.hideSolverProgress();
-            }
-        }, 50);
+    export function confirm_solver_start() {
+        console.log('🔍 confirm_solver_start called at', Date.now());
+        const result = confirm('解法を探します。\\n処理には通常5〜15秒かかります。\\n\\n処理中もブラウザは応答可能です。\\n進捗バーで進捗状況を確認できます。\\n\\nよろしいですか？');
+        console.log('✅ confirm result:', result, 'at', Date.now());
+        return result;
     }
-    export function show_solver_progress() {
-        if (window.showSolverProgress) {
-            window.showSolverProgress();
-        }
-    }
-    export function hide_solver_progress() {
-        if (window.hideSolverProgress) {
-            window.hideSolverProgress();
-        }
+
+    // UI更新を待ってからコールバックを実行
+    // requestAnimationFrameを2回使うことで、確実に描画後に実行
+    export function schedule_after_render(callback) {
+        console.log('📅 Scheduling callback after render');
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                console.log('🎬 Executing callback after render');
+                callback();
+            });
+        });
     }
 ")]
 extern "C" {
-    fn run_solver_delayed(callback: &JsValue);
-    fn show_solver_progress();
-    fn hide_solver_progress();
+    fn confirm_solver_start() -> bool;
+
+    #[wasm_bindgen(js_name = schedule_after_render)]
+    fn schedule_after_render(callback: &Closure<dyn FnMut()>);
 }
 
 /// スクランブルの最小手数
@@ -245,6 +241,14 @@ pub struct CubeApp {
 
     /// 手動操作の履歴 (Undo/Redo用)
     pub history: History,
+
+    /// WASM環境でのソルバー起動ペンディング状態
+    #[cfg(target_arch = "wasm32")]
+    pending_solver_start: Option<(SolverTask, bool, u8)>, // (task, ignore_orientation, frames_to_wait)
+
+    /// WASM環境用: インクリメンタルソルバーの状態
+    #[cfg(target_arch = "wasm32")]
+    solver_state: Option<solver::SolverState>,
 }
 
 /// ソルバーのタスク種類
@@ -282,6 +286,10 @@ impl Default for CubeApp {
             solver_task: SolverTask::Normal,
             statistics: Statistics::new(),
             history: History::new(),
+            #[cfg(target_arch = "wasm32")]
+            pending_solver_start: None,
+            #[cfg(target_arch = "wasm32")]
+            solver_state: None,
         }
     }
 }
@@ -366,10 +374,33 @@ impl CubeApp {
         self.solver_receiver = None;
         self.progress_receiver = None;
         self.move_queue.clear();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.solver_state = None;
+        }
     }
 
     /// ソルバー実行（通常）
     pub fn solve(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            // WASM環境では、状態を変更する前に確認ダイアログを表示
+            if !confirm_solver_start() {
+                // ユーザーがキャンセルした場合は何もせずに終了
+                return;
+            }
+            self.solve_without_confirm();
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.start_solver_internal(SolverTask::Normal, self.ignore_orientation);
+        }
+    }
+
+    /// 確認ダイアログなしでソルバーを開始（テスト用および内部用）
+    pub fn solve_without_confirm(&mut self) {
         self.start_solver_internal(SolverTask::Normal, self.ignore_orientation);
     }
 
@@ -385,28 +416,48 @@ impl CubeApp {
         if self.solving {
             return;
         }
-        self.solving = true;
-        self.solver_task = task;
-        self.solver_progress = 0.0;
 
-        match task {
-            SolverTask::Normal => self.solution_text = "探索中...".to_string(),
+        // WASM環境での処理
+        #[cfg(target_arch = "wasm32")]
+        {
+            // WASM環境: ペンディング状態を設定（2フレーム後に起動）
+            // これによりUIが確実に更新される時間を確保
+            self.pending_solver_start = Some((task, ignore_orientation, 2));
+            self.solving = true;
+            self.solver_task = task;
+            self.solver_progress = 0.0;
+            match task {
+                SolverTask::Normal => self.solution_text = "探索中...".to_string(),
+            }
+            self.solving_start_time = Some(Instant::now());
+            self.solution_cube_state = Some(self.cube.clone());
+            self.solution_step = 0;
+            return;
         }
 
-        self.solving_start_time = Some(Instant::now()); // 開始時刻を記録
-
-        // 解法開始時の状態を保存
-        self.solution_cube_state = Some(self.cube.clone());
-        self.solution_step = 0;
-
-        let cube_clone = self.cube.clone();
-        let (tx, rx) = channel();
-        let (progress_tx, progress_rx) = channel();
-        self.solver_receiver = Some(rx);
-        self.progress_receiver = Some(progress_rx);
-
+        // デスクトップ環境: ここから実際のソルバー処理を開始
         #[cfg(not(target_arch = "wasm32"))]
         {
+            self.solving = true;
+            self.solver_task = task;
+            self.solver_progress = 0.0;
+
+            match task {
+                SolverTask::Normal => self.solution_text = "探索中...".to_string(),
+            }
+
+            self.solving_start_time = Some(Instant::now()); // 開始時刻を記録
+
+            // 解法開始時の状態を保存
+            self.solution_cube_state = Some(self.cube.clone());
+            self.solution_step = 0;
+
+            let cube_clone = self.cube.clone();
+            let (tx, rx) = channel();
+            let (progress_tx, progress_rx) = channel();
+            self.solver_receiver = Some(rx);
+            self.progress_receiver = Some(progress_rx);
+
             // デスクトップ環境: 別スレッドで実行（UIをブロックしない）
             thread::spawn(move || {
                 let max_depth = solver::DEFAULT_MAX_DEPTH;
@@ -435,29 +486,6 @@ impl CubeApp {
                     eprintln!("ソルバー結果の送信に失敗しました: {:?}", e);
                 }
             });
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            // WASM環境: メインスレッドで同期実行
-            // ダイアログ表示
-            show_solver_progress();
-
-            let max_depth = solver::DEFAULT_MAX_DEPTH;
-            let solution = solver::solve_with_progress(
-                &cube_clone,
-                max_depth,
-                ignore_orientation,
-                Some(progress_tx),
-            );
-
-            // ダイアログ非表示
-            hide_solver_progress();
-
-            // 結果を即座に送信
-            if let Err(e) = tx.send(solution) {
-                eprintln!("ソルバー結果の送信に失敗しました: {:?}", e);
-            }
         }
     }
 
@@ -1134,10 +1162,66 @@ impl CubeApp {
             self.reset();
         }
     }
-}
 
-impl eframe::App for CubeApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    /// アプリケーションのコアロジックを更新します（UIレンダリング以外）
+    pub fn update_logic(&mut self, ctx: &egui::Context) {
+        // WASM環境: ペンディング状態のソルバーを起動
+        #[cfg(target_arch = "wasm32")]
+        if let Some((_task, ignore_orientation, mut frames_to_wait)) =
+            self.pending_solver_start.take()
+        {
+            if frames_to_wait > 0 {
+                // まだ待機中：カウンターをデクリメントして再設定
+                frames_to_wait -= 1;
+                self.pending_solver_start = Some((_task, ignore_orientation, frames_to_wait));
+            } else {
+                // 待機完了：インクリメンタルソルバーを初期化
+                let max_depth = solver::DEFAULT_MAX_DEPTH;
+                self.solver_state = Some(solver::SolverState::new(
+                    &self.cube,
+                    max_depth,
+                    ignore_orientation,
+                ));
+            }
+        }
+
+        // WASM環境: インクリメンタルソルバーのチャンク処理
+        #[cfg(target_arch = "wasm32")]
+        if let Some(state) = &mut self.solver_state {
+            // 100ノード処理（約10-20ms）
+            let (_processed, is_complete) = state.process_chunk(100);
+
+            if is_complete {
+                // 完了: 結果を取得
+                if let Some(solution) = state.get_solution() {
+                    if solution.found {
+                        self.solution = Some(solution.moves.clone());
+                        let duration_text = if let Some(d) = self.last_solve_duration {
+                            format!(" ({:.2}秒)", d)
+                        } else if let Some(start_time) = self.solving_start_time {
+                            let duration = start_time.elapsed().as_secs_f32();
+                            self.last_solve_duration = Some(duration);
+                            format!(" ({:.2}秒)", duration)
+                        } else {
+                            String::new()
+                        };
+                        self.solution_text =
+                            format!("解法: {} 手{}", solution.moves.len(), duration_text);
+                        self.solution_step = 0;
+                    } else {
+                        self.solution = None;
+                        self.solution_text = "解が見つかりませんでした".to_string();
+                    }
+                }
+
+                self.solving = false;
+                self.solver_state = None;
+            } else {
+                // 進捗更新
+                self.solver_progress = state.estimate_progress();
+            }
+        }
+
         self.check_solver_result();
         self.check_progress();
         self.update_animation();
@@ -1145,6 +1229,12 @@ impl eframe::App for CubeApp {
 
         // 継続的な再描画をリクエスト
         ctx.request_repaint();
+    }
+}
+
+impl eframe::App for CubeApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.update_logic(ctx);
 
         // 右側のサイドパネル (コントロールパネル)
         egui::SidePanel::right("control_panel")

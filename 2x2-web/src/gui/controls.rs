@@ -281,14 +281,23 @@ fn draw_solver_ui(app: &mut CubeApp, ui: &mut egui::Ui) {
         });
     });
 
-    if app.solving {
-        // 探索中
-        ui.horizontal(|ui| {
-            ui.label("探索中...");
-            if ui.button("中止").clicked() {
-                app.cancel_solve();
+    // 「解法を探す」ボタン（探索中は無効化）
+    ui.horizontal(|ui| {
+        ui.add_enabled_ui(!app.solving, |ui| {
+            if ui.button("解法を探す").clicked() {
+                app.solve();
             }
         });
+
+        // 探索中のみ「中止」ボタンを表示
+        if app.solving && ui.button("中止").clicked() {
+            app.cancel_solve();
+        }
+    });
+
+    // 探索中の進捗表示
+    if app.solving {
+        ui.label("探索中...");
         ui.add(egui::ProgressBar::new(app.solver_progress));
 
         if let Some(start_time) = app.solving_start_time {
@@ -297,11 +306,7 @@ fn draw_solver_ui(app: &mut CubeApp, ui: &mut egui::Ui) {
             ui.label(format!("経過: {:.1}秒", elapsed_display));
         }
     } else {
-        // 探索終了後または待機中
-        if ui.button("解法を探す").clicked() {
-            app.solve();
-        }
-
+        // 探索終了後の結果表示
         if !app.solution_text.is_empty() {
             ui.add_space(UI_SPACING_SMALL);
             ui.label(&app.solution_text);

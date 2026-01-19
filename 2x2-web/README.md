@@ -199,25 +199,203 @@ cargo test test_difficult_patterns_god_number --release -- --nocapture
 
 解法が見つかると、一歩ずつ進めたり戻したりできるコントローラーが表示されます。
 
-## プロジェクト構造
+```
 
-```text
-src/
-├── main.rs           # エントリーポイント
-├── lib.rs            # ライブラリルート
-├── cube/             # キューブモジュール
-│   ├── mod.rs        # キューブの状態管理と基本API
-│   ├── enums.rs      # Color, Move, Face 等の型定義
-│   ├── rotation.rs   # 回転・スクランブルロジック
-│   ├── validation.rs # 物理的整合性チェック
-│   └── io.rs         # シリアライズ・デシリアライズ
-├── solver.rs         # 最適化された双方向BFSソルバー
-└── gui/
-    ├── mod.rs        # GUIモジュール
-    ├── app.rs        # アプリケーション状態・ライフサイクル管理
-    ├── renderer.rs   # 2D描画ヘルパー
-    ├── renderer_3d.rs # 3D描画エンジン
-    └── controls.rs   # 操作パネルUI
+## アーキテクチャ
+
+### システム全体の構成
+
+```mermaid
+graph TB
+    subgraph "🖥️ デスクトップ版"
+        D1[main.rs<br/>エントリーポイント]
+        D2[eframe<br/>ネイティブウィンドウ]
+    end
+
+    subgraph "🌐 Web版 WASM"
+        W1[lib.rs::start<br/>WASMエントリー]
+        W2[Trunk<br/>ビルドツール]
+        W3[index.html<br/>ブラウザ]
+    end
+
+    subgraph "🎮 GUIレイヤー"
+        GUI1[app.rs<br/>アプリケーション状態]
+        GUI2[controls.rs<br/>UI操作パネル]
+        GUI3[renderer.rs<br/>2D描画]
+        GUI4[renderer_3d.rs<br/>3D描画]
+    end
+
+    subgraph "🧩 コアロジック"
+        CORE1[cube/mod.rs<br/>キューブ状態管理]
+        CORE2[solver.rs<br/>双方向BFS]
+        CORE3[history.rs<br/>Undo/Redo]
+        CORE4[statistics.rs<br/>統計情報]
+    end
+
+    subgraph "📦 基盤モジュール"
+        BASE1[cube/enums.rs<br/>型定義]
+        BASE2[cube/rotation.rs<br/>回転ロジック]
+        BASE3[cube/validation.rs<br/>パリティチェック]
+        BASE4[cube/io.rs<br/>ファイルI/O]
+        BASE5[error.rs<br/>エラー型]
+    end
+
+    D1 --> GUI1
+    W1 --> W3
+    W3 --> GUI1
+    D2 --> GUI1
+
+    GUI1 --> GUI2
+    GUI1 --> GUI3
+    GUI1 --> GUI4
+    GUI1 --> CORE1
+    GUI1 --> CORE2
+    GUI1 --> CORE3
+    GUI1 --> CORE4
+
+    CORE1 --> BASE1
+    CORE1 --> BASE2
+    CORE1 --> BASE3
+    CORE1 --> BASE4
+    CORE2 --> CORE1
+    CORE2 --> BASE1
+
+    BASE2 --> BASE1
+    BASE3 --> BASE1
+    BASE4 --> BASE1
+    BASE4 --> BASE5
+```
+
+### モジュール依存関係
+
+```mermaid
+graph LR
+    subgraph "外部クレート"
+        egui[egui<br/>UIフレームワーク]
+        eframe[eframe<br/>アプリ実行環境]
+        rayon[rayon<br/>並列処理]
+        fxhash[rustc-hash<br/>高速ハッシュ]
+        glam[glam<br/>3D数学]
+        rfd[rfd<br/>ファイルダイアログ]
+    end
+
+    subgraph "アプリケーション"
+        app[gui::app]
+        controls[gui::controls]
+        renderer[gui::renderer]
+        renderer3d[gui::renderer_3d]
+
+        cube[cube::mod]
+        enums[cube::enums]
+        solver[solver]
+        history[history]
+        stats[statistics]
+        error[error]
+    end
+
+    app --> egui
+    app --> cube
+    app --> solver
+    app --> history
+    app --> stats
+
+    controls --> egui
+    controls --> app
+    controls --> enums
+
+    renderer --> egui
+    renderer --> cube
+    renderer --> enums
+
+    renderer3d --> egui
+    renderer3d --> cube
+    renderer3d --> glam
+
+    solver --> cube
+    solver --> enums
+    solver --> fxhash
+    solver --> rayon
+
+    history --> enums
+    stats --> enums
+
+    cube --> enums
+    cube --> error
+    cube --> rfd
+```
+
+### データフロー図
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 ユーザー
+    participant GUI as 🎨 GUI<br/>(app.rs)
+    participant Cube as 🧩 Cube<br/>(状態管理)
+    participant Solver as 🔍 Solver<br/>(BFS)
+    participant History as 📚 History<br/>(履歴)
+
+    User->>GUI: 回転ボタンクリック (R)
+    GUI->>History: push(Move::R)
+    GUI->>Cube: apply_move(Move::R)
+    Cube->>Cube: 状態更新
+    GUI->>GUI: アニメーション開始
+    GUI-->>User: 描画更新
+
+    User->>GUI: Solveボタンクリック
+    GUI->>Solver: solve(cube, depth, ignore_orientation)
+
+    alt デスクトップ版
+        Solver->>Solver: 別スレッドで探索<br/>(Rayon並列化)
+        loop 探索中
+            Solver-->>GUI: 進捗送信 (0.0~1.0)
+            GUI-->>User: プログレスバー更新
+        end
+    else Web版 (WASM)
+        loop チャンク処理
+            Solver->>Solver: process_chunk(100ノード)
+            Solver-->>GUI: 進捗推定
+            GUI-->>User: UI更新
+        end
+    end
+
+    Solver-->>GUI: Solution{found, moves}
+    GUI->>GUI: 解を保存
+    GUI-->>User: "解法: N 手"表示
+
+    User->>GUI: ステップ前進
+    GUI->>Cube: apply_move(solution[step])
+    GUI->>GUI: アニメーション
+    GUI-->>User: 描画更新
+```
+
+### 探索アルゴリズム（双方向BFS）
+
+```mermaid
+graph TD
+    Start([開始状態]) --> |前方探索| F1[深度1]
+    F1 --> F2[深度2]
+    F2 --> F3[深度3]
+    F3 --> FN[深度N/2]
+
+    Goal([24通りの<br/>完成状態]) --> |後方探索| B1[深度1]
+    B1 --> B2[深度2]
+    B2 --> B3[深度3]
+    B3 --> BN[深度N/2]
+
+    FN -.-> |衝突検出| Collision{一致?}
+    BN -.-> Collision
+
+    Collision -->|Yes| Solution[✅ 解法発見<br/>パス再構築]
+    Collision -->|No| Continue[探索継続]
+    Continue --> Depth{深度<br/>制限?}
+    Depth -->|超過| NoSolution[❌ 解なし]
+    Depth -->|継続| F1
+
+    style Start fill:#e1f5e1
+    style Goal fill:#e1f5e1
+    style Solution fill:#c8e6c9
+    style NoSolution fill:#ffcdd2
+    style Collision fill:#fff9c4
 ```
 
 ## 技術詳細

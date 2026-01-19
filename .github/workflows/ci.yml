@@ -10,10 +10,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
-defaults:
-  run:
-    working-directory: 2x2
-
 jobs:
   test:
     name: Test Suite
@@ -23,12 +19,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable]
+        project: [2x2, 2x2-web]
         include:
           - os: ubuntu-latest
             rust: beta
+            project: 2x2
           - os: ubuntu-latest
             rust: nightly
+            project: 2x2
     continue-on-error: ${{ matrix.rust == 'nightly' }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,17 +50,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/registry/index
-          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-
+            ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-registry-
       
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
-          path: target
-          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          path: ${{ matrix.project }}/target
+          key: ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-cargo-build-
+            ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-build-
       
       - name: Check
         run: cargo check --all-targets --all-features
@@ -69,6 +71,12 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [2x2, 2x2-web]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -98,12 +106,23 @@ jobs:
         with:
           components: rustfmt
       
-      - name: Check formatting
+      - name: Check 2x2 formatting
         run: cargo fmt --all -- --check
+        working-directory: 2x2
+      
+      - name: Check 2x2-web formatting
+        run: cargo fmt --all -- --check
+        working-directory: 2x2-web
 
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [2x2, 2x2-web]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -125,25 +144,29 @@ jobs:
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: lcov.info
+          files: ${{ matrix.project }}/lcov.info
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: ${{ matrix.project }}
 
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run cargo-audit
+      - name: Run cargo-audit (2x2)
         uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: 2x2
+
+      - name: Run cargo-audit (2x2-web)
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: 2x2-web
 
   build-release:
     name: Build Release
@@ -152,14 +175,32 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            project: 2x2
             target: x86_64-unknown-linux-gnu
             artifact: rubiks-cube-2x2-linux
           - os: windows-latest
+            project: 2x2
             target: x86_64-pc-windows-msvc
             artifact: rubiks-cube-2x2-windows.exe
           - os: macos-latest
+            project: 2x2
             target: x86_64-apple-darwin
             artifact: rubiks-cube-2x2-macos
+          - os: ubuntu-latest
+            project: 2x2-web
+            target: x86_64-unknown-linux-gnu
+            artifact: rubiks-cube-2x2-web-linux
+          - os: windows-latest
+            project: 2x2-web
+            target: x86_64-pc-windows-msvc
+            artifact: rubiks-cube-2x2-web-windows.exe
+          - os: macos-latest
+            project: 2x2-web
+            target: x86_64-apple-darwin
+            artifact: rubiks-cube-2x2-web-macos
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -183,4 +224,4 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            target/${{ matrix.target }}/release/rubiks-cube-2x2${{ runner.os == 'Windows' && '.exe' || '' }}
+            ${{ matrix.project }}/target/${{ matrix.target }}/release/rubiks-cube-2x2${{ runner.os == 'Windows' && '.exe' || '' }}

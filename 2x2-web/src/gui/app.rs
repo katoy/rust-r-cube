@@ -249,6 +249,9 @@ pub struct CubeApp {
     /// WASM環境用: インクリメンタルソルバーの状態
     #[cfg(target_arch = "wasm32")]
     solver_state: Option<solver::SolverState>,
+
+    /// ファイル読み込み用のレシーバー
+    file_receiver: Option<Receiver<Result<String, String>>>,
 }
 
 /// ソルバーのタスク種類
@@ -286,6 +289,7 @@ impl Default for CubeApp {
             solver_task: SolverTask::Normal,
             statistics: Statistics::new(),
             history: History::new(),
+            file_receiver: None,
             #[cfg(target_arch = "wasm32")]
             pending_solver_start: None,
             #[cfg(target_arch = "wasm32")]
@@ -950,7 +954,12 @@ impl CubeApp {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
 
-        let loaded_cube = Cube::from_file_format(&content).map_err(|e| e.to_string())?;
+        self.load_from_content(&content)
+    }
+
+    /// 文字列（ファイル内容）からキューブの状態を読み込み
+    pub fn load_from_content(&mut self, content: &str) -> Result<String, String> {
+        let loaded_cube = Cube::from_file_format(content).map_err(|e| e.to_string())?;
 
         let mut warning = String::new();
 
@@ -1105,13 +1114,23 @@ impl CubeApp {
     }
 
     /// Web版: ブラウザのファイル選択機能でファイルを読み込み
-    /// 注意: Web版では非同期処理が必要だが、現在の実装では即座には反映されない
     #[cfg(target_arch = "wasm32")]
     pub fn load_with_dialog(&mut self) {
-        self.input_error_message =
-            "Web版: ファイルをドラッグ&ドロップするか、テキストで直接入力してください".to_string();
-        // 注: 完全な実装にはwasm-bindgen-futuresとasync処理が必要
-        // 現時点ではメッセージのみ表示
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.file_receiver = Some(rx);
+
+        // WASM環境では、AsyncFileDialogを使用して非同期にファイルを選択
+        wasm_bindgen_futures::spawn_local(async move {
+            let task = rfd::AsyncFileDialog::new()
+                .add_filter("Text files", &["txt"])
+                .pick_file();
+
+            if let Some(file_handle) = task.await {
+                let bytes = file_handle.read().await;
+                let content = String::from_utf8_lossy(&bytes).to_string();
+                let _ = tx.send(Ok(content));
+            }
+        });
     }
 
     /// キーボード入力を処理
@@ -1226,6 +1245,30 @@ impl CubeApp {
         self.check_progress();
         self.update_animation();
         self.handle_input(ctx);
+
+        // ファイル読み込みの結果を確認
+        if let Some(rx) = &self.file_receiver {
+            if let Ok(result) = rx.try_recv() {
+                self.file_receiver = None;
+                match result {
+                    Ok(content) => match self.load_from_content(&content) {
+                        Ok(warning) => {
+                            if warning.is_empty() {
+                                self.input_error_message = "ファイルを読み込みました".to_string();
+                            } else {
+                                self.input_error_message = format!("読み込み完了: {}", warning);
+                            }
+                        }
+                        Err(e) => {
+                            self.input_error_message = format!("読み込みエラー: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        self.input_error_message = format!("ファイル選択エラー: {}", e);
+                    }
+                }
+            }
+        }
 
         // 継続的な再描画をリクエスト
         ctx.request_repaint();

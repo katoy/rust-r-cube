@@ -56,6 +56,11 @@ desktop = []
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+criterion = "0.5"
+
+[[bench]]
+name = "solver_benchmarks"
+harness = false
 
 [profile.release]
 opt-level = 3

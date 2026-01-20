@@ -268,17 +268,10 @@ impl UiState {
 }
 
 /// ファイルI/O状態
+#[derive(Default)]
 pub struct FileIoState {
     /// ファイル読み込み用のレシーバー
     pub file_receiver: Option<Receiver<Result<String, String>>>,
-}
-
-impl Default for FileIoState {
-    fn default() -> Self {
-        Self {
-            file_receiver: None,
-        }
-    }
 }
 
 impl FileIoState {

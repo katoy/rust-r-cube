@@ -133,6 +133,19 @@ GGGG RRRR BBBB OOOO
 
 ファイルには `WOYG` と記載します。この形式で手動編集も可能です。
 
+#### サンプルファイル
+
+プロジェクトには、様々な状態のサンプルファイルが `cubes/` ディレクトリに含まれています：
+
+- [cube_normal.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_normal.txt) - 完成状態
+- [cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_god.txt) - 11手必要な最難関状態（God's Number）
+- [cube_god2.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_god2.txt) - 別の11手状態
+- [cube_ex001.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_ex001.txt) - サンプル状態
+- [cube_diff2.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_diff2.txt) - サンプル状態
+- [cube_normalwy.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_normalwy.txt) - サンプル状態
+
+これらのファイルを読み込んで、実際のキューブ状態を試すことができます。
+
 ### 回転操作
 
 キューブの各面を回転させる操作です。ボタンをクリックすると、対応する面が90度回転します。

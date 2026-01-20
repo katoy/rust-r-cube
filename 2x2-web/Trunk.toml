@@ -8,7 +8,7 @@ no_default_features = true
 
 [watch]
 # ファイル変更を監視するパターン
-ignore = ["./dist"]
+# ignore = ["dist"]
 
 [serve]
 # 開発サーバーの設定

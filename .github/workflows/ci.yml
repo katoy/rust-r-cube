@@ -152,21 +152,24 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [2x2, 2x2-web]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run cargo-audit (2x2)
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: 2x2
-
-      - name: Run cargo-audit (2x2-web)
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: 2x2-web
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      
+      - name: Run cargo-audit
+        run: cargo audit
 
   build-release:
     name: Build Release

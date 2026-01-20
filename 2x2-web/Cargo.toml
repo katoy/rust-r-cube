@@ -34,6 +34,7 @@ thiserror = "2.0"
 tracing = "0.1"
 rayon = "1.10"
 rfd = "0.17"
+web-time = "1.1"
 
 # Web用の依存関係
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -44,7 +45,8 @@ web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlE
 tracing-wasm = "0.2"
 console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
-instant = { version = "0.1", features = ["wasm-bindgen"] }
+# web-time (wasm/native compatibility for Instant)
+web-time = "1.1"
 
 # デスクトップ用の依存関係
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

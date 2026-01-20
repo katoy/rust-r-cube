@@ -1,10 +1,6 @@
 use std::time::Duration;
 
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::Instant;
-
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
+use web_time::Instant;
 
 /// アプリケーションの統計情報
 #[derive(Debug, Clone)]

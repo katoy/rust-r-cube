@@ -2,6 +2,7 @@
 
 Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速な双方向BFSソルバー機能を搭載しています。
 
+[![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
@@ -52,6 +53,12 @@ cargo run --release
 ```
 
 ### Web版
+
+**🌐 オンラインデモ:** [https://katoy.github.io/rust-r-cube/](https://katoy.github.io/rust-r-cube/)
+
+ブラウザから直接アクセスして、インストール不要で利用できます。
+
+**ローカル開発:**
 
 ```bash
 # 開発サーバーで起動（自動でブラウザが開きます）

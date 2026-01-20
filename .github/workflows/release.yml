@@ -19,16 +19,19 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+          generate_release_notes: true
 
   build-and-upload:
     name: Build and Upload
@@ -51,7 +54,7 @@ jobs:
             artifact: rubiks-cube-2x2-macos-aarch64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -85,22 +88,16 @@ jobs:
 
       - name: Upload Release Asset (Unix)
         if: runner.os != 'Windows'
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./artifacts/${{ matrix.artifact }}.tar.gz
-          asset_name: ${{ matrix.artifact }}.tar.gz
-          asset_content_type: application/gzip
+          files: ./artifacts/${{ matrix.artifact }}.tar.gz
 
       - name: Upload Release Asset (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./artifacts/${{ matrix.artifact }}.zip
-          asset_name: ${{ matrix.artifact }}.zip
-          asset_content_type: application/zip
+          files: ./artifacts/${{ matrix.artifact }}.zip

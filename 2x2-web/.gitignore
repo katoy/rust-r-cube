@@ -15,6 +15,11 @@
 # Generated files
 cube_state.txt
 coverage.txt
+coverage_detailed.txt
+coverage_final.txt
+
+# Web build artifacts
+/dist/
 
 # LLVM coverage
 *.profraw

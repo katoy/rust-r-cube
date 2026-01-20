@@ -504,3 +504,62 @@ cargo llvm-cov --summary-only
 # クリーンアップと自動整形
 cargo clippy && cargo fmt
 ```
+
+### ベンチマーク
+
+プロジェクトには包括的なベンチマークスイートが含まれており、ソルバーのパフォーマンスを測定できます。
+
+#### ローカルでのベンチマーク実行
+
+```bash
+# 全ベンチマークを実行
+cargo bench
+
+# 特定のベンチマークのみ実行
+cargo bench solver_scramble_5
+
+# ベンチマークのコンパイルのみ確認
+cargo bench --no-run
+```
+
+#### ベンチマークの内容
+
+現在のベンチマークスイート ([benches/solver_benchmarks.rs](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/benches/solver_benchmarks.rs)) には以下が含まれます:
+
+**ソルバー性能:**
+
+- `solver_scramble_3` - 簡単 (3手スクランブル)
+- `solver_scramble_5` - 中程度 (5手スクランブル)
+- `solver_scramble_8` - 難しい (8手スクランブル)
+- `solver_scramble_10` - God Number付近 (10手スクランブル)
+- `solver_with_orientation` / `solver_ignore_orientation` - 向き考慮/無視の比較
+
+**基本操作:**
+
+- `cube_apply_move` - 単一操作の適用速度
+- `cube_scramble_100` - 100手のスクランブル
+- `cube_clone` - クローン操作のコスト
+
+**その他:**
+
+- `cube_hash` - ハッシュ計算のパフォーマンス
+- `cube_normalized` - 正規化処理
+- `cube_to_file_format` - ファイルI/O
+
+#### CI統合
+
+ベンチマークは以下の形でCI/CDパイプラインに統合されています:
+
+1. **定期実行**: 毎週月曜日 午前2時(UTC) に自動実行
+2. **手動実行**: GitHub ActionsのUIから任意のタイミングで実行可能
+3. **自動実行**: `main`ブランチへのプッシュ時（`src/**`, `benches/**`, `Cargo.toml`/`Cargo.lock`の変更時）
+
+**結果の確認:**
+
+- [Actions](https://github.com/katoy/rust-r-cube/actions/workflows/benchmark.yml) タブから「Benchmark」ワークフローを選択
+- 各実行の詳細ページでStep Summaryに結果が表示されます
+- Artifactsから詳細なベンチマーク結果（Criterion出力含む）をダウンロード可能（90日間保持）
+
+> [!TIP]
+> ベンチマーク結果は前回実行との比較機能が組み込まれており、パフォーマンスの変化を追跡できます。
+

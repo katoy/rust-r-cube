@@ -1,0 +1,104 @@
+name: Benchmark
+
+on:
+  # 定期実行: 毎週月曜日 午前2時 (UTC)
+  schedule:
+    - cron: '0 2 * * 1'
+  
+  # 手動実行を許可
+  workflow_dispatch:
+  
+  # mainブランチへのプッシュ時にも実行（オプション）
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry/index
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-benchmark-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-benchmark-
+      
+      - name: Run benchmarks
+        run: |
+          cargo bench --no-fail-fast -- --output-format bencher | tee benchmark_results.txt
+      
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'cargo'
+          output-file-path: benchmark_results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          # 結果をコメントとして表示（PRの場合）
+          comment-on-alert: true
+          summary-always: true
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_number }}
+          path: |
+            benchmark_results.txt
+            target/criterion/
+          retention-days: 90
+      
+      - name: Download previous benchmark data
+        uses: actions/cache@v4
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+      
+      - name: Compare with previous results
+        run: |
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat benchmark_results.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+          # 前回の結果との比較（キャッシュがある場合）
+          if [ -f ./cache/benchmark_results.txt ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Comparison with Previous Run" >> $GITHUB_STEP_SUMMARY
+            echo "Previous benchmark data found. Comparing results..." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # 現在の結果を次回のためにキャッシュ
+          mkdir -p ./cache
+          cp benchmark_results.txt ./cache/benchmark_results.txt

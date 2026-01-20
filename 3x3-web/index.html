@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Rustで実装した2x2ルービックキューブのGUIプログラム">
+    <title>2x2 ルービックキューブ</title>
+    <link data-trunk rel="rust" data-target-name="rubiks_cube_2x2" />
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1e1e1e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ffffff;
+        }
+
+        #loading h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #ffffff;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* エラーメッセージのスタイル */
+        #error {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        /* 共通オーバーレイ */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        /* Confirmダイアログ */
+        .confirm-container {
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            padding: 30px;
+            min-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .confirm-container h2 {
+            color: #ffffff;
+            margin: 0 0 20px 0;
+            font-size: 1.3em;
+        }
+
+        .confirm-message {
+            color: #ccc;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .confirm-button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .confirm-button.ok {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .confirm-button.ok:hover {
+            background-color: #45a049;
+        }
+
+        .confirm-button.cancel {
+            background-color: #666;
+            color: white;
+        }
+
+        .confirm-button.cancel:hover {
+            background-color: #555;
+        }
+
+        /* ソルバープログレスオーバーレイ */
+        .solver-progress-container {
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            padding: 40px;
+            min-width: 350px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .solver-progress-container h2 {
+            color: #ffffff;
+            margin: 0 0 20px 0;
+            font-size: 1.5em;
+        }
+
+        .solver-elapsed-time {
+            color: #4CAF50;
+            font-size: 2.2em;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .solver-status-text {
+            color: #aaa;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <h1>🎮 2x2 ルービックキューブ</h1>
+        <div class="spinner"></div>
+        <p>読み込み中...</p>
+    </div>
+
+    <div id="error">
+        <h2>エラーが発生しました</h2>
+        <p id="error-message"></p>
+    </div>
+
+    <!-- Confirmダイアログ -->
+    <div id="confirm-overlay" class="overlay">
+        <div class="confirm-container">
+            <h2>解法の探索</h2>
+            <div class="confirm-message">
+                処理には通常5〜15秒かかります。<br>
+                よろしいですか？
+            </div>
+            <div class="confirm-buttons">
+                <button class="confirm-button cancel" id="confirm-cancel">キャンセル</button>
+                <button class="confirm-button ok" id="confirm-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ソルバープログレスオーバーレイ -->
+    <div id="solver-overlay" class="overlay">
+        <div class="solver-progress-container">
+            <h2>🧩 解法を探索中...</h2>
+            <div class="solver-elapsed-time" id="solver-elapsed-time">0.0秒</div>
+            <div class="solver-status-text">お待ちください</div>
+        </div>
+    </div>
+
+    <canvas id="the_canvas_id"></canvas>
+
+    <script>
+        // Confirmダイアログ（Promiseベース）
+        window.confirmSolverStart = function () {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('confirm-overlay');
+                const okButton = document.getElementById('confirm-ok');
+                const cancelButton = document.getElementById('confirm-cancel');
+
+                // ダイアログを表示
+                overlay.classList.add('active');
+
+                // OKボタンのハンドラ
+                const handleOk = () => {
+                    overlay.classList.remove('active');
+                    okButton.removeEventListener('click', handleOk);
+                    cancelButton.removeEventListener('click', handleCancel);
+                    resolve(true);
+                };
+
+                // キャンセルボタンのハンドラ
+                const handleCancel = () => {
+                    overlay.classList.remove('active');
+                    okButton.removeEventListener('click', handleOk);
+                    cancelButton.removeEventListener('click', handleCancel);
+                    resolve(false);
+                };
+
+                okButton.addEventListener('click', handleOk);
+                cancelButton.addEventListener('click', handleCancel);
+            });
+        };
+
+        // ソルバープログレス表示（経過時間付き）
+        let solverStartTime = null;
+        let solverElapsedInterval = null;
+
+        window.showSolverProgress = function () {
+            const overlay = document.getElementById('solver-overlay');
+            const elapsedText = document.getElementById('solver-elapsed-time');
+
+            // オーバーレイを表示
+            overlay.classList.add('active');
+
+            // 経過時間の計測開始
+            solverStartTime = Date.now();
+            elapsedText.textContent = '0.0秒';
+
+            // 100msごとに経過時間を更新
+            solverElapsedInterval = setInterval(() => {
+                const elapsed = (Date.now() - solverStartTime) / 1000;
+                elapsedText.textContent = `${elapsed.toFixed(1)}秒`;
+            }, 100);
+        };
+
+        window.hideSolverProgress = function () {
+            const overlay = document.getElementById('solver-overlay');
+
+            // インターバルをクリア
+            if (solverElapsedInterval) {
+                clearInterval(solverElapsedInterval);
+                solverElapsedInterval = null;
+            }
+
+            // オーバーレイを非表示
+            overlay.classList.remove('active');
+        };
+
+        // Trunkが自動挿入したWASMモジュールの読み込み完了を待つ
+        window.addEventListener('TrunkApplicationStarted', async (event) => {
+            try {
+                // Rustのstart関数を呼び出してアプリを起動
+                await window.wasmBindings.start('the_canvas_id');
+
+                // ローディング画面を非表示
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                console.error('Failed to start application:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error-message').textContent = error.toString();
+            }
+        });
+    </script>
+</body>
+
+</html>

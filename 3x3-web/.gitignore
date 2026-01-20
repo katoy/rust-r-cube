@@ -1,0 +1,27 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated files
+cube_state.txt
+coverage.txt
+coverage_detailed.txt
+coverage_final.txt
+
+# Web build artifacts
+/dist/
+
+# LLVM coverage
+*.profraw
+*.profdata
+/llvm-cov-target/

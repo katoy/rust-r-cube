@@ -110,9 +110,9 @@ fn draw_scanning_ui(app: &mut CubeApp, ui: &mut egui::Ui, face_index: usize) {
     egui::Grid::new("sticker_grid")
         .spacing([UI_SPACING_SMALL, UI_SPACING_SMALL])
         .show(ui, |ui| {
-            for row in 0..2 {
-                for col in 0..2 {
-                    let position = row * 2 + col;
+            for row in 0..3 {
+                for col in 0..3 {
+                    let position = row * 3 + col;
                     let current_color = app.get_current_face_sticker(position);
 
                     let button_color = if let Some(color) = current_color {
@@ -251,6 +251,18 @@ fn draw_rotation_buttons(app: &mut CubeApp, ui: &mut egui::Ui) {
         (
             vec![Move::F, Move::Fp, Move::F2],
             vec![Move::B, Move::Bp, Move::B2],
+        ),
+        (
+            vec![Move::M, Move::Mp, Move::M2],
+            vec![Move::E, Move::Ep, Move::E2],
+        ),
+        (
+            vec![Move::S, Move::Sp, Move::S2],
+            vec![Move::X, Move::Xp, Move::X2],
+        ),
+        (
+            vec![Move::Y, Move::Yp, Move::Y2],
+            vec![Move::Z, Move::Zp, Move::Z2],
         ),
     ];
 

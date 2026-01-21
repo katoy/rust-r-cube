@@ -6,24 +6,24 @@ pub mod validation;
 pub use self::enums::{Color, Face, Move, Sticker, NUM_STICKERS, STICKERS_PER_FACE};
 
 /// 完成状態における標準的なステッカーの向きパターン。
-pub const CLOCKWISE_ORIENTATION_PATTERN: [u8; 4] = [1, 2, 0, 3];
+pub const CLOCKWISE_ORIENTATION_PATTERN: [u8; 9] = [0; 9];
 
-/// 2x2 ルービックキューブ（ポケットキューブ）を表す構造体。
+/// 3x3 ルービックキューブを表す構造体。
 ///
-/// 24枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
+/// 54枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
 /// 内部構造は面の順序と各面内のインデックスによって定義されます。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Cube {
-    /// 全ステッカーの配列（総数24）。
+    /// 全ステッカーの配列（総数54）。
     ///
     /// インデックスの割り当て:
-    /// - 0-3:   上面 (Up)
-    /// - 4-7:   下面 (Down)
-    /// - 8-11:  左面 (Left)
-    /// - 12-15: 右面 (Right)
-    /// - 16-19: 前面 (Front)
-    /// - 20-23: 背面 (Back)
-    pub stickers: [Sticker; 24],
+    /// - 0-8:   上面 (Up)
+    /// - 9-17:  下面 (Down)
+    /// - 18-26: 左面 (Left)
+    /// - 27-35: 右面 (Right)
+    /// - 36-44: 前面 (Front)
+    /// - 45-53: 背面 (Back)
+    pub stickers: [Sticker; 54],
 }
 
 impl Cube {
@@ -140,11 +140,11 @@ impl Cube {
         new_cube
     }
 
-    /// 24個の色配列から新しいキューブを作成します（物理的な向きを自動復元）。
+    /// 54個の色配列から新しいキューブを作成します（物理的な向きを自動復元）。
     ///
-    /// 色の配置が物理的に可能でない（コーナーピースの色構成が不正など）場合はエラーを返します。
-    pub fn from_colors(colors: &[Color; 24]) -> crate::error::Result<Self> {
-        let mut stickers = [Sticker::new(Color::White); 24];
+    /// 色の配置が物理的に可能でない場合はエラーを返します。
+    pub fn from_colors(colors: &[Color; 54]) -> crate::error::Result<Self> {
+        let mut stickers = [Sticker::new(Color::White); 54];
         for (i, &color) in colors.iter().enumerate() {
             stickers[i] = Sticker {
                 color,
@@ -162,8 +162,8 @@ impl Cube {
         Ok(cube)
     }
 
-    /// 指定された色配列（24要素）がキューブとして妥当であるかを検証します。
-    pub fn validate_colors(colors: &[Color; 24]) -> crate::error::Result<()> {
+    /// 指定された色配列（54要素）がキューブとして妥当であるかを検証します。
+    pub fn validate_colors(colors: &[Color; 54]) -> crate::error::Result<()> {
         validation::validate_colors(colors)
     }
 
@@ -203,7 +203,7 @@ impl Cube {
     /// 場合などは `CubeError::InvalidState` を返します。
     pub fn restore_orientation_instantly(&mut self) -> crate::error::Result<()> {
         // 色の妥当性チェック
-        let mut colors_array = [Color::White; 24];
+        let mut colors_array = [Color::White; 54];
         for (i, color) in colors_array.iter_mut().enumerate() {
             *color = self.stickers[i].color;
         }

@@ -83,11 +83,7 @@ fn generate_all_solved_states() -> Vec<Cube> {
     visited.insert(base_norm);
     states.push(base);
 
-    let rotations = vec![
-        vec![Move::U, Move::Dp],
-        vec![Move::R, Move::Lp],
-        vec![Move::F, Move::Bp],
-    ];
+    let rotations = vec![vec![Move::X], vec![Move::Y], vec![Move::Z]];
 
     while let Some(current) = queue.pop_front() {
         for rot_moves in &rotations {
@@ -104,8 +100,7 @@ fn generate_all_solved_states() -> Vec<Cube> {
         }
     }
     // 回転操作によって得られた物理的な向きを、
-    // 方位によらず標準パターン [1, 2, 0, 3] にリセットする。
-    // (rotation.rs が物理的に整合したため、これら24状態はすべて解決状態として有効)
+    // 方位によらず標準パターン [0; 9] にリセットする。
     states
         .iter()
         .map(Cube::with_clockwise_orientations)
@@ -245,8 +240,8 @@ fn solve_internal(
     }
 
     let all_moves = Move::all_moves();
-    let forward_depth = max_depth.div_ceil(2);
-    let backward_depth = max_depth - forward_depth;
+    let forward_depth = max_depth.div_ceil(2).min(3); // 3x3では現実的な範囲に制限
+    let backward_depth = (max_depth - forward_depth).min(3);
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
@@ -555,8 +550,8 @@ impl SolverState {
             phase,
             solution,
             total_nodes_processed: 0,
-            forward_nodes_left_in_layer: 1,   // 開始状態のみ
-            backward_nodes_left_in_layer: 24, // 解決済み状態すべて
+            forward_nodes_left_in_layer: 1, // 開始状態のみ
+            backward_nodes_left_in_layer: get_solved_states().len(), // 解決済み状態すべて
         }
     }
 

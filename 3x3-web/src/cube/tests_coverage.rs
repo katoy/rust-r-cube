@@ -32,6 +32,24 @@ fn test_move_display_all() {
         (Move::B, "B"),
         (Move::Bp, "B'"),
         (Move::B2, "B2"),
+        (Move::M, "M"),
+        (Move::Mp, "M'"),
+        (Move::M2, "M2"),
+        (Move::E, "E"),
+        (Move::Ep, "E'"),
+        (Move::E2, "E2"),
+        (Move::S, "S"),
+        (Move::Sp, "S'"),
+        (Move::S2, "S2"),
+        (Move::X, "X"),
+        (Move::Xp, "X'"),
+        (Move::X2, "X2"),
+        (Move::Y, "Y"),
+        (Move::Yp, "Y'"),
+        (Move::Y2, "Y2"),
+        (Move::Z, "Z"),
+        (Move::Zp, "Z'"),
+        (Move::Z2, "Z2"),
     ];
     for (mv, s) in moves {
         assert_eq!(format!("{}", mv), s);
@@ -41,19 +59,31 @@ fn test_move_display_all() {
 #[test]
 fn test_io_from_file_format_errors() {
     // 行数不足
-    assert!(Cube::from_file_format("WWWW\nGGGG").is_err());
+    assert!(Cube::from_file_format("WWWWWWWWW\nGGGGGGGGG").is_err());
 
     // 1行目のパーツ数不正
-    assert!(Cube::from_file_format("WWW\nGGGG RRRR BBBB OOOO\nYYYY").is_err());
+    assert!(
+        Cube::from_file_format("WWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\nYYYYYYYYY")
+            .is_err()
+    );
 
     // 2行目のパーツ数不正
-    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOO\nYYYY").is_err());
+    assert!(
+        Cube::from_file_format("WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOO\nYYYYYYYYY")
+            .is_err()
+    );
 
     // 3行目のパーツ数不正
-    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOO\nYYY").is_err());
+    assert!(
+        Cube::from_file_format("WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\nWWWWWWWW")
+            .is_err()
+    );
 
     // 無効な文字
-    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOZ\nYYYY").is_err());
+    assert!(Cube::from_file_format(
+        "WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOZ\nYYYYYYYYY"
+    )
+    .is_err());
 }
 
 #[test]
@@ -76,14 +106,14 @@ fn test_is_solved_with_orientation_mismatch() {
 
 #[test]
 fn test_from_colors_and_restore_orientation() {
-    let mut solved_colors = [Color::White; 24];
+    let mut solved_colors = [Color::White; 54];
     let faces = [
-        (Color::White, 0..4),
-        (Color::Yellow, 4..8),
-        (Color::Green, 8..12),
-        (Color::Blue, 12..16),
-        (Color::Red, 16..20),
-        (Color::Orange, 20..24),
+        (Color::White, 0..9),
+        (Color::Yellow, 9..18),
+        (Color::Green, 18..27),
+        (Color::Blue, 27..36),
+        (Color::Red, 36..45),
+        (Color::Orange, 45..54),
     ];
     for (color, range) in faces {
         for i in range {
@@ -105,38 +135,26 @@ fn test_from_colors_and_restore_orientation() {
 fn test_check_corner_parity_detailed() {
     let cube = Cube::new();
 
-    // 同一コーナー内に同じ色（通常のキューブではありえないが、色数チェックはパスするよう調整）
+    // 同一コーナー内に同じ色
     let mut c1 = cube.clone();
-    c1.stickers[2].color = Color::Green; // UFL corner: U(W), L(G), F(R) -> U(G), L(G), F(R)
-    c1.stickers[8].color = Color::White; // 他の場所から色を補填して合計数を合わせる
+    c1.stickers[6].color = Color::Green; // UFL corner: index 6, 36, 20.
+    c1.stickers[18].color = Color::White; // 他の場所から色を補填
     assert!(c1.is_valid_state().is_err());
 
     // 同一コーナー内に対面色 (White-Yellow)
     let mut c2 = cube.clone();
-    c2.stickers[2].color = Color::Yellow; // UFL corner: index 2, 9, 16.
-    c2.stickers[9].color = Color::White; // Y and W in the same corner!
+    c2.stickers[6].color = Color::Yellow;
+    c2.stickers[36].color = Color::White;
     assert!(c2.is_valid_state().is_err());
 
-    // コーナーピースの重複 (UFLピースが2つある状態)
-    // UFL: W, G, R.  UFR: W, R, B.
-    // UFRをUFLと同じ色構成にする
-    let mut c3 = cube.clone();
-    c3.stickers[3].color = Color::White;
-    c3.stickers[17].color = Color::Green;
-    c3.stickers[12].color = Color::Red;
-    // 不足した色を補う
-    c3.stickers[11].color = Color::Blue;
-    c3.stickers[20].color = Color::Red; // ... 整合性をとるのが大変なので、適当に重複させる
-    assert!(c3.is_valid_state().is_err());
-
-    // Twist パリティエラー (1コーナーだけ捻る = 色を循環させる)
+    // Twist パリティエラー (1コーナーだけ捻る)
     let mut c4 = cube.clone();
-    // UBL: [0, 21, 8]  (U, B, L) -> (W, O, G)
-    // 捻る: (W, O, G) -> (G, W, O)
+    // UBL: [0, 18, 47]  (U, L, B) -> (W, G, O)
+    // 捻る: (W, G, O) -> (G, O, W)
     let t = c4.stickers[0].color;
-    c4.stickers[0].color = c4.stickers[8].color;
-    c4.stickers[8].color = c4.stickers[21].color;
-    c4.stickers[21].color = t;
+    c4.stickers[0].color = c4.stickers[18].color;
+    c4.stickers[18].color = c4.stickers[47].color;
+    c4.stickers[47].color = t;
     assert!(c4.is_valid_state().is_err());
 }
 

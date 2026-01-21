@@ -220,7 +220,7 @@ pub struct CubeApp {
     /// モードに応じた入力状態（通常、スキャンモード）
     pub input_state: InputState,
     /// 6面スキャン入力中の色データ一時保持用
-    pub input_buffer: [Option<Color>; 24],
+    pub input_buffer: [Option<Color>; 54],
     /// 入力パネルで選択されている色
     pub selected_input_color: Color,
     /// 入力中のエラーメッセージ（不正なパリティなど）
@@ -278,7 +278,7 @@ impl Default for CubeApp {
             solving_start_time: None,
             last_solve_duration: None,
             input_state: InputState::Normal,
-            input_buffer: [None; 24],
+            input_buffer: [None; 54],
             selected_input_color: Color::White,
             input_error_message: String::new(),
             skip_parity_check: false,
@@ -604,7 +604,7 @@ impl CubeApp {
             InputState::Scanning { .. } => {
                 // スキャンモード中: 入力バッファから一時キューブを生成
                 // 未入力のステッカーはデフォルトの色（グレー風）にする
-                let mut colors = [Color::Gray; 24];
+                let mut colors = [Color::Gray; 54];
 
                 for (i, maybe_color) in self.input_buffer.iter().enumerate() {
                     if let Some(color) = maybe_color {
@@ -798,7 +798,7 @@ impl CubeApp {
     /// スキャンモードを開始
     pub fn start_scanning_mode(&mut self) {
         self.input_state = InputState::Scanning { face_index: 0 };
-        self.input_buffer = [None; 24];
+        self.input_buffer = [None; 54];
         self.selected_input_color = Color::White;
         self.input_error_message.clear();
     }
@@ -806,7 +806,7 @@ impl CubeApp {
     /// スキャンモードをキャンセル
     pub fn cancel_scanning_mode(&mut self) {
         self.input_state = InputState::Normal;
-        self.input_buffer = [None; 24];
+        self.input_buffer = [None; 54];
         self.input_error_message.clear();
     }
 
@@ -836,8 +836,8 @@ impl CubeApp {
     /// position: 面内の位置 0-3 (左上、右上、左下、右下)
     pub fn set_current_face_sticker(&mut self, position: usize, color: Color) {
         if let InputState::Scanning { face_index } = self.input_state {
-            let global_index = face_index * 4 + position;
-            if global_index < 24 {
+            let global_index = face_index * 9 + position;
+            if global_index < 54 {
                 self.input_buffer[global_index] = Some(color);
             }
         }
@@ -846,8 +846,8 @@ impl CubeApp {
     /// 現在の面の指定位置のステッカー色を取得
     pub fn get_current_face_sticker(&self, position: usize) -> Option<Color> {
         if let InputState::Scanning { face_index } = self.input_state {
-            let global_index = face_index * 4 + position;
-            if global_index < 24 {
+            let global_index = face_index * 9 + position;
+            if global_index < 54 {
                 return self.input_buffer[global_index];
             }
         }
@@ -874,8 +874,8 @@ impl CubeApp {
     /// 現在の面が全て入力済みかチェック
     pub fn is_current_face_complete(&self) -> bool {
         if let InputState::Scanning { face_index } = self.input_state {
-            let start = face_index * 4;
-            let end = start + 4;
+            let start = face_index * 9;
+            let end = start + 9;
             return self.input_buffer[start..end].iter().all(|c| c.is_some());
         }
         false
@@ -890,13 +890,13 @@ impl CubeApp {
         }
 
         // Option<Color>をColorに変換
-        let colors: [Color; 24] = self
+        let colors: [Color; 54] = self
             .input_buffer
             .iter()
             .map(|c| c.expect("全ての色が入力されています"))
             .collect::<Vec<_>>()
             .try_into()
-            .expect("配列は24要素です");
+            .expect("配列は54要素です");
 
         // 妥当性チェック
         if let Err(e) = Cube::validate_colors(&colors) {
@@ -923,7 +923,7 @@ impl CubeApp {
 
         self.cube = new_cube;
         self.input_state = InputState::Normal;
-        self.input_buffer = [None; 24];
+        self.input_buffer = [None; 54];
         self.input_error_message.clear();
 
         // 向きの自動復元（即時）
@@ -1000,7 +1000,7 @@ impl CubeApp {
 
             self.cube = new_cube;
             self.input_state = InputState::Normal;
-            self.input_buffer = [None; 24];
+            self.input_buffer = [None; 54];
         }
 
         self.solution = None;

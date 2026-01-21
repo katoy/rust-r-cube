@@ -5,57 +5,55 @@ use std::sync::mpsc;
 // from_file_formatのエラーケース追加テスト
 #[test]
 fn test_from_file_format_too_few_lines() {
-    let invalid = "     WWWW\nGGGG RRRR BBBB OOOO\n";
+    let invalid = "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n";
     assert!(Cube::from_file_format(invalid).is_err());
 }
 
 #[test]
 fn test_from_file_format_line1_too_short() {
-    let invalid = "     WWW\nGGGG RRRR BBBB OOOO\n     YYYY\n";
+    let invalid =
+        "          WWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
     assert!(Cube::from_file_format(invalid).is_err());
 }
 
 #[test]
 fn test_from_file_format_line2_too_short() {
-    let invalid = "     WWWW\nGGGG RRRR BBBB OOO\n     YYYY\n";
+    let invalid =
+        "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOO\n          YYYYYYYYY\n";
     assert!(Cube::from_file_format(invalid).is_err());
 }
 
 #[test]
 fn test_from_file_format_line3_too_short() {
-    let invalid = "     WWWW\nGGGG RRRR BBBB OOOO\n     YYY\n";
+    let invalid =
+        "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          WWWWWWWW\n";
     assert!(Cube::from_file_format(invalid).is_err());
 }
 
 #[test]
 fn test_validate_colors_missing_color() {
     // すべての色が欠けているケース
-    let colors = [
-        Color::White,
-        Color::White,
-        Color::White,
-        Color::White,
-        Color::Yellow,
-        Color::Yellow,
-        Color::Yellow,
-        Color::Yellow,
-        Color::Green,
-        Color::Green,
-        Color::Green,
-        Color::Gray, // Greenが1つ少ない
-        Color::Blue,
-        Color::Blue,
-        Color::Blue,
-        Color::Blue,
-        Color::Red,
-        Color::Red,
-        Color::Red,
-        Color::Red,
-        Color::Orange,
-        Color::Orange,
-        Color::Orange,
-        Color::Orange,
-    ];
+    let mut colors = [Color::White; 54];
+    for i in 0..9 {
+        colors[i] = Color::White;
+    }
+    for i in 9..18 {
+        colors[i] = Color::Yellow;
+    }
+    for i in 18..27 {
+        colors[i] = Color::Green;
+    }
+    for i in 27..36 {
+        colors[i] = Color::Blue;
+    }
+    for i in 36..45 {
+        colors[i] = Color::Red;
+    }
+    for i in 45..54 {
+        colors[i] = Color::Orange;
+    }
+
+    colors[20] = Color::Gray; // 1つを Gray に置き換え
     let result = Cube::validate_colors(&colors);
     assert!(result.is_err());
 }
@@ -63,7 +61,7 @@ fn test_validate_colors_missing_color() {
 #[test]
 fn test_validate_colors_all_wrong() {
     // すべての色が間違っているケース
-    let colors = [Color::Gray; 24];
+    let colors = [Color::Gray; 54];
     let result = Cube::validate_colors(&colors);
     assert!(result.is_err());
 }
@@ -78,7 +76,7 @@ fn test_cube_default_equals_new() {
 #[test]
 fn test_color_gray_not_in_solved_cube() {
     let cube = Cube::new();
-    for i in 0..24 {
+    for i in 0..54 {
         assert_ne!(cube.get_sticker(i).color, Color::Gray);
     }
 }
@@ -109,12 +107,13 @@ fn test_from_file_format_whitespace_only() {
 fn test_apply_orientation_solution_error() {
     let mut cube = Cube::new();
     // 物理的に不可能な状態（捻じれパリティエラー）を作り出す
-    let c0 = cube.stickers[2];
-    let c1 = cube.stickers[9];
-    let c2 = cube.stickers[16];
-    cube.stickers[2] = c1;
-    cube.stickers[9] = c2;
-    cube.stickers[16] = c0;
+    // UFL: 6, 36, 20
+    let c0 = cube.stickers[6];
+    let c1 = cube.stickers[36];
+    let c2 = cube.stickers[20];
+    cube.stickers[6] = c1;
+    cube.stickers[36] = c2;
+    cube.stickers[20] = c0;
 
     let solution = Solution {
         moves: vec![],

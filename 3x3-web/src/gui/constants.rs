@@ -23,8 +23,8 @@ pub const ARROW_WING_ANGLE_DEG: f32 = 30.0;
 pub const ARROW_BASE_RATIO: f32 = 0.3;
 
 /// 2Dグリッド設定
-pub const GRID_COLS: f32 = 8.0;
-pub const GRID_ROWS: f32 = 6.0;
+pub const GRID_COLS: f32 = 12.0;
+pub const GRID_ROWS: f32 = 9.0;
 pub const GRID_PADDING_RATIO: f32 = 0.95;
 pub const STICKER_SIZE_IN_GRID: f32 = 0.85;
 

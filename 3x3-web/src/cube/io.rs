@@ -28,7 +28,7 @@ pub fn to_file_format(cube: &Cube) -> String {
 
     // 展開図形式で出力
     // 1行目: Up
-    result.push_str("     ");
+    result.push_str("          ");
     result.push_str(&get_face(0)); // Up
     result.push('\n');
 
@@ -43,7 +43,7 @@ pub fn to_file_format(cube: &Cube) -> String {
     result.push('\n');
 
     // 3行目: Down
-    result.push_str("     ");
+    result.push_str("          ");
     result.push_str(&get_face(1)); // Down
     result.push('\n');
 
@@ -84,21 +84,21 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
     let line3_colors = parse_colors(lines[2])?;
 
     // 検証
-    if line1_colors.len() != 4 {
+    if line1_colors.len() != 9 {
         return Err(CubeError::InvalidFormat(format!(
-            "1行目: 4ステッカー必要ですが{}個です",
+            "1行目: 9ステッカー必要ですが{}個です",
             line1_colors.len()
         )));
     }
-    if line2_colors.len() != 16 {
+    if line2_colors.len() != 36 {
         return Err(CubeError::InvalidFormat(format!(
-            "2行目: 16ステッカー必要ですが{}個です",
+            "2行目: 36ステッカー必要ですが{}個です",
             line2_colors.len()
         )));
     }
-    if line3_colors.len() != 4 {
+    if line3_colors.len() != 9 {
         return Err(CubeError::InvalidFormat(format!(
-            "3行目: 4ステッカー必要ですが{}個です",
+            "3行目: 9ステッカー必要ですが{}個です",
             line3_colors.len()
         )));
     }
@@ -119,10 +119,10 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
 
     map_face(Face::Up, &line1_colors);
     map_face(Face::Down, &line3_colors);
-    map_face(Face::Left, &line2_colors[0..4]);
-    map_face(Face::Front, &line2_colors[4..8]);
-    map_face(Face::Right, &line2_colors[8..12]);
-    map_face(Face::Back, &line2_colors[12..16]);
+    map_face(Face::Left, &line2_colors[0..9]);
+    map_face(Face::Front, &line2_colors[9..18]);
+    map_face(Face::Right, &line2_colors[18..27]);
+    map_face(Face::Back, &line2_colors[27..36]);
 
     let mut cube = Cube { stickers };
 

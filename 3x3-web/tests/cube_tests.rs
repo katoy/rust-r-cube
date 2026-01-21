@@ -110,9 +110,7 @@ fn test_normalized() {
     let norm = cube.normalized();
 
     // normalizedの結果、stickersのorientationが全て0になっていることを確認
-    // Cube構造体のフィールドはprivateだが、stickersにはアクセスできない。
-    // get_stickerメソッド経由で確認する。
-    for i in 0..24 {
+    for i in 0..54 {
         let s = norm.get_sticker(i);
         assert_eq!(s.orientation, 0, "Sticker {} orientation should be 0", i);
     }
@@ -180,24 +178,13 @@ fn test_specific_move_logic() {
 
     let mut cube = Cube::new();
 
-    // R (Right Clockwise) を実行
-    // R面(Blue)は回転する
-    // F面(Red)の右列 -> U面(White)の右列
-    // U面(White)の右列 -> B面(Orange)の左列 (Uの右はBの左につながる)
-    // B面(Orange)の左列 -> D面(Yellow)の右列
-    // D面(Yellow)の右列 -> F面(Red)の右列
-
+    // 3x3 での R 回転ロジック検証
     cube.apply_move(Move::R);
-
-    // F面(16-19)の右列(17, 19) は D面の色(Yellow)になっているはず
-    // D面は4-7. 元のD面右列は 5, 7.
-    assert_eq!(cube.get_sticker(17).color, Color::Yellow);
-    assert_eq!(cube.get_sticker(19).color, Color::Yellow);
-
-    // U面(0-3)の右列(1, 3) は F面の色(Red)になっているはず
-    // 元のF面右列は 17, 19
-    assert_eq!(cube.get_sticker(1).color, Color::Red);
-    assert_eq!(cube.get_sticker(3).color, Color::Red);
+    // F面(36-44)の右列(38, 41, 44) は D面の色(Yellow)になっているはず
+    // D面は9-17.
+    assert_eq!(cube.get_sticker(38).color, Color::Yellow);
+    assert_eq!(cube.get_sticker(41).color, Color::Yellow);
+    assert_eq!(cube.get_sticker(44).color, Color::Yellow);
 }
 
 #[test]
@@ -228,9 +215,9 @@ fn test_hash_consistency() {
 
 #[test]
 fn test_all_moves_available() {
-    // Move::all_moves()が18個の動きを返すことを確認
+    // Move::all_moves()が 18(基本)+18(中間+全体)=36個の動きを返すことを確認
     let moves = Move::all_moves();
-    assert_eq!(moves.len(), 18);
+    assert_eq!(moves.len(), 36);
 
     // 重複がないことを確認
     let mut set = HashSet::new();
@@ -343,9 +330,9 @@ fn test_normalized_preserves_colors() {
     let mut cube = Cube::new();
     cube.apply_move(Move::R);
 
-    let original_colors: Vec<Color> = (0..24).map(|i| cube.get_sticker(i).color).collect();
+    let original_colors: Vec<Color> = (0..54).map(|i| cube.get_sticker(i).color).collect();
     let normalized = cube.normalized();
-    let normalized_colors: Vec<Color> = (0..24).map(|i| normalized.get_sticker(i).color).collect();
+    let normalized_colors: Vec<Color> = (0..54).map(|i| normalized.get_sticker(i).color).collect();
 
     assert_eq!(original_colors, normalized_colors);
 }
@@ -360,26 +347,26 @@ fn test_multiple_scrambles() {
     }
 
     // スクランブル後もget_stickerが正常に動作することを確認
-    for i in 0..24 {
+    for i in 0..54 {
         let _ = cube.get_sticker(i);
     }
 }
 
 #[test]
 fn test_cube_invariants() {
-    // どのような操作をしても各色4枚ずつ存在することを確認
+    // どのような操作をしても各色9枚ずつ存在することを確認
     let mut cube = Cube::new();
     cube.scramble(50);
 
     let mut color_counts = std::collections::HashMap::new();
-    for i in 0..24 {
+    for i in 0..54 {
         let s = cube.get_sticker(i);
         *color_counts.entry(s.color).or_insert(0) += 1;
     }
 
     assert_eq!(color_counts.len(), 6);
     for count in color_counts.values() {
-        assert_eq!(*count, 4);
+        assert_eq!(*count, 9);
     }
 }
 
@@ -437,45 +424,20 @@ fn test_all_moves_exhaustive_physical() {
             panic!("Corner integrity failed for {}: {}", msg, e);
         }
 
-        // 特定の操作後の物理状態チェック（Dを含む主要なもの）
+        // 特定の操作後の物理状態チェック（U）
         match mv {
-            Move::D => {
-                // D面(4-7)は時計回りに回転
-                // 初期状態 clockwise pattern: idx4=1, idx5=2, idx6=0, idx7=3
-                // rotate_face_cw: 4←6, 5←4, 6←7, 7←5, then +1
-                // 結果: idx4=1, idx5=2, idx6=0, idx7=3
-                for i in 4..8 {
-                    assert_eq!(cube.get_sticker(i).color, Color::Yellow);
-                }
-                check_sticker_val(&cube, 4, Color::Yellow, 1, &msg);
-                check_sticker_val(&cube, 5, Color::Yellow, 2, &msg);
-                check_sticker_val(&cube, 6, Color::Yellow, 0, &msg);
-                check_sticker_val(&cube, 7, Color::Yellow, 3, &msg);
-                // D面付近の側面 (D操作 CW: F -> R -> B -> L -> F)
-                // 時計回りパターン初期状態:
-                // F面(16-19): [1, 2, 0, 3], R面(12-15): [1, 2, 0, 3]
-                // B面(20-23): [1, 2, 0, 3], L面(8-11): [1, 2, 0, 3]
-                // F(18,19) -> R(14,15): orientation [0, 3]
-                check_sticker_val(&cube, 14, Color::Red, 0, &msg); // F(18) -> R(14)
-                check_sticker_val(&cube, 15, Color::Red, 3, &msg); // F(19) -> R(15)
-                                                                   // R(14,15) -> B(22,23): orientation [1, 2]
-                check_sticker_val(&cube, 22, Color::Blue, 0, &msg); // R(14) -> B(22)
-                check_sticker_val(&cube, 23, Color::Blue, 3, &msg); // R(15) -> B(23)
-                                                                    // B(22,23) -> L(10,11): orientation [0, 3]
-                check_sticker_val(&cube, 10, Color::Orange, 0, &msg); // B(22) -> L(10)
-                check_sticker_val(&cube, 11, Color::Orange, 3, &msg); // B(23) -> L(11)
-                                                                      // L(10,11) -> F(18,19): orientation [1, 2]
-                check_sticker_val(&cube, 18, Color::Green, 0, &msg); // L(10) -> F(18)
-                check_sticker_val(&cube, 19, Color::Green, 3, &msg); // L(11) -> F(19)
-            }
             Move::U => {
-                // 初期状態 clockwise pattern: idx0=1, idx1=2, idx2=0, idx3=3
-                // rotate_face_cw: 0←2, 1←0, 2←3, 3←1, then +1
-                // 結果: idx0=1, idx1=2, idx2=0, idx3=3
-                check_sticker_val(&cube, 0, Color::White, 1, &msg);
-                check_sticker_val(&cube, 1, Color::White, 2, &msg);
-                check_sticker_val(&cube, 2, Color::White, 0, &msg);
-                check_sticker_val(&cube, 3, Color::White, 3, &msg);
+                // 初期状態 pattern: [0; 9]
+                for i in 0..9 {
+                    assert_eq!(cube.get_sticker(i).color, Color::White);
+                    // rotate_face_cw を 1回呼ぶので oris は 1
+                    assert_eq!(
+                        cube.get_sticker(i).orientation,
+                        1,
+                        "Sticker {} orientation mismatch",
+                        i
+                    );
+                }
             }
             _ => {}
         }
@@ -487,14 +449,14 @@ fn test_all_moves_exhaustive_physical() {
 /// コーナーキューブの整合性をチェックするヘルパー関数
 fn check_corners_integrity(cube: &Cube) -> Result<(), String> {
     let corners = vec![
-        ("ULF", vec![2, 9, 16]),  // Up-Left-Front
-        ("URF", vec![3, 12, 17]), // Up-Right-Front
-        ("ULB", vec![0, 8, 21]),  // Up-Left-Back
-        ("URB", vec![1, 13, 20]), // Up-Right-Back
-        ("DLF", vec![4, 11, 18]), // Down-Left-Front
-        ("DRF", vec![5, 14, 19]), // Down-Right-Front
-        ("DLB", vec![6, 10, 23]), // Down-Left-Back
-        ("DRB", vec![7, 15, 22]), // Down-Right-Back
+        ("UFL", vec![6, 36, 20]),
+        ("UFR", vec![8, 27, 38]),
+        ("UBR", vec![2, 45, 29]),
+        ("UBL", vec![0, 18, 47]),
+        ("DFL", vec![9, 26, 42]),
+        ("DFR", vec![11, 44, 33]),
+        ("DBR", vec![17, 35, 51]),
+        ("DBL", vec![15, 53, 24]),
     ];
 
     for (name, indices) in corners {

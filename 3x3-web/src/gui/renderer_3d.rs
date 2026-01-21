@@ -62,7 +62,7 @@ fn project_point(
 
 /// ステッカーの初期3D配置を生成
 fn get_initial_stickers() -> Vec<Sticker3D> {
-    let mut stickers = Vec::with_capacity(crate::cube::NUM_STICKERS);
+    let mut stickers = Vec::with_capacity(54);
     let size = VIEW3D_STICKER_SIZE;
 
     // 各面の定義: (normal, center_base, u_axis, v_axis, flip_v)
@@ -76,14 +76,14 @@ fn get_initial_stickers() -> Vec<Sticker3D> {
     ];
 
     for (f_idx, (normal, center_base, u_axis, v_axis, flip_v)) in face_defs.iter().enumerate() {
-        for i in 0..crate::cube::STICKERS_PER_FACE {
-            let col = (i % 2) as f32;
-            let row = (i / 2) as f32;
-            let u_val = (col - 0.5) * 1.0;
+        for i in 0..9 {
+            let col = (i % 3) as f32;
+            let row = (i / 3) as f32;
+            let u_val = (col - 1.0) * (2.0 / 3.0);
             let v_val = if *flip_v {
-                (1.0 - row - 0.5) * 1.0
+                (2.0 - row - 1.0) * (2.0 / 3.0)
             } else {
-                (row - 0.5) * 1.0
+                (row - 1.0) * (2.0 / 3.0)
             };
 
             stickers.push(Sticker3D {
@@ -170,6 +170,8 @@ pub fn draw_cube_3d(
             Move::B => (Vec3::Z, -1, 90.0_f32.to_radians()),
             Move::Bp => (Vec3::Z, -1, -90.0_f32.to_radians()),
             Move::B2 => (Vec3::Z, -1, 180.0_f32.to_radians()),
+            // 中間層と全体回転は一旦アニメーションなし
+            _ => (Vec3::X, 0, 0.0),
         }
     } else {
         (Vec3::X, 0, 0.0)

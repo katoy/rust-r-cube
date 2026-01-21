@@ -134,11 +134,7 @@ fn test_solve_with_orientation_change() {
 fn test_solve_all_orientations() {
     // 全ての完成状態（向き違い）が0手で解決されることを確認
     let base = Cube::new();
-    let rotations = vec![
-        vec![Move::U, Move::Dp],
-        vec![Move::R, Move::Lp],
-        vec![Move::F, Move::Bp],
-    ];
+    let rotations = vec![vec![Move::X], vec![Move::Y], vec![Move::Z]];
 
     let mut queue = std::collections::VecDeque::new();
     let mut visited = std::collections::HashSet::new();
@@ -213,9 +209,8 @@ fn test_solve_max_depth() {
 fn test_solve_fully_aligned() {
     // 向きも揃える解決のテスト
     let mut cube = Cube::new();
-    // 全体回転
-    cube.apply_move(Move::U);
-    cube.apply_move(Move::Dp);
+    // 全体回転 (Y)
+    cube.apply_move(Move::Y);
 
     assert!(cube.is_solved());
     assert!(solver::is_fully_solved(&cube));

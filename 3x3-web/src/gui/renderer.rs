@@ -146,22 +146,14 @@ fn draw_arrow(painter: &Painter, center: Pos2, length: f32, rotation: f32, alpha
 /// インデックスに対応するグリッド座標 (col, row) を取得
 fn get_grid_coords(index: usize) -> Pos2 {
     let (col, row) = match index {
-        i if i < Face::Down.start_index() => (2.0 + (i % 2) as f32, 0.0 + (i / 2) as f32), // U
-        i if i < Face::Left.start_index() => {
-            (2.0 + ((i - 4) % 2) as f32, 4.0 + ((i - 4) / 2) as f32)
-        } // D
-        i if i < Face::Right.start_index() => {
-            (0.0 + ((i - 8) % 2) as f32, 2.0 + ((i - 8) / 2) as f32)
-        } // L
-        i if i < Face::Front.start_index() => {
-            (4.0 + ((i - 12) % 2) as f32, 2.0 + ((i - 12) / 2) as f32)
-        } // R
-        i if i < Face::Back.start_index() => {
-            (2.0 + ((i - 16) % 2) as f32, 2.0 + ((i - 16) / 2) as f32)
-        } // F
+        i if i < 9 => (3.0 + (i % 3) as f32, 0.0 + (i / 3) as f32), // U
+        i if i < 18 => (3.0 + ((i - 9) % 3) as f32, 6.0 + ((i - 9) / 3) as f32), // D
+        i if i < 27 => (0.0 + ((i - 18) % 3) as f32, 3.0 + ((i - 18) / 3) as f32), // L
+        i if i < 36 => (6.0 + ((i - 27) % 3) as f32, 3.0 + ((i - 27) / 3) as f32), // R
+        i if i < 45 => (3.0 + ((i - 36) % 3) as f32, 3.0 + ((i - 36) / 3) as f32), // F
         _ => (
-            6.0 + ((index - 20) % 2) as f32,
-            2.0 + ((index - 20) / 2) as f32,
+            9.0 + ((index - 45) % 3) as f32,
+            3.0 + ((index - 45) / 3) as f32,
         ), // B
     };
     Pos2::new(col, row)
@@ -379,7 +371,14 @@ const FACE_ROTATION_TABLE: [(usize, f32); 18] = [
 /// アニメーション情報：移動マッピングと回転面情報
 fn get_animation_info(mv: Move) -> AnimationInfo {
     let all_moves = Move::all_moves();
+    let original_18_len = 18; // 2x2の時の基本回転数
     let idx = all_moves.iter().position(|&m| m == mv).unwrap_or(0);
+
+    // 3x3ではアニメーションテーブルを無効化（暫定）
+    if idx >= original_18_len || true {
+        return (vec![], None);
+    }
+
     (
         MOVE_MAPPING_TABLE[idx].to_vec(),
         Some(FACE_ROTATION_TABLE[idx]),
@@ -504,11 +503,44 @@ pub fn draw_cube(
                     screen_pos = rotate_point(screen_pos, center_screen, current_angle);
 
                     let orientation_delta = match anim.current_move {
-                        Move::R | Move::L | Move::F | Move::B => 1,
-                        Move::Rp | Move::Lp | Move::Fp | Move::Bp => 3,
-                        Move::U | Move::D => 1,
-                        Move::Up | Move::Dp => 3,
-                        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
+                        Move::R
+                        | Move::L
+                        | Move::F
+                        | Move::B
+                        | Move::U
+                        | Move::D
+                        | Move::M
+                        | Move::E
+                        | Move::S
+                        | Move::X
+                        | Move::Y
+                        | Move::Z => 1,
+
+                        Move::Rp
+                        | Move::Lp
+                        | Move::Fp
+                        | Move::Bp
+                        | Move::Up
+                        | Move::Dp
+                        | Move::Mp
+                        | Move::Ep
+                        | Move::Sp
+                        | Move::Xp
+                        | Move::Yp
+                        | Move::Zp => 3,
+
+                        Move::U2
+                        | Move::D2
+                        | Move::L2
+                        | Move::R2
+                        | Move::F2
+                        | Move::B2
+                        | Move::M2
+                        | Move::E2
+                        | Move::S2
+                        | Move::X2
+                        | Move::Y2
+                        | Move::Z2 => 2,
                     };
                     let orientation_change_deg = -(orientation_delta as f32 * 90.0);
                     rotation = current_angle + orientation_change_deg;
@@ -743,9 +775,44 @@ pub fn draw_cube(
 /// 面の回転による向きの変更量を取得
 fn get_face_orientation_delta(mv: Move) -> u8 {
     match mv {
-        Move::R | Move::L | Move::F | Move::B | Move::U | Move::D => 1,
-        Move::Rp | Move::Lp | Move::Fp | Move::Bp | Move::Up | Move::Dp => 3,
-        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
+        Move::R
+        | Move::L
+        | Move::F
+        | Move::B
+        | Move::U
+        | Move::D
+        | Move::M
+        | Move::E
+        | Move::S
+        | Move::X
+        | Move::Y
+        | Move::Z => 1,
+
+        Move::Rp
+        | Move::Lp
+        | Move::Fp
+        | Move::Bp
+        | Move::Up
+        | Move::Dp
+        | Move::Mp
+        | Move::Ep
+        | Move::Sp
+        | Move::Xp
+        | Move::Yp
+        | Move::Zp => 3,
+
+        Move::U2
+        | Move::D2
+        | Move::L2
+        | Move::R2
+        | Move::F2
+        | Move::B2
+        | Move::M2
+        | Move::E2
+        | Move::S2
+        | Move::X2
+        | Move::Y2
+        | Move::Z2 => 2,
     }
 }
 
@@ -787,14 +854,14 @@ fn get_moving_sticker_orientation_delta(mv: Move, src_idx: usize) -> u8 {
 /// インデックスに対応する面全体のグリッド領域を取得
 fn get_face_grid_rect(index: usize) -> Rect {
     let (min_col, min_row) = match index {
-        i if i == Face::Up.start_index() => (2.0, 0.0),   // U
-        i if i == Face::Down.start_index() => (2.0, 4.0), // D
-        i if i == Face::Left.start_index() => (0.0, 2.0), // L
-        i if i == Face::Right.start_index() => (4.0, 2.0), // R
-        i if i == Face::Front.start_index() => (2.0, 2.0), // F
-        i if i == Face::Back.start_index() => (6.0, 2.0), // B
+        i if i == Face::Up.start_index() => (3.0, 0.0),   // U
+        i if i == Face::Down.start_index() => (3.0, 6.0), // D
+        i if i == Face::Left.start_index() => (0.0, 3.0), // L
+        i if i == Face::Right.start_index() => (6.0, 3.0), // R
+        i if i == Face::Front.start_index() => (3.0, 3.0), // F
+        i if i == Face::Back.start_index() => (9.0, 3.0), // B
         _ => (0.0, 0.0),
     };
-    // 2x2なのでサイズは2.0x2.0
-    Rect::from_min_size(Pos2::new(min_col, min_row), Vec2::new(2.0, 2.0))
+    // 3x3なのでサイズは3.0x3.0
+    Rect::from_min_size(Pos2::new(min_col, min_row), Vec2::new(3.0, 3.0))
 }

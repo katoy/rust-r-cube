@@ -29,15 +29,14 @@ fn test_strict_physical_consistency_all_moves() {
 
         for face in Face::all() {
             let start = face.start_index();
-            let pattern: Vec<u8> = (0..4)
+            let pattern: Vec<u8> = (0..9)
                 .map(|i| resolved.get_sticker(start + i).orientation)
                 .collect();
+            let expected = vec![0u8; 9];
             assert_eq!(
-                pattern,
-                vec![1, 2, 0, 3],
+                pattern, expected,
                 "Face {:?} orientation pattern is broken after solving move {:?}",
-                face,
-                mv
+                face, mv
             );
         }
     }

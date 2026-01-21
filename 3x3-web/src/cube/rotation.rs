@@ -1,186 +1,197 @@
 use super::{Cube, Move};
 
-struct MoveData {
-    face_idx: usize,
-    orientation_delta: u8,
-    cycle: [usize; 8],
-    rotations: [u8; 8],
-}
-
-const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
-    (
-        Move::U,
-        MoveData {
-            face_idx: 0,
-            orientation_delta: 1,
-            cycle: [16, 17, 12, 13, 20, 21, 8, 9],
-            rotations: [0, 0, 0, 0, 0, 0, 0, 0],
-        },
-    ),
-    (
-        Move::D,
-        MoveData {
-            face_idx: 4,
-            orientation_delta: 1,
-            cycle: [18, 19, 10, 11, 22, 23, 14, 15],
-            rotations: [0, 0, 0, 0, 0, 0, 0, 0],
-        },
-    ),
-    (
-        Move::L,
-        MoveData {
-            face_idx: 8,
-            orientation_delta: 1,
-            cycle: [0, 2, 23, 21, 4, 6, 16, 18],
-            rotations: [2, 2, 2, 2, 0, 0, 0, 0],
-        },
-    ),
-    (
-        Move::R,
-        MoveData {
-            face_idx: 12,
-            orientation_delta: 1,
-            cycle: [1, 3, 17, 19, 5, 7, 22, 20],
-            rotations: [0, 0, 0, 0, 2, 2, 2, 2],
-        },
-    ),
-    (
-        Move::F,
-        MoveData {
-            face_idx: 16,
-            orientation_delta: 1,
-            cycle: [2, 3, 11, 9, 5, 4, 12, 14],
-            rotations: [1, 1, 1, 1, 1, 1, 1, 1],
-        },
-    ),
-    (
-        Move::B,
-        MoveData {
-            face_idx: 20,
-            orientation_delta: 1,
-            cycle: [0, 1, 13, 15, 7, 6, 10, 8],
-            rotations: [3, 3, 3, 3, 3, 3, 3, 3],
-        },
-    ),
-];
-
 /// 指定された回転操作をキューブに適用します。
-///
-/// この関数は2x2ルービックキューブの6つの面（U, D, L, R, F, B）に対する
-/// 回転操作を実行します。90度回転、逆回転（90度反時計回り）、
-/// 180度回転の3種類がサポートされています。
-///
-/// # 引数
-///
-/// - `cube` - 操作対象のキューブへの可変参照
-/// - `mv` - 実行する回転操作（Move enum）
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_2x2::cube::{Cube, Move};
-/// use rubiks_cube_2x2::cube::rotation::apply_move;
-///
-/// let mut cube = Cube::new();
-/// apply_move(&mut cube, Move::R);  // R面を90度時計回り
-/// apply_move(&mut cube, Move::Up); // U面を90度反時計回り
-/// ```
-///
-/// # 実装詳細
-///
-/// - 90度回転（R, L, U, D, F, B）: 基本回転を1回実行
-/// - 180度回転（R2, L2, U2, D2, F2, B2）: 基本回転を2回実行
-/// - 逆回転（Rp, Lp, Up, Dp, Fp, Bp）: 基本回転を3回実行
 pub fn apply_move(cube: &mut Cube, mv: Move) {
-    let base_move = match mv {
-        Move::U | Move::Up | Move::U2 => Move::U,
-        Move::D | Move::Dp | Move::D2 => Move::D,
-        Move::L | Move::Lp | Move::L2 => Move::L,
-        Move::R | Move::Rp | Move::R2 => Move::R,
-        Move::F | Move::Fp | Move::F2 => Move::F,
-        Move::B | Move::Bp | Move::B2 => Move::B,
-    };
-
-    let data = MOVE_DATA_TABLE
-        .iter()
-        .find(|(m, _)| *m == base_move)
-        .map(|(_, d)| d)
-        .expect("All moves should be in the table");
-
-    let repeat = match mv {
-        Move::U | Move::D | Move::L | Move::R | Move::F | Move::B => 1,
-        Move::U2 | Move::D2 | Move::L2 | Move::R2 | Move::F2 | Move::B2 => 2,
-        Move::Up | Move::Dp | Move::Lp | Move::Rp | Move::Fp | Move::Bp => 3,
+    let (base, repeat) = match mv {
+        Move::U => (Move::U, 1),
+        Move::Up => (Move::U, 3),
+        Move::U2 => (Move::U, 2),
+        Move::D => (Move::D, 1),
+        Move::Dp => (Move::D, 3),
+        Move::D2 => (Move::D, 2),
+        Move::L => (Move::L, 1),
+        Move::Lp => (Move::L, 3),
+        Move::L2 => (Move::L, 2),
+        Move::R => (Move::R, 1),
+        Move::Rp => (Move::R, 3),
+        Move::R2 => (Move::R, 2),
+        Move::F => (Move::F, 1),
+        Move::Fp => (Move::F, 3),
+        Move::F2 => (Move::F, 2),
+        Move::B => (Move::B, 1),
+        Move::Bp => (Move::B, 3),
+        Move::B2 => (Move::B, 2),
+        Move::M => (Move::M, 1),
+        Move::Mp => (Move::M, 3),
+        Move::M2 => (Move::M, 2),
+        Move::E => (Move::E, 1),
+        Move::Ep => (Move::E, 3),
+        Move::E2 => (Move::E, 2),
+        Move::S => (Move::S, 1),
+        Move::Sp => (Move::S, 3),
+        Move::S2 => (Move::S, 2),
+        Move::X => (Move::X, 1),
+        Move::Xp => (Move::X, 3),
+        Move::X2 => (Move::X, 2),
+        Move::Y => (Move::Y, 1),
+        Move::Yp => (Move::Y, 3),
+        Move::Y2 => (Move::Y, 2),
+        Move::Z => (Move::Z, 1),
+        Move::Zp => (Move::Z, 3),
+        Move::Z2 => (Move::Z, 2),
     };
 
     for _ in 0..repeat {
-        rotate_internal(
-            cube,
-            data.face_idx,
-            data.orientation_delta,
-            &data.cycle,
-            &data.rotations,
-        );
+        match base {
+            Move::U => rotate_face(
+                cube,
+                0,
+                &[36, 37, 38, 27, 28, 29, 45, 46, 47, 18, 19, 20],
+                &[0; 12],
+            ),
+            Move::D => rotate_face(
+                cube,
+                9,
+                &[42, 43, 44, 33, 34, 35, 51, 52, 53, 24, 25, 26],
+                &[0; 12],
+            ),
+            Move::L => rotate_face(
+                cube,
+                18,
+                &[0, 3, 6, 53, 50, 47, 9, 12, 15, 36, 39, 42],
+                &[2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0],
+            ),
+            Move::R => rotate_face(
+                cube,
+                27,
+                &[11, 14, 17, 45, 48, 51, 2, 5, 8, 38, 41, 44],
+                &[0, 0, 0, 2, 2, 2, 0, 0, 0, 2, 2, 2],
+            ),
+            Move::F => rotate_face(
+                cube,
+                36,
+                &[26, 23, 20, 11, 10, 9, 27, 30, 33, 6, 7, 8],
+                &[3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1],
+            ),
+            Move::B => rotate_face(
+                cube,
+                45,
+                &[35, 32, 29, 17, 16, 15, 18, 21, 24, 0, 1, 2],
+                &[1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+            ),
+            Move::M => rotate_slice_internal(
+                cube,
+                &[37, 40, 43, 10, 13, 16, 52, 49, 46, 1, 4, 7],
+                &[0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2],
+            ),
+            Move::E => rotate_slice_internal(
+                cube,
+                &[39, 40, 41, 30, 31, 32, 48, 49, 50, 21, 22, 23],
+                &[0; 12],
+            ),
+            Move::S => rotate_slice_internal(
+                cube,
+                &[3, 4, 5, 28, 31, 34, 14, 13, 12, 25, 22, 19],
+                &[1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+            ),
+            Move::X => {
+                apply_move(cube, Move::R);
+                apply_move(cube, Move::Lp);
+                apply_move(cube, Move::Mp);
+            }
+            Move::Y => {
+                apply_move(cube, Move::U);
+                apply_move(cube, Move::Dp);
+                apply_move(cube, Move::Ep);
+            }
+            Move::Z => {
+                apply_move(cube, Move::F);
+                apply_move(cube, Move::Bp);
+                apply_move(cube, Move::S);
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
-fn rotate_internal(cube: &mut Cube, face: usize, od: u8, cycle: &[usize; 8], rot: &[u8; 8]) {
-    // 1. 面自体のステッカーを CW 回転
-    let temp = cube.stickers[face];
-    cube.stickers[face] = cube.stickers[face + 2];
-    cube.stickers[face + 2] = cube.stickers[face + 3];
-    cube.stickers[face + 3] = cube.stickers[face + 1];
-    cube.stickers[face + 1] = temp;
-    for i in 0..4 {
-        for _ in 0..od {
-            cube.stickers[face + i].rotate_cw();
-        }
+fn rotate_face(cube: &mut Cube, face_start: usize, cycle: &[usize; 12], oris: &[u8; 12]) {
+    // 1. 面自体の回転
+    let s = &mut cube.stickers;
+    // 角
+    let tmp = s[face_start + 0];
+    s[face_start + 0] = s[face_start + 6];
+    s[face_start + 6] = s[face_start + 8];
+    s[face_start + 8] = s[face_start + 2];
+    s[face_start + 2] = tmp;
+    // 辺
+    let tmp = s[face_start + 1];
+    s[face_start + 1] = s[face_start + 3];
+    s[face_start + 3] = s[face_start + 7];
+    s[face_start + 7] = s[face_start + 5];
+    s[face_start + 5] = tmp;
+    // 向きの更新
+    for i in 0..9 {
+        s[face_start + i].rotate_cw();
     }
 
-    // 2. 隣接する面のステッカーを循環移動 (2枚ずつのペアで CW 方向)
+    // 2. 隣接ステッカーの巡回
+    rotate_slice_internal(cube, cycle, oris);
+}
+
+fn rotate_slice(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) {
+    rotate_slice_internal(cube, cycle, oris);
+}
+
+fn rotate_centers_internal(cube: &mut Cube, cycle: &[usize; 4], cw: bool) {
+    let s = &mut cube.stickers;
+    if cw {
+        let tmp = s[cycle[0]];
+        s[cycle[0]] = s[cycle[3]];
+        s[cycle[3]] = s[cycle[2]];
+        s[cycle[2]] = s[cycle[1]];
+        s[cycle[1]] = tmp;
+    } else {
+        let tmp = s[cycle[0]];
+        s[cycle[0]] = s[cycle[1]];
+        s[cycle[1]] = s[cycle[2]];
+        s[cycle[2]] = s[cycle[3]];
+        s[cycle[3]] = tmp;
+    }
+    for &idx in cycle {
+        s[idx].rotate_cw();
+    }
+}
+
+fn rotate_slice_internal(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) {
     let t0 = cube.stickers[cycle[0]];
     let t1 = cube.stickers[cycle[1]];
-    for i in 0..3 {
-        cube.stickers[cycle[i * 2]] = cube.stickers[cycle[(i + 1) * 2]];
-        cube.stickers[cycle[i * 2 + 1]] = cube.stickers[cycle[(i + 1) * 2 + 1]];
-    }
-    cube.stickers[cycle[6]] = t0;
-    cube.stickers[cycle[7]] = t1;
+    let t2 = cube.stickers[cycle[2]];
 
-    // 3. 移動後の向きの調整
-    for i in 0..8 {
-        for _ in 0..rot[i] {
+    // (A <- B <- C <- D <- A)
+    cube.stickers[cycle[0]] = cube.stickers[cycle[3]];
+    cube.stickers[cycle[1]] = cube.stickers[cycle[4]];
+    cube.stickers[cycle[2]] = cube.stickers[cycle[5]];
+
+    cube.stickers[cycle[3]] = cube.stickers[cycle[6]];
+    cube.stickers[cycle[4]] = cube.stickers[cycle[7]];
+    cube.stickers[cycle[5]] = cube.stickers[cycle[8]];
+
+    cube.stickers[cycle[6]] = cube.stickers[cycle[9]];
+    cube.stickers[cycle[7]] = cube.stickers[cycle[10]];
+    cube.stickers[cycle[8]] = cube.stickers[cycle[11]];
+
+    cube.stickers[cycle[9]] = t0;
+    cube.stickers[cycle[10]] = t1;
+    cube.stickers[cycle[11]] = t2;
+
+    // 3. 向きの調整
+    for i in 0..12 {
+        for _ in 0..oris[i] {
             cube.stickers[cycle[i]].rotate_cw();
         }
     }
 }
 
-/// ランダムなスクランブルを生成してキューブに適用します。
-///
-/// 指定された手数分のランダムな回転操作を実行し、キューブをスクランブル状態にします。
-/// 各手は18種類の可能な操作（R, Rp, R2, L, Lp, L2, ...）からランダムに選択されます。
-///
-/// # 引数
-///
-/// - `cube` - スクランブルするキューブへの可変参照
-/// - `moves` - 実行するランダム操作の回数
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_2x2::cube::Cube;
-/// use rubiks_cube_2x2::cube::rotation::scramble;
-///
-/// let mut cube = Cube::new();
-/// scramble(&mut cube, 10);  // 10手のランダムスクランブル
-/// assert!(!cube.is_solved()); // ほぼ確実に未完成状態
-/// ```
-///
-/// # 注意
-///
-/// - 連続する手で互いに逆操作になる可能性があります（例: R直後にRp）
-/// - より複雑なスクランブル（逆操作を避けるなど）が必要な場合は、
-///   別途カスタムロジックを実装してください
 pub fn scramble(cube: &mut Cube, moves: usize) {
     use rand::Rng;
     let mut rng = rand::thread_rng();

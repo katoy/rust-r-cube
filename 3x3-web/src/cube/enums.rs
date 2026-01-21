@@ -52,9 +52,9 @@ impl Face {
 }
 
 /// ステッカーの総数
-pub const NUM_STICKERS: usize = 24;
+pub const NUM_STICKERS: usize = 54;
 /// 1面あたりのステッカー数
-pub const STICKERS_PER_FACE: usize = 4;
+pub const STICKERS_PER_FACE: usize = 9;
 
 /// ステッカーの色の定義です。
 ///
@@ -152,6 +152,42 @@ pub enum Move {
     Bp,
     /// 背面 180度
     B2,
+    /// 中層(M) 時計回り 90度
+    M,
+    /// 中層(M) 反時計回り 90度
+    Mp,
+    /// 中層(M) 180度
+    M2,
+    /// 中層(E) 時計回り 90度
+    E,
+    /// 中層(E) 反時計回り 90度
+    Ep,
+    /// 中層(E) 180度
+    E2,
+    /// 中層(S) 時計回り 90度
+    S,
+    /// 中層(S) 反時計回り 90度
+    Sp,
+    /// 中層(S) 180度
+    S2,
+    /// 全体(X) 時計回り 90度
+    X,
+    /// 全体(X) 反時計回り 90度
+    Xp,
+    /// 全体(X) 180度
+    X2,
+    /// 全体(Y) 時計回り 90度
+    Y,
+    /// 全体(Y) 反時計回り 90度
+    Yp,
+    /// 全体(Y) 180度
+    Y2,
+    /// 全体(Z) 時計回り 90度
+    Z,
+    /// 全体(Z) 反時計回り 90度
+    Zp,
+    /// 全体(Z) 180度
+    Z2,
 }
 
 impl Move {
@@ -177,6 +213,24 @@ impl Move {
             Move::B,
             Move::Bp,
             Move::B2,
+            Move::M,
+            Move::Mp,
+            Move::M2,
+            Move::E,
+            Move::Ep,
+            Move::E2,
+            Move::S,
+            Move::Sp,
+            Move::S2,
+            Move::X,
+            Move::Xp,
+            Move::X2,
+            Move::Y,
+            Move::Yp,
+            Move::Y2,
+            Move::Z,
+            Move::Zp,
+            Move::Z2,
         ]
     }
 
@@ -204,6 +258,24 @@ impl Move {
             Move::B => Move::Bp,
             Move::Bp => Move::B,
             Move::B2 => Move::B2,
+            Move::M => Move::Mp,
+            Move::Mp => Move::M,
+            Move::M2 => Move::M2,
+            Move::E => Move::Ep,
+            Move::Ep => Move::E,
+            Move::E2 => Move::E2,
+            Move::S => Move::Sp,
+            Move::Sp => Move::S,
+            Move::S2 => Move::S2,
+            Move::X => Move::Xp,
+            Move::Xp => Move::X,
+            Move::X2 => Move::X2,
+            Move::Y => Move::Yp,
+            Move::Yp => Move::Y,
+            Move::Y2 => Move::Y2,
+            Move::Z => Move::Zp,
+            Move::Zp => Move::Z,
+            Move::Z2 => Move::Z2,
         }
     }
 
@@ -219,6 +291,12 @@ impl Move {
             Move::D2 => Some(Move::D),
             Move::F2 => Some(Move::F),
             Move::B2 => Some(Move::B),
+            Move::M2 => Some(Move::M),
+            Move::E2 => Some(Move::E),
+            Move::S2 => Some(Move::S),
+            Move::X2 => Some(Move::X),
+            Move::Y2 => Some(Move::Y),
+            Move::Z2 => Some(Move::Z),
             _ => None,
         }
     }
@@ -245,6 +323,24 @@ impl std::fmt::Display for Move {
             Move::B => "B",
             Move::Bp => "B'",
             Move::B2 => "B2",
+            Move::M => "M",
+            Move::Mp => "M'",
+            Move::M2 => "M2",
+            Move::E => "E",
+            Move::Ep => "E'",
+            Move::E2 => "E2",
+            Move::S => "S",
+            Move::Sp => "S'",
+            Move::S2 => "S2",
+            Move::X => "X",
+            Move::Xp => "X'",
+            Move::X2 => "X2",
+            Move::Y => "Y",
+            Move::Yp => "Y'",
+            Move::Y2 => "Y2",
+            Move::Z => "Z",
+            Move::Zp => "Z'",
+            Move::Z2 => "Z2",
         };
         write!(f, "{s}")
     }

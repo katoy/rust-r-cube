@@ -41,8 +41,7 @@ fn test_cube_god_solvability() {
 
 #[test]
 fn test_user_specified_state_solvability() {
-    // ユーザー指定の状態: WWWW / OOOO GGGR RRBG BBRB / YYYY
-    let state = "     WWWW\nOOOO GGGR RRBG BBRB\n     YYYY";
+    let state = "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY";
     let cube = Cube::from_file_format(state).expect("状態の読み込みに失敗");
 
     if cube.is_valid_state().is_ok() {

@@ -7,7 +7,7 @@ fn test_file_format_round_trip() {
     let restored = Cube::from_file_format(&format).unwrap();
 
     // ファイル形式は向きを保存しないため、色のみを比較
-    for i in 0..24 {
+    for i in 0..54 {
         assert_eq!(
             cube.get_sticker(i).color,
             restored.get_sticker(i).color,
@@ -27,24 +27,24 @@ fn test_file_format_scrambled() {
     let format = cube.to_file_format();
     let restored = Cube::from_file_format(&format).unwrap();
 
-    for i in 0..24 {
+    for i in 0..54 {
         assert_eq!(cube.get_sticker(i).color, restored.get_sticker(i).color);
     }
 }
 
 #[test]
 fn test_validate_colors_valid() {
-    let mut colors = [Color::White; 24];
+    let mut colors = [Color::White; 54];
     let faces = [
         (Color::White, 0),
-        (Color::Yellow, 4),
-        (Color::Green, 8),
-        (Color::Blue, 12),
-        (Color::Red, 16),
-        (Color::Orange, 20),
+        (Color::Yellow, 9),
+        (Color::Green, 18),
+        (Color::Blue, 27),
+        (Color::Red, 36),
+        (Color::Orange, 45),
     ];
     for (color, start) in faces {
-        for i in 0..4 {
+        for i in 0..9 {
             colors[start + i] = color;
         }
     }
@@ -57,8 +57,8 @@ fn test_to_file_format_structure() {
     let format = cube.to_file_format();
     let lines: Vec<&str> = format.lines().collect();
     assert_eq!(lines.len(), 3);
-    assert!(lines[0].starts_with("     "));
-    assert_eq!(lines[0].trim().len(), 4);
+    assert!(lines[0].starts_with("          "));
+    assert_eq!(lines[0].trim().len(), 9);
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn test_save_load_consistency() {
     let saved_str = cube.to_file_format();
     let loaded_cube = Cube::from_file_format(&saved_str).expect("Failed to load cube");
 
-    for i in 0..24 {
+    for i in 0..54 {
         assert_eq!(cube.get_sticker(i).color, loaded_cube.get_sticker(i).color);
     }
 }
@@ -93,15 +93,17 @@ fn test_save_load_orientation_restoration() {
 
 #[test]
 fn test_parse_gray_state() {
-    let input = "     ....\n.... .... .... ....\n     ....\n";
+    let input =
+        "          .........\n......... ......... ......... .........\n          .........\n";
     let cube = Cube::from_file_format(input).expect("Failed to parse gray state");
     assert_eq!(cube.stickers[0].color, Color::Gray);
 }
 
 #[test]
 fn test_legacy_format_compatibility() {
-    let legacy = "     WWWW\nGGGG RRRR BBBB OOOO\n     YYYY\n";
-    let cube = Cube::from_file_format(legacy).expect("Failed to load legacy format");
-    // [1,2,0,3] パターンの index 0 は 1
-    assert_eq!(cube.stickers[0].orientation, 1);
+    let legacy =
+        "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    let cube = Cube::from_file_format(legacy).expect("Failed to load 3x3 format");
+    // [0; 9] パターンの index 0 は 0
+    assert_eq!(cube.stickers[0].orientation, 0);
 }

@@ -13,7 +13,7 @@ pub fn validate_colors(colors: &[Color; crate::cube::NUM_STICKERS]) -> Result<()
         }
     }
 
-    // 各色が4つずつあるかチェック
+    // 各色が9つずつあるかチェック
     let expected_colors = [
         Color::White,
         Color::Yellow,
@@ -42,10 +42,10 @@ pub fn validate_colors(colors: &[Color; crate::cube::NUM_STICKERS]) -> Result<()
 
 /// キューブの状態が有効かどうかを判定
 ///
-/// 2x2ルービックキューブとして物理的に可能な配置かどうかをチェックします。
-/// - 各色が4つずつあるか
-/// - コーナーの位置パリティが正しいか（偶置換）
-/// - コーナーの向きパリティが正しいか（向きの合計が3の倍数）
+/// 3x3ルービックキューブとして物理的に可能な配置かどうかをチェックします。
+/// - 各色が9つずつあるか
+/// - コーナーの位置パリティと向きパリティ
+/// - エッジの位置パリティと向きパリティ（3x3特有）
 pub fn is_valid_state(cube: &Cube) -> Result<()> {
     // まず色数のチェック
     let mut colors_array = [Color::White; crate::cube::NUM_STICKERS];
@@ -62,14 +62,30 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
 
 /// コーナーの構成ステッカーのインデックス定義 (PrimaryFace(U/D) -> CW1 -> CW2)
 pub const CORNER_STICKERS: [[usize; 3]; 8] = [
-    [2, 9, 16],  // UFL: U2, L1, F0
-    [3, 17, 12], // UFR: U3, F1, R0
-    [1, 13, 20], // UBR: U1, R1, B0
-    [0, 21, 8],  // UBL: U0, B1, L0
-    [4, 18, 11], // DFL: D0, F2, L3
-    [5, 14, 19], // DFR: D1, R2, F3
-    [7, 22, 15], // DBR: D3, B2, R3
-    [6, 10, 23], // DBL: D2, L2, B3
+    [6, 36, 20],  // UFL: U6, F0, L2
+    [8, 27, 38],  // UFR: U8, R0, F2
+    [2, 45, 29],  // UBR: U2, B0, R2
+    [0, 18, 47],  // UBL: U0, L0, B2
+    [9, 26, 42],  // DFL: D0, L8, F6
+    [11, 44, 33], // DFR: D1, R2, F3
+    [17, 35, 51], // DBR: D3, B2, R3
+    [15, 53, 24], // DBL: D2, L2, B3
+];
+
+/// エッジの構成ステッカーのインデックス定義 (PrimaryFace(U/D/F/B) -> Side)
+pub const EDGE_STICKERS: [[usize; 2]; 12] = [
+    [7, 37],  // UF: U7, F1
+    [5, 28],  // UR: U5, R1
+    [1, 46],  // UB: U1, B1
+    [3, 19],  // UL: U3, L1
+    [10, 43], // DF: D1, F7
+    [14, 34], // DR: D5, R7
+    [16, 52], // DB: D7, B7
+    [12, 25], // DL: D3, L7
+    [39, 23], // FL: F3, L5
+    [41, 30], // FR: F5, R3
+    [50, 21], // BL: B5, L3
+    [48, 32], // BR: B3, R5
 ];
 
 /// 対面色かどうかを判定

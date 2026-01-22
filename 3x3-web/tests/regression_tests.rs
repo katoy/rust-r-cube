@@ -1,5 +1,5 @@
-use rubiks_cube_2x2::cube::{Cube, Move};
-use rubiks_cube_2x2::solver;
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::solver;
 
 /// リグレッションテスト: Entry APIのバグを検出
 ///

@@ -1,5 +1,5 @@
-use rubiks_cube_2x2::cube::{Cube, Move};
-use rubiks_cube_2x2::solver::solve;
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::solver::solve;
 
 #[test]
 fn test_solve_random_scramble_6_moves() {

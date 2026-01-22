@@ -1,5 +1,5 @@
-use rubiks_cube_2x2::cube::{Cube, Move};
-use rubiks_cube_2x2::solver::solve_with_progress;
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::solver::solve_with_progress;
 
 #[test]
 fn test_specific_cube_file_operations() {

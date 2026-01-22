@@ -1,4 +1,4 @@
-use rubiks_cube_2x2::cube::{Cube, Move};
+use rubiks_cube_3x3::cube::{Cube, Move};
 
 fn main() {
     // 初期状態（時計回りパターン）

@@ -18,6 +18,7 @@ pub struct Solution {
 pub struct SolverState {
     search: Search,
     raw_cube: RawCube,
+    max_depth: usize,
     solution: Option<Solution>,
     finished: bool,
 }
@@ -83,8 +84,8 @@ fn generate_all_solved_states() -> Vec<Cube> {
 /// # 例
 ///
 /// ```
-/// use rubiks_cube_2x2::cube::Cube;
-/// use rubiks_cube_2x2::solver::is_fully_solved;
+/// use rubiks_cube_3x3::cube::Cube;
+/// use rubiks_cube_3x3::solver::is_fully_solved;
 ///
 /// let cube = Cube::new();
 /// assert!(is_fully_solved(&cube));
@@ -113,8 +114,8 @@ pub fn is_fully_solved(cube: &Cube) -> bool {
 /// # 例
 ///
 /// ```
-/// use rubiks_cube_2x2::cube::{Cube, Move};
-/// use rubiks_cube_2x2::solver::solve_with_progress;
+/// use rubiks_cube_3x3::cube::{Cube, Move};
+/// use rubiks_cube_3x3::solver::solve_with_progress;
 /// use std::sync::mpsc;
 ///
 /// let mut cube = Cube::new();
@@ -153,8 +154,8 @@ pub fn solve_with_progress(
 /// # 例
 ///
 /// ```
-/// use rubiks_cube_2x2::cube::{Cube, Move};
-/// use rubiks_cube_2x2::solver::solve;
+/// use rubiks_cube_3x3::cube::{Cube, Move};
+/// use rubiks_cube_3x3::solver::solve;
 ///
 /// let mut cube = Cube::new();
 /// cube.apply_move(Move::R);
@@ -171,7 +172,7 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
 
 fn solve_internal(
     start_cube: &Cube,
-    _max_depth: usize,
+    max_depth: usize,
     _ignore_orientation: bool,
     progress_tx: Option<std::sync::mpsc::Sender<f32>>,
 ) -> Solution {
@@ -195,7 +196,7 @@ fn solve_internal(
     }
 
     let mut search = Search::new();
-    let moves = search.solve(&rc);
+    let moves = search.solve(&rc, max_depth);
 
     if let Some(ref tx) = progress_tx {
         let _ = tx.send(1.0);
@@ -223,6 +224,7 @@ impl SolverState {
         Self {
             search: Search::new(),
             raw_cube: rc,
+            max_depth: _max_depth,
             solution: None,
             finished: false,
         }
@@ -233,7 +235,7 @@ impl SolverState {
             return (0, true);
         }
         // Kociemba は高速なので、1つのチャンクで一気に解決する（暫定）
-        let moves = self.search.solve(&self.raw_cube);
+        let moves = self.search.solve(&self.raw_cube, self.max_depth);
         self.solution = Some(match moves {
             Option::Some(m) => Solution {
                 moves: m,
@@ -317,7 +319,7 @@ mod tests {
         // R U は HTM で 2手必要。depth 1 では解けないはず。
         cube.apply_move(Move::R);
         cube.apply_move(Move::U);
-        let solution = solve_internal(&cube, 1, true, None);
+        let solution = solve_internal(&cube, 1, false, None);
         assert!(!solution.found);
     }
 

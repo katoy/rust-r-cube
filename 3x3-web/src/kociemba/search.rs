@@ -1,4 +1,4 @@
-use super::coord::RawCube;
+use super::coord::{move_cube_18, RawCube};
 use super::tables::{MoveTable, PruningTable};
 use crate::cube::Move;
 
@@ -10,6 +10,7 @@ pub struct Search {
     phase2_moves: Vec<usize>,
     pub min_total_length: usize,
     pub solution: Option<Vec<Move>>,
+    phase1_solutions_found: usize,
 }
 
 impl Search {
@@ -22,21 +23,24 @@ impl Search {
             phase2_moves: Vec::with_capacity(32),
             min_total_length: 99,
             solution: None,
+            phase1_solutions_found: 0,
         }
     }
 
-    pub fn solve(&mut self, rc: &RawCube) -> Option<Vec<Move>> {
+    pub fn solve(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<Move>> {
         self.solution = None;
-        self.min_total_length = 32;
+        self.phase1_moves.clear();
+        self.phase2_moves.clear();
+        self.min_total_length = max_depth + 1;
         self.initial_cube = rc.clone();
+        self.phase1_solutions_found = 0;
 
         let twist = rc.get_twist();
         let flip = rc.get_flip();
         let slice = rc.get_ud_slice();
 
-        for depth in 0..=31 {
-            println!("  Phase 1 search: depth {}", depth);
-            if self.search_phase1(twist, flip, slice, depth, 99) {
+        for depth in 0..=max_depth {
+            if self.search_phase1(twist, flip, slice, depth as u8, 99) {
                 break;
             }
         }
@@ -53,7 +57,6 @@ impl Search {
     ) -> bool {
         if depth == 0 {
             if twist == 0 && flip == 0 && slice == 0 {
-                // Phase 1 完了 -> Phase 2 準備
                 return self.init_phase2();
             }
             return false;
@@ -77,7 +80,15 @@ impl Search {
 
                 self.phase1_moves.push(mv_idx);
                 if self.search_phase1(next_twist, next_flip, next_slice, depth - 1, m) {
-                    return true;
+                    let total_len = self.phase1_moves.len() + self.phase2_moves.len();
+                    if self.min_total_length <= total_len {
+                        // 既に最短に近い解がある
+                        // 完璧な解（Phase 2 が 0手）が見つかったか、または既に多くの解(1000個)を見つけた場合は打ち切る
+                        if total_len <= self.phase1_moves.len() || self.phase1_solutions_found >= 1
+                        {
+                            return true;
+                        }
+                    }
                 }
                 self.phase1_moves.pop();
             }
@@ -92,33 +103,34 @@ impl Search {
     }
 
     fn init_phase2(&mut self) -> bool {
+        self.phase2_moves.clear();
         // Phase 1 の解を適用して正確な RawCube を取得
         let mut rc = self.initial_cube.clone();
         for &m_idx in &self.phase1_moves {
-            let m = m_idx / 3;
-            let r = m_idx % 3;
-            for _ in 0..=r {
-                rc = rc.multiply(RawCube::move_cube(m));
-            }
+            rc = rc.multiply(move_cube_18(m_idx));
         }
 
         let cp = rc.get_cp();
         let ep8 = rc.get_ep8();
         let slice_p = rc.get_slice_p();
 
-        // Phase 2 の IDA*
-        println!(
-            "    Phase 1 found! length: {}. Starting Phase 2 search...",
-            self.phase1_moves.len()
-        );
         let p1_len = self.phase1_moves.len();
-        for depth in 0..=(self.min_total_length - p1_len - 1) {
-            println!("      Phase 2 search: depth {}", depth);
-            if self.search_phase2(cp, ep8, slice_p, depth as u8, 99) {
-                return true;
+        let mut found_any = false;
+        // 現在の最善解より短いもののみ探す。ただし Phase 2 が深すぎると探索が終わらないため、
+        // 12手程度で打ち切るのが Kociemba の一般的実装。
+        let max_p2_d = (self
+            .min_total_length
+            .saturating_sub(p1_len)
+            .saturating_sub(1))
+        .min(12);
+        for d in 0..=max_p2_d {
+            if self.search_phase2(cp, ep8, slice_p, d as u8, 99) {
+                self.phase1_solutions_found += 1;
+                found_any = true;
+                break;
             }
         }
-        false
+        found_any
     }
 
     fn search_phase2(

@@ -1,4 +1,4 @@
-use rubiks_cube_2x2::solver;
+use rubiks_cube_3x3::solver;
 
 fn main() {
     println!("Checking all 24 solved states...\n");

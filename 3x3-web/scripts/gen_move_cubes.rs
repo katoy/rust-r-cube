@@ -1,5 +1,5 @@
-use rubiks_cube_2x2::cube::{Cube, Move};
-use rubiks_cube_2x2::kociemba::RawCube;
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::kociemba::RawCube;
 
 fn main() {
     let moves = [Move::U, Move::R, Move::F, Move::D, Move::L, Move::B];

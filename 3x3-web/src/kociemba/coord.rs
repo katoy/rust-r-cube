@@ -132,7 +132,7 @@ impl RawCube {
                         Edge::BL,
                         Edge::UR,
                     ],
-                    eo: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
                 // 2: F CW
                 RawCube {
@@ -161,7 +161,7 @@ impl RawCube {
                         Edge::BL,
                         Edge::BR,
                     ],
-                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    eo: [0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0],
                 },
                 // 3: D CW
                 RawCube {
@@ -219,7 +219,7 @@ impl RawCube {
                         Edge::DL,
                         Edge::BR,
                     ],
-                    eo: [0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
                 // 5: B CW
                 RawCube {
@@ -248,13 +248,20 @@ impl RawCube {
                         Edge::UB,
                         Edge::DB,
                     ],
-                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    eo: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1],
                 },
             ]
         })[mv]
     }
 
     pub fn from_cube(cube: &Cube) -> Result<RawCube, String> {
+        let u_color = cube.stickers[4].color;
+        let d_color = cube.stickers[13].color;
+        let l_color = cube.stickers[22].color;
+        let r_color = cube.stickers[31].color;
+        let f_color = cube.stickers[40].color;
+        let b_color = cube.stickers[49].color;
+
         let mut rc = RawCube::default();
         use crate::cube::validation::{CORNER_STICKERS, EDGE_STICKERS};
         for i in 0..8 {
@@ -263,7 +270,7 @@ impl RawCube {
             let mut found = false;
             for (o, &f) in facelets.iter().enumerate() {
                 let color = cube.stickers[f].color;
-                if color == Color::White || color == Color::Yellow {
+                if color == u_color || color == d_color {
                     ori = o as u8;
                     found = true;
                     break;
@@ -277,19 +284,27 @@ impl RawCube {
             let c2 = cube.stickers[facelets[(ori as usize + 1) % 3]].color;
             let c3 = cube.stickers[facelets[(ori as usize + 2) % 3]].color;
             rc.cp[i] = match (c1, c2, c3) {
-                (Color::White, Color::Green, Color::Red) => Corner::UFR,
-                (Color::White, Color::Orange, Color::Green) => Corner::UFL,
-                (Color::White, Color::Blue, Color::Orange) => Corner::ULB,
-                (Color::White, Color::Red, Color::Blue) => Corner::UBR,
-                (Color::Yellow, Color::Red, Color::Green) => Corner::DFR,
-                (Color::Yellow, Color::Green, Color::Orange) => Corner::DLF,
-                (Color::Yellow, Color::Orange, Color::Blue) => Corner::DBL,
-                (Color::Yellow, Color::Blue, Color::Red) => Corner::DRB,
+                (c, f, r) if c == u_color && f == f_color && r == r_color => Corner::UFR,
+                (c, l, f) if c == u_color && l == l_color && f == f_color => Corner::UFL,
+                (c, b, l) if c == u_color && b == b_color && l == l_color => Corner::ULB,
+                (c, r, b) if c == u_color && r == r_color && b == b_color => Corner::UBR,
+                (c, r, f) if c == d_color && r == r_color && f == f_color => Corner::DFR,
+                (c, f, l) if c == d_color && f == f_color && l == l_color => Corner::DLF,
+                (c, l, b) if c == d_color && l == l_color && b == b_color => Corner::DBL,
+                (c, b, r) if c == d_color && b == b_color && r == r_color => Corner::DRB,
                 _ => {
+                    println!(
+                        "    Corner identification failure at index {}: c1={:?}, c2={:?}, c3={:?}",
+                        i, c1, c2, c3
+                    );
+                    println!(
+                        "    Expected colors: U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?}",
+                        u_color, d_color, l_color, r_color, f_color, b_color
+                    );
                     return Err(format!(
                         "Invalid corner colors at index {}: {:?}, {:?}, {:?}",
                         i, c1, c2, c3
-                    ))
+                    ));
                 }
             };
             rc.co[i] = ori;
@@ -300,13 +315,13 @@ impl RawCube {
             let color0 = cube.stickers[facelets[0]].color;
             let color1 = cube.stickers[facelets[1]].color;
 
-            let ori = if color0 == Color::White || color0 == Color::Yellow {
+            let ori = if color0 == u_color || color0 == d_color {
                 0
-            } else if color1 == Color::White || color1 == Color::Yellow {
+            } else if color1 == u_color || color1 == d_color {
                 1
-            } else if color0 == Color::Red || color0 == Color::Orange {
+            } else if color0 == f_color || color0 == b_color {
                 0
-            } else if color1 == Color::Red || color1 == Color::Orange {
+            } else if color1 == f_color || color1 == b_color {
                 1
             } else {
                 0
@@ -315,23 +330,55 @@ impl RawCube {
             let c1 = cube.stickers[facelets[ori as usize]].color;
             let c2 = cube.stickers[facelets[1 - ori as usize]].color;
             rc.ep[i] = match (c1, c2) {
-                (Color::White, Color::Red) | (Color::Red, Color::White) => Edge::UR,
-                (Color::White, Color::Green) | (Color::Green, Color::White) => Edge::UF,
-                (Color::White, Color::Orange) | (Color::Orange, Color::White) => Edge::UL,
-                (Color::White, Color::Blue) | (Color::Blue, Color::White) => Edge::UB,
-                (Color::Yellow, Color::Red) | (Color::Red, Color::Yellow) => Edge::DR,
-                (Color::Yellow, Color::Green) | (Color::Green, Color::Yellow) => Edge::DF,
-                (Color::Yellow, Color::Orange) | (Color::Orange, Color::Yellow) => Edge::DL,
-                (Color::Yellow, Color::Blue) | (Color::Blue, Color::Yellow) => Edge::DB,
-                (Color::Red, Color::Green) | (Color::Green, Color::Red) => Edge::FR,
-                (Color::Orange, Color::Green) | (Color::Green, Color::Orange) => Edge::FL,
-                (Color::Orange, Color::Blue) | (Color::Blue, Color::Orange) => Edge::BL,
-                (Color::Red, Color::Blue) | (Color::Blue, Color::Red) => Edge::BR,
+                (c, r) if (c == u_color && r == r_color) || (c == r_color && r == u_color) => {
+                    Edge::UR
+                }
+                (c, f) if (c == u_color && f == f_color) || (c == f_color && f == u_color) => {
+                    Edge::UF
+                }
+                (c, l) if (c == u_color && l == l_color) || (c == l_color && l == u_color) => {
+                    Edge::UL
+                }
+                (c, b) if (c == u_color && b == b_color) || (c == b_color && b == u_color) => {
+                    Edge::UB
+                }
+                (c, r) if (c == d_color && r == r_color) || (c == r_color && r == d_color) => {
+                    Edge::DR
+                }
+                (c, f) if (c == d_color && f == f_color) || (c == f_color && f == d_color) => {
+                    Edge::DF
+                }
+                (c, l) if (c == d_color && l == l_color) || (c == l_color && l == d_color) => {
+                    Edge::DL
+                }
+                (c, b) if (c == d_color && b == b_color) || (c == b_color && b == d_color) => {
+                    Edge::DB
+                }
+                (r, f) if (r == r_color && f == f_color) || (r == f_color && f == r_color) => {
+                    Edge::FR
+                }
+                (l, f) if (l == l_color && f == f_color) || (l == f_color && f == l_color) => {
+                    Edge::FL
+                }
+                (l, b) if (l == l_color && b == b_color) || (l == b_color && b == l_color) => {
+                    Edge::BL
+                }
+                (r, b) if (r == r_color && b == b_color) || (r == b_color && b == r_color) => {
+                    Edge::BR
+                }
                 _ => {
+                    println!(
+                        "    Edge identification failure at index {}: c1={:?}, c2={:?}",
+                        i, c1, c2
+                    );
+                    println!(
+                        "    Expected colors: U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?}",
+                        u_color, d_color, l_color, r_color, f_color, b_color
+                    );
                     return Err(format!(
                         "Invalid edge colors at index {}: {:?}, {:?}",
                         i, c1, c2
-                    ))
+                    ));
                 }
             };
             rc.eo[i] = ori;

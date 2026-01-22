@@ -1,4 +1,4 @@
-use rubiks_cube_2x2::cube::{Color, Cube, Move, Sticker};
+use rubiks_cube_3x3::cube::{Color, Cube, Move, Sticker};
 use std::collections::HashSet;
 
 #[test]
@@ -243,7 +243,7 @@ fn test_clone_and_eq() {
 #[test]
 fn test_face_enum() {
     // Face列挙型のテスト
-    use rubiks_cube_2x2::cube::Face;
+    use rubiks_cube_3x3::cube::Face;
 
     let faces = vec![
         Face::Up,
@@ -372,19 +372,16 @@ fn test_cube_invariants() {
 
 #[test]
 fn test_normalization_equivalence() {
-    // 全体回転させただけの「完成状態」が正規化後にすべて一致することを確認
-    // Y軸回転 (U D')
+    // Y軸回転
     let mut cube_y = Cube::new();
-    cube_y.apply_move(Move::U);
-    cube_y.apply_move(Move::Dp);
+    cube_y.apply_move(Move::Y);
     // 現在の normalized() は向きを0にするだけで、面を回転させて色を揃えるわけではない
-    // そのため、色が合っているかどうかの検証に留める（is_solved() の挙動に近い）
+    // しかし全体回転後の面は一色なので is_solved() は true になるはず
     assert!(cube_y.normalized().is_solved());
 
-    // X軸回転 (R L')
+    // X軸回転
     let mut cube_x = Cube::new();
-    cube_x.apply_move(Move::R);
-    cube_x.apply_move(Move::Lp);
+    cube_x.apply_move(Move::X);
     assert!(cube_x.normalized().is_solved());
 }
 

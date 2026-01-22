@@ -35,7 +35,7 @@ impl Cube {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::cube::Cube;
+    /// use rubiks_cube_3x3::cube::Cube;
     /// let cube = Cube::new();
     /// assert!(cube.is_solved_with_orientation());
     /// ```

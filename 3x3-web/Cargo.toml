@@ -1,9 +1,9 @@
 [package]
-name = "rubiks-cube-2x2"
+name = "rubiks-cube-3x3"
 version = "0.1.0"
 edition = "2021"
 authors = ["katoy <youichikato@gmail.com>"]
-description = "高速双方向BFSソルバー搭載の2x2ルービックキューブGUIアプリ"
+description = "Kociemba アルゴリズム搭載の 3x3 ルービックキューブ GUI アプリ"
 repository = "https://github.com/katoy/rust-r-cube"
 license = "MIT"
 keywords = ["rubiks-cube", "solver", "gui", "game"]
@@ -11,14 +11,14 @@ categories = ["games", "visualization"]
 autobins = false
 
 [lib]
-name = "rubiks_cube_2x2"
+name = "rubiks_cube_3x3"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 # デスクトップ用バイナリ（wasm32では無効）
 [[bin]]
-name = "rubiks-cube-2x2"
-path = "src/bin/rubiks-cube-2x2.rs"
+name = "rubiks-cube-3x3"
+path = "src/bin/rubiks-cube-3x3.rs"
 required-features = ["desktop"]
 
 [dependencies]

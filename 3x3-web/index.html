@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Rustで実装した2x2ルービックキューブのGUIプログラム">
-    <title>2x2 ルービックキューブ</title>
-    <link data-trunk rel="rust" data-target-name="rubiks_cube_2x2" />
+    <meta name="description" content="Kociemba アルゴリズム搭載の 3x3 ルービックキューブ GUI アプリ">
+    <title>3x3 ルービックキューブ</title>
+    <link data-trunk rel="rust" data-target-name="rubiks_cube_3x3" />
     <style>
         html,
         body {
@@ -180,7 +180,7 @@
 
 <body>
     <div id="loading">
-        <h1>🎮 2x2 ルービックキューブ</h1>
+        <h1>🧩 3x3 ルービックキューブ</h1>
         <div class="spinner"></div>
         <p>読み込み中...</p>
     </div>
@@ -195,7 +195,7 @@
         <div class="confirm-container">
             <h2>解法の探索</h2>
             <div class="confirm-message">
-                処理には通常5〜15秒かかります。<br>
+                Kociemba アルゴリズムによる解法を探索します。<br>
                 よろしいですか？
             </div>
             <div class="confirm-buttons">

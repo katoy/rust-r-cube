@@ -21,7 +21,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(inline_js = "
     export function confirm_solver_start() {
         console.log('🔍 confirm_solver_start called at', Date.now());
-        const result = confirm('解法を探します。\\n処理には通常5〜15秒かかります。\\n\\n処理中もブラウザは応答可能です。\\n進捗バーで進捗状況を確認できます。\\n\\nよろしいですか？');
+        const result = confirm('Kociemba アルゴリズムによる解法を探索します。\\nよろしいですか？');
         console.log('✅ confirm result:', result, 'at', Date.now());
         return result;
     }
@@ -50,7 +50,7 @@ extern "C" {
 const MIN_SCRAMBLE_MOVES: usize = 5;
 
 /// スクランブルの最大手数
-const MAX_SCRAMBLE_MOVES: usize = 10;
+const MAX_SCRAMBLE_MOVES: usize = 20;
 
 /// デフォルトのアニメーション時間(秒)
 const DEFAULT_ANIMATION_DURATION: f32 = 0.3;
@@ -1290,7 +1290,7 @@ impl eframe::App for CubeApp {
         // 中央パネル (メインコンテンツ)
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("2x2 ルービックキューブ");
+                ui.heading("3x3 ルービックキューブ");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.selectable_value(&mut self.view_mode, ViewMode::Both, "2D & 3D");
                     ui.selectable_value(&mut self.view_mode, ViewMode::ThreeD, "3Dのみ");

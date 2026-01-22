@@ -33,7 +33,7 @@ impl Face {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::cube::Face;
+    /// use rubiks_cube_3x3::cube::Face;
     /// for face in Face::all() {
     ///     println!("{:?}", face);
     /// }

@@ -25,7 +25,7 @@ impl History {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::history::History;
+    /// use rubiks_cube_3x3::history::History;
     ///
     /// let history = History::new();
     /// assert!(history.can_undo() == false);
@@ -44,7 +44,7 @@ impl History {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::history::History;
+    /// use rubiks_cube_3x3::history::History;
     ///
     /// let history = History::with_capacity(50);
     /// ```
@@ -72,8 +72,8 @@ impl History {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::history::History;
-    /// use rubiks_cube_2x2::cube::Move;
+    /// use rubiks_cube_3x3::history::History;
+    /// use rubiks_cube_3x3::cube::Move;
     ///
     /// let mut history = History::new();
     /// history.push(Move::R);
@@ -101,8 +101,8 @@ impl History {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::history::History;
-    /// use rubiks_cube_2x2::cube::Move;
+    /// use rubiks_cube_3x3::history::History;
+    /// use rubiks_cube_3x3::cube::Move;
     ///
     /// let mut history = History::new();
     /// history.push(Move::R);
@@ -127,8 +127,8 @@ impl History {
     /// # 例
     ///
     /// ```
-    /// use rubiks_cube_2x2::history::History;
-    /// use rubiks_cube_2x2::cube::Move;
+    /// use rubiks_cube_3x3::history::History;
+    /// use rubiks_cube_3x3::cube::Move;
     ///
     /// let mut history = History::new();
     /// history.push(Move::R);

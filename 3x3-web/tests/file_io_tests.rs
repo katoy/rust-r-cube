@@ -1,4 +1,4 @@
-use rubiks_cube_2x2::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::cube::{Color, Cube, Move};
 
 #[test]
 fn test_file_format_round_trip() {
@@ -87,7 +87,7 @@ fn test_save_load_orientation_restoration() {
     let loaded_cube = Cube::from_file_format(&saved_str).expect("Failed to load");
 
     assert!(loaded_cube.is_valid_state().is_ok());
-    let solution = rubiks_cube_2x2::solver::solve(&loaded_cube, 11, false);
+    let solution = rubiks_cube_3x3::solver::solve(&loaded_cube, 11, false);
     assert!(solution.found);
 }
 

@@ -1,7 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 #[cfg(not(target_arch = "wasm32"))]
-use rubiks_cube_2x2::gui::app::CubeApp;
+use rubiks_cube_3x3::gui::app::CubeApp;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -18,12 +18,12 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 780.0])
-            .with_title("2x2 ルービックキューブ"),
+            .with_title("3x3 ルービックキューブ"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "2x2 ルービックキューブ",
+        "3x3 ルービックキューブ",
         options,
         Box::new(|cc| Ok(Box::new(CubeApp::new(cc)))),
     )

@@ -1,5 +1,5 @@
-use rubiks_cube_2x2::cube::{Color, Cube, Move};
-use rubiks_cube_2x2::solver::{self, Solution};
+use rubiks_cube_3x3::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::solver::{self, Solution};
 use std::sync::mpsc;
 
 // from_file_formatのエラーケース追加テスト

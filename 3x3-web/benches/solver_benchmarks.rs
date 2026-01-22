@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rubiks_cube_2x2::cube::{Cube, Move};
-use rubiks_cube_2x2::solver;
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::solver;
 
 /// ソルバーの基本性能ベンチマーク
 fn benchmark_solver_easy(c: &mut Criterion) {

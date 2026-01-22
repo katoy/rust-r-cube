@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use rubiks_cube_2x2::cube::{Cube, Move};
+use rubiks_cube_3x3::cube::{Cube, Move};
 use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);

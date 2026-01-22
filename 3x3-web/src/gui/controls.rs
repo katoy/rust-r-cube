@@ -102,7 +102,7 @@ fn draw_scanning_ui(app: &mut CubeApp, ui: &mut egui::Ui, face_index: usize) {
     });
     ui.add_space(UI_SPACING_LARGE);
 
-    // ステッカーグリッド (2x2)
+    // ステッカーグリッド (3x3)
     ui.label("この面のステッカー:");
     ui.label("(クリックして選択した色を設定)");
     ui.add_space(UI_SPACING_SMALL);

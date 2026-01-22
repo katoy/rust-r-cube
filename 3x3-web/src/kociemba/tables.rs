@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(pruning.cp_slice[idx2], 0);
         assert_eq!(pruning.ep8_slice[idx2], 0);
 
-        // 初期状態でなければ距離 > 0 (適当な位置で確認)
-        assert!(pruning.twist_slice[0] > 0);
+        // 初期状態でなければ距離 > 0 (インデックス 1 で確認)
+        assert!(pruning.twist_slice[1] > 0);
     }
 }

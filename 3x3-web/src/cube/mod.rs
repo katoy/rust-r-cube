@@ -46,10 +46,10 @@ impl Cube {
         let faces = [
             (Color::White, Face::Up),
             (Color::Yellow, Face::Down),
-            (Color::Green, Face::Left),
-            (Color::Blue, Face::Right),
-            (Color::Red, Face::Front),
-            (Color::Orange, Face::Back),
+            (Color::Orange, Face::Left),
+            (Color::Red, Face::Right),
+            (Color::Green, Face::Front),
+            (Color::Blue, Face::Back),
         ];
 
         for (color, face) in faces {

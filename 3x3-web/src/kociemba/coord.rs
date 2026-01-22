@@ -36,7 +36,7 @@ pub enum Edge {
     BR,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RawCube {
     pub cp: [Corner; 8],
     pub co: [u8; 8],
@@ -88,7 +88,7 @@ impl RawCube {
                         Corner::DBL,
                         Corner::DRB,
                     ],
-                    co: [0; 8],
+                    co: [0, 0, 0, 0, 0, 0, 0, 0],
                     ep: [
                         Edge::UB,
                         Edge::UR,
@@ -103,7 +103,7 @@ impl RawCube {
                         Edge::BL,
                         Edge::BR,
                     ],
-                    eo: [0; 12],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
                 // 1: R CW
                 RawCube {
@@ -117,7 +117,7 @@ impl RawCube {
                         Corner::DBL,
                         Corner::UBR,
                     ],
-                    co: [2, 0, 0, 1, 1, 0, 0, 2],
+                    co: [1, 0, 0, 2, 2, 0, 0, 1],
                     ep: [
                         Edge::FR,
                         Edge::UF,
@@ -132,7 +132,7 @@ impl RawCube {
                         Edge::BL,
                         Edge::UR,
                     ],
-                    eo: [0; 12],
+                    eo: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1],
                 },
                 // 2: F CW
                 RawCube {
@@ -146,7 +146,7 @@ impl RawCube {
                         Corner::DBL,
                         Corner::DRB,
                     ],
-                    co: [1, 2, 0, 0, 2, 1, 0, 0],
+                    co: [2, 1, 0, 0, 1, 2, 0, 0],
                     ep: [
                         Edge::UR,
                         Edge::FL,
@@ -161,7 +161,7 @@ impl RawCube {
                         Edge::BL,
                         Edge::BR,
                     ],
-                    eo: [0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
                 // 3: D CW
                 RawCube {
@@ -170,27 +170,27 @@ impl RawCube {
                         Corner::UFL,
                         Corner::ULB,
                         Corner::UBR,
-                        Corner::DRB,
-                        Corner::DFR,
                         Corner::DLF,
                         Corner::DBL,
+                        Corner::DRB,
+                        Corner::DFR,
                     ],
-                    co: [0; 8],
+                    co: [0, 0, 0, 0, 0, 0, 0, 0],
                     ep: [
                         Edge::UR,
                         Edge::UF,
                         Edge::UL,
                         Edge::UB,
-                        Edge::DB,
-                        Edge::DR,
                         Edge::DF,
                         Edge::DL,
+                        Edge::DB,
+                        Edge::DR,
                         Edge::FR,
                         Edge::FL,
                         Edge::BL,
                         Edge::BR,
                     ],
-                    eo: [0; 12],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
                 // 4: L CW
                 RawCube {
@@ -204,7 +204,7 @@ impl RawCube {
                         Corner::DLF,
                         Corner::DRB,
                     ],
-                    co: [0, 1, 2, 0, 0, 2, 1, 0],
+                    co: [0, 2, 1, 0, 0, 1, 2, 0],
                     ep: [
                         Edge::UR,
                         Edge::UF,
@@ -219,7 +219,7 @@ impl RawCube {
                         Edge::DL,
                         Edge::BR,
                     ],
-                    eo: [0; 12],
+                    eo: [0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0],
                 },
                 // 5: B CW
                 RawCube {
@@ -233,7 +233,7 @@ impl RawCube {
                         Corner::ULB,
                         Corner::DBL,
                     ],
-                    co: [0, 0, 1, 2, 0, 0, 2, 1],
+                    co: [0, 0, 2, 1, 0, 0, 1, 2],
                     ep: [
                         Edge::UR,
                         Edge::UF,
@@ -248,7 +248,7 @@ impl RawCube {
                         Edge::UB,
                         Edge::DB,
                     ],
-                    eo: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1],
+                    eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
             ]
         })[mv]
@@ -257,9 +257,8 @@ impl RawCube {
     pub fn from_cube(cube: &Cube) -> Result<RawCube, String> {
         let mut rc = RawCube::default();
         use crate::cube::validation::{CORNER_STICKERS, EDGE_STICKERS};
-        let corner_map = [1, 0, 3, 2, 5, 4, 7, 6];
         for i in 0..8 {
-            let facelets = CORNER_STICKERS[corner_map[i]];
+            let facelets = CORNER_STICKERS[i];
             let mut ori = 0;
             let mut found = false;
             for (o, &f) in facelets.iter().enumerate() {
@@ -278,14 +277,14 @@ impl RawCube {
             let c2 = cube.stickers[facelets[(ori as usize + 1) % 3]].color;
             let c3 = cube.stickers[facelets[(ori as usize + 2) % 3]].color;
             rc.cp[i] = match (c1, c2, c3) {
-                (Color::White, Color::Blue, Color::Red) => Corner::UFR,
-                (Color::White, Color::Red, Color::Green) => Corner::UFL,
-                (Color::White, Color::Green, Color::Orange) => Corner::ULB,
-                (Color::White, Color::Orange, Color::Blue) => Corner::UBR,
-                (Color::Yellow, Color::Red, Color::Blue) => Corner::DFR,
-                (Color::Yellow, Color::Green, Color::Red) => Corner::DLF,
-                (Color::Yellow, Color::Orange, Color::Green) => Corner::DBL,
-                (Color::Yellow, Color::Blue, Color::Orange) => Corner::DRB,
+                (Color::White, Color::Green, Color::Red) => Corner::UFR,
+                (Color::White, Color::Orange, Color::Green) => Corner::UFL,
+                (Color::White, Color::Blue, Color::Orange) => Corner::ULB,
+                (Color::White, Color::Red, Color::Blue) => Corner::UBR,
+                (Color::Yellow, Color::Red, Color::Green) => Corner::DFR,
+                (Color::Yellow, Color::Green, Color::Orange) => Corner::DLF,
+                (Color::Yellow, Color::Orange, Color::Blue) => Corner::DBL,
+                (Color::Yellow, Color::Blue, Color::Red) => Corner::DRB,
                 _ => {
                     return Err(format!(
                         "Invalid corner colors at index {}: {:?}, {:?}, {:?}",
@@ -296,40 +295,38 @@ impl RawCube {
             rc.co[i] = ori;
         }
 
-        let edge_map = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 10, 11];
         for i in 0..12 {
-            let facelets = EDGE_STICKERS[edge_map[i]];
-            let mut ori = 0;
+            let facelets = EDGE_STICKERS[i];
             let color0 = cube.stickers[facelets[0]].color;
             let color1 = cube.stickers[facelets[1]].color;
 
-            if color0 == Color::White || color0 == Color::Yellow {
-                ori = 0;
+            let ori = if color0 == Color::White || color0 == Color::Yellow {
+                0
             } else if color1 == Color::White || color1 == Color::Yellow {
-                ori = 1;
+                1
             } else if color0 == Color::Red || color0 == Color::Orange {
-                ori = 0;
+                0
             } else if color1 == Color::Red || color1 == Color::Orange {
-                ori = 1;
+                1
             } else {
-                ori = 0;
-            }
+                0
+            };
 
             let c1 = cube.stickers[facelets[ori as usize]].color;
             let c2 = cube.stickers[facelets[1 - ori as usize]].color;
             rc.ep[i] = match (c1, c2) {
-                (Color::White, Color::Blue) => Edge::UR,
-                (Color::White, Color::Red) => Edge::UF,
-                (Color::White, Color::Green) => Edge::UL,
-                (Color::White, Color::Orange) => Edge::UB,
-                (Color::Yellow, Color::Blue) => Edge::DR,
-                (Color::Yellow, Color::Red) => Edge::DF,
-                (Color::Yellow, Color::Green) => Edge::DL,
-                (Color::Yellow, Color::Orange) => Edge::DB,
-                (Color::Red, Color::Blue) => Edge::FR,
-                (Color::Red, Color::Green) => Edge::FL,
-                (Color::Orange, Color::Green) => Edge::BL,
-                (Color::Orange, Color::Blue) => Edge::BR,
+                (Color::White, Color::Red) | (Color::Red, Color::White) => Edge::UR,
+                (Color::White, Color::Green) | (Color::Green, Color::White) => Edge::UF,
+                (Color::White, Color::Orange) | (Color::Orange, Color::White) => Edge::UL,
+                (Color::White, Color::Blue) | (Color::Blue, Color::White) => Edge::UB,
+                (Color::Yellow, Color::Red) | (Color::Red, Color::Yellow) => Edge::DR,
+                (Color::Yellow, Color::Green) | (Color::Green, Color::Yellow) => Edge::DF,
+                (Color::Yellow, Color::Orange) | (Color::Orange, Color::Yellow) => Edge::DL,
+                (Color::Yellow, Color::Blue) | (Color::Blue, Color::Yellow) => Edge::DB,
+                (Color::Red, Color::Green) | (Color::Green, Color::Red) => Edge::FR,
+                (Color::Orange, Color::Green) | (Color::Green, Color::Orange) => Edge::FL,
+                (Color::Orange, Color::Blue) | (Color::Blue, Color::Orange) => Edge::BL,
+                (Color::Red, Color::Blue) | (Color::Blue, Color::Red) => Edge::BR,
                 _ => {
                     return Err(format!(
                         "Invalid edge colors at index {}: {:?}, {:?}",
@@ -386,50 +383,33 @@ impl RawCube {
     }
 
     /// UDSlice (中層エッジの位置) を取得 (0..494)
-    /// 12個のエッジのうち、8(FR), 9(FL), 10(BL), 11(BR) がどの位置にあるかの組合せ
+    /// 12個のエッジのうち、8(FR), 9(FL), 10(BL), 11(BR) がどの位置にあるかの組合せ (Solved=0)
     pub fn get_ud_slice(&self) -> u16 {
-        let mut ud_slice = 0u16;
-        let mut x = 4;
+        let mut res = 0;
+        let mut k = 4;
         for i in (0..12).rev() {
-            if self.ep[i] as usize >= 8 {
-                ud_slice += n_choose_k(i as i16, x as i16);
-                x -= 1;
+            if (self.ep[i] as u8) >= 8 {
+                k -= 1;
+            } else if k > 0 {
+                res += n_choose_k(i as i16, (k - 1) as i16);
             }
         }
-        ud_slice
+        res
     }
 
     /// UDSlice を設定 (中層エッジの位置のみ設定、具体的なエッジの種類は任意)
-    pub fn set_ud_slice(&mut self, mut ud_slice: u16) {
-        let mut x = 4;
-        let mut occupied = [false; 12];
+    pub fn set_ud_slice(&mut self, ud_slice: u16) {
+        let mut k = 4;
+        let mut s = ud_slice;
         for i in (0..12).rev() {
-            if ud_slice >= n_choose_k(i as i16, x as i16) {
-                ud_slice -= n_choose_k(i as i16, x as i16);
-                occupied[i] = true;
-                x -= 1;
-            }
-        }
-        let mut slice_edges = [Edge::FR, Edge::FL, Edge::BL, Edge::BR];
-        let mut other_edges = [
-            Edge::UR,
-            Edge::UF,
-            Edge::UL,
-            Edge::UB,
-            Edge::DR,
-            Edge::DF,
-            Edge::DL,
-            Edge::DB,
-        ];
-        let mut s_idx = 0;
-        let mut o_idx = 0;
-        for i in 0..12 {
-            if occupied[i] {
-                self.ep[i] = slice_edges[s_idx];
-                s_idx += 1;
+            if k > 0 && s >= n_choose_k(i as i16, (k - 1) as i16) {
+                s -= n_choose_k(i as i16, (k - 1) as i16);
+                self.ep[i] = Edge::UR; // placeholder
+            } else if k > 0 {
+                self.ep[i] = Edge::FR; // placeholder
+                k -= 1;
             } else {
-                self.ep[i] = other_edges[o_idx];
-                o_idx += 1;
+                self.ep[i] = Edge::UR;
             }
         }
     }
@@ -437,31 +417,31 @@ impl RawCube {
     /// コーナーの置換をインデックス化 (0..40319)
     pub fn get_cp(&self) -> u16 {
         let mut cp = 0u32;
-        let mut p = self.cp.map(|c| c as u8);
-        for i in (1..8).rev() {
+        let p = self.cp.map(|c| c as u8).to_vec();
+        for i in 0..7 {
             let mut k = 0;
-            for j in 0..i {
-                if p[j] > p[i] {
+            for j in (i + 1)..8 {
+                if p[j] < p[i] {
                     k += 1;
                 }
             }
-            cp += k as u32 * factorial(i as u8) as u32;
+            cp = cp * (8 - i as u32) + k as u32;
         }
         cp as u16
     }
 
     /// コーナーの置換を設定
-    pub fn set_cp(&mut self, mut cp: u16) {
-        let mut p = [0u8; 8];
-        for i in 1..8 {
-            p[i] = (cp % i as u16) as u8;
-            cp /= i as u16;
-        }
+    pub fn set_cp(&mut self, cp: u16) {
+        let mut available = (0..8).collect::<Vec<u8>>();
+        let mut cp_u32 = cp as u32;
         let mut res = [0u8; 8];
-        let mut available = (0..8).collect::<Vec<_>>();
-        for i in (0..8).rev() {
-            res[i] = available.remove(p[i] as usize) as u8;
+        for i in 0..7 {
+            let fact = factorial(7 - i as u8);
+            let idx = (cp_u32 / fact) as usize;
+            res[i] = available.remove(idx);
+            cp_u32 %= fact;
         }
+        res[7] = available[0];
         for i in 0..8 {
             self.cp[i] = unsafe { std::mem::transmute(res[i]) };
         }
@@ -478,30 +458,30 @@ impl RawCube {
                 count += 1;
             }
         }
-        for i in (1..8).rev() {
+        for i in 0..7 {
             let mut k = 0;
-            for j in 0..i {
-                if p[j] > p[i] {
+            for j in (i + 1)..8 {
+                if p[j] < p[i] {
                     k += 1;
                 }
             }
-            ep8 += k as u32 * factorial(i as u8) as u32;
+            ep8 = ep8 * (8 - i as u32) + k as u32;
         }
         ep8 as u16
     }
 
     /// U/D面エッジの置換を設定
-    pub fn set_ep8(&mut self, mut ep8: u16) {
-        let mut p = [0u8; 8];
-        for i in 1..8 {
-            p[i] = (ep8 % i as u16) as u8;
-            ep8 /= i as u16;
-        }
+    pub fn set_ep8(&mut self, ep8: u16) {
+        let mut available = (0..8).collect::<Vec<u8>>();
+        let mut ep8_u32 = ep8 as u32;
         let mut res = [0u8; 8];
-        let mut available = (0..8).collect::<Vec<_>>();
-        for i in (0..8).rev() {
-            res[i] = available.remove(p[i] as usize) as u8;
+        for i in 0..7 {
+            let fact = factorial(7 - i as u8);
+            let idx = (ep8_u32 / fact) as usize;
+            res[i] = available.remove(idx);
+            ep8_u32 %= fact;
         }
+        res[7] = available[0];
         // U/D面の8箇所に配置
         let mut count = 0;
         for i in 0..12 {
@@ -514,7 +494,7 @@ impl RawCube {
 
     /// 中層エッジの置換をインデックス化 (Phase 2, 0..23)
     pub fn get_slice_p(&self) -> u16 {
-        let mut slice_p = 0u8;
+        let mut slice_p = 0u32;
         let mut p = [0u8; 4];
         let mut count = 0;
         for i in 0..12 {
@@ -523,31 +503,30 @@ impl RawCube {
                 count += 1;
             }
         }
-        for i in (1..4).rev() {
+        for i in 0..3 {
             let mut k = 0;
-            for j in 0..i {
-                if p[j] > p[i] {
+            for j in (i + 1)..4 {
+                if p[j] < p[i] {
                     k += 1;
                 }
             }
-            slice_p += k * factorial(i as u8) as u8;
+            slice_p = slice_p * (4 - i as u32) + k as u32;
         }
         slice_p as u16
     }
 
-    /// 中層エッジの置換を設定 (0..23)
-    pub fn set_slice_p(&mut self, mut slice_p: u16) {
-        let mut p = [0u8; 4];
-        for i in 1..4 {
-            p[i] = (slice_p % i as u16) as u8;
-            slice_p /= i as u16;
-        }
+    /// 中層エッジの置換を設定
+    pub fn set_slice_p(&mut self, slice_p: u16) {
+        let mut available = (0..4).collect::<Vec<u8>>();
+        let mut slice_p_u32 = slice_p as u32;
         let mut res = [0u8; 4];
-        let mut available = (0..4).collect::<Vec<_>>();
-        for i in (0..4).rev() {
-            res[i] = available.remove(p[i] as usize) as u8;
+        for i in 0..3 {
+            let fact = factorial(3 - i as u8);
+            let idx = (slice_p_u32 / fact) as usize;
+            res[i] = available.remove(idx);
+            slice_p_u32 %= fact;
         }
-        // 中層エッジの4箇所に配置
+        res[3] = available[0];
         let mut count = 0;
         for i in 0..12 {
             if (self.ep[i] as u8) >= 8 {
@@ -580,6 +559,20 @@ fn factorial(n: u8) -> u32 {
         res *= i as u32;
     }
     res
+}
+
+pub fn move_cube_18(mv_idx: usize) -> &'static RawCube {
+    static MOVE_CUBES_18: OnceLock<[RawCube; 18]> = OnceLock::new();
+    &MOVE_CUBES_18.get_or_init(|| {
+        let mut moves = [RawCube::default(); 18];
+        for mv in 0..6 {
+            let base = RawCube::move_cube(mv);
+            moves[mv * 3] = base.clone(); // CW
+            moves[mv * 3 + 1] = base.multiply(base); // 2
+            moves[mv * 3 + 2] = base.multiply(base).multiply(base); // CCW
+        }
+        moves
+    })[mv_idx]
 }
 
 impl Default for RawCube {
@@ -669,7 +662,7 @@ mod tests {
         let rc = RawCube::default();
         assert_eq!(rc.get_twist(), 0);
         assert_eq!(rc.get_flip(), 0);
-        assert_eq!(rc.get_ud_slice(), 494); // Lexicographical rank for {8,9,10,11}
+        assert_eq!(rc.get_ud_slice(), 0); // Corrected to 0
         assert_eq!(rc.get_cp(), 0);
         assert_eq!(rc.get_ep8(), 0);
         assert_eq!(rc.get_slice_p(), 0);
@@ -690,6 +683,15 @@ mod tests {
         for flip in 0..2048 {
             rc.set_flip(flip);
             assert_eq!(rc.get_flip(), flip, "Flip failed at {}", flip);
+        }
+    }
+
+    #[test]
+    fn test_slice_symmetry() {
+        let mut rc = RawCube::default();
+        for slice in 0..495 {
+            rc.set_ud_slice(slice);
+            assert_eq!(rc.get_ud_slice(), slice, "Slice failed at {}", slice);
         }
     }
 

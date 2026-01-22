@@ -153,9 +153,9 @@ fn generate_twist_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let total_size = size1 * size2;
     let mut table = vec![255u8; total_size];
 
-    // ソルブ状態: twist=0, ud_slice=494
+    // ソルブ状態: twist=0, ud_slice=0
     let initial1 = 0;
-    let initial2 = 494;
+    let initial2 = 0;
     table[initial1 * size2 + initial2] = 0;
 
     let mut distance = 0;
@@ -196,7 +196,7 @@ fn generate_flip_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let mut table = vec![255u8; total_size];
 
     let initial1 = 0;
-    let initial2 = 494;
+    let initial2 = 0;
     table[initial1 * size2 + initial2] = 0;
 
     let mut distance = 0;
@@ -323,8 +323,8 @@ mod tests {
     #[test]
     fn test_pruning_tables() {
         let pruning = PruningTable::get();
-        // Phase 1 ソルブ状態: twist=0, ud_slice=494 -> 距離 0
-        let idx1 = 0 * 495 + 494;
+        // Phase 1 ソルブ状態: twist=0, ud_slice=0 -> 距離 0
+        let idx1 = 0 * 495 + 0;
         assert_eq!(pruning.twist_slice[idx1], 0);
         assert_eq!(pruning.flip_slice[idx1], 0);
 

@@ -46,53 +46,53 @@ pub fn apply_move(cube: &mut Cube, mv: Move) {
             Move::U => rotate_face(
                 cube,
                 0,
-                &[36, 37, 38, 27, 28, 29, 45, 46, 47, 18, 19, 20],
+                &[18, 19, 20, 36, 37, 38, 27, 28, 29, 45, 46, 47],
                 &[0; 12],
             ),
             Move::D => rotate_face(
                 cube,
                 9,
-                &[42, 43, 44, 33, 34, 35, 51, 52, 53, 24, 25, 26],
+                &[33, 34, 35, 42, 43, 44, 24, 25, 26, 51, 52, 53],
                 &[0; 12],
             ),
             Move::L => rotate_face(
                 cube,
                 18,
-                &[0, 3, 6, 53, 50, 47, 9, 12, 15, 36, 39, 42],
-                &[2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0],
+                &[36, 39, 42, 0, 3, 6, 53, 50, 47, 9, 12, 15],
+                &[0; 12],
             ),
             Move::R => rotate_face(
                 cube,
                 27,
-                &[11, 14, 17, 45, 48, 51, 2, 5, 8, 38, 41, 44],
-                &[0, 0, 0, 2, 2, 2, 0, 0, 0, 2, 2, 2],
+                &[2, 5, 8, 38, 41, 44, 11, 14, 17, 51, 48, 45],
+                &[0; 12],
             ),
             Move::F => rotate_face(
                 cube,
                 36,
-                &[26, 23, 20, 11, 10, 9, 27, 30, 33, 6, 7, 8],
-                &[3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1],
+                &[27, 30, 33, 6, 7, 8, 26, 23, 20, 11, 10, 9],
+                &[0; 12],
             ),
             Move::B => rotate_face(
                 cube,
                 45,
-                &[35, 32, 29, 17, 16, 15, 18, 21, 24, 0, 1, 2],
-                &[1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+                &[18, 21, 24, 2, 1, 0, 35, 32, 29, 15, 16, 17],
+                &[0; 12],
             ),
             Move::M => rotate_slice_internal(
                 cube,
-                &[37, 40, 43, 10, 13, 16, 52, 49, 46, 1, 4, 7],
-                &[0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2],
+                &[37, 40, 43, 1, 4, 7, 52, 49, 46, 10, 13, 16],
+                &[0; 12],
             ),
             Move::E => rotate_slice_internal(
                 cube,
-                &[39, 40, 41, 30, 31, 32, 48, 49, 50, 21, 22, 23],
+                &[39, 40, 41, 21, 22, 23, 48, 49, 50, 30, 31, 32],
                 &[0; 12],
             ),
             Move::S => rotate_slice_internal(
                 cube,
-                &[3, 4, 5, 28, 31, 34, 14, 13, 12, 25, 22, 19],
-                &[1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+                &[28, 31, 34, 3, 4, 5, 19, 22, 25, 12, 13, 14],
+                &[0; 12],
             ),
             Move::X => {
                 apply_move(cube, Move::R);
@@ -138,10 +138,12 @@ fn rotate_face(cube: &mut Cube, face_start: usize, cycle: &[usize; 12], oris: &[
     rotate_slice_internal(cube, cycle, oris);
 }
 
+#[allow(dead_code)]
 fn rotate_slice(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) {
     rotate_slice_internal(cube, cycle, oris);
 }
 
+#[allow(dead_code)]
 fn rotate_centers_internal(cube: &mut Cube, cycle: &[usize; 4], cw: bool) {
     let s = &mut cube.stickers;
     if cw {
@@ -189,6 +191,24 @@ fn rotate_slice_internal(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) 
         for _ in 0..oris[i] {
             cube.stickers[cycle[i]].rotate_cw();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_apply_move_all_cycles() {
+        let mut cube = Cube::new();
+        // 全操作を 4 回繰り返すと元に戻るはず (180度操作は2回だが、ここでは簡略化)
+        let moves = [Move::U, Move::R, Move::F, Move::D, Move::L, Move::B];
+        for &mv in &moves {
+            for _ in 0..4 {
+                cube.apply_move(mv);
+            }
+        }
+        assert!(cube.is_solved());
     }
 }
 

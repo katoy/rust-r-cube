@@ -105,7 +105,7 @@ pub fn draw_cube_3d(
     let mut draw_faces = Vec::new();
     let size = VIEW3D_STICKER_SIZE;
 
-    for (_p_idx, piece) in cube.pieces.iter().enumerate() {
+    for piece in &cube.pieces {
         // アニメーションによる追加回転
         let mut anim_mat = Mat4::IDENTITY;
         if let Some(_anim) = animation {

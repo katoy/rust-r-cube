@@ -1,6 +1,7 @@
 use crate::cube::Move;
-pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
-    [ // R
+pub static MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
+    [
+        // R
         (0, 0),
         (1, 1),
         (2, 51),
@@ -56,7 +57,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // R'
+    [
+        // R'
         (0, 0),
         (1, 1),
         (2, 38),
@@ -112,7 +114,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // R2
+    [
+        // R2
         (0, 0),
         (1, 1),
         (2, 11),
@@ -168,7 +171,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // L
+    [
+        // L
         (0, 36),
         (1, 1),
         (2, 2),
@@ -224,7 +228,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 0),
     ],
-    [ // L'
+    [
+        // L'
         (0, 53),
         (1, 1),
         (2, 2),
@@ -280,7 +285,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 9),
     ],
-    [ // L2
+    [
+        // L2
         (0, 9),
         (1, 1),
         (2, 2),
@@ -336,7 +342,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 36),
     ],
-    [ // U
+    [
+        // U
         (0, 2),
         (1, 5),
         (2, 8),
@@ -392,7 +399,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // U'
+    [
+        // U'
         (0, 6),
         (1, 3),
         (2, 0),
@@ -448,7 +456,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // U2
+    [
+        // U2
         (0, 8),
         (1, 7),
         (2, 6),
@@ -504,7 +513,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // D
+    [
+        // D
         (0, 0),
         (1, 1),
         (2, 2),
@@ -560,7 +570,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 25),
         (53, 26),
     ],
-    [ // D'
+    [
+        // D'
         (0, 0),
         (1, 1),
         (2, 2),
@@ -616,7 +627,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 34),
         (53, 35),
     ],
-    [ // D2
+    [
+        // D2
         (0, 0),
         (1, 1),
         (2, 2),
@@ -672,7 +684,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 43),
         (53, 44),
     ],
-    [ // F
+    [
+        // F
         (0, 0),
         (1, 1),
         (2, 2),
@@ -728,7 +741,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // F'
+    [
+        // F'
         (0, 0),
         (1, 1),
         (2, 2),
@@ -784,7 +798,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // F2
+    [
+        // F2
         (0, 0),
         (1, 1),
         (2, 2),
@@ -840,7 +855,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // B
+    [
+        // B
         (0, 24),
         (1, 21),
         (2, 18),
@@ -896,7 +912,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 48),
         (53, 51),
     ],
-    [ // B'
+    [
+        // B'
         (0, 29),
         (1, 32),
         (2, 35),
@@ -952,7 +969,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 50),
         (53, 47),
     ],
-    [ // B2
+    [
+        // B2
         (0, 17),
         (1, 16),
         (2, 15),
@@ -1008,7 +1026,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 46),
         (53, 45),
     ],
-    [ // M
+    [
+        // M
         (0, 0),
         (1, 37),
         (2, 2),
@@ -1064,7 +1083,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 1),
         (53, 53),
     ],
-    [ // M'
+    [
+        // M'
         (0, 0),
         (1, 52),
         (2, 2),
@@ -1120,7 +1140,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 10),
         (53, 53),
     ],
-    [ // M2
+    [
+        // M2
         (0, 0),
         (1, 10),
         (2, 2),
@@ -1176,7 +1197,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 37),
         (53, 53),
     ],
-    [ // E
+    [
+        // E
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1232,7 +1254,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // E'
+    [
+        // E'
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1288,7 +1311,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // E2
+    [
+        // E2
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1344,7 +1368,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // S
+    [
+        // S
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1400,7 +1425,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // S'
+    [
+        // S'
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1456,7 +1482,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // S2
+    [
+        // S2
         (0, 0),
         (1, 1),
         (2, 2),
@@ -1512,7 +1539,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 52),
         (53, 53),
     ],
-    [ // X
+    [
+        // X
         (0, 53),
         (1, 52),
         (2, 51),
@@ -1568,7 +1596,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 10),
         (53, 9),
     ],
-    [ // X'
+    [
+        // X'
         (0, 36),
         (1, 37),
         (2, 38),
@@ -1624,7 +1653,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 1),
         (53, 0),
     ],
-    [ // X2
+    [
+        // X2
         (0, 9),
         (1, 10),
         (2, 11),
@@ -1680,7 +1710,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 37),
         (53, 36),
     ],
-    [ // Y
+    [
+        // Y
         (0, 2),
         (1, 5),
         (2, 8),
@@ -1736,7 +1767,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 34),
         (53, 35),
     ],
-    [ // Y'
+    [
+        // Y'
         (0, 6),
         (1, 3),
         (2, 0),
@@ -1792,7 +1824,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 25),
         (53, 26),
     ],
-    [ // Y2
+    [
+        // Y2
         (0, 8),
         (1, 7),
         (2, 6),
@@ -1848,7 +1881,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 43),
         (53, 44),
     ],
-    [ // Z
+    [
+        // Z
         (0, 29),
         (1, 32),
         (2, 35),
@@ -1904,7 +1938,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 50),
         (53, 47),
     ],
-    [ // Z'
+    [
+        // Z'
         (0, 24),
         (1, 21),
         (2, 18),
@@ -1960,7 +1995,8 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
         (52, 48),
         (53, 51),
     ],
-    [ // Z2
+    [
+        // Z2
         (0, 17),
         (1, 16),
         (2, 15),
@@ -2020,18 +2056,42 @@ pub const MOVE_MAPPING_TABLE: [[(usize, usize); 54]; 36] = [
 
 /// 3x3キューブの各面の開始インデックスと回転角度
 pub const FACE_ROTATION_TABLE: [(usize, f32); 36] = [
-    (27, 90.0), (27, -90.0), (27, 180.0), // R, Rp, R2
-    (18, 90.0), (18, -90.0), (18, 180.0), // L, Lp, L2
-    (0, 90.0), (0, -90.0), (0, 180.0), // U, Up, U2
-    (9, 90.0), (9, -90.0), (9, 180.0), // D, Dp, D2
-    (36, 90.0), (36, -90.0), (36, 180.0), // F, Fp, F2
-    (45, 90.0), (45, -90.0), (45, 180.0), // B, Bp, B2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // M, Mp, M2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // E, Ep, E2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // S, Sp, S2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // X, Xp, X2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // Y, Yp, Y2
-    (usize::MAX, 90.0), (usize::MAX, -90.0), (usize::MAX, 180.0), // Z, Zp, Z2
+    (27, 90.0),
+    (27, -90.0),
+    (27, 180.0), // R, Rp, R2
+    (18, 90.0),
+    (18, -90.0),
+    (18, 180.0), // L, Lp, L2
+    (0, 90.0),
+    (0, -90.0),
+    (0, 180.0), // U, Up, U2
+    (9, 90.0),
+    (9, -90.0),
+    (9, 180.0), // D, Dp, D2
+    (36, 90.0),
+    (36, -90.0),
+    (36, 180.0), // F, Fp, F2
+    (45, 90.0),
+    (45, -90.0),
+    (45, 180.0), // B, Bp, B2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // M, Mp, M2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // E, Ep, E2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // S, Sp, S2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // X, Xp, X2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // Y, Yp, Y2
+    (usize::MAX, 90.0),
+    (usize::MAX, -90.0),
+    (usize::MAX, 180.0), // Z, Zp, Z2
 ];
 
 /// 指定されたMoveに対する逆引きマッピング (destination_index -> source_index)

@@ -34,24 +34,12 @@ fn test_from_file_format_line3_too_short() {
 fn test_validate_colors_missing_color() {
     // すべての色が欠けているケース
     let mut colors = [Color::White; 54];
-    for i in 0..9 {
-        colors[i] = Color::White;
-    }
-    for i in 9..18 {
-        colors[i] = Color::Yellow;
-    }
-    for i in 18..27 {
-        colors[i] = Color::Green;
-    }
-    for i in 27..36 {
-        colors[i] = Color::Blue;
-    }
-    for i in 36..45 {
-        colors[i] = Color::Red;
-    }
-    for i in 45..54 {
-        colors[i] = Color::Orange;
-    }
+    colors[0..9].fill(Color::White);
+    colors[9..18].fill(Color::Yellow);
+    colors[18..27].fill(Color::Green);
+    colors[27..36].fill(Color::Blue);
+    colors[36..45].fill(Color::Red);
+    colors[45..54].fill(Color::Orange);
 
     colors[20] = Color::Gray; // 1つを Gray に置き換え
     let result = Cube::validate_colors(&colors);

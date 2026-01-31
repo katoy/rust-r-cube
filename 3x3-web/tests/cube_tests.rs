@@ -422,21 +422,18 @@ fn test_all_moves_exhaustive_physical() {
         }
 
         // 特定の操作後の物理状態チェック（U）
-        match mv {
-            Move::U => {
-                // 初期状態 pattern: [0; 9]
-                for i in 0..9 {
-                    assert_eq!(cube.get_sticker(i).color, Color::White);
-                    // rotate_face_cw を 1回呼ぶので oris は 1
-                    assert_eq!(
-                        cube.get_sticker(i).orientation,
-                        1,
-                        "Sticker {} orientation mismatch",
-                        i
-                    );
-                }
+        if mv == Move::U {
+            // 初期状態 pattern: [0; 9]
+            for i in 0..9 {
+                assert_eq!(cube.get_sticker(i).color, Color::White);
+                // 面回転により oris は 1 になる
+                assert_eq!(
+                    cube.get_sticker(i).orientation,
+                    1,
+                    "Sticker {} orientation mismatch",
+                    i
+                );
             }
-            _ => {}
         }
     }
 }
@@ -539,12 +536,6 @@ fn test_random_scramble_corner_integrity() {
             }
         }
     }
-}
-
-fn check_sticker_val(cube: &Cube, idx: usize, color: Color, orient: u8, msg: &str) {
-    let s = cube.get_sticker(idx);
-    assert_eq!(s.color, color, "{} idx:{} 色不一致", msg, idx);
-    assert_eq!(s.orientation, orient, "{} idx:{} 向き不一致", msg, idx);
 }
 
 #[test]

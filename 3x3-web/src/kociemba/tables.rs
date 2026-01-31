@@ -51,13 +51,15 @@ fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
     for i in 0..2187 {
         rc.set_twist(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_twist();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 2187 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 2187] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 2187];
     unsafe { Box::from_raw(ptr) }
 }
@@ -68,13 +70,15 @@ fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
     for i in 0..2048 {
         rc.set_flip(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_flip();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 2048 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 2048] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 2048];
     unsafe { Box::from_raw(ptr) }
 }
@@ -85,13 +89,15 @@ fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
     for i in 0..495 {
         rc.set_ud_slice(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_ud_slice();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 495 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 495] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 495];
     unsafe { Box::from_raw(ptr) }
 }
@@ -102,13 +108,15 @@ fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
     for i in 0..40320 {
         rc.set_cp(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_cp();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 40320 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 40320] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 40320];
     unsafe { Box::from_raw(ptr) }
 }
@@ -119,13 +127,15 @@ fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
     for i in 0..40320 {
         rc.set_ep8(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_ep8();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 40320 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 40320] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 40320];
     unsafe { Box::from_raw(ptr) }
 }
@@ -136,13 +146,15 @@ fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
     for i in 0..24 {
         rc.set_slice_p(i as u16);
         for m in 0..6 {
-            let mut move_rc = rc.clone();
+            let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
                 table[i * 18 + m * 3 + r] = move_rc.get_slice_p();
             }
         }
     }
+    // SAFETY: table は vec![0u16; 24 * 18] から作られた Box<[u16]> で、
+    // [[u16; 18]; 24] と完全にメモリレイアウトが一致するため、transmute は安全
     let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 24];
     unsafe { Box::from_raw(ptr) }
 }
@@ -324,12 +336,12 @@ mod tests {
     fn test_pruning_tables() {
         let pruning = PruningTable::get();
         // Phase 1 ソルブ状態: twist=0, ud_slice=0 -> 距離 0
-        let idx1 = 0 * 495 + 0;
+        let idx1 = 0;
         assert_eq!(pruning.twist_slice[idx1], 0);
         assert_eq!(pruning.flip_slice[idx1], 0);
 
         // Phase 2 ソルブ状態: cp=0, ep8=0, slice_p=0 -> 距離 0
-        let idx2 = 0 * 24 + 0;
+        let idx2 = 0;
         assert_eq!(pruning.cp_slice[idx2], 0);
         assert_eq!(pruning.ep8_slice[idx2], 0);
 

@@ -1,217 +1,35 @@
 use super::{Cube, Move};
+use glam::Vec3;
 
 /// 指定された回転操作をキューブに適用します。
 pub fn apply_move(cube: &mut Cube, mv: Move) {
-    let (base, repeat) = match mv {
-        Move::U => (Move::U, 1),
-        Move::Up => (Move::U, 3),
-        Move::U2 => (Move::U, 2),
-        Move::D => (Move::D, 1),
-        Move::Dp => (Move::D, 3),
-        Move::D2 => (Move::D, 2),
-        Move::L => (Move::L, 1),
-        Move::Lp => (Move::L, 3),
-        Move::L2 => (Move::L, 2),
-        Move::R => (Move::R, 1),
-        Move::Rp => (Move::R, 3),
-        Move::R2 => (Move::R, 2),
-        Move::F => (Move::F, 1),
-        Move::Fp => (Move::F, 3),
-        Move::F2 => (Move::F, 2),
-        Move::B => (Move::B, 1),
-        Move::Bp => (Move::B, 3),
-        Move::B2 => (Move::B, 2),
-        Move::M => (Move::M, 1),
-        Move::Mp => (Move::M, 3),
-        Move::M2 => (Move::M, 2),
-        Move::E => (Move::E, 1),
-        Move::Ep => (Move::E, 3),
-        Move::E2 => (Move::E, 2),
-        Move::S => (Move::S, 1),
-        Move::Sp => (Move::S, 3),
-        Move::S2 => (Move::S, 2),
-        Move::X => (Move::X, 1),
-        Move::Xp => (Move::X, 3),
-        Move::X2 => (Move::X, 2),
-        Move::Y => (Move::Y, 1),
-        Move::Yp => (Move::Y, 3),
-        Move::Y2 => (Move::Y, 2),
-        Move::Z => (Move::Z, 1),
-        Move::Zp => (Move::Z, 3),
-        Move::Z2 => (Move::Z, 2),
-    };
+    let (axis, layer_val, angle) = move_to_geometric_params(mv);
 
-    for _ in 0..repeat {
-        match base {
-            Move::U => rotate_face(
-                cube,
-                0,
-                &[18, 19, 20, 36, 37, 38, 27, 28, 29, 45, 46, 47],
-                &[0; 12],
-            ),
-            Move::D => rotate_face(
-                cube,
-                9,
-                &[33, 34, 35, 42, 43, 44, 24, 25, 26, 51, 52, 53],
-                &[0; 12],
-            ),
-            Move::L => rotate_face(
-                cube,
-                18,
-                &[36, 39, 42, 0, 3, 6, 53, 50, 47, 9, 12, 15],
-                &[0; 12],
-            ),
-            Move::R => rotate_face(
-                cube,
-                27,
-                &[2, 5, 8, 38, 41, 44, 11, 14, 17, 51, 48, 45],
-                &[0; 12],
-            ),
-            Move::F => rotate_face(
-                cube,
-                36,
-                &[27, 30, 33, 6, 7, 8, 26, 23, 20, 11, 10, 9],
-                &[0; 12],
-            ),
-            Move::B => rotate_face(
-                cube,
-                45,
-                &[18, 21, 24, 2, 1, 0, 35, 32, 29, 15, 16, 17],
-                &[0; 12],
-            ),
-            Move::M => rotate_slice_internal(
-                cube,
-                &[37, 40, 43, 1, 4, 7, 52, 49, 46, 10, 13, 16],
-                &[0; 12],
-            ),
-            Move::E => rotate_slice_internal(
-                cube,
-                &[39, 40, 41, 21, 22, 23, 48, 49, 50, 30, 31, 32],
-                &[0; 12],
-            ),
-            Move::S => rotate_slice_internal(
-                cube,
-                &[28, 31, 34, 3, 4, 5, 19, 22, 25, 12, 13, 14],
-                &[0; 12],
-            ),
-            Move::X => {
-                apply_move(cube, Move::R);
-                apply_move(cube, Move::Lp);
-                apply_move(cube, Move::Mp);
-            }
-            Move::Y => {
-                apply_move(cube, Move::U);
-                apply_move(cube, Move::Dp);
-                apply_move(cube, Move::Ep);
-            }
-            Move::Z => {
-                apply_move(cube, Move::F);
-                apply_move(cube, Move::Bp);
-                apply_move(cube, Move::S);
-            }
-            _ => unreachable!(),
+    // 全体回転 (X, Y, Z) の場合は全ピースを対象にする
+    let is_global = matches!(
+        mv,
+        Move::X
+            | Move::Xp
+            | Move::X2
+            | Move::Y
+            | Move::Yp
+            | Move::Y2
+            | Move::Z
+            | Move::Zp
+            | Move::Z2
+    );
+
+    for piece in &mut cube.pieces {
+        if is_global || is_in_layer(piece.current_pos, axis, layer_val) {
+            piece.rotate(axis, angle);
         }
     }
+
+    // ピースの状態を Facelet（ステッカー）配列に反映
+    cube.sync_stickers();
 }
 
-fn rotate_face(cube: &mut Cube, face_start: usize, cycle: &[usize; 12], oris: &[u8; 12]) {
-    // 1. 面自体の回転
-    let s = &mut cube.stickers;
-    // 角
-    let tmp = s[face_start + 0];
-    s[face_start + 0] = s[face_start + 6];
-    s[face_start + 6] = s[face_start + 8];
-    s[face_start + 8] = s[face_start + 2];
-    s[face_start + 2] = tmp;
-    // 辺
-    let tmp = s[face_start + 1];
-    s[face_start + 1] = s[face_start + 3];
-    s[face_start + 3] = s[face_start + 7];
-    s[face_start + 7] = s[face_start + 5];
-    s[face_start + 5] = tmp;
-    // 向きの更新
-    for i in 0..9 {
-        s[face_start + i].rotate_cw();
-    }
-
-    // 2. 隣接ステッカーの巡回
-    rotate_slice_internal(cube, cycle, oris);
-}
-
-#[allow(dead_code)]
-fn rotate_slice(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) {
-    rotate_slice_internal(cube, cycle, oris);
-}
-
-#[allow(dead_code)]
-fn rotate_centers_internal(cube: &mut Cube, cycle: &[usize; 4], cw: bool) {
-    let s = &mut cube.stickers;
-    if cw {
-        let tmp = s[cycle[0]];
-        s[cycle[0]] = s[cycle[3]];
-        s[cycle[3]] = s[cycle[2]];
-        s[cycle[2]] = s[cycle[1]];
-        s[cycle[1]] = tmp;
-    } else {
-        let tmp = s[cycle[0]];
-        s[cycle[0]] = s[cycle[1]];
-        s[cycle[1]] = s[cycle[2]];
-        s[cycle[2]] = s[cycle[3]];
-        s[cycle[3]] = tmp;
-    }
-    for &idx in cycle {
-        s[idx].rotate_cw();
-    }
-}
-
-fn rotate_slice_internal(cube: &mut Cube, cycle: &[usize; 12], oris: &[u8; 12]) {
-    let t0 = cube.stickers[cycle[0]];
-    let t1 = cube.stickers[cycle[1]];
-    let t2 = cube.stickers[cycle[2]];
-
-    // (A <- B <- C <- D <- A)
-    cube.stickers[cycle[0]] = cube.stickers[cycle[3]];
-    cube.stickers[cycle[1]] = cube.stickers[cycle[4]];
-    cube.stickers[cycle[2]] = cube.stickers[cycle[5]];
-
-    cube.stickers[cycle[3]] = cube.stickers[cycle[6]];
-    cube.stickers[cycle[4]] = cube.stickers[cycle[7]];
-    cube.stickers[cycle[5]] = cube.stickers[cycle[8]];
-
-    cube.stickers[cycle[6]] = cube.stickers[cycle[9]];
-    cube.stickers[cycle[7]] = cube.stickers[cycle[10]];
-    cube.stickers[cycle[8]] = cube.stickers[cycle[11]];
-
-    cube.stickers[cycle[9]] = t0;
-    cube.stickers[cycle[10]] = t1;
-    cube.stickers[cycle[11]] = t2;
-
-    // 3. 向きの調整
-    for i in 0..12 {
-        for _ in 0..oris[i] {
-            cube.stickers[cycle[i]].rotate_cw();
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_apply_move_all_cycles() {
-        let mut cube = Cube::new();
-        // 全操作を 4 回繰り返すと元に戻るはず (180度操作は2回だが、ここでは簡略化)
-        let moves = [Move::U, Move::R, Move::F, Move::D, Move::L, Move::B];
-        for &mv in &moves {
-            for _ in 0..4 {
-                cube.apply_move(mv);
-            }
-        }
-        assert!(cube.is_solved());
-    }
-}
-
+/// 指定回数のランダムな回転操作を適用します。
 pub fn scramble(cube: &mut Cube, moves: usize) {
     use rand::Rng;
     let mut rng = rand::thread_rng();
@@ -220,5 +38,113 @@ pub fn scramble(cube: &mut Cube, moves: usize) {
     for _ in 0..moves {
         let mv = all_moves[rng.gen_range(0..all_moves.len())];
         apply_move(cube, mv);
+    }
+}
+
+/// 操作を幾何学的なパラメータ（回転軸、対象層、角度）に変換します。
+fn move_to_geometric_params(mv: Move) -> (Vec3, i8, f32) {
+    let pi_2 = std::f32::consts::FRAC_PI_2;
+    match mv {
+        // R層 (x = 1)
+        Move::R => (Vec3::X, 1, -pi_2),
+        Move::Rp => (Vec3::X, 1, pi_2),
+        Move::R2 => (Vec3::X, 1, pi_2 * 2.0),
+        // L層 (x = -1)
+        Move::L => (Vec3::X, -1, pi_2),
+        Move::Lp => (Vec3::X, -1, -pi_2),
+        Move::L2 => (Vec3::X, -1, pi_2 * 2.0),
+        // M層 (x = 0) - Lと同じ回転方向
+        Move::M => (Vec3::X, 0, pi_2),
+        Move::Mp => (Vec3::X, 0, -pi_2),
+        Move::M2 => (Vec3::X, 0, pi_2 * 2.0),
+
+        // U層 (y = 1)
+        Move::U => (Vec3::Y, 1, -pi_2),
+        Move::Up => (Vec3::Y, 1, pi_2),
+        Move::U2 => (Vec3::Y, 1, pi_2 * 2.0),
+        // D層 (y = -1)
+        Move::D => (Vec3::Y, -1, pi_2),
+        Move::Dp => (Vec3::Y, -1, -pi_2),
+        Move::D2 => (Vec3::Y, -1, pi_2 * 2.0),
+        // E層 (y = 0) - Dと同じ回転方向
+        Move::E => (Vec3::Y, 0, pi_2),
+        Move::Ep => (Vec3::Y, 0, -pi_2),
+        Move::E2 => (Vec3::Y, 0, pi_2 * 2.0),
+
+        // F層 (z = 1)
+        Move::F => (Vec3::Z, 1, -pi_2),
+        Move::Fp => (Vec3::Z, 1, pi_2),
+        Move::F2 => (Vec3::Z, 1, pi_2 * 2.0),
+        // B層 (z = -1)
+        Move::B => (Vec3::Z, -1, pi_2),
+        Move::Bp => (Vec3::Z, -1, -pi_2),
+        Move::B2 => (Vec3::Z, -1, pi_2 * 2.0),
+        // S層 (z = 0) - Fと同じ回転方向
+        Move::S => (Vec3::Z, 0, -pi_2),
+        Move::Sp => (Vec3::Z, 0, pi_2),
+        Move::S2 => (Vec3::Z, 0, pi_2 * 2.0),
+
+        // 全体 X
+        Move::X => (Vec3::X, 2, -pi_2),
+        Move::Xp => (Vec3::X, 2, pi_2),
+        Move::X2 => (Vec3::X, 2, pi_2 * 2.0),
+        // 全体 Y
+        Move::Y => (Vec3::Y, 2, -pi_2),
+        Move::Yp => (Vec3::Y, 2, pi_2),
+        Move::Y2 => (Vec3::Y, 2, pi_2 * 2.0),
+        // 全体 Z
+        Move::Z => (Vec3::Z, 2, -pi_2),
+        Move::Zp => (Vec3::Z, 2, pi_2),
+        Move::Z2 => (Vec3::Z, 2, pi_2 * 2.0),
+    }
+}
+
+/// ピースがある回転軸上の指定された層に含まれるか判定します。
+fn is_in_layer(pos: Vec3, axis: Vec3, layer_val: i8) -> bool {
+    if axis == Vec3::X {
+        (pos.x.round() as i8) == layer_val
+    } else if axis == Vec3::Y {
+        (pos.y.round() as i8) == layer_val
+    } else if axis == Vec3::Z {
+        (pos.z.round() as i8) == layer_val
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cube::Cube;
+
+    #[test]
+    fn test_apply_move_all_cycles() {
+        let mut cube = Cube::new();
+        let moves = [Move::U, Move::R, Move::F, Move::D, Move::L, Move::B];
+        for &mv in &moves {
+            for _ in 0..4 {
+                apply_move(&mut cube, mv);
+            }
+        }
+        assert!(cube.is_solved());
+    }
+
+    #[test]
+    fn test_m_rotation() {
+        let mut cube = Cube::new();
+        apply_move(&mut cube, Move::M);
+        // M 操作後、センターピースが移動していることを期待
+        // U center (4) -> F (40), F (40) -> D (13), D (13) -> B (49), B (49) -> U (4)
+        // 色を確認
+        use crate::cube::Color;
+        assert_eq!(cube.stickers[40].color, Color::White);
+        assert_eq!(cube.stickers[13].color, Color::Green);
+        assert_eq!(cube.stickers[49].color, Color::Yellow);
+        assert_eq!(cube.stickers[4].color, Color::Blue);
+
+        apply_move(&mut cube, Move::M);
+        apply_move(&mut cube, Move::M);
+        apply_move(&mut cube, Move::M);
+        assert!(cube.is_solved());
     }
 }

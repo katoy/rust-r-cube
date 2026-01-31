@@ -63,11 +63,9 @@ const MIN_ANIMATION_SPEED: f32 = 0.1;
 #[allow(dead_code)]
 const MAX_ANIMATION_SPEED: f32 = 2.0;
 
-/// ズーム倍率の最小値
-const MIN_ZOOM_SCALE: f32 = 0.5;
-
-/// ズーム倍率の最大値
-const MAX_ZOOM_SCALE: f32 = 3.0;
+/// ズーム倍率の制限
+const ZOOM_MIN: f32 = 0.1;
+const ZOOM_MAX: f32 = 5.0;
 
 /// キューブの表示モードを定義します。
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -296,6 +294,7 @@ impl Default for CubeApp {
 
 impl CubeApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        tracing::info!("CubeApp::new starting");
         // 日本語フォントを設定
         Self::setup_custom_fonts(&cc.egui_ctx);
 
@@ -315,7 +314,10 @@ impl CubeApp {
         );
         cc.egui_ctx.set_style(style);
 
-        Self::default()
+        tracing::info!("CubeApp::new calling Self::default()");
+        let app = Self::default();
+        tracing::info!("CubeApp::new finishing");
+        app
     }
 
     /// 回転操作をキューに追加
@@ -494,7 +496,6 @@ impl CubeApp {
         if let Some(ref mut anim) = self.animation {
             if anim.update() {
                 // アニメーション完了
-                self.cube.apply_move(anim.current_move);
                 self.animation = None;
 
                 // ソルーション再生中の場合、ステップ数を更新
@@ -516,6 +517,7 @@ impl CubeApp {
             if let Some(easing) = easing_override {
                 // 指定されたイージングで実行 (分割後半など)
                 let duration = duration_override.unwrap_or(self.animation_speed);
+                self.cube.apply_move(mv);
                 self.animation = Some(AnimationState::with_easing(mv, duration, easing));
             } else if let Some(single_mv) = mv.split_to_single() {
                 // 180度回転の場合、90度回転2回に分割する
@@ -523,6 +525,7 @@ impl CubeApp {
                 let half_duration = self.animation_speed * ANIMATION_SPLIT_DURATION_FACTOR;
 
                 // 1回目の90度回転 (加速のみ)
+                self.cube.apply_move(single_mv);
                 self.animation = Some(AnimationState::with_easing(
                     single_mv,
                     half_duration,
@@ -535,6 +538,7 @@ impl CubeApp {
                 );
             } else {
                 // 通常の90度回転
+                self.cube.apply_move(mv);
                 self.animation = Some(AnimationState::new(mv, self.animation_speed));
             }
         }
@@ -692,8 +696,10 @@ impl CubeApp {
     }
 
     fn setup_custom_fonts(ctx: &egui::Context) {
+        tracing::info!("setup_custom_fonts starting");
         let mut fonts = egui::FontDefinitions::default();
 
+        tracing::info!("Loading font data");
         fonts.font_data.insert(
             "NotoSansCJKjp".to_owned(),
             egui::FontData::from_static(include_bytes!(
@@ -701,6 +707,7 @@ impl CubeApp {
             )),
         );
 
+        tracing::info!("Setting font families");
         fonts
             .families
             .entry(egui::FontFamily::Proportional)
@@ -713,65 +720,64 @@ impl CubeApp {
             .or_default()
             .insert(0, "NotoSansCJKjp".to_owned());
 
+        tracing::info!("Applying fonts to context");
         ctx.set_fonts(fonts);
+        tracing::info!("setup_custom_fonts finishing");
     }
 
     /// 3Dビューの描画処理
     fn show_3d_view(&mut self, ui: &mut egui::Ui) {
         let available = ui.available_size();
         let size = available.x.min(available.y);
-        // 領域確保
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(available.x, size), // 横幅いっぱいに使う
-            egui::Sense::drag(),
-        );
+        let y_offset = (available.y - size) / 2.0;
 
-        // 3Dビュー操作
-        if response.dragged() {
-            let delta = response.drag_delta();
-            self.view_3d.yaw += delta.x * MOUSE_SENSITIVITY;
-            self.view_3d.pitch += delta.y * MOUSE_SENSITIVITY;
-
-            // Pitch制限
-            self.view_3d.pitch = self.view_3d.pitch.clamp(
-                -std::f32::consts::FRAC_PI_2 + VIEW3D_PITCH_LIMIT_MARGIN,
-                std::f32::consts::FRAC_PI_2 - VIEW3D_PITCH_LIMIT_MARGIN,
-            );
+        if y_offset > 0.0 {
+            ui.add_space(y_offset);
         }
-        // ズーム操作
-        if response.hovered() {
-            let zoom_delta = ui.input(|i| i.raw_scroll_delta.y);
-            if zoom_delta != 0.0 {
-                self.view_3d.scale *= if zoom_delta > 0.0 {
+
+        ui.horizontal(|ui| {
+            let x_offset = (ui.available_width() - size) / 2.0;
+            if x_offset > 0.0 {
+                ui.add_space(x_offset);
+            }
+
+            // 描画領域 (正方形)
+            let rect_size = egui::vec2(size, size);
+            let (rect, response) = ui.allocate_at_least(rect_size, egui::Sense::drag());
+
+            // 3Dビュー操作
+            if response.dragged() {
+                self.view_3d.yaw += response.drag_delta().x * MOUSE_SENSITIVITY;
+                self.view_3d.pitch += response.drag_delta().y * MOUSE_SENSITIVITY;
+
+                // Pitch制限
+                self.view_3d.pitch = self.view_3d.pitch.clamp(
+                    -std::f32::consts::FRAC_PI_2 + VIEW3D_PITCH_LIMIT_MARGIN,
+                    std::f32::consts::FRAC_PI_2 - VIEW3D_PITCH_LIMIT_MARGIN,
+                );
+            }
+            // ズーム操作
+            let scroll_delta = ui.input(|i| i.raw_scroll_delta.y);
+            if scroll_delta != 0.0 {
+                self.view_3d.scale *= if scroll_delta > 0.0 {
                     ZOOM_FACTOR
                 } else {
                     1.0 / ZOOM_FACTOR
                 };
-                self.view_3d.scale = self.view_3d.scale.clamp(MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+                self.view_3d.scale = self.view_3d.scale.clamp(ZOOM_MIN, ZOOM_MAX);
             }
-        }
 
-        let display_cube = self.display_cube();
-        let highlight_face = self.editing_face_index();
-        draw_cube_3d(
-            ui,
-            rect,
-            &display_cube,
-            self.animation.as_ref(),
-            &self.view_3d,
-            highlight_face,
-        );
-
-        // ヘルプテキストを描画
-        let help_text = "ドラッグで回転、ホイールでズーム";
-        let help_pos = rect.min + egui::vec2(UI_SPACING_LARGE, UI_SPACING_LARGE);
-        ui.painter().text(
-            help_pos,
-            egui::Align2::LEFT_TOP,
-            help_text,
-            egui::FontId::proportional(UI_HELP_TEXT_SIZE),
-            egui::Color32::from_rgba_premultiplied(255, 255, 255, 200),
-        );
+            let display_cube = self.display_cube();
+            let highlight_face = self.editing_face_index();
+            draw_cube_3d(
+                ui,
+                rect,
+                &display_cube,
+                self.animation.as_ref(),
+                &self.view_3d,
+                highlight_face,
+            );
+        });
     }
 
     /// 2Dビューの描画処理
@@ -1310,12 +1316,23 @@ impl eframe::App for CubeApp {
                         self.show_2d_view(ui);
                     }
                     ViewMode::ThreeD => {
-                        self.show_3d_view(ui);
+                        ui.vertical(|ui| {
+                            ui.heading("3Dビュー");
+                            ui.label(
+                                egui::RichText::new("ドラッグで回転、ホイールでズーム")
+                                    .size(UI_HELP_TEXT_SIZE),
+                            );
+                            self.show_3d_view(ui);
+                        });
                     }
                     ViewMode::Both => {
                         ui.columns(2, |columns| {
                             columns[0].vertical(|ui| {
                                 ui.heading("3Dビュー");
+                                ui.label(
+                                    egui::RichText::new("ドラッグで回転、ホイールでズーム")
+                                        .size(UI_HELP_TEXT_SIZE),
+                                );
                                 self.show_3d_view(ui);
                             });
                             columns[1].vertical(|ui| {

@@ -124,7 +124,10 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
     map_face(Face::Right, &line2_colors[18..27]);
     map_face(Face::Back, &line2_colors[27..36]);
 
-    let mut cube = Cube { stickers };
+    let mut cube = Cube {
+        stickers,
+        pieces: crate::cube::piece::get_initial_pieces(),
+    };
 
     // スキャン途中（Grayあり）でない場合は、向きを初期化
     let has_gray = cube.stickers.iter().any(|s| s.color == Color::Gray);

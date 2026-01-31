@@ -1,5 +1,6 @@
 pub mod enums;
 pub mod io;
+pub mod piece;
 pub mod rotation;
 pub mod validation;
 
@@ -12,57 +13,41 @@ pub const CLOCKWISE_ORIENTATION_PATTERN: [u8; 9] = [0; 9];
 ///
 /// 54枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
 /// 内部構造は面の順序と各面内のインデックスによって定義されます。
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Cube {
-    /// 全ステッカーの配列（総数54）。
-    ///
-    /// インデックスの割り当て:
-    /// - 0-8:   上面 (Up)
-    /// - 9-17:  下面 (Down)
-    /// - 18-26: 左面 (Left)
-    /// - 27-35: 右面 (Right)
-    /// - 36-44: 前面 (Front)
-    /// - 45-53: 背面 (Back)
     pub stickers: [Sticker; 54],
+    pub pieces: [piece::Cubie; 26],
+}
+
+impl PartialEq for Cube {
+    fn eq(&self, other: &Self) -> bool {
+        self.stickers == other.stickers
+    }
+}
+
+impl Eq for Cube {}
+
+impl std::hash::Hash for Cube {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.stickers.hash(state);
+    }
 }
 
 impl Cube {
-    /// 完成した状態の新しいキューブを作成します。
-    ///
-    /// 各面は標準的な配色（白・黄・緑・青・赤・橙）で塗り分けられ、
-    /// ステッカーの向きは標準的な時計回りパターン `[1, 2, 0, 3]` に設定されます。
-    ///
-    /// # 例
-    ///
-    /// ```
-    /// use rubiks_cube_3x3::cube::Cube;
-    /// let cube = Cube::new();
-    /// assert!(cube.is_solved_with_orientation());
-    /// ```
     #[must_use]
     pub fn new() -> Self {
-        let mut stickers = [Sticker::new(Color::White); NUM_STICKERS];
+        let stickers = [Sticker::new(Color::White); NUM_STICKERS];
+        let pieces = piece::get_initial_pieces();
+        let mut cube = Self { stickers, pieces };
+        cube.sync_stickers();
+        cube
+    }
 
-        let faces = [
-            (Color::White, Face::Up),
-            (Color::Yellow, Face::Down),
-            (Color::Orange, Face::Left),
-            (Color::Red, Face::Right),
-            (Color::Green, Face::Front),
-            (Color::Blue, Face::Back),
-        ];
-
-        for (color, face) in faces {
-            let start = face.start_index();
-            for i in 0..STICKERS_PER_FACE {
-                stickers[start + i] = Sticker {
-                    color,
-                    orientation: CLOCKWISE_ORIENTATION_PATTERN[i],
-                };
-            }
+    /// ピースの状態からステッカー配列を更新します。
+    pub fn sync_stickers(&mut self) {
+        for p in &self.pieces {
+            p.project_to_stickers(&mut self.stickers);
         }
-
-        Self { stickers }
     }
 
     /// 各面のステッカーの色がすべて一致しているか（完成しているか）を判定します。
@@ -152,7 +137,10 @@ impl Cube {
             };
         }
 
-        let mut cube = Cube { stickers };
+        let mut cube = Cube {
+            stickers,
+            pieces: piece::get_initial_pieces(),
+        };
         // Call the static validate_colors method
         Self::validate_colors(colors)?;
 

@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 /// 2x2ルービックキューブの6つの面を表します。
 ///
 /// 内部的には0から5の整数値にマップされており、
@@ -298,6 +300,49 @@ impl Move {
             Move::Y2 => Some(Move::Y),
             Move::Z2 => Some(Move::Z),
             _ => None,
+        }
+    }
+
+    /// 操作を幾何学的なパラメータ（回転軸、角度）に変換します。
+    pub fn geometric_params(self) -> (Vec3, f32) {
+        let pi_2 = std::f32::consts::FRAC_PI_2;
+        match self {
+            Move::R => (Vec3::X, -pi_2),
+            Move::Rp => (Vec3::X, pi_2),
+            Move::R2 => (Vec3::X, pi_2 * 2.0),
+            Move::L => (Vec3::X, pi_2),
+            Move::Lp => (Vec3::X, -pi_2),
+            Move::L2 => (Vec3::X, pi_2 * 2.0),
+            Move::U => (Vec3::Y, -pi_2),
+            Move::Up => (Vec3::Y, pi_2),
+            Move::U2 => (Vec3::Y, pi_2 * 2.0),
+            Move::D => (Vec3::Y, pi_2),
+            Move::Dp => (Vec3::Y, -pi_2),
+            Move::D2 => (Vec3::Y, pi_2 * 2.0),
+            Move::F => (Vec3::Z, -pi_2),
+            Move::Fp => (Vec3::Z, pi_2),
+            Move::F2 => (Vec3::Z, pi_2 * 2.0),
+            Move::B => (Vec3::Z, pi_2),
+            Move::Bp => (Vec3::Z, -pi_2),
+            Move::B2 => (Vec3::Z, pi_2 * 2.0),
+            Move::M => (Vec3::X, pi_2),
+            Move::Mp => (Vec3::X, -pi_2),
+            Move::M2 => (Vec3::X, pi_2 * 2.0),
+            Move::E => (Vec3::Y, pi_2),
+            Move::Ep => (Vec3::Y, -pi_2),
+            Move::E2 => (Vec3::Y, pi_2 * 2.0),
+            Move::S => (Vec3::Z, -pi_2),
+            Move::Sp => (Vec3::Z, pi_2),
+            Move::S2 => (Vec3::Z, pi_2 * 2.0),
+            Move::X => (Vec3::X, -pi_2),
+            Move::Xp => (Vec3::X, pi_2),
+            Move::X2 => (Vec3::X, pi_2 * 2.0),
+            Move::Y => (Vec3::Y, -pi_2),
+            Move::Yp => (Vec3::Y, pi_2),
+            Move::Y2 => (Vec3::Y, pi_2 * 2.0),
+            Move::Z => (Vec3::Z, -pi_2),
+            Move::Zp => (Vec3::Z, pi_2),
+            Move::Z2 => (Vec3::Z, pi_2 * 2.0),
         }
     }
 }

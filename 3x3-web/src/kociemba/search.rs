@@ -13,6 +13,12 @@ pub struct Search {
     phase1_solutions_found: usize,
 }
 
+impl Default for Search {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Search {
     pub fn new() -> Self {
         Self {
@@ -32,7 +38,7 @@ impl Search {
         self.phase1_moves.clear();
         self.phase2_moves.clear();
         self.min_total_length = max_depth + 1;
-        self.initial_cube = rc.clone();
+        self.initial_cube = *rc;
         self.phase1_solutions_found = 0;
 
         let twist = rc.get_twist();
@@ -105,7 +111,7 @@ impl Search {
     fn init_phase2(&mut self) -> bool {
         self.phase2_moves.clear();
         // Phase 1 の解を適用して正確な RawCube を取得
-        let mut rc = self.initial_cube.clone();
+        let mut rc = self.initial_cube;
         for &m_idx in &self.phase1_moves {
             rc = rc.multiply(move_cube_18(m_idx));
         }

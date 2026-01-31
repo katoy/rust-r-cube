@@ -76,7 +76,7 @@ impl RawCube {
         static MOVE_CUBES: OnceLock<[RawCube; 6]> = OnceLock::new();
         &MOVE_CUBES.get_or_init(|| {
             [
-                // 0: U CW
+                // 0: U CW (B->R->F->L)
                 RawCube {
                     cp: [
                         Corner::UBR,
@@ -105,7 +105,7 @@ impl RawCube {
                     ],
                     eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
-                // 1: R CW
+                // 1: R CW (U->B->D->F)
                 RawCube {
                     cp: [
                         Corner::DFR,
@@ -134,7 +134,7 @@ impl RawCube {
                     ],
                     eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
-                // 2: F CW
+                // 2: F CW (U->R->D->L)
                 RawCube {
                     cp: [
                         Corner::UFL,
@@ -163,7 +163,7 @@ impl RawCube {
                     ],
                     eo: [0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0],
                 },
-                // 3: D CW
+                // 3: D CW (F->R->B->L)
                 RawCube {
                     cp: [
                         Corner::UFR,
@@ -192,7 +192,7 @@ impl RawCube {
                     ],
                     eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
-                // 4: L CW
+                // 4: L CW (U->F->D->B)
                 RawCube {
                     cp: [
                         Corner::UFR,
@@ -221,7 +221,7 @@ impl RawCube {
                     ],
                     eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 },
-                // 5: B CW
+                // 5: B CW (U->L->D->R)
                 RawCube {
                     cp: [
                         Corner::UFR,
@@ -264,54 +264,66 @@ impl RawCube {
 
         let mut rc = RawCube::default();
         use crate::cube::validation::{CORNER_STICKERS, EDGE_STICKERS};
-        for i in 0..8 {
-            let facelets = CORNER_STICKERS[i];
-            let mut ori = 0;
-            let mut found = false;
-            for (o, &f) in facelets.iter().enumerate() {
-                let color = cube.stickers[f].color;
-                if color == u_color || color == d_color {
-                    ori = o as u8;
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                return Err(format!("No primary color at corner {}", i));
-            }
+        for (i, &facelets) in CORNER_STICKERS.iter().enumerate() {
+            let c1 = cube.stickers[facelets[0]].color; // Primary (U/D)
+            let c2 = cube.stickers[facelets[1]].color; // Side 1
+            let c3 = cube.stickers[facelets[2]].color; // Side 2
 
-            let c1 = cube.stickers[facelets[ori as usize]].color;
-            let c2 = cube.stickers[facelets[(ori as usize + 1) % 3]].color;
-            let c3 = cube.stickers[facelets[(ori as usize + 2) % 3]].color;
+            // Corner Enum: 0:UFR, 1:UFL, 2:ULB, 3:UBR, 4:DFR, 5:DLF, 6:DBL, 7:DRB
             rc.cp[i] = match (c1, c2, c3) {
+                // slot i にあるピースの色の組み合わせ (U/D, Side1, Side2)
+
+                // U-Corners (Primary: White/U)
                 (c, f, r) if c == u_color && f == f_color && r == r_color => Corner::UFR,
                 (c, l, f) if c == u_color && l == l_color && f == f_color => Corner::UFL,
                 (c, b, l) if c == u_color && b == b_color && l == l_color => Corner::ULB,
                 (c, r, b) if c == u_color && r == r_color && b == b_color => Corner::UBR,
+
+                // D-Corners (Primary: Yellow/D)
                 (c, r, f) if c == d_color && r == r_color && f == f_color => Corner::DFR,
                 (c, f, l) if c == d_color && f == f_color && l == l_color => Corner::DLF,
                 (c, l, b) if c == d_color && l == l_color && b == b_color => Corner::DBL,
                 (c, b, r) if c == d_color && b == b_color && r == r_color => Corner::DRB,
+
+                // Twisted Ori 1
+                (f, r, c) if c == u_color && f == f_color && r == r_color => Corner::UFR,
+                (l, f, c) if c == u_color && l == l_color && f == f_color => Corner::UFL,
+                (b, l, c) if c == u_color && b == b_color && l == l_color => Corner::ULB,
+                (r, b, c) if c == u_color && r == r_color && b == b_color => Corner::UBR,
+                (r, f, c) if c == d_color && r == r_color && f == f_color => Corner::DFR,
+                (f, l, c) if c == d_color && f == f_color && l == l_color => Corner::DLF,
+                (l, b, c) if c == d_color && l == l_color && b == b_color => Corner::DBL,
+                (b, r, c) if c == d_color && b == b_color && r == r_color => Corner::DRB,
+
+                // Twisted Ori 2
+                (r, c, f) if c == u_color && f == f_color && r == r_color => Corner::UFR,
+                (f, c, l) if c == u_color && l == l_color && f == f_color => Corner::UFL,
+                (l, c, b) if c == u_color && b == b_color && l == l_color => Corner::ULB,
+                (b, c, r) if c == u_color && r == r_color && b == b_color => Corner::UBR,
+                (f, c, r) if c == d_color && r == r_color && f == f_color => Corner::DFR,
+                (l, c, f) if c == d_color && f == f_color && l == l_color => Corner::DLF,
+                (b, c, l) if c == d_color && l == l_color && b == b_color => Corner::DBL,
+                (r, c, b) if c == d_color && b == b_color && r == r_color => Corner::DRB,
+
                 _ => {
-                    println!(
-                        "    Corner identification failure at index {}: c1={:?}, c2={:?}, c3={:?}",
-                        i, c1, c2, c3
-                    );
-                    println!(
-                        "    Expected colors: U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?}",
-                        u_color, d_color, l_color, r_color, f_color, b_color
-                    );
                     return Err(format!(
-                        "Invalid corner colors at index {}: {:?}, {:?}, {:?}",
-                        i, c1, c2, c3
-                    ));
+                        "Invalid corner colors at index {}: c1={:?}, c2={:?}, c3={:?}, centers(U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?})",
+                        i, c1, c2, c3, u_color, d_color, l_color, r_color, f_color, b_color
+                    ))
                 }
             };
-            rc.co[i] = ori;
+
+            // Orientation calculation
+            rc.co[i] = if c1 == u_color || c1 == d_color {
+                0
+            } else if c2 == u_color || c2 == d_color {
+                1
+            } else {
+                2
+            };
         }
 
-        for i in 0..12 {
-            let facelets = EDGE_STICKERS[i];
+        for (i, &facelets) in EDGE_STICKERS.iter().enumerate() {
             let color0 = cube.stickers[facelets[0]].color;
             let color1 = cube.stickers[facelets[1]].color;
 
@@ -367,13 +379,9 @@ impl RawCube {
                     Edge::BR
                 }
                 _ => {
-                    println!(
-                        "    Edge identification failure at index {}: c1={:?}, c2={:?}",
-                        i, c1, c2
-                    );
-                    println!(
-                        "    Expected colors: U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?}",
-                        u_color, d_color, l_color, r_color, f_color, b_color
+                    tracing::warn!(
+                        "Edge identification failure at index {}: c1={:?}, c2={:?}, expected U={:?}, D={:?}, L={:?}, R={:?}, F={:?}, B={:?}",
+                        i, c1, c2, u_color, d_color, l_color, r_color, f_color, b_color
                     );
                     return Err(format!(
                         "Invalid edge colors at index {}: {:?}, {:?}",
@@ -482,15 +490,16 @@ impl RawCube {
         let mut available = (0..8).collect::<Vec<u8>>();
         let mut cp_u32 = cp as u32;
         let mut res = [0u8; 8];
-        for i in 0..7 {
+        for (i, item) in res.iter_mut().enumerate().take(7) {
             let fact = factorial(7 - i as u8);
             let idx = (cp_u32 / fact) as usize;
-            res[i] = available.remove(idx);
+            *item = available.remove(idx);
             cp_u32 %= fact;
         }
         res[7] = available[0];
-        for i in 0..8 {
-            self.cp[i] = unsafe { std::mem::transmute(res[i]) };
+        for (i, &item) in res.iter().enumerate() {
+            // SAFETY: res[i] は 0..7 の範囲内の値で、Corner enum の判別値と一致するため、transmute は安全
+            self.cp[i] = unsafe { std::mem::transmute::<u8, Corner>(item) };
         }
     }
 
@@ -522,10 +531,10 @@ impl RawCube {
         let mut available = (0..8).collect::<Vec<u8>>();
         let mut ep8_u32 = ep8 as u32;
         let mut res = [0u8; 8];
-        for i in 0..7 {
+        for (i, item) in res.iter_mut().enumerate().take(7) {
             let fact = factorial(7 - i as u8);
             let idx = (ep8_u32 / fact) as usize;
-            res[i] = available.remove(idx);
+            *item = available.remove(idx);
             ep8_u32 %= fact;
         }
         res[7] = available[0];
@@ -533,7 +542,8 @@ impl RawCube {
         let mut count = 0;
         for i in 0..12 {
             if (self.ep[i] as u8) < 8 {
-                self.ep[i] = unsafe { std::mem::transmute(res[count]) };
+                // SAFETY: res[count] は 0..7 の範囲内の値で、Edge enum の判別値 (0..7) と一致するため、transmute は安全
+                self.ep[i] = unsafe { std::mem::transmute::<u8, Edge>(res[count]) };
                 count += 1;
             }
         }
@@ -567,17 +577,18 @@ impl RawCube {
         let mut available = (0..4).collect::<Vec<u8>>();
         let mut slice_p_u32 = slice_p as u32;
         let mut res = [0u8; 4];
-        for i in 0..3 {
+        for (i, item) in res.iter_mut().enumerate().take(3) {
             let fact = factorial(3 - i as u8);
             let idx = (slice_p_u32 / fact) as usize;
-            res[i] = available.remove(idx);
+            *item = available.remove(idx);
             slice_p_u32 %= fact;
         }
         res[3] = available[0];
         let mut count = 0;
         for i in 0..12 {
             if (self.ep[i] as u8) >= 8 {
-                self.ep[i] = unsafe { std::mem::transmute(res[count] + 8) };
+                // SAFETY: res[count] + 8 は 8..11 の範囲内の値で、Edge enum の判別値 (8:FR, 9:FL, 10:BL, 11:BR) と一致するため、transmute は安全
+                self.ep[i] = unsafe { std::mem::transmute::<u8, Edge>(res[count] + 8) };
                 count += 1;
             }
         }
@@ -614,7 +625,7 @@ pub fn move_cube_18(mv_idx: usize) -> &'static RawCube {
         let mut moves = [RawCube::default(); 18];
         for mv in 0..6 {
             let base = RawCube::move_cube(mv);
-            moves[mv * 3] = base.clone(); // CW
+            moves[mv * 3] = *base; // CW (Copy)
             moves[mv * 3 + 1] = base.multiply(base); // 2
             moves[mv * 3 + 2] = base.multiply(base).multiply(base); // CCW
         }
@@ -693,6 +704,19 @@ mod tests {
     fn test_raw_cube_move_u() {
         let mut cube = Cube::new();
         crate::cube::rotation::apply_move(&mut cube, Move::U);
+
+        // Debug prints for U-corners
+        for i in 0..4 {
+            let stickers = crate::cube::validation::CORNER_STICKERS[i];
+            let c1 = cube.stickers[stickers[0]].color;
+            let c2 = cube.stickers[stickers[1]].color;
+            let c3 = cube.stickers[stickers[2]].color;
+            println!(
+                "Slot {} (index {:?}): c1={:?}, c2={:?}, c3={:?}",
+                i, stickers, c1, c2, c3
+            );
+        }
+
         let rc_from_cube = RawCube::from_cube(&cube).unwrap();
 
         let identity = RawCube::default();
@@ -748,8 +772,8 @@ mod tests {
         for (i, &mv) in moves.iter().enumerate() {
             let mut cube = Cube::new();
             crate::cube::rotation::apply_move(&mut cube, mv);
-            let rc_from_cube =
-                RawCube::from_cube(&cube).expect(&format!("Convert fail for {:?}", mv));
+            let rc_from_cube = RawCube::from_cube(&cube)
+                .unwrap_or_else(|e| panic!("Convert fail for {:?}: {}", mv, e));
 
             let identity = RawCube::default();
             let rc_from_move = identity.multiply(RawCube::move_cube(i));

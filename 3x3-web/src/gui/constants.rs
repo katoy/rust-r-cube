@@ -33,10 +33,12 @@ pub const VIEW3D_DEFAULT_YAW: f32 = PI / 4.0;
 pub const VIEW3D_DEFAULT_PITCH: f32 = PI / 6.0;
 pub const VIEW3D_DEFAULT_SCALE: f32 = 1.0;
 
-pub const VIEW3D_CAMERA_DISTANCE: f32 = 5.0;
-pub const VIEW3D_PROJECTION_SCALE: f32 = 0.3;
-pub const VIEW3D_STICKER_SIZE: f32 = 0.45;
-pub const VIEW3D_BACKFACE_CULLING_THRESHOLD: f32 = 0.2;
+pub const VIEW3D_CAMERA_DISTANCE: f32 = 20.0;
+pub const VIEW3D_PROJECTION_SCALE: f32 = 0.25;
+// 3x3キューブでは中心間隔が1.0なので、ステッカーの半径は0.5が適切
+// これにより隣接面のステッカーがぴったり繋がる
+pub const VIEW3D_STICKER_SIZE: f32 = 0.5;
+pub const VIEW3D_BACKFACE_CULLING_THRESHOLD: f32 = 0.01;
 pub const VIEW3D_ARROW_VEC_SCALE: f32 = 0.6;
 pub const VIEW3D_ARROW_WIDTH: f32 = 6.0;
 pub const VIEW3D_ARROW_HEAD_RATIO: f32 = 0.6;

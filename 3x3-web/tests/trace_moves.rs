@@ -4,7 +4,6 @@ use rubiks_cube_3x3::kociemba::RawCube;
 #[test]
 fn test_trace_moves_step_by_step() {
     let mut cube = Cube::new();
-    let moves = [Move::U, Move::R];
 
     println!("Initial state:");
     assert!(RawCube::from_cube(&cube).is_ok());

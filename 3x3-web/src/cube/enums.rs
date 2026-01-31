@@ -51,6 +51,33 @@ impl Face {
             Face::Back,
         ]
     }
+
+    /// インデックスから面を取得します。
+    pub fn from_index(index: usize) -> Self {
+        match index / 9 {
+            0 => Face::Up,
+            1 => Face::Down,
+            2 => Face::Left,
+            3 => Face::Right,
+            4 => Face::Front,
+            5 => Face::Back,
+            _ => Face::Up,
+        }
+    }
+
+    /// 面内の 0-8 のインデックスから空間座標を返します。
+    pub fn to_pos_for_local_index(&self, local_idx: usize) -> Vec3 {
+        let row = (local_idx / 3) as f32;
+        let col = (local_idx % 3) as f32;
+        match self {
+            Face::Up => Vec3::new(col - 1.0, 1.0, row - 1.0),
+            Face::Down => Vec3::new(col - 1.0, -1.0, 1.0 - row),
+            Face::Left => Vec3::new(-1.0, 1.0 - row, col - 1.0),
+            Face::Right => Vec3::new(1.0, 1.0 - row, 1.0 - col),
+            Face::Front => Vec3::new(col - 1.0, 1.0 - row, 1.0),
+            Face::Back => Vec3::new(1.0 - col, 1.0 - row, -1.0),
+        }
+    }
 }
 
 /// ステッカーの総数

@@ -2120,7 +2120,7 @@ pub fn get_destination_index(mv: Move, src_idx: usize) -> usize {
     src_idx
 }
 
-/// 指定されたMoveとインデックスに対する論理的な向きの変更量 (0-3)
+/// 指定されたMoveとインデックスに対する論理的な向きの展開図上での変更量 (0-3)
 pub fn get_oris_delta(mv: Move, src_idx: usize) -> u8 {
     use glam::Mat4;
     let (axis, angle) = mv.geometric_params();

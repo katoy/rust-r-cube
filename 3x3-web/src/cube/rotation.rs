@@ -138,9 +138,9 @@ mod tests {
         // 色を確認
         use crate::cube::Color;
         assert_eq!(cube.stickers[40].color, Color::White);
-        assert_eq!(cube.stickers[13].color, Color::Green);
+        assert_eq!(cube.stickers[13].color, Color::Red);
         assert_eq!(cube.stickers[49].color, Color::Yellow);
-        assert_eq!(cube.stickers[4].color, Color::Blue);
+        assert_eq!(cube.stickers[4].color, Color::Orange);
 
         apply_move(&mut cube, Move::M);
         apply_move(&mut cube, Move::M);

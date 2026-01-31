@@ -10,9 +10,9 @@ fn test_l_move_colors() {
     // L面自体は回転（詳細は省略）
     // 隣接面の確認:
     // U面左列(0,3,6) <- B面右列(53,50,47) の逆順
-    assert_eq!(cube.get_sticker(0).color, Color::Blue);
-    assert_eq!(cube.get_sticker(3).color, Color::Blue);
-    assert_eq!(cube.get_sticker(6).color, Color::Blue);
+    assert_eq!(cube.get_sticker(0).color, Color::Orange);
+    assert_eq!(cube.get_sticker(3).color, Color::Orange);
+    assert_eq!(cube.get_sticker(6).color, Color::Orange);
 
     // F面左列(36,39,42) <- U面左列(0,3,6)
     assert_eq!(cube.get_sticker(36).color, Color::White);
@@ -20,9 +20,9 @@ fn test_l_move_colors() {
     assert_eq!(cube.get_sticker(42).color, Color::White);
 
     // D面左列(9,12,15) <- F面左列(36,39,42)
-    assert_eq!(cube.get_sticker(9).color, Color::Green);
-    assert_eq!(cube.get_sticker(12).color, Color::Green);
-    assert_eq!(cube.get_sticker(15).color, Color::Green);
+    assert_eq!(cube.get_sticker(9).color, Color::Red);
+    assert_eq!(cube.get_sticker(12).color, Color::Red);
+    assert_eq!(cube.get_sticker(15).color, Color::Red);
 
     // B面右列(53,50,47) <- D面左列(9,12,15) の逆順
     assert_eq!(cube.get_sticker(53).color, Color::Yellow);
@@ -82,9 +82,9 @@ fn test_r_move_colors() {
     cube.apply_move(Move::R);
 
     // U面右列(2,5,8) <- F面右列(38,41,44)
-    assert_eq!(cube.get_sticker(2).color, Color::Green);
-    assert_eq!(cube.get_sticker(5).color, Color::Green);
-    assert_eq!(cube.get_sticker(8).color, Color::Green);
+    assert_eq!(cube.get_sticker(2).color, Color::Red);
+    assert_eq!(cube.get_sticker(5).color, Color::Red);
+    assert_eq!(cube.get_sticker(8).color, Color::Red);
 
     // B面左列(45,48,51) <- U面右列(2,5,8) の逆順
     assert_eq!(cube.get_sticker(45).color, Color::White);
@@ -92,9 +92,9 @@ fn test_r_move_colors() {
     assert_eq!(cube.get_sticker(51).color, Color::White);
 
     // D面右列(11,14,17) <- B面左列(45,48,51) の逆順
-    assert_eq!(cube.get_sticker(11).color, Color::Blue);
-    assert_eq!(cube.get_sticker(14).color, Color::Blue);
-    assert_eq!(cube.get_sticker(17).color, Color::Blue);
+    assert_eq!(cube.get_sticker(11).color, Color::Orange);
+    assert_eq!(cube.get_sticker(14).color, Color::Orange);
+    assert_eq!(cube.get_sticker(17).color, Color::Orange);
 
     // F面右列(38,41,44) <- D面右列(11,14,17)
     assert_eq!(cube.get_sticker(38).color, Color::Yellow);

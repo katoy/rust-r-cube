@@ -129,10 +129,11 @@ pub fn from_file_format(s: &str) -> Result<Cube> {
         pieces: crate::cube::piece::get_initial_pieces(),
     };
 
-    // スキャン途中（Grayあり）でない場合は、向きを初期化
+    // スキャン途中（Grayあり）でない場合は、向きを初期化し、ピースモデルを復元
     let has_gray = cube.stickers.iter().any(|s| s.color == Color::Gray);
     if !has_gray {
-        cube = cube.with_clockwise_orientations();
+        // 各ピースの位置と回転を色から物理的に正しく復元
+        cube.restore_orientation_instantly()?;
     }
 
     Ok(cube)

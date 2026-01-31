@@ -90,6 +90,16 @@ pub const EDGE_STICKERS: [[usize; 2]; 12] = [
     [48, 32], // 11: BR (B3, R5)
 ];
 
+/// センターの構成ステッカーのインデックス定義 (U, D, L, R, F, B)
+pub const CENTER_STICKERS: [usize; 6] = [
+    4,  // 0: U
+    13, // 1: D
+    22, // 2: L
+    31, // 3: R
+    40, // 4: F
+    49, // 5: B
+];
+
 /// 対面色かどうかを判定
 fn is_opposite(c1: Color, c2: Color) -> bool {
     matches!(

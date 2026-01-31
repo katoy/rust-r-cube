@@ -187,8 +187,7 @@ impl Cube {
     ///
     /// # エラー
     ///
-    /// コーナーピースの色の組み合わせが物理的に存在しない（例：白と黄が隣接している）
-    /// 場合などは `CubeError::InvalidState` を返します。
+    /// 各ステッカーの色情報から、ピースの位置と回転を物理的に正しい状態に復元します。
     pub fn restore_orientation_instantly(&mut self) -> crate::error::Result<()> {
         // 色の妥当性チェック
         let mut colors_array = [Color::White; 54];
@@ -197,49 +196,122 @@ impl Cube {
         }
         Self::validate_colors(&colors_array)?;
 
-        use crate::cube::validation::CORNER_STICKERS;
+        use crate::cube::validation::{CENTER_STICKERS, CORNER_STICKERS, EDGE_STICKERS};
 
-        // 24通りの完成状態（すべて [1, 2, 0, 3] パターンを持つ）を取得
+        // 24通りの完成状態（全方位）を取得
         let solved_states = crate::solver::get_solved_states();
+        let mut new_pieces_vec = Vec::new();
 
-        // 各スロットに対して、24通りの完成状態のいずれかから「同じ色の配置（twist一致）」を持つものを探し、
-        // その向きをコピーする。
-        // rotation.rs の物理整合性により、どの解決方位から見つけても結果は一貫する。
-        for &slot_indices in &CORNER_STICKERS {
-            let current_colors = [
-                self.stickers[slot_indices[0]].color,
-                self.stickers[slot_indices[1]].color,
-                self.stickers[slot_indices[2]].color,
-            ];
-
-            let mut found = false;
-            for solved in solved_states {
-                let solved_colors = [
-                    solved.stickers[slot_indices[0]].color,
-                    solved.stickers[slot_indices[1]].color,
-                    solved.stickers[slot_indices[2]].color,
-                ];
-
-                // 色の並び（twist）まで完全一致
-                if current_colors == solved_colors {
-                    for &idx in &slot_indices {
-                        self.stickers[idx].orientation = solved.stickers[idx].orientation;
-                    }
-                    found = true;
+        // 1. まずセンターの位置関係から、現在の「全体の方位」を特定する。
+        //    センターのみが完全に一致する solved_state を探す。
+        let mut preferred_state_idx = 0;
+        let mut found_preferred = false;
+        for (idx, solved) in solved_states.iter().enumerate() {
+            let mut centers_match = true;
+            for &c_idx in &CENTER_STICKERS {
+                if self.stickers[c_idx].color != solved.stickers[c_idx].color {
+                    centers_match = false;
                     break;
                 }
             }
-
-            if !found {
-                return Err(crate::error::CubeError::InvalidState(format!(
-                    "不正な色のピース配置: {:?}",
-                    current_colors
-                )));
+            if centers_match {
+                preferred_state_idx = idx;
+                found_preferred = true;
+                break;
             }
         }
 
+        if !found_preferred {
+            return Err(crate::error::CubeError::InvalidState(
+                "中心ピースの色配置が不正です".to_string(),
+            ));
+        }
+        let preferred_state = &solved_states[preferred_state_idx];
+
+        if !preferred_state.is_solved_with_orientation() {
+            return Err(crate::error::CubeError::InvalidState(
+                "内部解決状態の不整合".to_string(),
+            ));
+        }
+
+        // 2. 特定された preferred_state に基づいてセンターピースを復元
+        for &idx in &CENTER_STICKERS {
+            self.restore_piece_at_slot(
+                &[idx],
+                std::slice::from_ref(preferred_state),
+                &mut new_pieces_vec,
+            )?;
+        }
+
+        // 3. コーナーとエッジを復元（これらは色情報から物理的に一義的に決まる）
+        // コーナー (8個)
+        for &slot_indices in &CORNER_STICKERS {
+            self.restore_piece_at_slot(&slot_indices, solved_states, &mut new_pieces_vec)?;
+        }
+
+        // エッジ (12個)
+        for &slot_indices in &EDGE_STICKERS {
+            self.restore_piece_at_slot(&slot_indices, solved_states, &mut new_pieces_vec)?;
+        }
+
+        if new_pieces_vec.len() != 26 {
+            return Err(crate::error::CubeError::InvalidState(format!(
+                "ピースの復元に失敗しました（計{}個）",
+                new_pieces_vec.len()
+            )));
+        }
+
+        // pieces 配列を更新
+        self.pieces = new_pieces_vec.try_into().map_err(|_| {
+            crate::error::CubeError::InvalidState("ピース配列の変換に失敗しました".to_string())
+        })?;
+
+        // 最後に pieces の状態を stickers (特に orientation) に反映
+        self.sync_stickers();
+
         // 最終的なチェック
         self.is_valid_state()
+    }
+
+    /// 特定のスロットにあるピースを、 solved_states を利用して復元します。
+    fn restore_piece_at_slot(
+        &self,
+        slot_indices: &[usize],
+        solved_states: &[Cube],
+        target_pieces: &mut Vec<piece::Cubie>,
+    ) -> crate::error::Result<()> {
+        let current_colors: Vec<Color> = slot_indices
+            .iter()
+            .map(|&idx| self.stickers[idx].color)
+            .collect();
+
+        for solved in solved_states {
+            let solved_colors: Vec<Color> = slot_indices
+                .iter()
+                .map(|&idx| solved.stickers[idx].color)
+                .collect();
+
+            if current_colors == solved_colors {
+                // どのステッカーも同じピースに属しているはずなので、slot_indices[0] を使ってピースを特定する
+                let test_idx = slot_indices[0];
+
+                // solved.pieces を探索して、test_idx にステッカーを投影するピースを探す
+                for p in &solved.pieces {
+                    let mut temp_stickers = [Sticker::new(Color::Gray); NUM_STICKERS];
+                    p.project_to_stickers(&mut temp_stickers);
+                    if temp_stickers[test_idx].color != Color::Gray {
+                        // 見つけた！(位置も回転も solved Cube のものが現在のスロットの状態を正しく表している)
+                        target_pieces.push(p.clone());
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        Err(crate::error::CubeError::InvalidState(format!(
+            "指定された色の組み合わせを持つピースが見つかりません: {:?}",
+            current_colors
+        )))
     }
 
     /// ソルバーで見つかった解を利用して向きを復元します（現在は内部で `restore_orientation_instantly` を呼び出します）。

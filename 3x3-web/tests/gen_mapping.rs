@@ -10,15 +10,15 @@ fn generate_mapping_code() {
         let mut after_cube = initial_cube.clone();
         after_cube.apply_move(mv);
 
-        print!("    [ // {}\n", mv);
+        println!("    [ // {}", mv);
         let mut count = 0;
         for dst_idx in 0..NUM_STICKERS {
-            let initial_sticker = initial_cube.get_sticker(dst_idx);
-            let after_sticker = after_cube.get_sticker(dst_idx);
+            let _initial_sticker = initial_cube.get_sticker(dst_idx);
+            let _after_sticker = after_cube.get_sticker(dst_idx);
 
             // 全ての遷移を出力（または移動したものだけを出力して 99 で埋める）
             // ここでは一貫性のために全54個を出力する方針にする
-            let src_idx = (0..NUM_STICKERS).find(|&s| {
+            let _src_idx = (0..NUM_STICKERS).find(|&s| {
                 // 物理モデルのピース位置から逆引き
                 // 実際には get_initial_pieces などの状態から追跡が必要だが
                 // 単純に「初期状態でこの色だった場所」を探す
@@ -43,8 +43,8 @@ fn generate_mapping_code() {
     println!("];");
 }
 
-fn find_source_index(mv: Move, dst_idx: usize) -> usize {
-    let mut initial_cube = Cube::new();
+fn find_source_index(_mv: Move, _dst_idx: usize) -> usize {
+    let _initial_cube = Cube::new();
     // 各ステッカーにユニークな「初期インデックス」を color の代わりに埋め込む
     // （Pieceモデルの内部情報にアクセスする必要があるが、
     // ここでは apply_move をシミュレートして追跡する）

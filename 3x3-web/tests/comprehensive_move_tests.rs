@@ -89,13 +89,18 @@ fn test_single_move_continuity(mv: Move) {
 }
 
 fn is_moving(mv: Move, idx: usize) -> bool {
-    use rubiks_cube_3x3::gui::mapping::MOVE_MAPPING_TABLE;
+    use rubiks_cube_3x3::gui::mapping::{FACE_ROTATION_TABLE, MOVE_MAPPING_TABLE};
     let all_moves = Move::all_moves();
     let move_idx = all_moves.iter().position(|&m| m == mv).unwrap();
-    if move_idx >= 27 {
-        return true; // X, Y, Z moves affect all stickers
-    }
-    MOVE_MAPPING_TABLE[move_idx]
-        .iter()
-        .any(|&(src, _)| src == idx)
+
+    let (face_start, _) = FACE_ROTATION_TABLE[move_idx];
+    let (src, dst) = MOVE_MAPPING_TABLE[move_idx][idx];
+
+    let is_on_face = if face_start != usize::MAX {
+        dst >= face_start && dst < face_start + 9
+    } else {
+        false // Slice moves don't have a single face rotation in 2D
+    };
+
+    src != dst || is_on_face
 }

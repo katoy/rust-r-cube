@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::cube::{Cube, Move};
 use rubiks_cube_3x3::gui::mapping::get_oris_delta;
 
 /// 現状の実装における不具合（M 操作で矢印が反転し、アニメーション中に自転する）を検出するテスト

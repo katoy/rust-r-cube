@@ -1,5 +1,5 @@
 use glam::Vec3;
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move, Sticker, NUM_STICKERS};
+use rubiks_cube_3x3::cube::{Cube, Face, Move, NUM_STICKERS};
 
 #[test]
 fn dump_mapping_v2() {
@@ -36,9 +36,9 @@ fn dump_mapping_v2() {
         cube.apply_move(mv);
 
         println!("    [ // {}", mv);
-        for src_idx in 0..NUM_STICKERS {
-            let (target_initial_pos, target_initial_normal) = sticker_to_piece[src_idx];
-
+        for (src_idx, &(target_initial_pos, target_initial_normal)) in
+            sticker_to_piece.iter().enumerate().take(NUM_STICKERS)
+        {
             let mut found_dst = 99;
             for piece in &cube.pieces {
                 if piece.initial_pos == target_initial_pos {

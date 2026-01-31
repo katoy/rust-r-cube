@@ -1,5 +1,5 @@
 use glam::{Mat4, Vec3};
-use rubiks_cube_3x3::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::cube::Move;
 
 /// renderer_3d.rs と同じ面定義
 struct FaceDef {
@@ -49,22 +49,12 @@ struct PhysicalSticker {
     center: Vec3,
     normal: Vec3,
     arrow_dir: Vec3, // orientation 0 の時の向き (= v_axis)
-    color: Color,
 }
 
 fn get_initial_physical_state() -> Vec<PhysicalSticker> {
     let mut stickers = Vec::new();
     let defs = get_face_defs();
-    let colors = [
-        Color::White,
-        Color::Yellow,
-        Color::Orange,
-        Color::Red,
-        Color::Green,
-        Color::Blue,
-    ];
-
-    for (f_idx, def) in defs.iter().enumerate() {
+    for def in defs.iter() {
         for i in 0..9 {
             let col = (i % 3) as f32;
             let row = (i / 3) as f32;
@@ -78,7 +68,6 @@ fn get_initial_physical_state() -> Vec<PhysicalSticker> {
                 center,
                 normal: def.normal,
                 arrow_dir: def.v_axis,
-                color: colors[f_idx],
             });
         }
     }
@@ -129,8 +118,6 @@ fn calculate_logical_orientation(sticker: &PhysicalSticker) -> u8 {
     }
     best_dir as u8
 }
-
-const EPSILON: f32 = 0.001;
 
 fn is_affected(mv: Move, p: Vec3) -> bool {
     match mv {
@@ -251,7 +238,6 @@ fn print_expected_orientations() {
             let face_name = ["U", "D", "L", "R", "F", "B"][f];
             print!("{}: ", face_name);
             for i in 0..9 {
-                let s_idx = f * 9 + i;
                 // 現在のスロット f*9+i にあるステッカーを探す
                 let sticker = stickers
                     .iter()
@@ -284,7 +270,7 @@ fn print_expected_orientations() {
 
                         let row = (v / (2.0 / 3.0) + 1.0).round() as i32;
                         let col = (u / (2.0 / 3.0) + 1.0).round() as i32;
-                        row * 3 + col == i as i32
+                        row * 3 + col == i
                     })
                     .unwrap();
 

@@ -105,6 +105,22 @@ impl Cubie {
     pub fn calculate_orientation(&self, initial_normal: Vec3, current_normal: Vec3) -> u8 {
         calculate_orientation_with_rot(initial_normal, current_normal, self.current_rot)
     }
+
+    /// 与えられた色（順序不同）をすべて持っているピースかどうか判定します。
+    pub fn matches_colors(&self, target_colors: &[Color]) -> bool {
+        if self.stickers.len() != target_colors.len() {
+            return false;
+        }
+        let mut available_colors: Vec<Color> = self.stickers.iter().map(|s| s.color).collect();
+        for &tc in target_colors {
+            if let Some(pos) = available_colors.iter().position(|&c| c == tc) {
+                available_colors.remove(pos);
+            } else {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// 指定された回転行列に基づいて向きを計算します（アニメーション用）。
@@ -218,13 +234,13 @@ pub fn get_initial_pieces() -> [Cubie; 26] {
                 if x == 1 {
                     stickers.push(CubieSticker {
                         initial_normal: Vec3::X,
-                        color: Color::Red,
+                        color: Color::Blue,
                     });
                 }
                 if x == -1 {
                     stickers.push(CubieSticker {
                         initial_normal: -Vec3::X,
-                        color: Color::Orange,
+                        color: Color::Green,
                     });
                 }
                 if y == 1 {
@@ -242,13 +258,13 @@ pub fn get_initial_pieces() -> [Cubie; 26] {
                 if z == 1 {
                     stickers.push(CubieSticker {
                         initial_normal: Vec3::Z,
-                        color: Color::Green,
+                        color: Color::Red,
                     });
                 }
                 if z == -1 {
                     stickers.push(CubieSticker {
                         initial_normal: -Vec3::Z,
-                        color: Color::Blue,
+                        color: Color::Orange,
                     });
                 }
 

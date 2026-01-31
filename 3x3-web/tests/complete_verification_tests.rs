@@ -30,10 +30,10 @@ fn test_m_move_all_stickers() {
     // M 操作のサイクル: [1,4,7, 37,40,43, 10,13,16, 52,49,46] (U, F, D, B)
     // colors: U<-B, F<-U, D<-F, B<-D
 
-    // B -> U (orientation 0)
-    expected[1] = (Color::Blue, 0);
-    expected[4] = (Color::Blue, 0);
-    expected[7] = (Color::Blue, 0);
+    // B -> U (orientation 2)
+    expected[1] = (Color::Orange, 2);
+    expected[4] = (Color::Orange, 2);
+    expected[7] = (Color::Orange, 2);
 
     // U -> F (orientation 0)
     expected[37] = (Color::White, 0);
@@ -41,14 +41,14 @@ fn test_m_move_all_stickers() {
     expected[43] = (Color::White, 0);
 
     // F -> D (orientation 0)
-    expected[10] = (Color::Green, 0);
-    expected[13] = (Color::Green, 0);
-    expected[16] = (Color::Green, 0);
+    expected[10] = (Color::Red, 0);
+    expected[13] = (Color::Red, 0);
+    expected[16] = (Color::Red, 0);
 
-    // D -> B (orientation 0)
-    expected[52] = (Color::Yellow, 0);
-    expected[49] = (Color::Yellow, 0);
-    expected[46] = (Color::Yellow, 0);
+    // D -> B (orientation 2)
+    expected[52] = (Color::Yellow, 2);
+    expected[49] = (Color::Yellow, 2);
+    expected[46] = (Color::Yellow, 2);
 
     cube.apply_move(Move::M);
     let actual = get_all_stickers(&cube);
@@ -65,15 +65,13 @@ fn test_l_move_all_stickers() {
     let mut expected = get_solved_state();
 
     // L 面自体の回転 (orientation 1)
-    for i in 18..=26 {
-        expected[i] = (Color::Orange, 1);
-    }
+    expected[18..=26].fill((Color::Green, 1));
 
     // サイクル: [0,3,6, 36,39,42, 9,12,15, 53,50,47] (U, F, D, B)
-    // B -> U (orientation 0)
-    expected[0] = (Color::Blue, 0);
-    expected[3] = (Color::Blue, 0);
-    expected[6] = (Color::Blue, 0);
+    // B -> U (orientation 2)
+    expected[0] = (Color::Orange, 2);
+    expected[3] = (Color::Orange, 2);
+    expected[6] = (Color::Orange, 2);
 
     // U -> F (orientation 0)
     expected[36] = (Color::White, 0);
@@ -81,14 +79,14 @@ fn test_l_move_all_stickers() {
     expected[42] = (Color::White, 0);
 
     // F -> D (orientation 0)
-    expected[9] = (Color::Green, 0);
-    expected[12] = (Color::Green, 0);
-    expected[15] = (Color::Green, 0);
+    expected[9] = (Color::Red, 0);
+    expected[12] = (Color::Red, 0);
+    expected[15] = (Color::Red, 0);
 
-    // D -> B (orientation 0)
-    expected[53] = (Color::Yellow, 0);
-    expected[50] = (Color::Yellow, 0);
-    expected[47] = (Color::Yellow, 0);
+    // D -> B (orientation 2)
+    expected[53] = (Color::Yellow, 2);
+    expected[50] = (Color::Yellow, 2);
+    expected[47] = (Color::Yellow, 2);
 
     cube.apply_move(Move::L);
     let actual = get_all_stickers(&cube);
@@ -105,25 +103,23 @@ fn test_r_move_all_stickers() {
     let mut expected = get_solved_state();
 
     // R 面自体の回転 (orientation 1)
-    for i in 27..=35 {
-        expected[i] = (Color::Red, 1);
-    }
+    expected[27..=35].fill((Color::Blue, 1));
 
     // サイクル: [8,5,2, 45,48,51, 17,14,11, 44,41,38] (U, B, D, F)
     // F -> U (orientation 0)
-    expected[8] = (Color::Green, 0);
-    expected[5] = (Color::Green, 0);
-    expected[2] = (Color::Green, 0);
+    expected[8] = (Color::Red, 0);
+    expected[5] = (Color::Red, 0);
+    expected[2] = (Color::Red, 0);
 
-    // U -> B (orientation 0)
-    expected[45] = (Color::White, 0);
-    expected[48] = (Color::White, 0);
-    expected[51] = (Color::White, 0);
+    // U -> B (orientation 2)
+    expected[45] = (Color::White, 2);
+    expected[48] = (Color::White, 2);
+    expected[51] = (Color::White, 2);
 
-    // B -> D (orientation 0)
-    expected[17] = (Color::Blue, 0);
-    expected[14] = (Color::Blue, 0);
-    expected[11] = (Color::Blue, 0);
+    // B -> D (orientation 2)
+    expected[17] = (Color::Orange, 2);
+    expected[14] = (Color::Orange, 2);
+    expected[11] = (Color::Orange, 2);
 
     // D -> F (orientation 0)
     expected[44] = (Color::Yellow, 0);
@@ -145,27 +141,29 @@ fn test_u_move_all_stickers() {
     let mut expected = get_solved_state();
 
     // U 面自体の回転 (orientation 1)
-    for i in 0..9 {
-        expected[i] = (Color::White, 1);
-    }
+    expected[0..9].fill((Color::White, 1));
 
     // サイクル: [45,46,47, 27,28,29, 36,37,38, 18,19,20] (B, R, F, L)
     // 水平移動なので orientation は変わらない (0)
-    expected[27] = (Color::Blue, 0);
-    expected[28] = (Color::Blue, 0);
-    expected[29] = (Color::Blue, 0);
+    // B -> R
+    expected[27] = (Color::Orange, 0);
+    expected[28] = (Color::Orange, 0);
+    expected[29] = (Color::Orange, 0);
 
-    expected[36] = (Color::Red, 0);
-    expected[37] = (Color::Red, 0);
-    expected[38] = (Color::Red, 0);
+    // R -> F
+    expected[36] = (Color::Blue, 0);
+    expected[37] = (Color::Blue, 0);
+    expected[38] = (Color::Blue, 0);
 
-    expected[18] = (Color::Green, 0);
-    expected[19] = (Color::Green, 0);
-    expected[20] = (Color::Green, 0);
+    // F -> L
+    expected[18] = (Color::Red, 0);
+    expected[19] = (Color::Red, 0);
+    expected[20] = (Color::Red, 0);
 
-    expected[45] = (Color::Orange, 0);
-    expected[46] = (Color::Orange, 0);
-    expected[47] = (Color::Orange, 0);
+    // L -> B
+    expected[45] = (Color::Green, 0);
+    expected[46] = (Color::Green, 0);
+    expected[47] = (Color::Green, 0);
 
     cube.apply_move(Move::U);
     let actual = get_all_stickers(&cube);

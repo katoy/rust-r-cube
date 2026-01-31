@@ -5,20 +5,20 @@ fn test_m_move_detailed() {
     let mut cube = Cube::new();
 
     // M 操作前の B面中央(46, 49, 52)
-    assert_eq!(cube.get_sticker(46).color, Color::Blue);
-    assert_eq!(cube.get_sticker(49).color, Color::Blue);
-    assert_eq!(cube.get_sticker(52).color, Color::Blue);
+    assert_eq!(cube.get_sticker(46).color, Color::Orange);
+    assert_eq!(cube.get_sticker(49).color, Color::Orange);
+    assert_eq!(cube.get_sticker(52).color, Color::Orange);
 
     cube.apply_move(Move::M);
 
-    // B -> U: 色は Blue, 向きは 0 (回転なし)
+    // B -> U: 色は Orange, 向きは 2 (180度回転)
     // 物理移動: B-Bottom(52) -> U-Top(1), B-Mid(49) -> U-Mid(4), B-Top(46) -> U-Bot(7)
-    assert_eq!(cube.get_sticker(1).color, Color::Blue);
-    assert_eq!(cube.get_sticker(1).orientation, 0);
-    assert_eq!(cube.get_sticker(4).color, Color::Blue);
-    assert_eq!(cube.get_sticker(4).orientation, 0);
-    assert_eq!(cube.get_sticker(7).color, Color::Blue);
-    assert_eq!(cube.get_sticker(7).orientation, 0);
+    assert_eq!(cube.get_sticker(1).color, Color::Orange);
+    assert_eq!(cube.get_sticker(1).orientation, 2);
+    assert_eq!(cube.get_sticker(4).color, Color::Orange);
+    assert_eq!(cube.get_sticker(4).orientation, 2);
+    assert_eq!(cube.get_sticker(7).color, Color::Orange);
+    assert_eq!(cube.get_sticker(7).orientation, 2);
 }
 
 #[test]
@@ -27,11 +27,11 @@ fn test_l_move_detailed() {
     cube.apply_move(Move::L);
 
     // B-Bottom-Right(53) -> U-Top-Left(0)
-    assert_eq!(cube.get_sticker(0).color, Color::Blue);
-    assert_eq!(cube.get_sticker(0).orientation, 0);
+    assert_eq!(cube.get_sticker(0).color, Color::Orange);
+    assert_eq!(cube.get_sticker(0).orientation, 2);
 
     // L面センター(22) -> 面回転により 1
-    assert_eq!(cube.get_sticker(22).color, Color::Orange);
+    assert_eq!(cube.get_sticker(22).color, Color::Green);
     assert_eq!(cube.get_sticker(22).orientation, 1);
 }
 
@@ -42,10 +42,10 @@ fn test_r_move_detailed() {
 
     // U-Top-Right(2) -> B-Bottom-Left(51)
     assert_eq!(cube.get_sticker(51).color, Color::White);
-    assert_eq!(cube.get_sticker(51).orientation, 0);
+    assert_eq!(cube.get_sticker(51).orientation, 2);
 
     // R面センター(31) -> 面回転により 1
-    assert_eq!(cube.get_sticker(31).color, Color::Red);
+    assert_eq!(cube.get_sticker(31).color, Color::Blue);
     assert_eq!(cube.get_sticker(31).orientation, 1);
 }
 

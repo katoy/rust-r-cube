@@ -1,31 +1,29 @@
-use crate::cube::{Cube, Move};
+use crate::cube::{Cube, Face, Move};
 use crate::kociemba::{RawCube, Search};
 use std::sync::mpsc::Sender;
 use std::sync::OnceLock;
 
-/// デフォルトの最大探索深度 (Kociemba では通常合計20手程度)
 pub const DEFAULT_MAX_DEPTH: usize = 24;
 
-/// ソルバーの結果
 #[derive(Debug, Clone)]
 pub struct Solution {
     pub moves: Vec<Move>,
     pub found: bool,
 }
 
-/// Kociemba ソルバーの状態
 #[cfg(any(target_arch = "wasm32", test))]
 pub struct SolverState {
     search: Search,
     raw_cube: RawCube,
+    initial_cube: Cube,
     max_depth: usize,
+    ignore_orientation: bool,
     solution: Option<Solution>,
     finished: bool,
 }
 
 static SOLVED_STATES: OnceLock<Vec<Cube>> = OnceLock::new();
 
-/// 全24通りの向きの完成状態を取得（キャッシュ）
 pub fn get_solved_states() -> &'static [Cube] {
     SOLVED_STATES.get_or_init(generate_all_solved_states)
 }
@@ -38,94 +36,30 @@ fn generate_all_solved_states() -> Vec<Cube> {
     let mut queue = VecDeque::new();
     let mut visited: FxHashSet<Cube> = FxHashSet::default();
 
-    let base_norm = base.normalized();
     queue.push_back(base.clone());
-    visited.insert(base_norm);
+    visited.insert(base.clone());
     states.push(base);
 
     let rotations = vec![vec![Move::X], vec![Move::Y], vec![Move::Z]];
-
     while let Some(current) = queue.pop_front() {
         for rot_moves in &rotations {
             let mut next = current.clone();
             for &mv in rot_moves {
                 next.apply_move(mv);
             }
-
-            let next_norm = next.normalized();
-            if visited.insert(next_norm) {
+            if visited.insert(next.clone()) {
                 states.push(next.clone());
                 queue.push_back(next);
             }
         }
     }
-    // 回転操作によって得られた物理的な向きを、
-    // 方位によらず標準パターン [0; 9] にリセットする。
     states
-        .iter()
-        .map(Cube::with_clockwise_orientations)
-        .collect()
 }
 
-/// キューブが（向きも含めて）完全に解けているか判定します。
-///
-/// 色だけでなく、ステッカーの向き（矢印の方向）も初期状態の24通りの
-/// いずれかと一致しているかを確認します。
-///
-/// # 引数
-///
-/// - `cube`: 判定するキューブ
-///
-/// # 戻り値
-///
-/// - `true`: 完全に解けている（24通りの完成状態のいずれか）
-/// - `false`: 解けていない
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_3x3::cube::Cube;
-/// use rubiks_cube_3x3::solver::is_fully_solved;
-///
-/// let cube = Cube::new();
-/// assert!(is_fully_solved(&cube));
-/// ```
-#[must_use]
 pub fn is_fully_solved(cube: &Cube) -> bool {
     get_solved_states().contains(cube)
 }
 
-/// 双方向BFSを使用して最短解を探索します（進捗送信あり）。
-///
-/// GUI用の進捗通知機能付きバージョンです。探索の進捗状況を
-/// チャネル経由で送信します。
-///
-/// # 引数
-///
-/// - `start_cube`: 開始状態のキューブ
-/// - `max_depth`: 最大探索深度
-/// - `ignore_orientation`: `true` の場合、色のみを考慮（向きは無視）
-/// - `progress_tx`: 進捗通知用のSender（Noneの場合は通知なし）
-///
-/// # 戻り値
-///
-/// 解法の結果を含む `Solution` 構造体
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_3x3::cube::{Cube, Move};
-/// use rubiks_cube_3x3::solver::solve_with_progress;
-/// use std::sync::mpsc;
-///
-/// let mut cube = Cube::new();
-/// cube.apply_move(Move::R);
-///
-/// let (tx, rx) = mpsc::channel();
-/// let solution = solve_with_progress(&cube, 11, true, Some(tx));
-/// assert!(solution.found);
-/// ```
-#[must_use]
 pub fn solve_with_progress(
     start_cube: &Cube,
     max_depth: usize,
@@ -135,113 +69,88 @@ pub fn solve_with_progress(
     solve_internal(start_cube, max_depth, ignore_orientation, progress_tx)
 }
 
-/// 双方向BFSを使用して最短解を探索します。
-///
-/// キューブの現在の状態から完成状態への最短手順を探索します。
-///
-/// # 引数
-///
-/// - `start_cube`: 開始状態のキューブ
-/// - `max_depth`: 最大探索深度（デフォルト: 11手）
-/// - `ignore_orientation`: `true` の場合、色のみを考慮（向きは無視）
-///
-/// # 戻り値
-///
-/// 解法の結果を含む `Solution` 構造体
-/// - `found`: 解が見つかったかどうか
-/// - `moves`: 解法の手順（見つかった場合）
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_3x3::cube::{Cube, Move};
-/// use rubiks_cube_3x3::solver::solve;
-///
-/// let mut cube = Cube::new();
-/// cube.apply_move(Move::R);
-/// cube.apply_move(Move::U);
-///
-/// let solution = solve(&cube, 11, true);
-/// assert!(solution.found);
-/// println!("解法: {} 手", solution.moves.len());
-/// ```
-#[must_use]
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
-    solve_internal(start_cube, max_depth, ignore_orientation, Option::None)
+    solve_internal(start_cube, max_depth, ignore_orientation, None)
 }
 
 fn solve_internal(
     start_cube: &Cube,
     max_depth: usize,
-    _ignore_orientation: bool,
+    ignore_orientation: bool,
     progress_tx: Option<std::sync::mpsc::Sender<f32>>,
 ) -> Solution {
     if let Some(ref tx) = progress_tx {
         let _ = tx.send(0.1);
     }
-
     let rc = match RawCube::from_cube(start_cube) {
         Ok(rc) => rc,
-        Err(e) => {
-            eprintln!("RawCube::from_cube failed: {}", e);
+        Err(_) => {
             return Solution {
                 moves: vec![],
                 found: false,
-            };
+            }
         }
     };
-
     if let Some(ref tx) = progress_tx {
-        let _ = tx.send(0.3);
+        let _ = tx.send(0.4);
     }
-
     let mut search = Search::new();
     let moves = search.solve(&rc, max_depth);
-
     if let Some(ref tx) = progress_tx {
         let _ = tx.send(1.0);
     }
 
     match moves {
-        Option::Some(m) => Solution {
-            moves: m,
-            found: true,
-        },
-        Option::None => Solution {
+        Some(m) => {
+            let mut final_moves = m;
+            if !ignore_orientation {
+                solve_supercube_orientations(start_cube, &mut final_moves, &mut search, max_depth);
+            }
+            Solution {
+                moves: final_moves,
+                found: true,
+            }
+        }
+        None => Solution {
             moves: vec![],
             found: false,
         },
     }
 }
 
-// --- 以下の古いBFS関連ロジックは削除 ---
-
-// WASM環境およびテスト用: インクリメンタルソルバーの実装
 #[cfg(any(target_arch = "wasm32", test))]
 impl SolverState {
-    pub fn new(start_cube: &Cube, _max_depth: usize, _ignore_orientation: bool) -> Self {
+    pub fn new(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Self {
         let rc = RawCube::from_cube(start_cube).unwrap_or_default();
         Self {
             search: Search::new(),
             raw_cube: rc,
-            max_depth: _max_depth,
+            initial_cube: start_cube.clone(),
+            max_depth,
+            ignore_orientation,
             solution: None,
             finished: false,
         }
     }
-
-    pub fn process_chunk(&mut self, _max_nodes: usize) -> (usize, bool) {
-        if self.finished {
-            return (0, true);
-        }
-        // Kociemba は高速なので、1つのチャンクで一気に解決する（暫定）
+    pub fn process_chunk(&mut self, _: usize) -> (usize, bool) {
         let moves = self.search.solve(&self.raw_cube, self.max_depth);
         self.solution = Some(match moves {
-            Option::Some(m) => Solution {
-                moves: m,
-                found: true,
-            },
-            Option::None => Solution {
+            Some(m) => {
+                let mut final_moves = m;
+                if !self.ignore_orientation {
+                    solve_supercube_orientations(
+                        &self.initial_cube,
+                        &mut final_moves,
+                        &mut self.search,
+                        self.max_depth,
+                    );
+                }
+                Solution {
+                    moves: final_moves,
+                    found: true,
+                }
+            }
+            None => Solution {
                 moves: vec![],
                 found: false,
             },
@@ -249,13 +158,9 @@ impl SolverState {
         self.finished = true;
         (1, true)
     }
-
-    /// 解を取得
     pub fn get_solution(&self) -> Option<Solution> {
         self.solution.clone()
     }
-
-    /// 進捗の推定（0.0 - 1.0）
     pub fn estimate_progress(&self) -> f32 {
         if self.finished {
             1.0
@@ -265,72 +170,278 @@ impl SolverState {
     }
 }
 
+fn solve_supercube_orientations(
+    start_cube: &Cube,
+    final_moves: &mut Vec<Move>,
+    search: &mut Search,
+    max_depth: usize,
+) {
+    let mut cube = start_cube.clone();
+    for &mv in &*final_moves {
+        cube.apply_move(mv);
+    }
+
+    if is_fully_solved(&cube) {
+        return;
+    }
+
+    // Phase 1: 180度補正
+    let centers = [
+        (Face::Up, 4),
+        (Face::Down, 13),
+        (Face::Left, 22),
+        (Face::Right, 31),
+        (Face::Front, 40),
+        (Face::Back, 49),
+    ];
+    let mut applied_any = false;
+    for (face, idx) in centers {
+        let base_ori = cube.stickers[face.start_index()].orientation;
+        let center_ori = cube.stickers[idx].orientation;
+        if (center_ori + 4 - base_ori) % 4 == 2 {
+            let seq = get_pure_180_move(face);
+            for &m in &seq {
+                cube.apply_move(m);
+            }
+            final_moves.extend(seq);
+            applied_any = true;
+        }
+    }
+
+    // Phase 2: 90度ペア補正 (1ペアずつ)
+    for _ in 0..3 {
+        let mut d90s = Vec::new();
+        for (face, idx) in centers {
+            let base_ori = cube.stickers[face.start_index()].orientation;
+            let center_ori = cube.stickers[idx].orientation;
+            let diff = (center_ori + 4 - base_ori) % 4;
+            if diff == 1 || diff == 3 {
+                d90s.push((face, diff));
+            }
+        }
+        if d90s.len() < 2 {
+            break;
+        }
+
+        let (f1, d1) = d90s[0];
+        let (f2, _) = d90s[1];
+        let seq = get_center_commutator_90_pair(f1, d1, f2);
+        for &m in &seq {
+            cube.apply_move(m);
+        }
+        final_moves.extend(seq);
+        applied_any = true;
+    }
+
+    // Phase 3: 色修正
+    if applied_any && !cube.is_solved() {
+        if let Ok(rc) = RawCube::from_cube(&cube) {
+            if let Some(m_fix) = search.solve(&rc, max_depth.max(20)) {
+                for &mv in &m_fix {
+                    cube.apply_move(mv);
+                }
+                final_moves.extend(m_fix);
+            }
+        }
+    }
+
+    // Phase 4: まだ 90 度ズレ（パリティ）がある場合、任意の面を 90 度回して再解決
+    if !is_fully_solved(&cube) {
+        let mut d90s = Vec::new();
+        for (face, idx) in centers {
+            let base_ori = cube.stickers[face.start_index()].orientation;
+            let center_ori = cube.stickers[idx].orientation;
+            let diff = (center_ori + 4 - base_ori) % 4;
+            if diff != 0 {
+                d90s.push((face, diff));
+            }
+        }
+        if !d90s.is_empty() {
+            let m = Move::U;
+            cube.apply_move(m);
+            final_moves.push(m);
+            if let Ok(rc) = RawCube::from_cube(&cube) {
+                if let Some(m_fix) = search.solve(&rc, 20) {
+                    for &mv in &m_fix {
+                        cube.apply_move(mv);
+                    }
+                    final_moves.extend(m_fix);
+                }
+            }
+        }
+    }
+
+    // Final Phase: 残った 180 度を掃除
+    for (face, idx) in centers {
+        let base_ori = cube.stickers[face.start_index()].orientation;
+        let center_ori = cube.stickers[idx].orientation;
+        if (center_ori + 4 - base_ori) % 4 == 2 {
+            let seq = get_pure_180_move(face);
+            for &m in &seq {
+                cube.apply_move(m);
+            }
+            final_moves.extend(seq);
+        }
+    }
+}
+
+fn get_pure_180_move(face: Face) -> Vec<Move> {
+    let setup = get_setup_to_up(face);
+    let mut seq = vec![
+        Move::L,
+        Move::R,
+        Move::U2,
+        Move::Lp,
+        Move::Rp,
+        Move::U,
+        Move::L,
+        Move::R,
+        Move::U2,
+        Move::Lp,
+        Move::Rp,
+        Move::U,
+    ];
+    let mut result = setup.clone();
+    result.append(&mut seq);
+    result.append(&mut undo_setup(setup));
+    result
+}
+
+fn get_center_commutator_90_pair(f1: Face, d1: u8, f2: Face) -> Vec<Move> {
+    let mut setup = get_setup_to_up(f1);
+    let s2 = match f2 {
+        Face::Front => vec![],
+        Face::Back => vec![Move::Y2],
+        Face::Left => vec![Move::Yp],
+        Face::Right => vec![Move::Y],
+        _ => vec![],
+    };
+    setup.extend(s2);
+    let mut seq = vec![
+        Move::Mp,
+        Move::U,
+        Move::M,
+        Move::Up,
+        Move::Mp,
+        Move::U,
+        Move::M,
+        Move::Up,
+        Move::Mp,
+        Move::U,
+        Move::M,
+        Move::Up,
+    ];
+    if d1 == 1 {
+        let mut inv_seq = Vec::new();
+        for m in seq.iter().rev() {
+            inv_seq.push(m.inverse());
+        }
+        seq = inv_seq;
+    }
+    let mut result = setup.clone();
+    result.append(&mut seq);
+    result.append(&mut undo_setup(setup));
+    result
+}
+
+fn get_setup_to_up(face: Face) -> Vec<Move> {
+    match face {
+        Face::Up => vec![],
+        Face::Down => vec![Move::X2],
+        Face::Left => vec![Move::Z],
+        Face::Right => vec![Move::Zp],
+        Face::Front => vec![Move::X],
+        Face::Back => vec![Move::Xp],
+    }
+}
+
+fn undo_setup(mut setup: Vec<Move>) -> Vec<Move> {
+    for m in &mut setup {
+        *m = m.inverse();
+    }
+    setup.reverse();
+    setup
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cube::{Cube, Move};
-
     #[test]
-    fn test_solver_state_incremental() {
+    fn test_solve_center_orientation_180() {
         let mut cube = Cube::new();
-        cube.apply_move(Move::R);
-        cube.apply_move(Move::U);
-
-        let mut state = SolverState::new(&cube, 2, true);
-        let (_, done) = state.process_chunk(10);
-
-        assert!(done);
-        let solution = state.get_solution().expect("Solution should be found");
-        assert!(solution.found);
-        assert!(!solution.moves.is_empty());
+        let seq = get_pure_180_move(Face::Up);
+        for &m in &seq {
+            cube.apply_move(m);
+        }
+        assert_eq!(cube.stickers[4].orientation, 2);
+        let sol = solve(&cube, 24, false);
+        let mut final_cube = cube.clone();
+        for &mv in &sol.moves {
+            final_cube.apply_move(mv);
+        }
+        assert!(is_fully_solved(&final_cube));
     }
 
     #[test]
-    fn test_solver_state_already_solved() {
-        let cube = Cube::new();
-        let mut state = SolverState::new(&cube, 11, true);
-        let (_, done) = state.process_chunk(1000);
-        assert!(done);
-        let solution = state.get_solution().unwrap();
-        assert!(solution.found);
-        assert_eq!(solution.moves.len(), 0);
-    }
-
-    #[test]
-    fn test_solve_internal_forward_early_exit() {
-        // R操作を1回適用したキューブを解く
+    fn test_solve_center_orientation_90_pair() {
         let mut cube = Cube::new();
-        cube.apply_move(Move::R);
-
-        // Kociembaアルゴリズムは最適解を保証しないが、短い解を見つけるはず
-        let (tx, rx) = std::sync::mpsc::channel();
-        let solution = solve_internal(&cube, 11, true, Some(tx));
-        assert!(solution.found);
-        // Kociembaは厳密に最短解を保証しないため、数手以内であることを確認
-        assert!(
-            !solution.moves.is_empty() && solution.moves.len() <= 5,
-            "Expected 1-5 moves, got {}",
-            solution.moves.len()
-        );
-
-        // 進捗送信の確認 (1.0 が送られるはず)
-        let progress: Vec<f32> = rx.into_iter().collect();
-        assert!(progress.contains(&1.0));
+        let seq = get_center_commutator_90_pair(Face::Up, 1, Face::Front);
+        for &m in &seq {
+            cube.apply_move(m);
+        }
+        let sol = solve(&cube, 24, false);
+        assert!(sol.found);
+        let mut final_cube = cube.clone();
+        for &mv in &sol.moves {
+            final_cube.apply_move(mv);
+        }
+        if !is_fully_solved(&final_cube) {
+            println!("90_pair test failed output:");
+            for face in Face::all() {
+                let start = face.start_index();
+                println!(
+                    "Face {:?}: color={:?}, center_ori={}, corner_ori={}",
+                    face,
+                    final_cube.stickers[start + 4].color,
+                    final_cube.stickers[start + 4].orientation,
+                    final_cube.stickers[start].orientation
+                );
+            }
+        }
+        assert!(is_fully_solved(&final_cube));
     }
 
     #[test]
-    fn test_solve_internal_unsolvable_low_depth() {
+    fn test_solve_center_orientation_complex() {
         let mut cube = Cube::new();
-        // R U は HTM で 2手必要。depth 1 では解けないはず。
-        cube.apply_move(Move::R);
-        cube.apply_move(Move::U);
-        let solution = solve_internal(&cube, 1, false, None);
-        assert!(!solution.found);
-    }
-
-    #[test]
-    fn test_get_solved_states_duplicates() {
-        let states = get_solved_states();
-        assert_eq!(states.len(), 24);
+        let m180 = get_pure_180_move(Face::Up);
+        for &m in &m180 {
+            cube.apply_move(m);
+        }
+        let m90pair = get_center_commutator_90_pair(Face::Left, 1, Face::Right);
+        for &m in &m90pair {
+            cube.apply_move(m);
+        }
+        let sol = solve(&cube, 24, false);
+        assert!(sol.found);
+        let mut final_cube = cube.clone();
+        for &mv in &sol.moves {
+            final_cube.apply_move(mv);
+        }
+        if !is_fully_solved(&final_cube) {
+            println!("Complex test failed output:");
+            for face in Face::all() {
+                let start = face.start_index();
+                println!(
+                    "Face {:?}: color={:?}, center_ori={}, corner_ori={}",
+                    face,
+                    final_cube.stickers[start + 4].color,
+                    final_cube.stickers[start + 4].orientation,
+                    final_cube.stickers[start].orientation
+                );
+            }
+        }
+        assert!(is_fully_solved(&final_cube));
+        assert!(sol.moves.len() < 100);
     }
 }

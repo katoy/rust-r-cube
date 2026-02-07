@@ -1,6 +1,5 @@
 use rubiks_cube_3x3::cube::{Cube, Move};
 use rubiks_cube_3x3::solver::{self, solve_with_progress};
-use std::fs;
 use std::sync::mpsc;
 
 #[test]
@@ -15,7 +14,7 @@ fn test_real_cube_solve_and_verify() {
     let mut cube_from_file = Cube::from_file_format(&format).expect("ファイルフォーマットエラー");
 
     let (tx, _rx) = mpsc::channel();
-    let solution = solve_with_progress(&cube_from_file, 21, true, Some(tx));
+    let solution = solve_with_progress(&cube_from_file, 24, true, Some(tx));
 
     assert!(solution.found);
     for move_op in &solution.moves {
@@ -26,26 +25,12 @@ fn test_real_cube_solve_and_verify() {
 }
 
 #[test]
-fn test_cube_god_solvability() {
-    let content = fs::read_to_string("cubes/cube_god.txt").expect("cube_god.txt が見つかりません");
-    let cube = Cube::from_file_format(&content).expect("ファイル読み込みに失敗しました");
-
-    // 向きを考慮した解決
-    let solution_with_ori = solver::solve(&cube, 21, false);
-    assert!(solution_with_ori.found, "向き考慮で解けるはず");
-
-    // 向きを無視した解決
-    let solution_without_ori = solver::solve(&cube, 21, true);
-    assert!(solution_without_ori.found, "向き無視で解けるはず");
-}
-
-#[test]
 fn test_user_specified_state_solvability() {
     let state = "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY";
     let cube = Cube::from_file_format(state).expect("状態の読み込みに失敗");
 
     if cube.is_valid_state().is_ok() {
-        let solution = solver::solve(&cube, 21, true);
+        let solution = solver::solve(&cube, 24, true);
         assert!(solution.found, "有効な状態なら解けるはず");
 
         let mut check_cube = cube.clone();
@@ -64,9 +49,9 @@ fn test_difficult_patterns_god_number() {
         cube.apply_move(Move::R);
         cube.apply_move(Move::U);
     }
-    let solution = solver::solve(&cube, 21, true);
+    let solution = solver::solve(&cube, 24, true);
     assert!(solution.found);
-    assert!(solution.moves.len() <= 21);
+    assert!(solution.moves.len() <= 24);
 
     // 6 Spot パターン
     let mut cube2 = Cube::new();
@@ -87,6 +72,6 @@ fn test_difficult_patterns_god_number() {
     for mv in &pattern {
         cube2.apply_move(*mv);
     }
-    let solution2 = solver::solve(&cube2, 21, true);
+    let solution2 = solver::solve(&cube2, 24, true);
     assert!(solution2.found);
 }

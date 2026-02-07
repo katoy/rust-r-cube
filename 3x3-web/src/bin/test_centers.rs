@@ -1,112 +1,30 @@
-use rubiks_cube_3x3::cube::{Cube, Face, Move};
-use std::collections::{HashMap, VecDeque};
+use rubiks_cube_3x3::cube::{Cube, Move};
+use rubiks_cube_3x3::solver::get_orientations_vec;
 
 fn main() {
-    let mut visited = HashMap::new();
-    let mut queue = VecDeque::new();
-
-    let start = Cube::new();
-    visited.insert(start.clone(), Vec::new());
-    queue.push_back(start.clone());
-
-    println!("Searching for pure center orientation procedures (Outer moves only)...");
-
-    let mut count = 0;
-    while let Some(current) = queue.pop_front() {
-        count += 1;
-        let path = visited.get(&current).unwrap().clone();
-
-        if path.len() > 10 {
-            continue;
-        }
-
-        if current.is_solved() {
-            let mut mismatch = Vec::new();
-            for f in Face::all() {
-                let start_idx = f.start_index();
-                if current.stickers[start_idx + 4].orientation
-                    != current.stickers[start_idx].orientation
-                {
-                    mismatch.push(f);
-                }
-            }
-            if !mismatch.is_empty() {
-                println!("FOUND PURE OR FIX! Path: {:?}", path);
-                for f in mismatch {
-                    let start_idx = f.start_index();
-                    println!(
-                        "Face {:?}: diff={}",
-                        f,
-                        (current.stickers[start_idx + 4].orientation + 4
-                            - current.stickers[start_idx].orientation)
-                            % 4
-                    );
-                }
-                if is_target(&current) {
-                    return;
-                }
-            }
-        }
-
-        let outer_moves = [
-            Move::U,
-            Move::Up,
-            Move::U2,
-            Move::D,
-            Move::Dp,
-            Move::D2,
-            Move::L,
-            Move::Lp,
-            Move::L2,
-            Move::R,
-            Move::Rp,
-            Move::R2,
-            Move::F,
-            Move::Fp,
-            Move::F2,
-            Move::B,
-            Move::Bp,
-            Move::B2,
-        ];
-
-        for &mv in &outer_moves {
-            // 逆転手順を避けるための簡単な枝刈り
-            if let Some(&last) = path.last() {
-                if mv.inverse() == last {
-                    continue;
-                }
-            }
-
-            let mut next = current.clone();
-            next.apply_move(mv);
-            if !visited.contains_key(&next) {
-                let mut next_path = path.clone();
-                next_path.push(mv);
-                visited.insert(next.clone(), next_path);
-                queue.push_back(next);
-            }
-        }
-
-        if count % 100000 == 0 {
-            println!("Checked {} states, depth {}", count, path.len());
-        }
+    let mut cube = Cube::new();
+    // (U Dp Ep) rotates Up CW (1) and Down CCW (3)
+    let seq = vec![Move::U, Move::Dp, Move::Ep];
+    for &m in &seq {
+        cube.apply_move(m);
     }
-}
+    println!("Initial state (after sequence):");
+    println!("  Solved (colors): {}", cube.is_solved());
+    println!("  Orientations: {:?}", get_orientations_vec(&cube));
 
-fn is_target(cube: &Cube) -> bool {
-    let mut d90s = 0;
-    let mut d180s = 0;
-    for f in Face::all() {
-        let start_idx = f.start_index();
-        let diff = (cube.stickers[start_idx + 4].orientation + 4
-            - cube.stickers[start_idx].orientation)
-            % 4;
-        if diff == 1 || diff == 3 {
-            d90s += 1;
+    let sol = rubiks_cube_3x3::solver::solve(&cube, 24, false);
+    println!("Solver found solution: {}", sol.found);
+    if sol.found {
+        let mut final_cube = cube.clone();
+        for &mv in &sol.moves {
+            final_cube.apply_move(mv);
         }
-        if diff == 2 {
-            d180s += 1;
-        }
+        println!("Final state:");
+        println!("  Solved (colors): {}", final_cube.is_solved());
+        println!(
+            "  Fully Solved: {}",
+            final_cube.is_solved_with_orientation()
+        );
+        println!("  Orientations: {:?}", get_orientations_vec(&final_cube));
     }
-    d90s == 2 && d180s == 0
 }

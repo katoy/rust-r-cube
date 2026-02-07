@@ -30,6 +30,32 @@ impl Face {
         (self as usize) * STICKERS_PER_FACE
     }
 
+    /// 対面を取得します。
+    #[must_use]
+    pub fn opposite(self) -> Face {
+        match self {
+            Face::Up => Face::Down,
+            Face::Down => Face::Up,
+            Face::Left => Face::Right,
+            Face::Right => Face::Left,
+            Face::Front => Face::Back,
+            Face::Back => Face::Front,
+        }
+    }
+
+    /// 適当な隣接面を1つ取得します。
+    #[must_use]
+    pub fn any_adjacent(self) -> Face {
+        match self {
+            Face::Up => Face::Front,
+            Face::Down => Face::Front,
+            Face::Left => Face::Up,
+            Face::Right => Face::Up,
+            Face::Front => Face::Up,
+            Face::Back => Face::Up,
+        }
+    }
+
     /// すべての面を列挙した配列を返します。
     ///
     /// # 例
@@ -220,7 +246,47 @@ pub enum Move {
 }
 
 impl Move {
-    /// 利用可能なすべての回転操作（18種類）を一覧したベクタを返します。
+    /// 全体回転（X, Y, Z）であるかを判定します。
+    #[must_use]
+    pub fn is_global(self) -> bool {
+        matches!(
+            self,
+            Move::X
+                | Move::Xp
+                | Move::X2
+                | Move::Y
+                | Move::Yp
+                | Move::Y2
+                | Move::Z
+                | Move::Zp
+                | Move::Z2
+        )
+    }
+
+    /// 中層回転（M, E, S）であるかを判定します。
+    #[must_use]
+    pub fn is_middle_layer(self) -> bool {
+        matches!(
+            self,
+            Move::M
+                | Move::Mp
+                | Move::M2
+                | Move::E
+                | Move::Ep
+                | Move::E2
+                | Move::S
+                | Move::Sp
+                | Move::S2
+        )
+    }
+
+    /// 基本面回転（U, D, L, R, F, B）であるかを判定します。
+    #[must_use]
+    pub fn is_face_move(self) -> bool {
+        !self.is_global() && !self.is_middle_layer()
+    }
+
+    /// 利用可能なすべての回転操作（36種類）を一覧したベクタを返します。
     #[must_use]
     pub fn all_moves() -> Vec<Move> {
         vec![

@@ -124,46 +124,36 @@ impl Cubie {
 }
 
 /// 指定された回転行列に基づいて向きを計算します（アニメーション用）。
-pub fn calculate_orientation_with_rot(initial_normal: Vec3, current_normal: Vec3, rot: Mat4) -> u8 {
-    use glam::Quat;
-
-    let initial_v_base = get_face_up_axis(initial_normal);
+pub fn calculate_orientation_with_rot(
+    _initial_normal: Vec3,
+    current_normal: Vec3,
+    rot: Mat4,
+) -> u8 {
     let current_v_base = get_face_up_axis(current_normal);
 
-    let shortest_rot = Quat::from_rotation_arc(initial_normal, current_normal);
-    let natural_v = shortest_rot.mul_vec3(initial_v_base);
+    // ピースの初期「上」方向（Whiteステッカーなら -Z等）が、今の回転行列でどこを向いているか
+    // すべてのステッカーについて、初期状態 (rot=IDENTITY) での initial_normal 方向の面において
+    // get_face_up_axis(initial_normal) が「上 (orientation=0)」を指していると仮定する。
+    // しかし、Cubie には複数のステッカーがあるので、各ステッカーごとに初期の上方向が異なる。
 
+    // 正しいアプローチ: 各ステッカーの initial_normal に対応する initial_v_base を求める。
+    let initial_v_base = get_face_up_axis(_initial_normal);
     let actual_v = rot.transform_vector3(initial_v_base);
 
-    let dot = actual_v.dot(natural_v);
-    let raw_ori = if dot > 0.9 {
+    // actual_v と、現在の面の基準上方向 current_v_base のズレを計算する。
+    let dot = actual_v.dot(current_v_base);
+    if dot > 0.9 {
         0
     } else if dot < -0.9 {
         2
     } else {
-        let cross = natural_v.cross(actual_v);
+        let cross = current_v_base.cross(actual_v);
         if cross.dot(current_normal) > 0.9 {
-            3 // CCW: natural -> actual is CCW
+            3 // CCW
         } else {
-            1 // CW: natural -> actual is CW
+            1 // CW
         }
-    };
-
-    let base_dot = natural_v.dot(current_v_base);
-    let base_offset = if base_dot > 0.9 {
-        0
-    } else if base_dot < -0.9 {
-        2
-    } else {
-        let cross = current_v_base.cross(natural_v);
-        if cross.dot(current_normal) > 0.9 {
-            3 // CCW: v_base -> natural is CCW
-        } else {
-            1 // CW: v_base -> natural is CW
-        }
-    };
-
-    (raw_ori + base_offset) % 4
+    }
 }
 
 /// 面と空間座標から、面内の 0-8 のインデックスを返します。

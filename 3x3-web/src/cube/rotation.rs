@@ -33,7 +33,10 @@ pub fn apply_move(cube: &mut Cube, mv: Move) {
 pub fn scramble(cube: &mut Cube, moves: usize) {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    let all_moves = Move::all_moves();
+    let all_moves: Vec<Move> = Move::all_moves()
+        .into_iter()
+        .filter(|m| !m.is_global() && !m.is_middle_layer())
+        .collect();
 
     for _ in 0..moves {
         let mv = all_moves[rng.gen_range(0..all_moves.len())];

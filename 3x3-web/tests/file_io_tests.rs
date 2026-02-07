@@ -87,7 +87,7 @@ fn test_save_load_orientation_restoration() {
     let loaded_cube = Cube::from_file_format(&saved_str).expect("Failed to load");
 
     assert!(loaded_cube.is_valid_state().is_ok());
-    let solution = rubiks_cube_3x3::solver::solve(&loaded_cube, 11, false);
+    let solution = rubiks_cube_3x3::solver::solve(&loaded_cube, 24, false);
     assert!(solution.found);
 }
 

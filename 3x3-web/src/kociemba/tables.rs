@@ -194,9 +194,6 @@ fn generate_twist_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
             break;
         }
         distance += 1;
-        if distance > 20 {
-            break;
-        }
     }
     table.into_boxed_slice()
 }
@@ -235,9 +232,6 @@ fn generate_flip_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
             break;
         }
         distance += 1;
-        if distance > 20 {
-            break;
-        }
     }
     table.into_boxed_slice()
 }
@@ -252,7 +246,8 @@ fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let initial2 = 0;
     table[initial1 * size2 + initial2] = 0;
 
-    let allowed_moves = [0, 1, 2, 9, 10, 11, 4, 13, 7, 16];
+    // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
+    let allowed_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
 
     let mut distance = 0;
     let mut count = 1;
@@ -278,9 +273,6 @@ fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
             break;
         }
         distance += 1;
-        if distance > 20 {
-            break;
-        }
     }
     table.into_boxed_slice()
 }
@@ -295,7 +287,8 @@ fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let initial2 = 0;
     table[initial1 * size2 + initial2] = 0;
 
-    let allowed_moves = [0, 1, 2, 9, 10, 11, 4, 13, 7, 16];
+    // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
+    let allowed_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
 
     let mut distance = 0;
     let mut count = 1;
@@ -321,9 +314,6 @@ fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
             break;
         }
         distance += 1;
-        if distance > 20 {
-            break;
-        }
     }
     table.into_boxed_slice()
 }

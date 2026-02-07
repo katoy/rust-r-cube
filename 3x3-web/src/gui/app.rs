@@ -1287,10 +1287,14 @@ impl eframe::App for CubeApp {
             .default_width(UI_SIDE_PANEL_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.vertical(|ui| {
-                    ui.add_space(UI_SPACING_LARGE);
-                    crate::gui::controls::draw_controls(self, ui);
-                });
+                egui::ScrollArea::vertical()
+                    .id_salt("side_panel_scroll")
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.add_space(UI_SPACING_LARGE);
+                            crate::gui::controls::draw_controls(self, ui);
+                        });
+                    });
             });
 
         // 中央パネル (メインコンテンツ)

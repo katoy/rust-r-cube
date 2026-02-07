@@ -83,6 +83,95 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
     solve_internal(start_cube, max_depth, ignore_orientation, None)
 }
 
+/// setup_moves と rotation を適用してソルバーを実行し、解の検証と向き修正を行う
+///
+/// 成功時に Solution を返す。max_depth を超える場合や解けない場合は None を返す。
+fn try_solve_with_rotation(
+    start_cube: &Cube,
+    setup_moves: &[Move],
+    rotation: &[Move],
+    max_depth: usize,
+    ignore_orientation: bool,
+    search: &mut Search,
+    color_only_solution: &mut Option<Solution>,
+) -> Option<Solution> {
+    // setup_moves + rotation を適用したキューブを作成
+    let mut test_cube = start_cube.clone();
+    for &m in setup_moves {
+        test_cube.apply_move(m);
+    }
+    for &m in rotation {
+        test_cube.apply_move(m);
+    }
+
+    // RawCube に変換
+    let rc = RawCube::from_cube(&test_cube).ok()?;
+
+    // 必要な手数を計算
+    let needed = setup_moves.len() + rotation.len();
+    if needed >= max_depth {
+        return None;
+    }
+
+    // Kociemba ソルバーで解を探索
+    let m_fix = search.solve(&rc, max_depth.saturating_sub(needed))?;
+
+    // 全ての手順を結合
+    let mut moves = Vec::new();
+    moves.extend_from_slice(setup_moves);
+    moves.extend_from_slice(rotation);
+    moves.extend(m_fix);
+
+    // 解を適用して検証
+    let mut check_cube = start_cube.clone();
+    for &m in &moves {
+        check_cube.apply_move(m);
+    }
+
+    // 完全に解けている場合、即座に返す
+    if is_fully_solved(&check_cube) && moves.len() <= max_depth {
+        return Some(Solution { moves, found: true });
+    }
+
+    // 向きを無視する場合、色が揃っていれば返す
+    if ignore_orientation && check_cube.is_solved() && moves.len() <= max_depth {
+        return Some(Solution { moves, found: true });
+    }
+
+    // 色が揃っている場合、向き修正を試みる
+    if check_cube.is_solved() {
+        let fixes = apply_supercube_fixes(&check_cube, search);
+        let mut final_moves = moves.clone();
+        final_moves.extend(fixes.clone());
+
+        let mut final_cube = check_cube.clone();
+        for &m in &fixes {
+            final_cube.apply_move(m);
+        }
+
+        if is_fully_solved(&final_cube) {
+            if final_moves.len() <= max_depth {
+                return Some(Solution {
+                    moves: final_moves,
+                    found: true,
+                });
+            }
+            // max_depth を超える場合でも、color_only_solution として保存
+            if color_only_solution.is_none() {
+                *color_only_solution = Some(Solution {
+                    moves: final_moves,
+                    found: true,
+                });
+            }
+        }
+    } else if !ignore_orientation && color_only_solution.is_none() {
+        // 色が揃っていない場合でも、部分解として保存
+        *color_only_solution = Some(Solution { moves, found: true });
+    }
+
+    None
+}
+
 fn solve_internal(
     start_cube: &Cube,
     max_depth: usize,
@@ -117,66 +206,19 @@ fn solve_internal(
 
     // 1. 直近方位試行
     for rot in &rotations {
-        let mut test_cube = start_cube.clone();
-        for &m in rot {
-            test_cube.apply_move(m);
-        }
-        if let Ok(rc) = RawCube::from_cube(&test_cube) {
-            let color_solve_limit = max_depth;
-            if let Some(m_fix) = search.solve(&rc, color_solve_limit.saturating_sub(rot.len())) {
-                let mut moves = rot.clone();
-                moves.extend(m_fix);
-                let mut check_cube = start_cube.clone();
-                for &m in &moves {
-                    check_cube.apply_move(m);
-                }
-                if is_fully_solved(&check_cube) && moves.len() <= max_depth {
-                    if let Some(ref tx) = progress_tx {
-                        let _ = tx.send(1.0);
-                    }
-                    return Solution { moves, found: true };
-                }
-                if ignore_orientation && check_cube.is_solved() && moves.len() <= max_depth {
-                    if let Some(ref tx) = progress_tx {
-                        let _ = tx.send(1.0);
-                    }
-                    return Solution {
-                        moves: moves.clone(),
-                        found: true,
-                    };
-                }
-                if check_cube.is_solved() {
-                    let fixes = apply_supercube_fixes(&check_cube, &mut search);
-                    let mut final_moves = moves.clone();
-                    final_moves.extend(fixes.clone());
-                    let mut final_cube = check_cube.clone();
-                    for &m in &fixes {
-                        final_cube.apply_move(m);
-                    }
-                    if is_fully_solved(&final_cube) {
-                        if final_moves.len() <= max_depth {
-                            if let Some(ref tx) = progress_tx {
-                                let _ = tx.send(1.0);
-                            }
-                            return Solution {
-                                moves: final_moves,
-                                found: true,
-                            };
-                        }
-                        if color_only_solution.is_none() {
-                            color_only_solution = Some(Solution {
-                                moves: final_moves,
-                                found: true,
-                            });
-                        }
-                    }
-                } else if color_only_solution.is_none() {
-                    color_only_solution = Some(Solution {
-                        moves: moves.clone(),
-                        found: true,
-                    });
-                }
+        if let Some(solution) = try_solve_with_rotation(
+            start_cube,
+            &[],
+            rot,
+            max_depth,
+            ignore_orientation,
+            &mut search,
+            &mut color_only_solution,
+        ) {
+            if let Some(ref tx) = progress_tx {
+                let _ = tx.send(1.0);
             }
+            return solution;
         }
     }
 
@@ -199,72 +241,26 @@ fn solve_internal(
             let _ = tx.send(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
         }
         let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
-        let mut setup_moves = Vec::with_capacity(n_random);
-        let mut trial_cube = start_cube.clone();
+        let mut setup_moves = vec![];
         for _ in 0..n_random {
             let m = all_moves[next_rn(&mut seed) % TOTAL_BASIC_MOVES];
-            trial_cube.apply_move(m);
             setup_moves.push(m);
         }
         let rot = &rotations[next_rn(&mut seed) % TOTAL_ROTATIONS];
-        if setup_moves.len() + rot.len() >= max_depth {
-            continue;
-        }
-        let mut test_cube = trial_cube.clone();
-        for &m in rot {
-            test_cube.apply_move(m);
-        }
-        if let Ok(rc) = RawCube::from_cube(&test_cube) {
-            let color_solve_limit = max_depth;
-            let needed = setup_moves.len() + rot.len();
-            if color_solve_limit > needed {
-                if let Some(m_fix) = search.solve(&rc, color_solve_limit.saturating_sub(needed)) {
-                    let mut base_moves = setup_moves.clone();
-                    base_moves.extend(rot.clone());
-                    base_moves.extend(m_fix);
-                    let mut check_cube = start_cube.clone();
-                    for &m in &base_moves {
-                        check_cube.apply_move(m);
-                    }
-                    if is_fully_solved(&check_cube) && base_moves.len() <= max_depth {
-                        if let Some(ref tx) = progress_tx {
-                            let _ = tx.send(1.0);
-                        }
-                        return Solution {
-                            moves: base_moves,
-                            found: true,
-                        };
-                    }
-                    if ignore_orientation && check_cube.is_solved() && base_moves.len() <= max_depth
-                    {
-                        if let Some(ref tx) = progress_tx {
-                            let _ = tx.send(1.0);
-                        }
-                        return Solution {
-                            moves: base_moves,
-                            found: true,
-                        };
-                    }
-                    if check_cube.is_solved() {
-                        let fixes = apply_supercube_fixes(&check_cube, &mut search);
-                        let mut final_moves = base_moves.clone();
-                        final_moves.extend(fixes.clone());
-                        let mut final_cube = check_cube.clone();
-                        for &m in &fixes {
-                            final_cube.apply_move(m);
-                        }
-                        if is_fully_solved(&final_cube) && final_moves.len() <= max_depth {
-                            if let Some(ref tx) = progress_tx {
-                                let _ = tx.send(1.0);
-                            }
-                            return Solution {
-                                moves: final_moves,
-                                found: true,
-                            };
-                        }
-                    }
-                }
+
+        if let Some(solution) = try_solve_with_rotation(
+            start_cube,
+            &setup_moves,
+            rot,
+            max_depth,
+            ignore_orientation,
+            &mut search,
+            &mut color_only_solution,
+        ) {
+            if let Some(ref tx) = progress_tx {
+                let _ = tx.send(1.0);
             }
+            return solution;
         }
     }
     if let Some(ref tx) = progress_tx {

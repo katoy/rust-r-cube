@@ -4,6 +4,16 @@ use std::sync::OnceLock;
 
 pub const DEFAULT_MAX_DEPTH: usize = 32;
 
+// ランダム探索パラメータ
+const RANDOM_TRIALS: usize = 3000;
+const RANDOM_SEED: usize = 999888777;
+const LCG_MULTIPLIER: usize = 1103515245;
+const LCG_INCREMENT: usize = 12345;
+const PROGRESS_WEIGHT: f32 = 0.9;
+const MAX_SETUP_MOVES: usize = 6;
+const TOTAL_BASIC_MOVES: usize = 18;
+const TOTAL_ROTATIONS: usize = 24;
+
 #[derive(Debug, Clone)]
 pub struct Solution {
     pub moves: Vec<Move>,
@@ -178,25 +188,25 @@ fn solve_internal(
 
     // 2. 超軽量・高密度試行 (2000試行)
     let all_moves = Move::all_moves();
-    let mut seed: usize = 999888777;
+    let mut seed: usize = RANDOM_SEED;
     let next_rn = |s: &mut usize| -> usize {
-        *s = s.wrapping_mul(1103515245).wrapping_add(12345);
+        *s = s.wrapping_mul(LCG_MULTIPLIER).wrapping_add(LCG_INCREMENT);
         (*s / 65536) % 32768
     };
 
-    for trial_iter in 0..3000 {
+    for trial_iter in 0..RANDOM_TRIALS {
         if let Some(ref tx) = progress_tx {
-            let _ = tx.send(trial_iter as f32 / 3000.0 * 0.9);
+            let _ = tx.send(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
         }
-        let n_random = (next_rn(&mut seed) % 6) + 1;
+        let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
         let mut setup_moves = Vec::with_capacity(n_random);
         let mut trial_cube = start_cube.clone();
         for _ in 0..n_random {
-            let m = all_moves[next_rn(&mut seed) % 18];
+            let m = all_moves[next_rn(&mut seed) % TOTAL_BASIC_MOVES];
             trial_cube.apply_move(m);
             setup_moves.push(m);
         }
-        let rot = &rotations[next_rn(&mut seed) % 24];
+        let rot = &rotations[next_rn(&mut seed) % TOTAL_ROTATIONS];
         if setup_moves.len() + rot.len() >= max_depth {
             continue;
         }

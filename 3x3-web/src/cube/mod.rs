@@ -322,6 +322,52 @@ impl Cube {
         self.restore_orientation_instantly()
     }
 
+    /// ステッカー配列に設定された中央方位（orientation）情報を、内部のピース状態に強制的に同期させます。
+    ///
+    /// 通常、`apply_move` を呼ぶとピースの状態からステッカーが再生成されますが、
+    /// テストなどでステッカーの方位を直接書き換えた場合、このメソッドを呼ぶことで
+    /// その方位を物理的なピースの回転状態として定着させることができます。
+    pub fn force_sync_orientation_to_pieces(&mut self) {
+        use crate::cube::validation::CENTER_STICKERS;
+
+        for &idx in &CENTER_STICKERS {
+            let ori = self.stickers[idx].orientation;
+            if ori == 0 {
+                continue;
+            }
+
+            // 該当するセンターピースを見つける
+            let target_color = self.stickers[idx].color;
+            for p in &mut self.pieces {
+                if p.piece_type == crate::cube::piece::PieceType::Center
+                    && p.stickers[0].color == target_color
+                {
+                    // センターピースの向きを更新する
+                    // calculate_orientation の逆関数的な動作が必要。
+                    // 0 -> 単位行列
+                    // 1 -> 軸を中心に時計回り 90度
+                    // 2 -> 180度
+                    // 3 -> 反時計回り 90度
+
+                    let normal = p.stickers[0].initial_normal;
+                    let angle = match ori {
+                        1 => -std::f32::consts::FRAC_PI_2, // CW
+                        2 => std::f32::consts::PI,         // 180
+                        3 => std::f32::consts::FRAC_PI_2,  // CCW
+                        _ => 0.0,
+                    };
+
+                    // 現在の回転をリセットして、指定された方位に設定する
+                    // (注意: このメソッドは「色が揃っている解決状態」付近での使用を想定している)
+                    p.current_rot = glam::Mat4::from_axis_angle(normal, angle);
+                    break;
+                }
+            }
+        }
+        // pieces を更新したので、再度 stickers に反映（整合性確保）
+        self.sync_stickers();
+    }
+
     /// 各ステッカーの向き情報をリセット（0に設定）したキューブの複製を返します。
     ///
     /// ハッシュマップやセットで、向きによらず「色の配置」のみで状態を管理したい場合に使用します。

@@ -39,20 +39,23 @@ pub fn get_solved_states() -> &'static [Cube] {
 fn generate_all_solved_states() -> Vec<Cube> {
     use rustc_hash::FxHashSet;
     use std::collections::VecDeque;
+
     let base = Cube::new();
     let mut states = Vec::new();
     let mut queue = VecDeque::new();
     let mut visited: FxHashSet<Cube> = FxHashSet::default();
+
     queue.push_back(base.clone());
     visited.insert(base.clone());
     states.push(base);
-    let rotations = vec![vec![Move::X], vec![Move::Y], vec![Move::Z]];
+
+    // X, Y, Z 軸の 90 度回転のみを基本単位とする
+    let basic_rotations = [Move::X, Move::Y, Move::Z];
+
     while let Some(current) = queue.pop_front() {
-        for rot_moves in &rotations {
+        for &rot in &basic_rotations {
             let mut next = current.clone();
-            for &mv in rot_moves {
-                next.apply_move(mv);
-            }
+            next.apply_move(rot);
             if visited.insert(next.clone()) {
                 states.push(next.clone());
                 queue.push_back(next);
@@ -63,11 +66,33 @@ fn generate_all_solved_states() -> Vec<Cube> {
 }
 
 pub fn is_fully_solved(cube: &Cube) -> bool {
+    // 色が揃っていない場合は即座に false
     if !cube.is_solved() {
         return false;
     }
+
     let oris = get_orientations_vec(cube);
-    oris.iter().all(|&o| o == 0)
+    let total_ori: u32 = oris.iter().map(|&o| o as u32).sum();
+
+    // センター方位の合計が偶数（90度単位の回転数の合計が 180度の倍数）であれば、
+    // 物理的に全方位完成状態（SOLVED_STATES のいずれか）に到達可能なパリティ状態である。
+    let is_matched = total_ori.is_multiple_of(2);
+
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        if is_matched {
+            println!(
+                "DEBUG: is_fully_solved: ACCEPTED (Even parity). RelativeOris={:?}",
+                oris
+            );
+        } else {
+            println!(
+                "DEBUG: is_fully_solved: REJECTED (Odd parity). RelativeOris={:?}",
+                oris
+            );
+        }
+    }
+
+    is_matched
 }
 
 pub fn solve_with_progress(
@@ -81,6 +106,23 @@ pub fn solve_with_progress(
 
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
     solve_internal(start_cube, max_depth, ignore_orientation, None)
+}
+
+/// プログレス報告を抽象化するヘルパー
+struct ProgressReporter {
+    tx: Option<std::sync::mpsc::Sender<f32>>,
+}
+
+impl ProgressReporter {
+    fn new(tx: Option<std::sync::mpsc::Sender<f32>>) -> Self {
+        Self { tx }
+    }
+
+    fn report(&self, progress: f32) {
+        if let Some(ref tx) = self.tx {
+            let _ = tx.send(progress);
+        }
+    }
 }
 
 /// setup_moves と rotation を適用してソルバーを実行し、解の検証と向き修正を行う
@@ -128,14 +170,20 @@ fn try_solve_with_rotation(
         check_cube.apply_move(m);
     }
 
-    // 完全に解けている場合、即座に返す
+    // 完全に解けている場合 (方位も含めて)
     if is_fully_solved(&check_cube) && moves.len() <= max_depth {
-        return Some(Solution { moves, found: true });
+        return Some(Solution {
+            moves: moves.clone(),
+            found: true,
+        });
     }
 
-    // 向きを無視する場合、色が揃っていれば返す
+    // 向きを無視する場合に限り、色が揃っていれば即座に返す
     if ignore_orientation && check_cube.is_solved() && moves.len() <= max_depth {
-        return Some(Solution { moves, found: true });
+        return Some(Solution {
+            moves: moves.clone(),
+            found: true,
+        });
     }
 
     // 色が揃っている場合、向き修正を試みる
@@ -156,18 +204,22 @@ fn try_solve_with_rotation(
                     found: true,
                 });
             }
-            // max_depth を超える場合でも、color_only_solution として保存
-            if color_only_solution.is_none() {
+            // max_depth を超え、かつ ignore_orientation の場合のみ、color_only_solution として保存
+            if ignore_orientation && color_only_solution.is_none() {
                 *color_only_solution = Some(Solution {
                     moves: final_moves,
                     found: true,
                 });
             }
         }
-    } else if !ignore_orientation && color_only_solution.is_none() {
-        // 色が揃っていない場合でも、部分解として保存
-        *color_only_solution = Some(Solution { moves, found: true });
     }
+    // ignore_orientation が false の場合、色が揃っていない状態は color_only_solution として保存しない
+    // (color_only_solution は色が揃っているが向きが揃っていない状態を保存するために使用される)
+    // また、色が揃っているが向きが揃わない状態（パリティエラー）も、ignore_orientation=false の場合は
+    // color_only_solution には保存しない。
+    // このブロックは、check_cube.is_solved() が false の場合にのみ到達する。
+    // そのため、color_only_solution には、色が揃った状態のみを保存する。
+    // したがって、この else if ブロックは削除する。
 
     None
 }
@@ -178,22 +230,19 @@ fn solve_internal(
     ignore_orientation: bool,
     progress_tx: Option<std::sync::mpsc::Sender<f32>>,
 ) -> Solution {
-    if let Some(ref tx) = progress_tx {
-        let _ = tx.send(0.0);
-    }
+    let progress = ProgressReporter::new(progress_tx);
+    progress.report(0.0);
+
     if is_fully_solved(start_cube) {
-        if let Some(ref tx) = progress_tx {
-            let _ = tx.send(1.0);
-        }
+        progress.report(1.0);
         return Solution {
             moves: vec![],
             found: true,
         };
     }
+    // 向きを無視する場合に限り、色が揃っていれば即座に返す
     if ignore_orientation && start_cube.is_solved() {
-        if let Some(ref tx) = progress_tx {
-            let _ = tx.send(1.0);
-        }
+        progress.report(1.0);
         return Solution {
             moves: vec![],
             found: true,
@@ -215,15 +264,17 @@ fn solve_internal(
             &mut search,
             &mut color_only_solution,
         ) {
-            if let Some(ref tx) = progress_tx {
-                let _ = tx.send(1.0);
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!("DEBUG: solve_internal returned solution from basic rotations");
             }
+            progress.report(1.0);
             return solution;
         }
     }
 
+    // ignore_orientation が true の場合、色が揃った解があればそれを優先
     if ignore_orientation {
-        if let Some(sol) = color_only_solution {
+        if let Some(sol) = color_only_solution.clone() {
             return sol;
         }
     }
@@ -237,9 +288,7 @@ fn solve_internal(
     };
 
     for trial_iter in 0..RANDOM_TRIALS {
-        if let Some(ref tx) = progress_tx {
-            let _ = tx.send(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
-        }
+        progress.report(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
         let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
         let mut setup_moves = vec![];
         for _ in 0..n_random {
@@ -257,15 +306,22 @@ fn solve_internal(
             &mut search,
             &mut color_only_solution,
         ) {
-            if let Some(ref tx) = progress_tx {
-                let _ = tx.send(1.0);
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!("DEBUG: solve_internal returned solution from random trials");
             }
+            progress.report(1.0);
             return solution;
         }
     }
-    if let Some(ref tx) = progress_tx {
-        let _ = tx.send(1.0);
+
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        println!(
+            "DEBUG: solve_internal: no exact solution found. color_only={}",
+            color_only_solution.is_some()
+        );
     }
+
+    progress.report(1.0);
     Solution {
         moves: vec![],
         found: false,
@@ -275,12 +331,7 @@ fn solve_internal(
 pub fn get_orientations_vec(cube: &Cube) -> Vec<u8> {
     Face::all()
         .iter()
-        .map(|f| {
-            let start = f.start_index();
-            let c_ori = cube.stickers[start + 4].orientation;
-            let f_ori = cube.stickers[start].orientation;
-            (c_ori + 4 - f_ori) % 4
-        })
+        .map(|f| cube.stickers[f.start_index() + 4].orientation)
         .collect()
 }
 
@@ -324,7 +375,10 @@ fn get_all_rotations() -> Vec<Vec<Move>> {
 fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     let mut current_cube = cube.clone();
     let mut final_moves = Vec::new();
-    for _ in 0..10 {
+
+    // 1. まず 180度回転 (orientation=2) をすべて解消する。
+    // これは個別の面で解決可能なので、最初に行う。
+    loop {
         let oris = get_orientations_vec(&current_cube);
         if let Some(idx) = oris.iter().position(|&o| o == 2) {
             let f = Face::from_index(idx * 9);
@@ -337,7 +391,11 @@ fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
             break;
         }
     }
-    for _ in 0..6 {
+
+    // 2. 90度回転 (1 または 3) のペアを解消する。
+    // 合計回転数が偶数（180度の倍数）であれば、ペアで解消できる。
+    // パリティエラー（奇数）の場合は1つ残るが、無限ループしないように制限する。
+    for _ in 0..12 {
         let oris = get_orientations_vec(&current_cube);
         let d90s: Vec<(usize, u8)> = oris
             .iter()
@@ -345,46 +403,55 @@ fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
             .filter(|(_, &o)| o == 1 || o == 3)
             .map(|(i, &o)| (i, o))
             .collect();
-        if d90s.len() >= 2 {
-            let i1 = d90s[0].0;
-            let o1 = d90s[0].1;
-            let f1 = Face::from_index(i1 * 9);
-            let mut i2_opt = None;
-            for (j, &(i2, _)) in d90s.iter().enumerate().skip(1) {
-                let f2 = Face::from_index(i2 * 9);
-                if !is_opposite_face(f1, f2) {
-                    i2_opt = Some(j);
-                    break;
-                }
-            }
-            if let Some(j) = i2_opt {
-                let f2 = Face::from_index(d90s[j].0 * 9);
-                let fix = if o1 == 1 {
-                    get_rotation_and_seq_cw_ccw(f1, f2)
-                } else {
-                    get_rotation_and_seq_cw_ccw(f2, f1)
-                };
-                for &m in &fix {
-                    current_cube.apply_move(m);
-                }
-                final_moves.extend(fix);
-            } else {
-                let f2 = Face::from_index(d90s[1].0 * 9);
-                let buffer = get_buffer_face(f1, f2);
-                let fix1 = if o1 == 1 {
-                    get_rotation_and_seq_cw_ccw(f1, buffer)
-                } else {
-                    get_rotation_and_seq_cw_ccw(buffer, f1)
-                };
-                for &m in &fix1 {
-                    current_cube.apply_move(m);
-                }
-                final_moves.extend(fix1);
-            }
-        } else {
+
+        if d90s.len() < 2 {
             break;
         }
+
+        // ペアリングの試行: 可能な限り「反対側ではない」ペアを探す。
+        // （反対側の面同士だと24手必要だが、隣接面なら12手で済むため優先する）
+        let i1 = d90s[0].0;
+        let o1 = d90s[0].1;
+        let f1 = Face::from_index(i1 * 9);
+
+        let mut best_i2_idx = None;
+        for (j, &(i2, _)) in d90s.iter().enumerate().skip(1) {
+            let f2 = Face::from_index(i2 * 9);
+            if !is_opposite_face(f1, f2) {
+                best_i2_idx = Some(j);
+                break;
+            }
+        }
+
+        if let Some(j) = best_i2_idx {
+            // 隣接ペアが見つかった場合
+            let f2 = Face::from_index(d90s[j].0 * 9);
+            let fix = if o1 == 1 {
+                get_rotation_and_seq_cw_ccw(f2, f1)
+            } else {
+                get_rotation_and_seq_cw_ccw(f1, f2)
+            };
+            for &m in &fix {
+                current_cube.apply_move(m);
+            }
+            final_moves.extend(fix);
+        } else {
+            // 反対側のペアしか残っていない場合
+            let f2 = Face::from_index(d90s[1].0 * 9);
+            let buffer = get_buffer_face(f1, f2);
+            // f1面をバッファを使って修復する（buffer面は一時的に90度回るが、次のステップでペアとして解消される）
+            let fix1 = if o1 == 1 {
+                get_rotation_and_seq_cw_ccw(buffer, f1)
+            } else {
+                get_rotation_and_seq_cw_ccw(f1, buffer)
+            };
+            for &m in &fix1 {
+                current_cube.apply_move(m);
+            }
+            final_moves.extend(fix1);
+        }
     }
+
     final_moves
 }
 

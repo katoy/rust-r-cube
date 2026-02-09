@@ -231,4 +231,35 @@ mod tests {
         history.push(Move::U);
         assert!(!history.can_redo());
     }
+
+    #[test]
+    fn test_capacity_limit() {
+        let mut history = History::with_capacity(2);
+        history.push(Move::R);
+        history.push(Move::U);
+        history.push(Move::F);
+
+        assert_eq!(history.undo_count(), 2);
+        assert_eq!(history.undo(), Some(Move::Fp));
+        assert_eq!(history.undo(), Some(Move::Up));
+        assert_eq!(history.undo(), None);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut history = History::new();
+        history.push(Move::R);
+        history.undo();
+        history.clear();
+        assert!(!history.can_undo());
+        assert!(!history.can_redo());
+        assert_eq!(history.undo_count(), 0);
+        assert_eq!(history.redo_count(), 0);
+    }
+
+    #[test]
+    fn test_default() {
+        let history = History::default();
+        assert_eq!(history.undo_count(), 0);
+    }
 }

@@ -169,3 +169,17 @@ fn test_apply_orientation_solution() {
     };
     assert!(cube.apply_orientation_solution(&solution).is_ok());
 }
+
+#[test]
+fn test_restore_orientation_errors() {
+    let mut cube = Cube::new();
+    // センターピースの色を重複させる
+    cube.stickers[4].color = Color::Yellow; // Up を Yellow に (Yellow-Yellow)
+    assert!(cube.restore_orientation_instantly().is_err());
+
+    let mut cube2 = Cube::new();
+    // 物理的に存在しないエッジ（白-黄）
+    cube2.stickers[1].color = Color::Yellow; // UB edge: U(1), B(46) -> Yellow, Orange (OK)
+    cube2.stickers[46].color = Color::White; // UB edge: Front(1), Back(46) -> Yellow, White (Invalid)
+    assert!(cube2.restore_orientation_instantly().is_err());
+}

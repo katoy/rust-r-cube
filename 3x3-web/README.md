@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-89.35%25-orange)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -111,7 +111,28 @@ cargo test --release
 
 # ベンチマーク実行
 cargo bench
+
+# カバレッジ計測 (GUI/bin除外)
+cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 ```
+
+### テストカバレッジ (Core Logic)
+
+| Filename                 | Lines    | Cover      |
+| :----------------------- | :------- | :--------- |
+| `src/cube/enums.rs`      | 249      | 100.00%    |
+| `src/cube/io.rs`         | 107      | 99.07%     |
+| `src/cube/mod.rs`        | 422      | 98.40%     |
+| `src/cube/piece.rs`      | 162      | 100.00%    |
+| `src/cube/rotation.rs`   | 92       | 98.91%     |
+| `src/cube/validation.rs` | 96       | 90.62%     |
+| `src/history.rs`         | 145      | 99.31%     |
+| `src/kociemba/coord.rs`  | 901      | 97.45%     |
+| `src/kociemba/search.rs` | 345      | 99.42%     |
+| `src/kociemba/tables.rs` | 422      | 99.05%     |
+| `src/solver.rs`          | 1423     | 94.10%     |
+| `src/statistics.rs`      | 145      | 100.00%    |
+| **TOTAL**                | **5072** | **96.79%** |
 
 ## ライセンス
 

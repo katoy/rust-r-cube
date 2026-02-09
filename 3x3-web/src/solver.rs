@@ -1073,4 +1073,145 @@ mod tests {
             "Should be fully solved after M and moves"
         );
     }
+
+    #[test]
+    fn test_solver_unsolvable_parity() {
+        let mut cube = Cube::new();
+        // Manually break parity by rotating one center 90 degrees (physically impossible move)
+        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+
+        assert!(!is_orientation_solvable(&cube));
+
+        let solution = solve(&cube, 10, false);
+        assert!(!solution.found);
+        assert!(solution.message.contains("方位パリティが異常"));
+    }
+
+    #[test]
+    fn test_solver_debug_logs() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+        let cube = Cube::new();
+        let _ = solve(&cube, 1, false);
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_solver_state_coverage() {
+        let cube = Cube::new();
+        let mut state = SolverState::new(&cube, 32, false);
+        assert!(state.error().is_none());
+        assert!(state.get_solution().is_none());
+        assert_eq!(state.estimate_progress(), 0.5);
+
+        let (steps, finished) = state.process_chunk(100);
+        assert_eq!(steps, 1);
+        assert!(finished);
+        assert!(state.get_solution().is_some());
+        assert_eq!(state.estimate_progress(), 1.0);
+
+        // Already finished
+        let (steps2, finished2) = state.process_chunk(100);
+        assert_eq!(steps2, 0);
+        assert!(finished2);
+
+        // Error state
+        let mut broken_cube = Cube::new();
+        broken_cube.stickers[0].color = crate::cube::Color::Gray; // Invalid color to trigger RawCube error
+        let state_err = SolverState::new(&broken_cube, 32, false);
+        assert!(state_err.error().is_some());
+    }
+
+    #[test]
+    fn test_solver_opposite_faces_coverage() {
+        let mut cube = Cube::new();
+        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+        cube.stickers[Face::Down.start_index() + 4].orientation = 3;
+
+        assert!(is_orientation_solvable(&cube));
+        let sol = solve(&cube, 128, false);
+        assert!(sol.found);
+
+        let mut test_cube = cube.clone();
+        for &m in &sol.moves {
+            test_cube.apply_move(m);
+        }
+        assert!(is_fully_solved(&test_cube));
+    }
+
+    #[test]
+    fn test_get_buffer_face_coverage() {
+        // Test various combinations of faces to cover get_buffer_face
+        assert_eq!(get_buffer_face(Face::Up, Face::Down), Face::Front);
+        assert_eq!(get_buffer_face(Face::Left, Face::Right), Face::Up);
+        assert_eq!(get_buffer_face(Face::Front, Face::Back), Face::Up);
+    }
+
+    #[test]
+    fn test_is_opposite_face_coverage() {
+        assert!(is_opposite_face(Face::Up, Face::Down));
+        assert!(is_opposite_face(Face::Left, Face::Right));
+        assert!(is_opposite_face(Face::Front, Face::Back));
+    }
+
+    #[test]
+    fn test_is_fully_solved_unmatched_orientation_debug() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+        let mut cube = Cube::new();
+        // 色はそのままで、方位だけ異常な状態にする (全ての get_solved_oris に一致しないはず)
+        cube.stickers[4].orientation = 11;
+        assert!(!is_fully_solved(&cube));
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_get_setup_to_up_all_faces() {
+        for f in Face::all() {
+            let setup = get_setup_to_up(f);
+            let mut cube = Cube::new();
+            for &m in &setup {
+                cube.apply_move(m);
+            }
+            // センターピースの移動を模倣
+            let res = apply_rot_to_face(f, &setup);
+            assert_eq!(
+                res,
+                Face::Up,
+                "Face {:?} should be Up after setup {:?}",
+                f,
+                setup
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_setup_to_up_right_all_pairs() {
+        // 代表的なペアのみ
+        let pairs = [
+            (Face::Up, Face::Right),
+            (Face::Front, Face::Left),
+            (Face::Down, Face::Back),
+        ];
+        for (f1, f2) in pairs {
+            let setup = get_setup_to_up_right(f1, f2);
+            let res1 = apply_rot_to_face(f1, &setup);
+            let res2 = apply_rot_to_face(f2, &setup);
+            // 少なくとも何らかの有効な面に変換されることを確認 (パニック防止とカバレッジが目的)
+            assert!(Face::all().contains(&res1));
+            assert!(Face::all().contains(&res2));
+            assert_ne!(res1, res2, "f1 and f2 should not map to the same face");
+        }
+    }
+
+    #[test]
+    fn test_solve_internal_edge_cases() {
+        let cube = Cube::new();
+        // 探索深度制限 0 でも、既に解決済みなら found=true になる仕様
+        let sol_depth = solve(&cube, 0, false);
+        assert!(sol_depth.found);
+
+        let mut c = Cube::new();
+        c.stickers[4].orientation = 1; // 色は揃っているが方位が違う
+        let result = solve(&c, 1, false);
+        assert!(!result.found);
+    }
 }

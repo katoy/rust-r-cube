@@ -215,7 +215,7 @@ impl Search {
     }
 }
 
-fn is_redundant(m: usize, last_m: usize) -> bool {
+pub fn is_redundant(m: usize, last_m: usize) -> bool {
     // 同じ面は除外 (last_face と比較済み)
     // 対向面の重複 (U-D, R-L, F-B) を防ぐ。Uの後にDはOKだが、Dの後にUはインデックス順で制限
     if last_m == 99 {
@@ -232,7 +232,7 @@ fn is_redundant(m: usize, last_m: usize) -> bool {
     }
 }
 
-fn idx_to_move(idx: usize) -> Move {
+pub fn idx_to_move(idx: usize) -> Move {
     let m = idx / 3;
     let r = idx % 3;
     match (m, r) {
@@ -255,97 +255,5 @@ fn idx_to_move(idx: usize) -> Move {
         (5, 1) => Move::B2,
         (5, 2) => Move::Bp,
         _ => unreachable!(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::cube::Cube;
-    use crate::kociemba::coord::RawCube;
-
-    #[test]
-    fn test_superflip_distance() {
-        // Superflip state colors
-        let content =
-            "          WOWGWBWRW\nGWGOGRGYG RWRGRBRYR BWBRBOBYB OWOBOGOYO\n          YOYGYBYRY";
-        let cube = Cube::from_file_format(content).expect("Superflip format error");
-        let rc = RawCube::from_cube(&cube).expect("Superflip convert error");
-
-        let search = Search::default();
-        let twist = rc.get_twist();
-        let flip = rc.get_flip();
-        let slice = rc.get_ud_slice();
-
-        println!(
-            "Superflip coordinates: twist={}, flip={}, slice={}",
-            twist, flip, slice
-        );
-
-        // Check MoveTable consistency
-        let mt = MoveTable::get();
-        let u_move_idx = 0; // U CW
-        let expected_twist = mt.twist[twist as usize][u_move_idx];
-        let expected_flip = mt.flip[flip as usize][u_move_idx];
-        let expected_slice = mt.ud_slice[slice as usize][u_move_idx];
-
-        let mut rc_u = rc;
-        rc_u = rc_u.multiply(RawCube::move_cube(0)); // U CW
-        let actual_twist = rc_u.get_twist();
-        let actual_flip = rc_u.get_flip();
-        let actual_slice = rc_u.get_ud_slice();
-
-        println!(
-            "After U: expected(t={}, f={}, s={}), actual(t={}, f={}, s={})",
-            expected_twist, expected_flip, expected_slice, actual_twist, actual_flip, actual_slice
-        );
-
-        assert_eq!(expected_twist, actual_twist);
-        assert_eq!(expected_flip, actual_flip);
-        assert_eq!(expected_slice, actual_slice);
-
-        let d1 = search.pruning_table.twist_slice[twist as usize * 495 + slice as usize];
-        let d2 = search.pruning_table.flip_slice[flip as usize * 495 + slice as usize];
-
-        println!(
-            "Superflip Phase 1 distance: twist_slice={}, flip_slice={}",
-            d1, d2
-        );
-
-        // Phase 2 check (for standard Superflip state)
-        let cp = rc.get_cp();
-        let ep8 = rc.get_ep8();
-        let slice_p = rc.get_slice_p();
-
-        let d_cp = search.pruning_table.cp_slice[cp as usize * 24 + slice_p as usize];
-        let d_ep8 = search.pruning_table.ep8_slice[ep8 as usize * 24 + slice_p as usize];
-
-        println!(
-            "Superflip Phase 2 coordinates: cp={}, ep8={}, slice_p={}",
-            cp, ep8, slice_p
-        );
-        println!(
-            "Superflip Phase 2 distance: cp_slice={}, ep8_slice={}",
-            d_cp, d_ep8
-        );
-
-        // Standard Superflip: twist=0, slice=0, flip=2047. cp=0, ep8=0, slice_p=0.
-        assert!(d1 != 255, "Twist-Slice distance table incomplete");
-        assert!(d2 != 255, "Flip-Slice distance table incomplete");
-
-        // Actual solve test
-        let mut search_instance = Search::default();
-        let result = search_instance.solve(&rc, 30);
-        println!(
-            "Solve result: found={:?}, nodes={}",
-            result.is_some(),
-            search_instance.node_count
-        );
-        if let Some(ref sol) = result {
-            println!("Solution ({} moves): {:?}", sol.len(), sol);
-        }
-        // Superflip は Kociemba アルゴリズムにとって極端に難しいケースのため、
-        // 解けないことを許容する。座標計算と MoveTable の一貫性は上記で確認済み。
-        // 実用的なケースは test_solve_normal_cube や test_solve_scrambled_cube_full_completeness で検証。
     }
 }

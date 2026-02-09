@@ -160,7 +160,7 @@ impl ProgressReporter {
 /// setup_moves と rotation を適用してソルバーを実行し、解の検証と向き修正を行う
 ///
 /// 成功時に Solution を返す。max_depth を超える場合や解けない場合は None を返す。
-fn try_solve_with_rotation(
+pub fn try_solve_with_rotation(
     start_cube: &Cube,
     setup_moves: &[Move],
     rotation: &[Move],
@@ -459,7 +459,7 @@ pub fn get_orientations_vec(cube: &Cube) -> Vec<u8> {
         .collect()
 }
 
-fn undo_setup(mut setup: Vec<Move>) -> Vec<Move> {
+pub fn undo_setup(mut setup: Vec<Move>) -> Vec<Move> {
     for m in &mut setup {
         *m = m.inverse();
     }
@@ -467,7 +467,7 @@ fn undo_setup(mut setup: Vec<Move>) -> Vec<Move> {
     setup
 }
 
-fn get_all_rotations() -> Vec<Vec<Move>> {
+pub fn get_all_rotations() -> Vec<Vec<Move>> {
     vec![
         vec![],
         vec![Move::X],
@@ -526,7 +526,7 @@ fn get_target_oris(cube: &Cube) -> Vec<u8> {
     vec![0, 0, 0, 0, 0, 0]
 }
 
-fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
+pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     let mut current_cube = cube.clone();
     let mut final_moves = Vec::new();
     let target_oris = get_target_oris(cube);
@@ -618,7 +618,7 @@ fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     final_moves
 }
 
-fn is_opposite_face(f1: Face, f2: Face) -> bool {
+pub fn is_opposite_face(f1: Face, f2: Face) -> bool {
     matches!(
         (f1, f2),
         (Face::Up, Face::Down)
@@ -630,7 +630,7 @@ fn is_opposite_face(f1: Face, f2: Face) -> bool {
     )
 }
 
-fn get_buffer_face(f1: Face, f2: Face) -> Face {
+pub fn get_buffer_face(f1: Face, f2: Face) -> Face {
     for &f in &[
         Face::Up,
         Face::Down,
@@ -692,7 +692,7 @@ fn get_fix_90_pair(f_cw: Face, f_ccw: Face) -> Vec<Move> {
     moves
 }
 
-fn get_setup_to_up(face: Face) -> Vec<Move> {
+pub fn get_setup_to_up(face: Face) -> Vec<Move> {
     for rot in get_all_rotations() {
         // その回転で Piece originally at Y=1 がどこに動くかを探す
         // （実際には Face SLOT がどこに映るかを知りたい）
@@ -705,7 +705,7 @@ fn get_setup_to_up(face: Face) -> Vec<Move> {
     vec![]
 }
 
-fn get_setup_to_up_right(f_up: Face, f_right: Face) -> Vec<Move> {
+pub fn get_setup_to_up_right(f_up: Face, f_right: Face) -> Vec<Move> {
     for rot in get_all_rotations() {
         if apply_rot_to_face(f_up, &rot) == Face::Up
             && apply_rot_to_face(f_right, &rot) == Face::Right
@@ -716,7 +716,7 @@ fn get_setup_to_up_right(f_up: Face, f_right: Face) -> Vec<Move> {
     vec![]
 }
 
-fn apply_rot_to_face(face: Face, rot: &[Move]) -> Face {
+pub fn apply_rot_to_face(face: Face, rot: &[Move]) -> Face {
     let mut normal = match face {
         Face::Up => Vec3::Y,
         Face::Down => -Vec3::Y,
@@ -806,412 +806,5 @@ impl SolverState {
         } else {
             0.5
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_solve_center_orientation_90_pair() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::U);
-        cube.apply_move(Move::Dp);
-        cube.apply_move(Move::Ep);
-        let sol = solve(&cube, 32, false);
-        assert!(sol.found);
-        let mut final_cube = cube.clone();
-        for &mv in &sol.moves {
-            final_cube.apply_move(mv);
-        }
-        assert!(is_fully_solved(&final_cube));
-    }
-    #[test]
-    fn test_solve_normal_cube() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::U);
-        cube.apply_move(Move::R);
-        let sol = solve(&cube, 32, false);
-        assert!(sol.found);
-        let mut final_cube = cube.clone();
-        for &mv in &sol.moves {
-            final_cube.apply_move(mv);
-        }
-        assert!(is_fully_solved(&final_cube));
-    }
-    #[test]
-    fn test_solved_states_parity() {
-        let states = get_solved_states();
-        for (i, s) in states.iter().enumerate() {
-            let oris = get_orientations_vec(s);
-            let total: u32 = oris.iter().map(|&o| o as u32).sum();
-            println!("State {}: Oris={:?}, Total={}", i, oris, total);
-            assert!(total % 2 == 0, "State {} has ODD parity: {:?}", i, oris);
-        }
-    }
-    #[test]
-    fn test_solve_scrambled_cube_full_completeness() {
-        for i in 0..5 {
-            let mut cube = Cube::new();
-            cube.scramble(20 + i);
-            let sol = solve(&cube, 64, false);
-            assert!(sol.found, "Solution not found for scramble {}", i);
-            let mut check_cube = cube.clone();
-            for &mv in &sol.moves {
-                check_cube.apply_move(mv);
-            }
-            assert!(
-                is_fully_solved(&check_cube),
-                "Scramble {} moves found but not fully solved: {:?}",
-                i,
-                sol.moves
-            );
-        }
-    }
-
-    #[test]
-    fn test_orientation_parity_consistency() {
-        for i in 0..20 {
-            let mut cube = Cube::new();
-            cube.scramble(20 + i);
-
-            // 向きを無視して解決
-            let sol = solve(&cube, 32, true);
-            assert!(sol.found);
-
-            let mut solved_cube = cube.clone();
-            for &mv in &sol.moves {
-                solved_cube.apply_move(mv);
-            }
-
-            assert!(solved_cube.is_solved(), "Color should be solved");
-            assert!(is_orientation_solvable(&solved_cube),
-                "Any color-solved state reached from identity must have even orientation parity. Oris={:?}, Moves: {:?}",
-                get_orientations_vec(&solved_cube), sol.moves);
-        }
-    }
-
-    #[test]
-    fn test_extensive_parity_search() {
-        use rustc_hash::FxHashSet;
-        use std::collections::VecDeque;
-
-        let mut visited = FxHashSet::default();
-        let mut queue = VecDeque::new();
-
-        let base = Cube::new();
-        queue.push_back(base.clone());
-        visited.insert(base.clone());
-
-        let moves = [
-            Move::U,
-            Move::D,
-            Move::L,
-            Move::R,
-            Move::F,
-            Move::B,
-            Move::X,
-            Move::Y,
-            Move::Z,
-            Move::M,
-            Move::E,
-            Move::S,
-        ];
-
-        let mut count = 0;
-        let mut solved_count = 0;
-        while let Some(current) = queue.pop_front() {
-            count += 1;
-            if count > 5000 {
-                break;
-            }
-
-            if current.is_solved() {
-                solved_count += 1;
-                let oris = get_orientations_vec(&current);
-                let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-                assert!(
-                    sum % 2 == 0,
-                    "FOUND ODD SOLVED STATE! Oris={:?}, Sum={}",
-                    oris,
-                    sum
-                );
-            }
-
-            for &mv in &moves {
-                let mut next = current.clone();
-                next.apply_move(mv);
-                if visited.insert(next.clone()) {
-                    queue.push_back(next);
-                }
-            }
-        }
-        println!(
-            "Checked {} states, found {} solved states. All had even parity.",
-            count, solved_count
-        );
-    }
-
-    #[test]
-    fn test_ep_move_parity() {
-        let mut cube = Cube::new();
-        let oris_init = get_orientations_vec(&cube);
-        println!("Initial Oris: {:?}", oris_init);
-
-        cube.apply_move(Move::Ep);
-        let oris_after = get_orientations_vec(&cube);
-        println!("After Ep Oris: {:?}", oris_after);
-
-        let sum: u32 = oris_after.iter().map(|&o| o as u32).sum();
-        println!("Sum after Ep: {}", sum);
-        assert!(sum % 2 == 0, "Ep move must preserve even parity");
-    }
-
-    #[test]
-    fn test_u_move_parity() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::U);
-        let oris = get_orientations_vec(&cube);
-        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-        println!("Oris after U: {:?}", oris);
-        println!("Sum after U: {}", sum);
-        assert!(sum % 2 != 0, "Single U move must have ODD parity");
-    }
-
-    #[test]
-    fn test_b_move_parity() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::B); // 背面 CW (背面側から見て時計回り)
-        let oris = get_orientations_vec(&cube);
-        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-        println!("Oris after B: {:?}", oris);
-        println!("Sum after B: {}", sum);
-        assert!(sum % 2 != 0, "Single B move must have ODD parity");
-    }
-
-    #[test]
-    fn test_x_rot_parity() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::X);
-        let oris = get_orientations_vec(&cube);
-        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-        println!("Oris after X: {:?}", oris);
-        println!("Sum after X: {}", sum);
-        assert!(sum % 2 == 0, "Global X rotation must have EVEN parity");
-    }
-
-    #[test]
-    fn test_solve_after_x_rot() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::X);
-
-        // 既に完成状態（回転してるだけ）のはず
-        assert!(
-            is_fully_solved(&cube),
-            "X-rotated cube should be recognized as fully solved"
-        );
-
-        // そこから 1 手動かしてみる
-        cube.apply_move(Move::U);
-        let sol = solve(&cube, 32, false);
-        assert!(sol.found, "Should find solution after X and U");
-
-        let mut final_cube = cube.clone();
-        for &m in &sol.moves {
-            final_cube.apply_move(m);
-        }
-        assert!(
-            is_fully_solved(&final_cube),
-            "Should be fully solved after moves"
-        );
-    }
-
-    #[test]
-    fn test_algorithm_cw_ccw() {
-        let mut cube = Cube::new();
-        // (Mp U M Up) * 3
-        let seq = [
-            Move::Mp,
-            Move::U,
-            Move::M,
-            Move::Up,
-            Move::Mp,
-            Move::U,
-            Move::M,
-            Move::Up,
-            Move::Mp,
-            Move::U,
-            Move::M,
-            Move::Up,
-        ];
-        for &m in &seq {
-            cube.apply_move(m);
-        }
-
-        let oris = get_orientations_vec(&cube);
-        println!("Oris after (Mp U M Up)*3: {:?}", oris);
-        // U=0, D=1, L=2, R=3, F=4, B=5
-        // 期待値: U を CW (+1), F を CCW (-1 = 3) に回転させるはず
-        assert_eq!(oris[0], 1, "U center should be 1 (CW)");
-        assert_eq!(oris[4], 3, "F center should be 3 (CCW)");
-    }
-
-    #[test]
-    fn test_solve_after_m_move() {
-        let mut cube = Cube::new();
-        cube.apply_move(Move::M);
-
-        let sol = solve(&cube, 32, false);
-        assert!(sol.found, "Should find solution after M move");
-
-        let mut final_cube = cube.clone();
-        for &m in &sol.moves {
-            final_cube.apply_move(m);
-        }
-        assert!(
-            is_fully_solved(&final_cube),
-            "Should be fully solved after M and moves"
-        );
-    }
-
-    #[test]
-    fn test_solver_unsolvable_parity() {
-        let mut cube = Cube::new();
-        // Manually break parity by rotating one center 90 degrees (physically impossible move)
-        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
-
-        assert!(!is_orientation_solvable(&cube));
-
-        let solution = solve(&cube, 10, false);
-        assert!(!solution.found);
-        assert!(solution.message.contains("方位パリティが異常"));
-    }
-
-    #[test]
-    fn test_solver_debug_logs() {
-        std::env::set_var("SOLVER_DEBUG", "1");
-        let cube = Cube::new();
-        let _ = solve(&cube, 1, false);
-        std::env::remove_var("SOLVER_DEBUG");
-    }
-
-    #[test]
-    fn test_solver_state_coverage() {
-        let cube = Cube::new();
-        let mut state = SolverState::new(&cube, 32, false);
-        assert!(state.error().is_none());
-        assert!(state.get_solution().is_none());
-        assert_eq!(state.estimate_progress(), 0.5);
-
-        let (steps, finished) = state.process_chunk(100);
-        assert_eq!(steps, 1);
-        assert!(finished);
-        assert!(state.get_solution().is_some());
-        assert_eq!(state.estimate_progress(), 1.0);
-
-        // Already finished
-        let (steps2, finished2) = state.process_chunk(100);
-        assert_eq!(steps2, 0);
-        assert!(finished2);
-
-        // Error state
-        let mut broken_cube = Cube::new();
-        broken_cube.stickers[0].color = crate::cube::Color::Gray; // Invalid color to trigger RawCube error
-        let state_err = SolverState::new(&broken_cube, 32, false);
-        assert!(state_err.error().is_some());
-    }
-
-    #[test]
-    fn test_solver_opposite_faces_coverage() {
-        let mut cube = Cube::new();
-        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
-        cube.stickers[Face::Down.start_index() + 4].orientation = 3;
-
-        assert!(is_orientation_solvable(&cube));
-        let sol = solve(&cube, 128, false);
-        assert!(sol.found);
-
-        let mut test_cube = cube.clone();
-        for &m in &sol.moves {
-            test_cube.apply_move(m);
-        }
-        assert!(is_fully_solved(&test_cube));
-    }
-
-    #[test]
-    fn test_get_buffer_face_coverage() {
-        // Test various combinations of faces to cover get_buffer_face
-        assert_eq!(get_buffer_face(Face::Up, Face::Down), Face::Front);
-        assert_eq!(get_buffer_face(Face::Left, Face::Right), Face::Up);
-        assert_eq!(get_buffer_face(Face::Front, Face::Back), Face::Up);
-    }
-
-    #[test]
-    fn test_is_opposite_face_coverage() {
-        assert!(is_opposite_face(Face::Up, Face::Down));
-        assert!(is_opposite_face(Face::Left, Face::Right));
-        assert!(is_opposite_face(Face::Front, Face::Back));
-    }
-
-    #[test]
-    fn test_is_fully_solved_unmatched_orientation_debug() {
-        std::env::set_var("SOLVER_DEBUG", "1");
-        let mut cube = Cube::new();
-        // 色はそのままで、方位だけ異常な状態にする (全ての get_solved_oris に一致しないはず)
-        cube.stickers[4].orientation = 11;
-        assert!(!is_fully_solved(&cube));
-        std::env::remove_var("SOLVER_DEBUG");
-    }
-
-    #[test]
-    fn test_get_setup_to_up_all_faces() {
-        for f in Face::all() {
-            let setup = get_setup_to_up(f);
-            let mut cube = Cube::new();
-            for &m in &setup {
-                cube.apply_move(m);
-            }
-            // センターピースの移動を模倣
-            let res = apply_rot_to_face(f, &setup);
-            assert_eq!(
-                res,
-                Face::Up,
-                "Face {:?} should be Up after setup {:?}",
-                f,
-                setup
-            );
-        }
-    }
-
-    #[test]
-    fn test_get_setup_to_up_right_all_pairs() {
-        // 代表的なペアのみ
-        let pairs = [
-            (Face::Up, Face::Right),
-            (Face::Front, Face::Left),
-            (Face::Down, Face::Back),
-        ];
-        for (f1, f2) in pairs {
-            let setup = get_setup_to_up_right(f1, f2);
-            let res1 = apply_rot_to_face(f1, &setup);
-            let res2 = apply_rot_to_face(f2, &setup);
-            // 少なくとも何らかの有効な面に変換されることを確認 (パニック防止とカバレッジが目的)
-            assert!(Face::all().contains(&res1));
-            assert!(Face::all().contains(&res2));
-            assert_ne!(res1, res2, "f1 and f2 should not map to the same face");
-        }
-    }
-
-    #[test]
-    fn test_solve_internal_edge_cases() {
-        let cube = Cube::new();
-        // 探索深度制限 0 でも、既に解決済みなら found=true になる仕様
-        let sol_depth = solve(&cube, 0, false);
-        assert!(sol_depth.found);
-
-        let mut c = Cube::new();
-        c.stickers[4].orientation = 1; // 色は揃っているが方位が違う
-        let result = solve(&c, 1, false);
-        assert!(!result.found);
     }
 }

@@ -23,11 +23,6 @@ name = "rubiks-cube-3x3"
 path = "src/bin/rubiks-cube-3x3.rs"
 required-features = ["desktop"]
 
-[[bin]]
-name = "test_centers"
-path = "src/bin/test_centers.rs"
-required-features = ["desktop"]
-
 
 [dependencies]
 egui = "0.29"

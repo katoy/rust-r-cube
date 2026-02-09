@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-89.35%25-orange)
+![Core Coverage](https://img.shields.io/badge/core_coverage-96.70%25-green)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -132,7 +132,7 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 | `src/kociemba/tables.rs` | 422      | 99.05%     |
 | `src/solver.rs`          | 1423     | 94.10%     |
 | `src/statistics.rs`      | 145      | 100.00%    |
-| **TOTAL**                | **5072** | **96.79%** |
+| **TOTAL**                | **4873** | **96.70%** |
 
 ## ライセンス
 

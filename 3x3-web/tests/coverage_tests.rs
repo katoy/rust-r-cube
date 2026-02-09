@@ -106,6 +106,7 @@ fn test_apply_orientation_solution_error() {
     let solution = Solution {
         moves: vec![],
         found: true,
+        message: String::new(),
     };
     let result = cube.apply_orientation_solution(&solution);
     assert!(result.is_err());

@@ -1,8 +1,9 @@
 use crate::cube::{Cube, Face, Move};
 use crate::kociemba::{RawCube, Search};
+use glam::Vec3;
 use std::sync::OnceLock;
 
-pub const DEFAULT_MAX_DEPTH: usize = 32;
+pub const DEFAULT_MAX_DEPTH: usize = 128;
 
 // ランダム探索パラメータ
 const RANDOM_TRIALS: usize = 3000;
@@ -18,6 +19,7 @@ const TOTAL_ROTATIONS: usize = 24;
 pub struct Solution {
     pub moves: Vec<Move>,
     pub found: bool,
+    pub message: String,
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
@@ -30,7 +32,12 @@ pub struct SolverState {
     finished: bool,
 }
 
+static SOLVED_ORIS: OnceLock<Vec<Vec<u8>>> = OnceLock::new();
 static SOLVED_STATES: OnceLock<Vec<Cube>> = OnceLock::new();
+
+pub fn get_solved_oris() -> &'static [Vec<u8>] {
+    SOLVED_ORIS.get_or_init(generate_all_solved_oris)
+}
 
 pub fn get_solved_states() -> &'static [Cube] {
     SOLVED_STATES.get_or_init(generate_all_solved_states)
@@ -49,7 +56,6 @@ fn generate_all_solved_states() -> Vec<Cube> {
     visited.insert(base.clone());
     states.push(base);
 
-    // X, Y, Z 軸の 90 度回転のみを基本単位とする
     let basic_rotations = [Move::X, Move::Y, Move::Z];
 
     while let Some(current) = queue.pop_front() {
@@ -65,34 +71,60 @@ fn generate_all_solved_states() -> Vec<Cube> {
     states
 }
 
+fn generate_all_solved_oris() -> Vec<Vec<u8>> {
+    let states = get_solved_states();
+    states.iter().map(get_orientations_vec).collect()
+}
+
 pub fn is_fully_solved(cube: &Cube) -> bool {
-    // 色が揃っていない場合は即座に false
     if !cube.is_solved() {
         return false;
     }
 
-    let oris = get_orientations_vec(cube);
-    let total_ori: u32 = oris.iter().map(|&o| o as u32).sum();
-
-    // センター方位の合計が偶数（90度単位の回転数の合計が 180度の倍数）であれば、
-    // 物理的に全方位完成状態（SOLVED_STATES のいずれか）に到達可能なパリティ状態である。
-    let is_matched = total_ori.is_multiple_of(2);
-
-    if std::env::var("SOLVER_DEBUG").is_ok() {
-        if is_matched {
-            println!(
-                "DEBUG: is_fully_solved: ACCEPTED (Even parity). RelativeOris={:?}",
-                oris
-            );
-        } else {
-            println!(
-                "DEBUG: is_fully_solved: REJECTED (Odd parity). RelativeOris={:?}",
-                oris
-            );
+    let current_oris = get_orientations_vec(cube);
+    let solved_oris = get_solved_oris();
+    let mut matched_pattern = None;
+    for (i, target) in solved_oris.iter().enumerate() {
+        if current_oris == *target {
+            matched_pattern = Some(i);
+            break;
         }
     }
 
-    is_matched
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        if let Some(pattern_idx) = matched_pattern {
+            println!(
+                "DEBUG: is_fully_solved: MATCHED orientation pattern {}! RelativeOris={:?}",
+                pattern_idx, current_oris
+            );
+        } else {
+            println!(
+                "DEBUG: is_fully_solved: Color=Solved, RelativeOris={:?}",
+                current_oris
+            );
+            // 全パターンを詳細比較
+            for (i, target) in solved_oris.iter().enumerate() {
+                if i % 8 == 0 {
+                    print!("  ");
+                }
+                print!("P{}:{} ", i, current_oris == *target);
+                if i % 8 == 7 {
+                    println!();
+                }
+            }
+        }
+    }
+
+    matched_pattern.is_some()
+}
+
+pub fn is_orientation_solvable(cube: &Cube) -> bool {
+    if !cube.is_solved() {
+        return false;
+    }
+    let oris = get_orientations_vec(cube);
+    let total_ori: u32 = oris.iter().map(|&o| o as u32).sum();
+    total_ori.is_multiple_of(2)
 }
 
 pub fn solve_with_progress(
@@ -175,6 +207,7 @@ fn try_solve_with_rotation(
         return Some(Solution {
             moves: moves.clone(),
             found: true,
+            message: "方位も含めて完全に解決しました。".to_string(),
         });
     }
 
@@ -183,12 +216,48 @@ fn try_solve_with_rotation(
         return Some(Solution {
             moves: moves.clone(),
             found: true,
+            message: "色の揃った解（向きは無視）を見つけました。".to_string(),
         });
     }
 
     // 色が揃っている場合、向き修正を試みる
     if check_cube.is_solved() {
+        if !is_orientation_solvable(&check_cube) {
+            let oris = get_orientations_vec(&check_cube);
+            let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!("DEBUG: try_solve_with_rotation: Odd parity detected (sum={}). Physically impossible.", sum);
+            }
+            if ignore_orientation && color_only_solution.is_none() {
+                *color_only_solution = Some(Solution {
+                    moves: moves.clone(),
+                    found: true,
+                    message: format!("色は解決しましたが、方位パリティが異常(sum={})なため、方位の解決は不可能です。", sum),
+                });
+            } else if color_only_solution.is_none() {
+                // ignore_orientation が false の場合でも、失敗原因として保存しておく
+                *color_only_solution = Some(Solution {
+                    moves: moves.clone(),
+                    found: false,
+                    message: format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum),
+                });
+            }
+            return None;
+        }
+
+        if std::env::var("SOLVER_DEBUG").is_ok() {
+            println!(
+                "DEBUG: try_solve_with_rotation: color solved. oris={:?}",
+                get_orientations_vec(&check_cube)
+            );
+        }
         let fixes = apply_supercube_fixes(&check_cube, search);
+        if std::env::var("SOLVER_DEBUG").is_ok() {
+            println!(
+                "DEBUG: try_solve_with_rotation: apply_supercube_fixes returned {} moves.",
+                fixes.len()
+            );
+        }
         let mut final_moves = moves.clone();
         final_moves.extend(fixes.clone());
 
@@ -197,11 +266,20 @@ fn try_solve_with_rotation(
             final_cube.apply_move(m);
         }
 
+        if std::env::var("SOLVER_DEBUG").is_ok() {
+            println!(
+                "DEBUG: try_solve_with_rotation: after fixes, oris={:?}, is_solved={}",
+                get_orientations_vec(&final_cube),
+                final_cube.is_solved()
+            );
+        }
+
         if is_fully_solved(&final_cube) {
             if final_moves.len() <= max_depth {
                 return Some(Solution {
                     moves: final_moves,
                     found: true,
+                    message: "色解決後にセンターの向きを修正しました。".to_string(),
                 });
             }
             // max_depth を超え、かつ ignore_orientation の場合のみ、color_only_solution として保存
@@ -209,6 +287,8 @@ fn try_solve_with_rotation(
                 *color_only_solution = Some(Solution {
                     moves: final_moves,
                     found: true,
+                    message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
+                        .to_string(),
                 });
             }
         }
@@ -238,6 +318,7 @@ fn solve_internal(
         return Solution {
             moves: vec![],
             found: true,
+            message: "既に完全に解決されています。".to_string(),
         };
     }
     // 向きを無視する場合に限り、色が揃っていれば即座に返す
@@ -246,7 +327,32 @@ fn solve_internal(
         return Solution {
             moves: vec![],
             found: true,
+            message: "既に色が揃っています（向きは無視）。".to_string(),
         };
+    }
+
+    // 色が揃っているが向きが不完全な場合、即座に方位修正を試みる (探索をバイパス)
+    if start_cube.is_solved() {
+        let mut search = Search::new();
+        let mut color_only_solution = None;
+        if let Some(solution) = try_solve_with_rotation(
+            start_cube,
+            &[], // setup_moves
+            &[], // rot
+            max_depth,
+            false, // ignore_orientation=false
+            &mut search,
+            &mut color_only_solution,
+        ) {
+            progress.report(1.0);
+            return solution;
+        }
+        // solve_internal の末尾の「解が見つかりませんでした」にフォールスルーさせるか、
+        // ここで詳細な理由を返して終了する。
+        if let Some(sol) = color_only_solution {
+            progress.report(1.0);
+            return sol;
+        }
     }
 
     let mut search = Search::new();
@@ -321,10 +427,28 @@ fn solve_internal(
         );
     }
 
+    if let Some(sol) = color_only_solution {
+        progress.report(1.0);
+        return sol;
+    }
+
     progress.report(1.0);
+    let mut msg = "解が見つかりませんでした。".to_string();
+    if !is_orientation_solvable(start_cube) {
+        let oris = get_orientations_vec(start_cube);
+        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+        msg += &format!(
+            "方位パリティが異常(sum={})なため、現在の色配置のままでは解決不可能です。",
+            sum
+        );
+    } else {
+        msg += "物理的に不可能な状態か、探索深度（最大128手）を超えている可能性があります。";
+    }
+
     Solution {
         moves: vec![],
         found: false,
+        message: msg,
     }
 }
 
@@ -372,86 +496,125 @@ fn get_all_rotations() -> Vec<Vec<Move>> {
     ]
 }
 
-fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
-    let mut current_cube = cube.clone();
-    let mut final_moves = Vec::new();
-
-    // 1. まず 180度回転 (orientation=2) をすべて解消する。
-    // これは個別の面で解決可能なので、最初に行う。
-    loop {
-        let oris = get_orientations_vec(&current_cube);
-        if let Some(idx) = oris.iter().position(|&o| o == 2) {
-            let f = Face::from_index(idx * 9);
-            let fix = get_fix_180(f);
-            for &m in &fix {
-                current_cube.apply_move(m);
-            }
-            final_moves.extend(fix);
-        } else {
-            break;
-        }
-    }
-
-    // 2. 90度回転 (1 または 3) のペアを解消する。
-    // 合計回転数が偶数（180度の倍数）であれば、ペアで解消できる。
-    // パリティエラー（奇数）の場合は1つ残るが、無限ループしないように制限する。
-    for _ in 0..12 {
-        let oris = get_orientations_vec(&current_cube);
-        let d90s: Vec<(usize, u8)> = oris
-            .iter()
-            .enumerate()
-            .filter(|(_, &o)| o == 1 || o == 3)
-            .map(|(i, &o)| (i, o))
-            .collect();
-
-        if d90s.len() < 2 {
-            break;
-        }
-
-        // ペアリングの試行: 可能な限り「反対側ではない」ペアを探す。
-        // （反対側の面同士だと24手必要だが、隣接面なら12手で済むため優先する）
-        let i1 = d90s[0].0;
-        let o1 = d90s[0].1;
-        let f1 = Face::from_index(i1 * 9);
-
-        let mut best_i2_idx = None;
-        for (j, &(i2, _)) in d90s.iter().enumerate().skip(1) {
-            let f2 = Face::from_index(i2 * 9);
-            if !is_opposite_face(f1, f2) {
-                best_i2_idx = Some(j);
+fn get_target_oris(cube: &Cube) -> Vec<u8> {
+    let states = get_solved_states();
+    for (_i, s) in states.iter().enumerate() {
+        let mut match_centers = true;
+        for f in Face::all() {
+            let sc = s.stickers[f.start_index() + 4].color;
+            let cc = cube.stickers[f.start_index() + 4].color;
+            if sc != cc {
+                match_centers = false;
                 break;
             }
         }
+        if match_centers {
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!("DEBUG: get_target_oris: Matched solved state pattern {} based on center colors.", _i);
+                let colors: Vec<_> = Face::all()
+                    .iter()
+                    .map(|f| s.stickers[f.start_index() + 4].color)
+                    .collect();
+                println!("DEBUG: get_target_oris: Pattern colors={:?}", colors);
+            }
+            return get_orientations_vec(s);
+        }
+    }
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        println!("DEBUG: get_target_oris: No match found! Falling back to Pattern 0.");
+    }
+    vec![0, 0, 0, 0, 0, 0]
+}
 
-        if let Some(j) = best_i2_idx {
-            // 隣接ペアが見つかった場合
-            let f2 = Face::from_index(d90s[j].0 * 9);
-            let fix = if o1 == 1 {
-                get_rotation_and_seq_cw_ccw(f2, f1)
+fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
+    let mut current_cube = cube.clone();
+    let mut final_moves = Vec::new();
+    let target_oris = get_target_oris(cube);
+
+    for iter in 0..12 {
+        let oris = get_orientations_vec(&current_cube);
+        if std::env::var("SOLVER_DEBUG").is_ok() {
+            println!(
+                "DEBUG: apply_supercube_fixes: iter={}, oris={:?}, target={:?}",
+                iter, oris, target_oris
+            );
+        }
+        if oris == target_oris {
+            break;
+        }
+
+        // 相対的なズレを計算 (0:なし, 1:CW, 2:180, 3:CCW)
+        let mut rel_oris = [0u8; 6];
+        for i in 0..6 {
+            rel_oris[i] = (oris[i] as i8 - target_oris[i] as i8).rem_euclid(4) as u8;
+        }
+
+        let mut d180s = Vec::new();
+        let mut d90s = Vec::new(); // (Face, rel_ori)
+        for (i, &rel_o) in rel_oris.iter().enumerate() {
+            let f = Face::from_index(i * 9);
+            if rel_o == 2 {
+                d180s.push(f);
+            } else if rel_o != 0 {
+                d90s.push((f, rel_o));
+            }
+        }
+
+        let fix = if let Some(&f) = d180s.first() {
+            get_fix_180(f)
+        } else if d90s.len() >= 2 {
+            let (f1, r1) = d90s[0];
+            let (f2, r2) = d90s[1];
+
+            if !is_opposite_face(f1, f2) {
+                // 90度ペア修正
+                if r1 == 1 && r2 == 3 {
+                    get_fix_90_pair(f1, f2)
+                } else if r1 == 3 && r2 == 1 {
+                    get_fix_90_pair(f2, f1)
+                } else if r1 == 1 && r2 == 1 {
+                    get_fix_90_pair(f1, f2)
+                } else {
+                    get_fix_90_pair(f2, f1)
+                }
             } else {
-                get_rotation_and_seq_cw_ccw(f1, f2)
-            };
+                // 反対側の面同士の場合、中継面（バッファ）を使用
+                let buffer = get_buffer_face(f1, f2);
+                if r1 == 1 {
+                    get_fix_90_pair(f1, buffer)
+                } else {
+                    get_fix_90_pair(buffer, f1)
+                }
+            }
+        } else {
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!(
+                    "DEBUG: apply_supercube_fixes: breaking at iter {} with d90s.len={}",
+                    iter,
+                    d90s.len()
+                );
+            }
+            break;
+        };
+
+        if std::env::var("SOLVER_DEBUG").is_ok() {
+            let oris_before = get_orientations_vec(&current_cube);
             for &m in &fix {
                 current_cube.apply_move(m);
             }
-            final_moves.extend(fix);
+            println!(
+                "DEBUG: apply_supercube_fixes: applied fix of len {}. Oris: {:?} -> {:?}",
+                fix.len(),
+                oris_before,
+                get_orientations_vec(&current_cube)
+            );
         } else {
-            // 反対側のペアしか残っていない場合
-            let f2 = Face::from_index(d90s[1].0 * 9);
-            let buffer = get_buffer_face(f1, f2);
-            // f1面をバッファを使って修復する（buffer面は一時的に90度回るが、次のステップでペアとして解消される）
-            let fix1 = if o1 == 1 {
-                get_rotation_and_seq_cw_ccw(buffer, f1)
-            } else {
-                get_rotation_and_seq_cw_ccw(f1, buffer)
-            };
-            for &m in &fix1 {
+            for &m in &fix {
                 current_cube.apply_move(m);
             }
-            final_moves.extend(fix1);
         }
+        final_moves.extend(fix);
     }
-
     final_moves
 }
 
@@ -486,39 +649,41 @@ fn get_buffer_face(f1: Face, f2: Face) -> Face {
 fn get_fix_180(face: Face) -> Vec<Move> {
     let rot = get_setup_to_up(face);
     let mut moves = rot.clone();
+    // (U R L U2 R' L' U R L U2 R' L') is a verfied color-preserving 180-rot for center.
+    // In our tests: (U R L U2 Rp Lp) * 2 worked.
     let seq = vec![
-        Move::L,
-        Move::R,
-        Move::U2,
-        Move::Lp,
-        Move::Rp,
         Move::U,
-        Move::L,
         Move::R,
+        Move::L,
         Move::U2,
-        Move::Lp,
         Move::Rp,
+        Move::Lp,
         Move::U,
+        Move::R,
+        Move::L,
+        Move::U2,
+        Move::Rp,
+        Move::Lp,
     ];
     moves.extend(seq);
     moves.extend(undo_setup(rot));
     moves
 }
 
-fn get_rotation_and_seq_cw_ccw(f_up: Face, f_front: Face) -> Vec<Move> {
-    let rot = get_setup_to_up_front(f_up, f_front);
+fn get_fix_90_pair(f_cw: Face, f_ccw: Face) -> Vec<Move> {
+    // Verified color-preserving 90-degree pair rotation:
+    // Mp E M U Mp Ep M Up (Up CCW, Right CW)
+    // To solve f_cw=1 and f_ccw=3, we apply 3 to f_cw and 1 to f_ccw.
+    // So setup f_cw -> Up, f_ccw -> Right.
+    let rot = get_setup_to_up_right(f_cw, f_ccw);
     let mut moves = rot.clone();
     let seq = vec![
         Move::Mp,
-        Move::U,
+        Move::E,
         Move::M,
-        Move::Up,
-        Move::Mp,
         Move::U,
-        Move::M,
-        Move::Up,
         Move::Mp,
-        Move::U,
+        Move::Ep,
         Move::M,
         Move::Up,
     ];
@@ -528,36 +693,75 @@ fn get_rotation_and_seq_cw_ccw(f_up: Face, f_front: Face) -> Vec<Move> {
 }
 
 fn get_setup_to_up(face: Face) -> Vec<Move> {
-    let base = Cube::new();
-    let target = base.stickers[face.start_index() + 4].color;
     for rot in get_all_rotations() {
-        let mut c = base.clone();
-        for &m in &rot {
-            c.apply_move(m);
-        }
-        if c.stickers[Face::Up.start_index() + 4].color == target {
+        // その回転で Piece originally at Y=1 がどこに動くかを探す
+        // （実際には Face SLOT がどこに映るかを知りたい）
+        // SLOT "face" を SLOT "Up" に持ってくる回転を探す。
+        let result_face = apply_rot_to_face(face, &rot);
+        if result_face == Face::Up {
             return rot;
         }
     }
     vec![]
 }
 
-fn get_setup_to_up_front(f_up: Face, f_front: Face) -> Vec<Move> {
-    let base = Cube::new();
-    let up_c = base.stickers[f_up.start_index() + 4].color;
-    let front_c = base.stickers[f_front.start_index() + 4].color;
+fn get_setup_to_up_right(f_up: Face, f_right: Face) -> Vec<Move> {
     for rot in get_all_rotations() {
-        let mut c = base.clone();
-        for &m in &rot {
-            c.apply_move(m);
-        }
-        if c.stickers[Face::Up.start_index() + 4].color == up_c
-            && c.stickers[Face::Front.start_index() + 4].color == front_c
+        if apply_rot_to_face(f_up, &rot) == Face::Up
+            && apply_rot_to_face(f_right, &rot) == Face::Right
         {
             return rot;
         }
     }
     vec![]
+}
+
+fn apply_rot_to_face(face: Face, rot: &[Move]) -> Face {
+    let mut normal = match face {
+        Face::Up => Vec3::Y,
+        Face::Down => -Vec3::Y,
+        Face::Left => -Vec3::X,
+        Face::Right => Vec3::X,
+        Face::Front => Vec3::Z,
+        Face::Back => -Vec3::Z,
+    };
+    for &m in rot {
+        let (axis, _, angle) = move_to_geometric_params_for_rot(m);
+        let mat = glam::Mat4::from_axis_angle(axis, angle);
+        normal = mat.transform_vector3(normal);
+    }
+    // 法線に最も近い Face を返す
+    Face::all()
+        .iter()
+        .copied()
+        .find(|&f| {
+            let fnorm = match f {
+                Face::Up => Vec3::Y,
+                Face::Down => -Vec3::Y,
+                Face::Left => -Vec3::X,
+                Face::Right => Vec3::X,
+                Face::Front => Vec3::Z,
+                Face::Back => -Vec3::Z,
+            };
+            (normal - fnorm).length() < 0.1
+        })
+        .unwrap_or(Face::Up)
+}
+
+fn move_to_geometric_params_for_rot(mv: Move) -> (Vec3, i8, f32) {
+    let pi_2 = std::f32::consts::FRAC_PI_2;
+    match mv {
+        Move::X => (Vec3::X, 0, -pi_2),
+        Move::Xp => (Vec3::X, 0, pi_2),
+        Move::X2 => (Vec3::X, 0, std::f32::consts::PI),
+        Move::Y => (Vec3::Y, 0, -pi_2),
+        Move::Yp => (Vec3::Y, 0, pi_2),
+        Move::Y2 => (Vec3::Y, 0, std::f32::consts::PI),
+        Move::Z => (Vec3::Z, 0, -pi_2),
+        Move::Zp => (Vec3::Z, 0, pi_2),
+        Move::Z2 => (Vec3::Z, 0, std::f32::consts::PI),
+        _ => (Vec3::Y, 0, 0.0),
+    }
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
@@ -636,6 +840,16 @@ mod tests {
         assert!(is_fully_solved(&final_cube));
     }
     #[test]
+    fn test_solved_states_parity() {
+        let states = get_solved_states();
+        for (i, s) in states.iter().enumerate() {
+            let oris = get_orientations_vec(s);
+            let total: u32 = oris.iter().map(|&o| o as u32).sum();
+            println!("State {}: Oris={:?}, Total={}", i, oris, total);
+            assert!(total % 2 == 0, "State {} has ODD parity: {:?}", i, oris);
+        }
+    }
+    #[test]
     fn test_solve_scrambled_cube_full_completeness() {
         for i in 0..5 {
             let mut cube = Cube::new();
@@ -653,5 +867,210 @@ mod tests {
                 sol.moves
             );
         }
+    }
+
+    #[test]
+    fn test_orientation_parity_consistency() {
+        for i in 0..20 {
+            let mut cube = Cube::new();
+            cube.scramble(20 + i);
+
+            // 向きを無視して解決
+            let sol = solve(&cube, 32, true);
+            assert!(sol.found);
+
+            let mut solved_cube = cube.clone();
+            for &mv in &sol.moves {
+                solved_cube.apply_move(mv);
+            }
+
+            assert!(solved_cube.is_solved(), "Color should be solved");
+            assert!(is_orientation_solvable(&solved_cube),
+                "Any color-solved state reached from identity must have even orientation parity. Oris={:?}, Moves: {:?}",
+                get_orientations_vec(&solved_cube), sol.moves);
+        }
+    }
+
+    #[test]
+    fn test_extensive_parity_search() {
+        use rustc_hash::FxHashSet;
+        use std::collections::VecDeque;
+
+        let mut visited = FxHashSet::default();
+        let mut queue = VecDeque::new();
+
+        let base = Cube::new();
+        queue.push_back(base.clone());
+        visited.insert(base.clone());
+
+        let moves = [
+            Move::U,
+            Move::D,
+            Move::L,
+            Move::R,
+            Move::F,
+            Move::B,
+            Move::X,
+            Move::Y,
+            Move::Z,
+            Move::M,
+            Move::E,
+            Move::S,
+        ];
+
+        let mut count = 0;
+        let mut solved_count = 0;
+        while let Some(current) = queue.pop_front() {
+            count += 1;
+            if count > 5000 {
+                break;
+            }
+
+            if current.is_solved() {
+                solved_count += 1;
+                let oris = get_orientations_vec(&current);
+                let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+                assert!(
+                    sum % 2 == 0,
+                    "FOUND ODD SOLVED STATE! Oris={:?}, Sum={}",
+                    oris,
+                    sum
+                );
+            }
+
+            for &mv in &moves {
+                let mut next = current.clone();
+                next.apply_move(mv);
+                if visited.insert(next.clone()) {
+                    queue.push_back(next);
+                }
+            }
+        }
+        println!(
+            "Checked {} states, found {} solved states. All had even parity.",
+            count, solved_count
+        );
+    }
+
+    #[test]
+    fn test_ep_move_parity() {
+        let mut cube = Cube::new();
+        let oris_init = get_orientations_vec(&cube);
+        println!("Initial Oris: {:?}", oris_init);
+
+        cube.apply_move(Move::Ep);
+        let oris_after = get_orientations_vec(&cube);
+        println!("After Ep Oris: {:?}", oris_after);
+
+        let sum: u32 = oris_after.iter().map(|&o| o as u32).sum();
+        println!("Sum after Ep: {}", sum);
+        assert!(sum % 2 == 0, "Ep move must preserve even parity");
+    }
+
+    #[test]
+    fn test_u_move_parity() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+        let oris = get_orientations_vec(&cube);
+        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+        println!("Oris after U: {:?}", oris);
+        println!("Sum after U: {}", sum);
+        assert!(sum % 2 != 0, "Single U move must have ODD parity");
+    }
+
+    #[test]
+    fn test_b_move_parity() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::B); // 背面 CW (背面側から見て時計回り)
+        let oris = get_orientations_vec(&cube);
+        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+        println!("Oris after B: {:?}", oris);
+        println!("Sum after B: {}", sum);
+        assert!(sum % 2 != 0, "Single B move must have ODD parity");
+    }
+
+    #[test]
+    fn test_x_rot_parity() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::X);
+        let oris = get_orientations_vec(&cube);
+        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+        println!("Oris after X: {:?}", oris);
+        println!("Sum after X: {}", sum);
+        assert!(sum % 2 == 0, "Global X rotation must have EVEN parity");
+    }
+
+    #[test]
+    fn test_solve_after_x_rot() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::X);
+
+        // 既に完成状態（回転してるだけ）のはず
+        assert!(
+            is_fully_solved(&cube),
+            "X-rotated cube should be recognized as fully solved"
+        );
+
+        // そこから 1 手動かしてみる
+        cube.apply_move(Move::U);
+        let sol = solve(&cube, 32, false);
+        assert!(sol.found, "Should find solution after X and U");
+
+        let mut final_cube = cube.clone();
+        for &m in &sol.moves {
+            final_cube.apply_move(m);
+        }
+        assert!(
+            is_fully_solved(&final_cube),
+            "Should be fully solved after moves"
+        );
+    }
+
+    #[test]
+    fn test_algorithm_cw_ccw() {
+        let mut cube = Cube::new();
+        // (Mp U M Up) * 3
+        let seq = [
+            Move::Mp,
+            Move::U,
+            Move::M,
+            Move::Up,
+            Move::Mp,
+            Move::U,
+            Move::M,
+            Move::Up,
+            Move::Mp,
+            Move::U,
+            Move::M,
+            Move::Up,
+        ];
+        for &m in &seq {
+            cube.apply_move(m);
+        }
+
+        let oris = get_orientations_vec(&cube);
+        println!("Oris after (Mp U M Up)*3: {:?}", oris);
+        // U=0, D=1, L=2, R=3, F=4, B=5
+        // 期待値: U を CW (+1), F を CCW (-1 = 3) に回転させるはず
+        assert_eq!(oris[0], 1, "U center should be 1 (CW)");
+        assert_eq!(oris[4], 3, "F center should be 3 (CCW)");
+    }
+
+    #[test]
+    fn test_solve_after_m_move() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::M);
+
+        let sol = solve(&cube, 32, false);
+        assert!(sol.found, "Should find solution after M move");
+
+        let mut final_cube = cube.clone();
+        for &m in &sol.moves {
+            final_cube.apply_move(m);
+        }
+        assert!(
+            is_fully_solved(&final_cube),
+            "Should be fully solved after M and moves"
+        );
     }
 }

@@ -83,3 +83,25 @@ fn test_slice_idempotency() {
         }
     }
 }
+#[test]
+fn test_repro_screenshot_state() {
+    let mut cube = Cube::new();
+    cube.stickers[Face::Up.start_index() + 4].orientation = 3;
+    cube.stickers[Face::Down.start_index() + 4].orientation = 2;
+    cube.stickers[Face::Left.start_index() + 4].orientation = 2;
+    cube.stickers[Face::Right.start_index() + 4].orientation = 3;
+    cube.stickers[Face::Front.start_index() + 4].orientation = 0;
+    cube.stickers[Face::Back.start_index() + 4].orientation = 1;
+    cube.force_sync_orientation_to_pieces();
+
+    // パリティをチェックしてみる
+    let oris = vec![3, 2, 2, 3, 0, 1]; // U, D, L, R, F, B
+    let sum: u32 = oris.iter().sum();
+    println!("Parity sum: {}", sum);
+
+    let sol = solve(&cube, 64, false);
+    // もしこれが物理的に不可能な状態なら found == false で正しい。
+    // もしユーザーが「揃えられるはず」と言っているなら、この期待値は true になるはず。
+    // 現時点では、コードの挙動を確認するためにアサーションを後回しにするか、println で確認する。
+    println!("Solution found: {}", sol.found);
+}

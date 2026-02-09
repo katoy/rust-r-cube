@@ -139,9 +139,6 @@ impl Search {
         .min(18);
         for d in 0..=max_p2_d {
             if self.search_phase2(cp, ep8, slice_p, d as u8, 99) {
-                if self.phase1_solutions_found == 0 {
-                    println!("Phase 1 found at depth {}. Phase 2 depth {}.", p1_len, d);
-                }
                 self.phase1_solutions_found += 1;
                 found_any = true;
                 break;

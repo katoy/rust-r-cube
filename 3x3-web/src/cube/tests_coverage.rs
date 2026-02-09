@@ -165,6 +165,7 @@ fn test_apply_orientation_solution() {
     let solution = crate::solver::Solution {
         moves: vec![Move::Rp],
         found: true,
+        message: "test".to_string(),
     };
     assert!(cube.apply_orientation_solution(&solution).is_ok());
 }

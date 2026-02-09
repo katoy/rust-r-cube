@@ -808,3 +808,191 @@ impl SolverState {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== SolverState Tests ====================
+
+    #[test]
+    fn test_solver_state_new_valid() {
+        let cube = Cube::new();
+        let state = SolverState::new(&cube, 20, false);
+        assert!(state.error().is_none());
+    }
+
+    #[test]
+    fn test_solver_state_new_scrambled() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+        cube.apply_move(Move::R);
+        cube.apply_move(Move::F);
+
+        let state = SolverState::new(&cube, 30, false);
+        assert!(state.error().is_none());
+    }
+
+    #[test]
+    fn test_solver_state_process_chunk_solved() {
+        let cube = Cube::new();
+        let mut state = SolverState::new(&cube, 20, false);
+
+        let (progress, finished) = state.process_chunk(10);
+        assert!(finished);
+        assert_eq!(progress, 1);
+
+        let solution = state.get_solution();
+        assert!(solution.is_some());
+        if let Some(sol) = solution {
+            assert!(sol.found);
+            assert_eq!(sol.moves.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_solver_state_process_chunk_scrambled() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+        cube.apply_move(Move::R);
+        cube.apply_move(Move::F);
+
+        let mut state = SolverState::new(&cube, 30, false);
+
+        let (progress, finished) = state.process_chunk(100);
+        assert!(finished);
+        assert_eq!(progress, 1);
+
+        let solution = state.get_solution();
+        assert!(solution.is_some());
+    }
+
+    #[test]
+    fn test_solver_state_estimate_progress_before() {
+        let cube = Cube::new();
+        let state = SolverState::new(&cube, 20, false);
+
+        let progress = state.estimate_progress();
+        assert_eq!(progress, 0.5);
+    }
+
+    #[test]
+    fn test_solver_state_estimate_progress_after() {
+        let cube = Cube::new();
+        let mut state = SolverState::new(&cube, 20, false);
+
+        state.process_chunk(10);
+        let progress = state.estimate_progress();
+        assert_eq!(progress, 1.0);
+    }
+
+    #[test]
+    fn test_solver_state_multiple_calls() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+
+        let mut state = SolverState::new(&cube, 20, false);
+
+        let (_, finished1) = state.process_chunk(10);
+        assert!(finished1);
+
+        let (progress2, finished2) = state.process_chunk(10);
+        assert!(finished2);
+        assert_eq!(progress2, 0);
+    }
+
+    #[test]
+    fn test_solver_state_get_solution_before() {
+        let cube = Cube::new();
+        let state = SolverState::new(&cube, 20, false);
+
+        let solution = state.get_solution();
+        assert!(solution.is_none());
+    }
+
+    #[test]
+    fn test_solver_state_ignore_orientation() {
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+        cube.apply_move(Move::Ep);
+
+        let mut state = SolverState::new(&cube, 30, true);
+
+        state.process_chunk(100);
+        let solution = state.get_solution();
+        assert!(solution.is_some());
+    }
+
+    #[test]
+    fn test_solver_state_complex_scramble() {
+        let mut cube = Cube::new();
+        cube.scramble(10);
+
+        let mut state = SolverState::new(&cube, 50, false);
+
+        let (_, finished) = state.process_chunk(1000);
+        assert!(finished);
+
+        let solution = state.get_solution();
+        assert!(solution.is_some());
+    }
+
+    // ==================== Special Conditions Tests ====================
+
+    #[test]
+    fn test_solve_color_solved_ignore_orientation() {
+        let mut cube = Cube::new();
+        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+
+        let solution = solve(&cube, 20, true);
+        assert!(solution.found);
+        assert!(solution.message.contains("色が揃っています") || solution.message.contains("解決"));
+    }
+
+    #[test]
+    fn test_debug_log_random_success() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+
+        let mut cube = Cube::new();
+        cube.apply_move(Move::U);
+        cube.apply_move(Move::R);
+        cube.apply_move(Move::F);
+
+        let _ = solve(&cube, 30, false);
+
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_debug_log_no_solution() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+
+        let mut cube = Cube::new();
+        for _ in 0..25 {
+            cube.apply_move(Move::U);
+            cube.apply_move(Move::R);
+            cube.apply_move(Move::F);
+        }
+
+        let solution = solve(&cube, 1, false);
+        assert!(!solution.found);
+
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_error_message_depth_exceeded() {
+        let mut cube = Cube::new();
+        for _ in 0..30 {
+            cube.apply_move(Move::U);
+            cube.apply_move(Move::R);
+            cube.apply_move(Move::F);
+        }
+
+        let solution = solve(&cube, 1, false);
+        assert!(!solution.found);
+        assert!(
+            solution.message.contains("解が見つかりません")
+                || solution.message.contains("探索深度")
+        );
+    }
+}

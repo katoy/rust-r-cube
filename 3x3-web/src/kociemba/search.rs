@@ -12,9 +12,10 @@ pub struct Search {
     pub solution: Option<Vec<Move>>,
     phase1_solutions_found: usize,
     pub node_count: usize,
+    pub max_nodes: usize,
 }
 
-const MAX_NODES: usize = 20_000_000;
+pub const DEFAULT_MAX_NODES: usize = 20_000_000;
 
 impl Default for Search {
     fn default() -> Self {
@@ -34,6 +35,7 @@ impl Search {
             solution: None,
             phase1_solutions_found: 0,
             node_count: 0,
+            max_nodes: DEFAULT_MAX_NODES,
         }
     }
 
@@ -54,11 +56,11 @@ impl Search {
             if self.search_phase1(twist, flip, slice, depth as u8, 99) {
                 break;
             }
-            if self.node_count > MAX_NODES {
+            if self.node_count > self.max_nodes {
                 break;
             }
         }
-        if self.solution.is_none() && self.node_count > MAX_NODES {
+        if self.solution.is_none() && self.node_count > self.max_nodes {
             println!("Search hit node limit: {}", self.node_count);
         }
         self.solution.clone()
@@ -81,7 +83,7 @@ impl Search {
 
         // 枝刈り
         self.node_count += 1;
-        if self.node_count > MAX_NODES {
+        if self.node_count > self.max_nodes {
             return false;
         }
 
@@ -166,7 +168,7 @@ impl Search {
 
         // 枝刈り
         self.node_count += 1;
-        if self.node_count > MAX_NODES {
+        if self.node_count > self.max_nodes {
             return false;
         }
 

@@ -393,7 +393,20 @@ fn solve_internal(
         (*s / 65536) % 32768
     };
 
+    use crate::kociemba::DEFAULT_MAX_NODES;
+
     for trial_iter in 0..RANDOM_TRIALS {
+        // 探索が難航している場合、早期にノード制限を引き上げる
+        if trial_iter > 100 {
+            search.max_nodes = DEFAULT_MAX_NODES * 5; // 1億ノード
+        }
+        if trial_iter > 500 {
+            search.max_nodes = DEFAULT_MAX_NODES * 10; // 2億ノード
+        }
+        if trial_iter > 1000 {
+            search.max_nodes = DEFAULT_MAX_NODES * 25; // 5億ノード
+        }
+
         progress.report(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
         let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
         let mut setup_moves = vec![];

@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-94.40%25-green)
+![Core Coverage](https://img.shields.io/badge/core_coverage-94.39%25-green)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -125,14 +125,14 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 | `src/cube/mod.rs`        | 217      | 92.17%     |
 | `src/cube/piece.rs`      | 162      | 98.77%     |
 | `src/cube/rotation.rs`   | 71       | 98.59%     |
-| `src/cube/validation.rs` | 96       | 90.62%     |
+| `src/cube/validation.rs` | 150      | 88.00%     |
 | `src/history.rs`         | 48       | 100.00%    |
 | `src/kociemba/coord.rs`  | 528      | 94.70%     |
-| `src/kociemba/search.rs` | 198      | 99.49%     |
+| `src/kociemba/search.rs` | 205      | 98.54%     |
 | `src/kociemba/tables.rs` | 233      | 98.28%     |
-| `src/solver.rs`          | 742      | 88.81%     |
+| `src/solver.rs`          | 764      | 89.92%     |
 | `src/statistics.rs`      | 45       | 100.00%    |
-| **TOTAL**                | **2696** | **94.40%** |
+| **TOTAL**                | **2779** | **94.39%** |
 
 ## ライセンス
 

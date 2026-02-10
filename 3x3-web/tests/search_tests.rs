@@ -7,11 +7,11 @@ use rubiks_cube_3x3::kociemba::search::{idx_to_move, is_redundant};
 fn test_superflip_distance() {
     // Superflip state colors
     let content =
-        "          WOWGWBWRW\nGWGOGRGYG RWRGRBRYR BWBRBOBYB OWOBOGOYO\n          YOYGYBYRY";
+        "          WOWGWBWRW\nGWGOGRGYG RWRGRBRYR BWBRBOBYB OWOBOGOYO\n          YRYGYBYOY";
     let cube = Cube::from_file_format(content).expect("Superflip format error");
     let rc = RawCube::from_cube(&cube).expect("Superflip convert error");
 
-    let search = Search::default();
+    Search::default();
     let twist = rc.get_twist();
     let flip = rc.get_flip();
     let slice = rc.get_ud_slice();

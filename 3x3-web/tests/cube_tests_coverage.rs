@@ -1,5 +1,5 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move, Sticker};
-use rubiks_cube_3x3::solver::{get_solved_oris, is_fully_solved, Solution};
+use rubiks_cube_3x3::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::solver::Solution;
 
 #[test]
 fn test_move_split_to_single() {

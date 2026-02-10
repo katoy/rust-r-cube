@@ -16,7 +16,7 @@ fn main() {
 
     // We need to access Search to use its pruning table logic, but Search::new() is private?
     // No, it's public.
-    let search = Search::new();
+    Search::new();
 
     // Search has pruning tables. Let's see if we can get the distance.
     // The pruning tables are MoveTable and PruningTable.

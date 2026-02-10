@@ -1,9 +1,6 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
-use rubiks_cube_3x3::kociemba::Search;
+use rubiks_cube_3x3::cube::{Cube, Face, Move};
 use rubiks_cube_3x3::solver::{
-    apply_rot_to_face, apply_supercube_fixes, get_all_rotations, get_buffer_face, get_setup_to_up,
-    get_setup_to_up_right, is_fully_solved, is_opposite_face, is_orientation_solvable, solve,
-    solve_with_progress, try_solve_with_rotation, undo_setup,
+    apply_rot_to_face, get_setup_to_up, is_fully_solved, is_opposite_face, solve,
 };
 
 #[test]

@@ -137,29 +137,45 @@ pub fn solve_with_progress(
 }
 
 pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> Solution {
+    // 物理的妥当性チェック
+    if let Err(e) = start_cube.is_valid_state() {
+        return Solution {
+            moves: vec![],
+            found: false,
+            message: format!("無効なキューブ状態: {}", e),
+        };
+    }
+
     solve_internal(start_cube, max_depth, ignore_orientation, None)
 }
 
 /// プログレス報告を抽象化するヘルパー
 struct ProgressReporter {
-    tx: Option<std::sync::mpsc::Sender<f32>>,
+    tx: Option<std::sync::Mutex<std::sync::mpsc::Sender<f32>>>,
 }
 
 impl ProgressReporter {
     fn new(tx: Option<std::sync::mpsc::Sender<f32>>) -> Self {
-        Self { tx }
+        Self {
+            tx: tx.map(std::sync::Mutex::new),
+        }
     }
 
     fn report(&self, progress: f32) {
-        if let Some(ref tx) = self.tx {
-            let _ = tx.send(progress);
+        if let Some(ref tx_mutex) = self.tx {
+            if let Ok(tx) = tx_mutex.lock() {
+                let _ = tx.send(progress);
+            }
         }
     }
 }
 
+pub enum TrySolveResult {
+    Perfect(Solution),
+    ColorOnly(Solution),
+}
+
 /// setup_moves と rotation を適用してソルバーを実行し、解の検証と向き修正を行う
-///
-/// 成功時に Solution を返す。max_depth を超える場合や解けない場合は None を返す。
 pub fn try_solve_with_rotation(
     start_cube: &Cube,
     setup_moves: &[Move],
@@ -167,8 +183,7 @@ pub fn try_solve_with_rotation(
     max_depth: usize,
     ignore_orientation: bool,
     search: &mut Search,
-    color_only_solution: &mut Option<Solution>,
-) -> Option<Solution> {
+) -> Option<TrySolveResult> {
     // setup_moves + rotation を適用したキューブを作成
     let mut test_cube = start_cube.clone();
     for &m in setup_moves {
@@ -204,20 +219,20 @@ pub fn try_solve_with_rotation(
 
     // 完全に解けている場合 (方位も含めて)
     if is_fully_solved(&check_cube) && moves.len() <= max_depth {
-        return Some(Solution {
+        return Some(TrySolveResult::Perfect(Solution {
             moves: moves.clone(),
             found: true,
             message: "方位も含めて完全に解決しました。".to_string(),
-        });
+        }));
     }
 
     // 向きを無視する場合に限り、色が揃っていれば即座に返す
     if ignore_orientation && check_cube.is_solved() && moves.len() <= max_depth {
-        return Some(Solution {
+        return Some(TrySolveResult::Perfect(Solution {
             moves: moves.clone(),
             found: true,
             message: "色の揃った解（向きは無視）を見つけました。".to_string(),
-        });
+        }));
     }
 
     // 色が揃っている場合、向き修正を試みる
@@ -228,21 +243,15 @@ pub fn try_solve_with_rotation(
             if std::env::var("SOLVER_DEBUG").is_ok() {
                 println!("DEBUG: try_solve_with_rotation: Odd parity detected (sum={}). Physically impossible.", sum);
             }
-            if ignore_orientation && color_only_solution.is_none() {
-                *color_only_solution = Some(Solution {
-                    moves: moves.clone(),
-                    found: true,
-                    message: format!("色は解決しましたが、方位パリティが異常(sum={})なため、方位の解決は不可能です。", sum),
-                });
-            } else if color_only_solution.is_none() {
-                // ignore_orientation が false の場合でも、失敗原因として保存しておく
-                *color_only_solution = Some(Solution {
-                    moves: moves.clone(),
-                    found: false,
-                    message: format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum),
-                });
-            }
-            return None;
+            return Some(TrySolveResult::ColorOnly(Solution {
+                moves: moves.clone(),
+                found: ignore_orientation, // 向きを無視する場合のみ "成功" とみなす
+                message: if ignore_orientation {
+                    format!("色は解決しましたが、方位パリティが異常(sum={})なため、方位の解決は不可能です。", sum)
+                } else {
+                    format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum)
+                },
+            }));
         }
 
         if std::env::var("SOLVER_DEBUG").is_ok() {
@@ -276,20 +285,18 @@ pub fn try_solve_with_rotation(
 
         if is_fully_solved(&final_cube) {
             if final_moves.len() <= max_depth {
-                return Some(Solution {
+                return Some(TrySolveResult::Perfect(Solution {
                     moves: final_moves,
                     found: true,
                     message: "色解決後にセンターの向きを修正しました。".to_string(),
-                });
-            }
-            // max_depth を超え、かつ ignore_orientation の場合のみ、color_only_solution として保存
-            if ignore_orientation && color_only_solution.is_none() {
-                *color_only_solution = Some(Solution {
+                }));
+            } else {
+                return Some(TrySolveResult::ColorOnly(Solution {
                     moves: final_moves,
-                    found: true,
+                    found: ignore_orientation,
                     message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
                         .to_string(),
-                });
+                }));
             }
         }
     }
@@ -331,50 +338,55 @@ fn solve_internal(
         };
     }
 
+    let mut color_only_solution: Option<Solution> = None;
+
     // 色が揃っているが向きが不完全な場合、即座に方位修正を試みる (探索をバイパス)
     if start_cube.is_solved() {
         let mut search = Search::new();
-        let mut color_only_solution = None;
-        if let Some(solution) = try_solve_with_rotation(
+        if let Some(res) = try_solve_with_rotation(
             start_cube,
             &[], // setup_moves
             &[], // rot
             max_depth,
             false, // ignore_orientation=false
             &mut search,
-            &mut color_only_solution,
         ) {
-            progress.report(1.0);
-            return solution;
-        }
-        // solve_internal の末尾の「解が見つかりませんでした」にフォールスルーさせるか、
-        // ここで詳細な理由を返して終了する。
-        if let Some(sol) = color_only_solution {
-            progress.report(1.0);
-            return sol;
+            match res {
+                TrySolveResult::Perfect(sol) => {
+                    progress.report(1.0);
+                    return sol;
+                }
+                TrySolveResult::ColorOnly(sol) => {
+                    color_only_solution = Some(sol);
+                }
+            }
         }
     }
 
     let mut search = Search::new();
     let rotations = get_all_rotations();
-    let mut color_only_solution: Option<Solution> = None;
 
     // 1. 直近方位試行
     for rot in &rotations {
-        if let Some(solution) = try_solve_with_rotation(
+        if let Some(res) = try_solve_with_rotation(
             start_cube,
             &[],
             rot,
             max_depth,
             ignore_orientation,
             &mut search,
-            &mut color_only_solution,
         ) {
-            if std::env::var("SOLVER_DEBUG").is_ok() {
-                println!("DEBUG: solve_internal returned solution from basic rotations");
+            match res {
+                TrySolveResult::Perfect(sol) => {
+                    progress.report(1.0);
+                    return sol;
+                }
+                TrySolveResult::ColorOnly(sol) => {
+                    if color_only_solution.is_none() {
+                        color_only_solution = Some(sol);
+                    }
+                }
             }
-            progress.report(1.0);
-            return solution;
         }
     }
 
@@ -387,49 +399,126 @@ fn solve_internal(
 
     // 2. 超軽量・高密度試行 (2000試行)
     let all_moves = Move::all_moves();
-    let mut seed: usize = RANDOM_SEED;
-    let next_rn = |s: &mut usize| -> usize {
-        *s = s.wrapping_mul(LCG_MULTIPLIER).wrapping_add(LCG_INCREMENT);
-        (*s / 65536) % 32768
-    };
-
     use crate::kociemba::DEFAULT_MAX_NODES;
 
-    for trial_iter in 0..RANDOM_TRIALS {
-        // 探索が難航している場合、早期にノード制限を引き上げる
-        if trial_iter > 100 {
-            search.max_nodes = DEFAULT_MAX_NODES * 5; // 1億ノード
-        }
-        if trial_iter > 500 {
-            search.max_nodes = DEFAULT_MAX_NODES * 10; // 2億ノード
-        }
-        if trial_iter > 1000 {
-            search.max_nodes = DEFAULT_MAX_NODES * 25; // 5億ノード
-        }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use rayon::prelude::*;
+        use std::sync::Mutex;
 
-        progress.report(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
-        let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
-        let mut setup_moves = vec![];
-        for _ in 0..n_random {
-            let m = all_moves[next_rn(&mut seed) % TOTAL_BASIC_MOVES];
-            setup_moves.push(m);
-        }
-        let rot = &rotations[next_rn(&mut seed) % TOTAL_ROTATIONS];
+        let color_only_mutex = Mutex::new(color_only_solution);
 
-        if let Some(solution) = try_solve_with_rotation(
-            start_cube,
-            &setup_moves,
-            rot,
-            max_depth,
-            ignore_orientation,
-            &mut search,
-            &mut color_only_solution,
-        ) {
-            if std::env::var("SOLVER_DEBUG").is_ok() {
-                println!("DEBUG: solve_internal returned solution from random trials");
-            }
+        let perfect_sol = (0..RANDOM_TRIALS)
+            .into_par_iter()
+            .find_map_any(|trial_iter| {
+                let mut local_search = Search::new();
+                // 探索が難航している場合、早期にノード制限を引き上げる
+                if trial_iter > 100 {
+                    local_search.max_nodes = DEFAULT_MAX_NODES * 5;
+                }
+                if trial_iter > 500 {
+                    local_search.max_nodes = DEFAULT_MAX_NODES * 10;
+                }
+                if trial_iter > 1000 {
+                    local_search.max_nodes = DEFAULT_MAX_NODES * 25;
+                }
+
+                // スレッドごとに異なるシードを作成
+                let mut local_seed = RANDOM_SEED.wrapping_add(trial_iter * 12345);
+                let next_rn_local = |s: &mut usize| -> usize {
+                    *s = s.wrapping_mul(LCG_MULTIPLIER).wrapping_add(LCG_INCREMENT);
+                    (*s / 65536) % 32768
+                };
+
+                let n_random = (next_rn_local(&mut local_seed) % MAX_SETUP_MOVES) + 1;
+                let mut setup_moves = vec![];
+                for _ in 0..n_random {
+                    let m = all_moves[next_rn_local(&mut local_seed) % TOTAL_BASIC_MOVES];
+                    setup_moves.push(m);
+                }
+                let rot = &rotations[next_rn_local(&mut local_seed) % TOTAL_ROTATIONS];
+
+                if let Some(res) = try_solve_with_rotation(
+                    start_cube,
+                    &setup_moves,
+                    rot,
+                    max_depth,
+                    ignore_orientation,
+                    &mut local_search,
+                ) {
+                    match res {
+                        TrySolveResult::Perfect(sol) => return Some(sol),
+                        TrySolveResult::ColorOnly(sol) => {
+                            let mut guard = color_only_mutex.lock().unwrap();
+                            if guard.is_none() {
+                                *guard = Some(sol);
+                            }
+                        }
+                    }
+                }
+                // 100回ごとにプログレス報告 (適当な頻度)
+                if trial_iter % 100 == 0 {
+                    progress.report(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
+                }
+                None
+            });
+
+        if let Some(sol) = perfect_sol {
             progress.report(1.0);
-            return solution;
+            return sol;
+        }
+        color_only_solution = color_only_mutex.into_inner().unwrap();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let mut seed: usize = RANDOM_SEED;
+        let mut next_rn = |s: &mut usize| -> usize {
+            *s = s.wrapping_mul(LCG_MULTIPLIER).wrapping_add(LCG_INCREMENT);
+            (*s / 65536) % 32768
+        };
+
+        for trial_iter in 0..RANDOM_TRIALS {
+            // 探索が難航している場合、早期にノード制限を引き上げる
+            if trial_iter > 100 {
+                search.max_nodes = DEFAULT_MAX_NODES * 5;
+            }
+            if trial_iter > 500 {
+                search.max_nodes = DEFAULT_MAX_NODES * 10;
+            }
+            if trial_iter > 1000 {
+                search.max_nodes = DEFAULT_MAX_NODES * 25;
+            }
+
+            progress.report(trial_iter as f32 / RANDOM_TRIALS as f32 * PROGRESS_WEIGHT);
+            let n_random = (next_rn(&mut seed) % MAX_SETUP_MOVES) + 1;
+            let mut setup_moves = vec![];
+            for _ in 0..n_random {
+                let m = all_moves[next_rn(&mut seed) % TOTAL_BASIC_MOVES];
+                setup_moves.push(m);
+            }
+            let rot = &rotations[next_rn(&mut seed) % TOTAL_ROTATIONS];
+
+            if let Some(res) = try_solve_with_rotation(
+                start_cube,
+                &setup_moves,
+                rot,
+                max_depth,
+                ignore_orientation,
+                &mut search,
+            ) {
+                match res {
+                    TrySolveResult::Perfect(sol) => {
+                        progress.report(1.0);
+                        return sol;
+                    }
+                    TrySolveResult::ColorOnly(sol) => {
+                        if color_only_solution.is_none() {
+                            color_only_solution = Some(sol);
+                        }
+                    }
+                }
+            }
         }
     }
 

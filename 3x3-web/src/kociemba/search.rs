@@ -53,6 +53,12 @@ impl Search {
         let slice = rc.get_ud_slice();
 
         for depth in 0..=max_depth {
+            if std::env::var("SOLVER_DEBUG").is_ok() {
+                println!(
+                    "DEBUG: search.solve: Phase 1 depth {}... (Nodes: {})",
+                    depth, self.node_count
+                );
+            }
             if self.search_phase1(twist, flip, slice, depth as u8, 99) {
                 break;
             }
@@ -138,7 +144,7 @@ impl Search {
             .min_total_length
             .saturating_sub(p1_len)
             .saturating_sub(1))
-        .min(18);
+        .min(12); // Superflip のために 12 手まで探索
         for d in 0..=max_p2_d {
             if self.search_phase2(cp, ep8, slice_p, d as u8, 99) {
                 self.phase1_solutions_found += 1;
@@ -177,7 +183,7 @@ impl Search {
             return false;
         }
 
-        // U(0-2), R2(4), F2(7), D(9-11), L2(13), B2(16)
+        // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
         let allowed_p2_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
         for &mv_idx in &allowed_p2_moves {
             let m = mv_idx / 3;
@@ -218,18 +224,17 @@ impl Search {
 }
 
 pub fn is_redundant(m: usize, last_m: usize) -> bool {
-    // 同じ面は除外 (last_face と比較済み)
-    // 対向面の重複 (U-D, R-L, F-B) を防ぐ。Uの後にDはOKだが、Dの後にUはインデックス順で制限
     if last_m == 99 {
         return false;
     }
+    // U:0, R:1, F:2, D:3, L:4, B:5 (idx_to_move の定義に準拠)
     match (last_m, m) {
-        (0, 3) => false,
-        (3, 0) => true,
-        (1, 4) => false,
-        (4, 1) => true,
-        (2, 5) => false,
-        (5, 2) => true,
+        (0, 3) => false, // U-D OK
+        (3, 0) => true,  // D-U Redundant
+        (1, 4) => false, // R-L OK
+        (4, 1) => true,  // L-R Redundant
+        (2, 5) => false, // F-B OK
+        (5, 2) => true,  // B-F Redundant
         _ => false,
     }
 }

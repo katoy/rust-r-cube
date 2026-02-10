@@ -57,6 +57,12 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
     // コーナーの位置パリティと向きパリティをチェック
     check_corner_parity(cube)?;
 
+    // エッジの位置パリティと向きパリティをチェック
+    check_edge_parity(cube)?;
+
+    // 置換パリティ（コーナー+エッジの一貫性）をチェック
+    check_total_permutation_parity(cube)?;
+
     Ok(())
 }
 
@@ -191,6 +197,76 @@ pub fn check_corner_parity(cube: &Cube) -> Result<()> {
     if total_twist % 3 != 0 {
         return Err(CubeError::InvalidState(
             "コーナーの向きが無効です（捻じれパリティエラー）。\n一つ以上のコーナーが物理的に回転してしまっている可能性があります。".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// エッジのパリティをチェック
+pub fn check_edge_parity(cube: &Cube) -> Result<()> {
+    use crate::kociemba::RawCube;
+    let rc = RawCube::from_cube(cube).map_err(CubeError::InvalidState)?;
+
+    // 1. 各エッジピースがユニークか
+    let mut sorted_ep = rc.ep;
+    sorted_ep.sort_by_key(|&e| e as u8);
+    for i in 0..11 {
+        if sorted_ep[i] == sorted_ep[i + 1] {
+            return Err(CubeError::InvalidState(
+                "重複するエッジピースが存在します。".to_string(),
+            ));
+        }
+    }
+
+    // 2. エッジ方位パリティ
+    let total_eo: u8 = rc.eo.iter().sum();
+    #[allow(clippy::manual_is_multiple_of)]
+    if total_eo % 2 != 0 {
+        return Err(CubeError::InvalidState(
+            "エッジの向きが無効です（エッジ方位パリティエラー）。".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// 置換パリティのチェック（コーナー置換パリティ + エッジ置換パリティ = 偶数）
+/// 置換パリティのチェック（コーナー置換パリティ + エッジ置換パリティ = 偶数）
+pub fn check_total_permutation_parity(cube: &Cube) -> Result<()> {
+    use crate::kociemba::RawCube;
+    let rc = RawCube::from_cube(cube).map_err(CubeError::InvalidState)?;
+
+    fn get_permutation_parity(p: &[usize]) -> usize {
+        let mut visited = vec![false; p.len()];
+        let mut total_swaps = 0;
+        for i in 0..p.len() {
+            if !visited[i] {
+                let mut curr = i;
+                let mut cycle_len = 0;
+                while !visited[curr] {
+                    visited[curr] = true;
+                    curr = p[curr];
+                    cycle_len += 1;
+                }
+                if cycle_len > 1 {
+                    total_swaps += cycle_len - 1;
+                }
+            }
+        }
+        total_swaps % 2
+    }
+
+    let cp_p: Vec<usize> = rc.cp.iter().map(|&c| c as usize).collect();
+    let ep_p: Vec<usize> = rc.ep.iter().map(|&e| e as usize).collect();
+
+    let cp_parity = get_permutation_parity(&cp_p);
+    let ep_parity = get_permutation_parity(&ep_p);
+
+    #[allow(clippy::manual_is_multiple_of)]
+    if (cp_parity + ep_parity) % 2 != 0 {
+        return Err(CubeError::InvalidState(
+            "置換パリティが不正です。コーナーとエッジの配置が物理的に不可能です。".to_string(),
         ));
     }
 

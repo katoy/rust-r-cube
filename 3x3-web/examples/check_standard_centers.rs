@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face};
+use rubiks_cube_3x3::cube::{Cube, Face};
 
 fn main() {
     let cube = Cube::new();

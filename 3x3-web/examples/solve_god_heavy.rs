@@ -1,6 +1,5 @@
 use rubiks_cube_3x3::cube::Cube;
-use rubiks_cube_3x3::kociemba::DEFAULT_MAX_NODES;
-use rubiks_cube_3x3::solver::{solve, DEFAULT_MAX_DEPTH};
+use rubiks_cube_3x3::solver::solve;
 use std::fs;
 use std::time::Instant;
 

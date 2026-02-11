@@ -2,7 +2,7 @@
 
 Rustで実装した3x3ルービックキューブのGUIプログラムです。Kociembaの2段階アルゴリズム（Two-Phase Algorithm）を搭載し、どのような状態からでも瞬時に解法を提示します。
 
-[![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
+[![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/3x3/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-97.55%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
@@ -80,7 +80,7 @@ cargo run --release --bin rubiks-cube-3x3
 
 ### Web版のビルド
 
-**🌐 オンラインデモ:** [https://katoy.github.io/rust-r-cube/](https://katoy.github.io/rust-r-cube/)
+**🌐 オンラインデモ:** [https://katoy.github.io/rust-r-cube/3x3/](https://katoy.github.io/rust-r-cube/3x3/)
 
 **ローカル開発:**
 

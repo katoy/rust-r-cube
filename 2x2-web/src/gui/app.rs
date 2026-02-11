@@ -1291,6 +1291,9 @@ impl eframe::App for CubeApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("2x2 ルービックキューブ");
+                ui.add_space(20.0);
+                ui.hyperlink_to("➡ 3x3版はこちら", "3x3/");
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.selectable_value(&mut self.view_mode, ViewMode::Both, "2D & 3D");
                     ui.selectable_value(&mut self.view_mode, ViewMode::ThreeD, "3Dのみ");

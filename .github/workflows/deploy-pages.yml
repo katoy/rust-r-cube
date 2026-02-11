@@ -14,13 +14,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
-defaults:
-  run:
-    working-directory: 2x2-web
-
 jobs:
   build:
-    name: Build WASM Application
+    name: Build WASM Applications
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -47,18 +43,34 @@ jobs:
       - name: Cache cargo build
         uses: actions/cache@v5
         with:
-          path: 2x2-web/target
+          path: |
+            2x2-web/target
+            3x3-web/target
           key: ${{ runner.os }}-cargo-build-wasm-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-wasm-
 
-      - name: Build with Trunk
-        run: trunk build --release --public-url /rust-r-cube/
+      - name: Build 2x2-web with Trunk
+        run: |
+          cd 2x2-web
+          trunk build --release --public-url /rust-r-cube/
+
+      - name: Build 3x3-web with Trunk
+        run: |
+          cd 3x3-web
+          trunk build --release --public-url /rust-r-cube/3x3/
+
+      - name: Prepare final dist
+        run: |
+          mkdir -p final_dist
+          cp -r 2x2-web/dist/* final_dist/
+          mkdir -p final_dist/3x3
+          cp -r 3x3-web/dist/* final_dist/3x3/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 2x2-web/dist
+          path: final_dist
 
   deploy:
     name: Deploy to GitHub Pages

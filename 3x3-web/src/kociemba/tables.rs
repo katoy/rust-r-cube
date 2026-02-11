@@ -1,24 +1,44 @@
 use super::coord::RawCube;
 use std::sync::OnceLock;
 
-/// Kociemba アルゴリズムで使用する遷移テーブル (Move Tables)
+/// Kociemba アルゴリズムで使用する遷移テーブル (Move Tables)。
+///
+/// 探索中に毎回キューブを物理的に回転させるのは非常に重い処理であるため、
+/// 各状態（Twist, Flip, Permutation等）が特定の回転操作によって
+/// どの状態に遷移するかを事前にすべて計算し、配列として保持します。
 pub struct MoveTable {
+    /// コーナーの向き (3^7 = 2187通り) の遷移テーブル
     pub twist: Box<[[u16; 18]; 2187]>,
+    /// エッジの向き (2^11 = 2048通り) の遷移テーブル
     pub flip: Box<[[u16; 18]; 2048]>,
+    /// 中層エッジの所属 (12C4 = 495通り) の遷移テーブル
     pub ud_slice: Box<[[u16; 18]; 495]>,
+    /// コーナーの配置 (8! = 40320通り) の遷移テーブル
     pub cp: Box<[[u16; 18]; 40320]>,
+    /// Phase 2 用のエッジの配置 (8! = 40320通り) の遷移テーブル
     pub ep8: Box<[[u16; 18]; 40320]>,
+    /// Phase 2 用の Slice パーツの置換 (24通り) の遷移テーブル
     pub slice_p: Box<[[u16; 18]; 24]>,
 }
 
+/// IDA* 探索で使用する枝刈りテーブル (Pruning Tables)。
+///
+/// 各状態から完成（または目標状態）までの最短手数の「下限値」を保持します。
+/// 探索中、[現在の手数 + 枝刈りテーブルの値 > 制限手数] となった場合、
+/// その先を探索しても解が見つからないことが保証されるため、探索を打ち切ることができます。
 pub struct PruningTable {
+    /// Twist と Slice を組み合わせた Phase 1 用の枝刈りテーブル
     pub twist_slice: Box<[u8]>,
+    /// Flip と Slice を組み合わせた Phase 1 用の枝刈りテーブル
     pub flip_slice: Box<[u8]>,
+    /// コーナー配置と Slice 配置を組み合わせた Phase 2 用の枝刈りテーブル
     pub cp_slice: Box<[u8]>,
+    /// エッジ配置と Slice 配置を組み合わせた Phase 2 用の枝刈りテーブル
     pub ep8_slice: Box<[u8]>,
 }
 
 impl MoveTable {
+    /// 移動テーブルを取得します。初回呼び出し時に生成（事前計算）されます。
     pub fn get() -> &'static MoveTable {
         static TABLE: OnceLock<MoveTable> = OnceLock::new();
         TABLE.get_or_init(|| MoveTable {
@@ -33,6 +53,7 @@ impl MoveTable {
 }
 
 impl PruningTable {
+    /// 枝刈りテーブルを取得します。初回呼び出し時に幅優先探索（BFS）を用いて生成されます。
     pub fn get() -> &'static PruningTable {
         static TABLE: OnceLock<PruningTable> = OnceLock::new();
         let move_table = MoveTable::get();

@@ -3,6 +3,10 @@ use crate::cube::{Cube, Face, Move};
 use crate::kociemba::Search;
 use glam::Vec3;
 
+/// 現在のキューブのセンター方位に基づき、正しい完成状態の方位（ターゲット）を特定します。
+///
+/// キューブが全体的に X, Y, Z 回転されている場合でも、センターの色配置から、
+/// 24通りの完成状態のうち現在の色配置に一致するものを探し出し、その向きを目標とします。
 pub fn get_target_oris(cube: &Cube) -> Vec<u8> {
     let states = get_solved_states();
     for (_i, s) in states.iter().enumerate() {
@@ -33,6 +37,12 @@ pub fn get_target_oris(cube: &Cube) -> Vec<u8> {
     vec![0, 0, 0, 0, 0, 0]
 }
 
+/// スーパーキューブ（センターに絵や向きがあるキューブ）としての解決手順を生成します。
+///
+/// 1. 現在のセンターの向きとターゲットの向きのズレを計算します。
+/// 2. 180度回転が必要な面がある場合、単独で180度回転させる手順を適用します。
+/// 3. 90度回転が必要な面が複数ある場合、ペア（片方を時計回り、もう片方を反時計回り）で修正する手順を適用します。
+/// これらの手順は「真に色保存的」であり、センター以外のピース（エッジ、コーナー）の配置を一切崩しません。
 pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     let mut current_cube = cube.clone();
     let mut final_moves = Vec::new();
@@ -68,13 +78,14 @@ pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
         }
 
         let fix = if let Some(&f) = d180s.first() {
+            // 単独180度修正
             get_fix_180(f)
         } else if d90s.len() >= 2 {
             let (f1, r1) = d90s[0];
             let (f2, r2) = d90s[1];
 
             if !is_opposite_face(f1, f2) {
-                // 90度ペア修正
+                // 隣接する2つの面で90度ペア修正
                 if r1 == 1 && r2 == 3 {
                     get_fix_90_pair(f1, f2)
                 } else if r1 == 3 && r2 == 1 {
@@ -85,7 +96,7 @@ pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
                     get_fix_90_pair(f2, f1)
                 }
             } else {
-                // 反対側の面同士の場合、中継面（バッファ）を使用
+                // 反対側の面同士の場合、中継面（バッファ）を使用して2ステップで修正
                 let buffer = get_buffer_face(f1, f2);
                 if r1 == 1 {
                     get_fix_90_pair(f1, buffer)

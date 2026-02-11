@@ -2,6 +2,10 @@ use super::coord::{move_cube_18, RawCube};
 use super::tables::{MoveTable, PruningTable};
 use crate::cube::Move;
 
+/// Kociemba の 2段階アルゴリズム（Two-Phase Algorithm）を用いてキューブを探索する構造体。
+///
+/// このアルゴリズムは、巨大な探索空間を持つルービックキューブを、2つの小さなフェーズに分けて解くことで、
+/// 数ミリ秒〜数百ミリ秒という短時間で 20 手前後の解法を見つけます。
 pub struct Search {
     move_table: &'static MoveTable,
     pruning_table: &'static PruningTable,
@@ -39,6 +43,10 @@ impl Search {
         }
     }
 
+    /// 与えられたキューブの状態から解法を探索します。
+    ///
+    /// 反復深化 A* (IDA*) を用いて、Phase 1 の深さを徐々に増やしながら、
+    /// Phase 1 の条件を満たす状態（Phase 2 の制限された回転操作だけで完成できる状態）を探索します。
     pub fn solve(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<Move>> {
         self.solution = None;
         self.phase1_moves.clear();
@@ -59,6 +67,7 @@ impl Search {
                     depth, self.node_count
                 );
             }
+            // フェーズ1の探索開始
             if self.search_phase1(twist, flip, slice, depth as u8, 99) {
                 break;
             }
@@ -72,6 +81,10 @@ impl Search {
         self.solution.clone()
     }
 
+    /// フェーズ1の IDA* 探索。
+    ///
+    /// 目的: ピースの向き（Twist, Flip）を正しくし、中層（UD-Slice）のピースを正しい層に移動させる。
+    /// この状態に到達すると、Phase 2 で使用可能な回転（U, D, R2, L2, F2, B2）のみでキューブを完成させることができます。
     pub fn search_phase1(
         &mut self,
         twist: u16,
@@ -82,12 +95,13 @@ impl Search {
     ) -> bool {
         if depth == 0 {
             if twist == 0 && flip == 0 && slice == 0 {
+                // Phase 1 の目標達成。Phase 2 の探索に移行。
                 return self.init_phase2();
             }
             return false;
         }
 
-        // 枝刈り
+        // 枝刈り: 現在の距離 + 残りの推定距離が制限を超える場合は探索を打ち切る
         self.node_count += 1;
         if self.node_count > self.max_nodes {
             return false;
@@ -98,6 +112,7 @@ impl Search {
             return false;
         }
 
+        // 6面それぞれの回転（時計回り、180度、反時計回り）を試行
         for m in 0..6 {
             if m == last_face || is_redundant(m, last_face) {
                 continue;
@@ -124,6 +139,7 @@ impl Search {
         d1.max(d2)
     }
 
+    /// フェーズ1の解が見つかった際に、そこからフェーズ2の探索を初期化します。
     fn init_phase2(&mut self) -> bool {
         self.phase2_moves.clear();
         // Phase 1 の解を適用して正確な RawCube を取得
@@ -138,8 +154,8 @@ impl Search {
 
         let p1_len = self.phase1_moves.len();
         let mut found_any = false;
-        // 現在の最善解より短いもののみ探す。ただし Phase 2 が深すぎると探索が終わらないため、
-        // 12手程度で打ち切るのが Kociemba の一般的実装。
+        // Phase 2 の IDA* 探索
+        // Phase 1 で見つかった状態から、完成までの最短手順を探索。
         let max_p2_d = (self
             .min_total_length
             .saturating_sub(p1_len)
@@ -155,6 +171,10 @@ impl Search {
         found_any
     }
 
+    /// フェーズ2の IDA* 探索。
+    ///
+    /// 目的: ピースの配置（Permutation）を修正し、完成状態に導く。
+    /// 使用可能な回転は U, D, R2, L2, F2, B2 に限定される。
     fn search_phase2(
         &mut self,
         cp: u16,
@@ -165,7 +185,7 @@ impl Search {
     ) -> bool {
         if depth == 0 {
             if cp == 0 && ep8 == 0 && slice_p == 0 {
-                // 解が見つかった
+                // 完成！解を抽出して終了
                 self.extract_solution();
                 return true;
             }
@@ -184,6 +204,7 @@ impl Search {
         }
 
         // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
+        // これらは Phase 1 で整えた「向き」や「Sliceの所属」を破壊しない回転。
         let allowed_p2_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
         for &mv_idx in &allowed_p2_moves {
             let m = mv_idx / 3;

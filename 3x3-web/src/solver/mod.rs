@@ -304,13 +304,9 @@ pub fn try_solve_with_rotation(
             }
         }
     }
-    // ignore_orientation が false の場合、色が揃っていない状態は color_only_solution として保存しない
     // (color_only_solution は色が揃っているが向きが揃っていない状態を保存するために使用される)
     // また、色が揃っているが向きが揃わない状態（パリティエラー）も、ignore_orientation=false の場合は
     // color_only_solution には保存しない。
-    // このブロックは、check_cube.is_solved() が false の場合にのみ到達する。
-    // そのため、color_only_solution には、色が揃った状態のみを保存する。
-    // したがって、この else if ブロックは削除する。
 
     None
 }

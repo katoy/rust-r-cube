@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable]
-        project: [2x2, 2x2-web]
+        project: [2x2, 2x2-web, 3x3-web]
         include:
           - os: ubuntu-latest
             rust: beta
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [2x2, 2x2-web]
+        project: [2x2, 2x2-web, 3x3-web]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -114,12 +114,16 @@ jobs:
         run: cargo fmt --all -- --check
         working-directory: 2x2-web
 
+      - name: Check 3x3-web formatting
+        run: cargo fmt --all -- --check
+        working-directory: 3x3-web
+
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [2x2, 2x2-web]
+        project: [2x2, 2x2-web, 3x3-web]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -154,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [2x2, 2x2-web]
+        project: [2x2, 2x2-web, 3x3-web]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -179,28 +183,49 @@ jobs:
         include:
           - os: ubuntu-latest
             project: 2x2
+            bin_name: rubiks-cube-2x2
             target: x86_64-unknown-linux-gnu
             artifact: rubiks-cube-2x2-linux
           - os: windows-latest
             project: 2x2
+            bin_name: rubiks-cube-2x2
             target: x86_64-pc-windows-msvc
             artifact: rubiks-cube-2x2-windows.exe
           - os: macos-latest
             project: 2x2
+            bin_name: rubiks-cube-2x2
             target: x86_64-apple-darwin
             artifact: rubiks-cube-2x2-macos
           - os: ubuntu-latest
             project: 2x2-web
+            bin_name: rubiks-cube-2x2
             target: x86_64-unknown-linux-gnu
             artifact: rubiks-cube-2x2-web-linux
           - os: windows-latest
             project: 2x2-web
+            bin_name: rubiks-cube-2x2
             target: x86_64-pc-windows-msvc
             artifact: rubiks-cube-2x2-web-windows.exe
           - os: macos-latest
             project: 2x2-web
+            bin_name: rubiks-cube-2x2
             target: x86_64-apple-darwin
             artifact: rubiks-cube-2x2-web-macos
+          - os: ubuntu-latest
+            project: 3x3-web
+            bin_name: rubiks-cube-3x3
+            target: x86_64-unknown-linux-gnu
+            artifact: rubiks-cube-3x3-web-linux
+          - os: windows-latest
+            project: 3x3-web
+            bin_name: rubiks-cube-3x3
+            target: x86_64-pc-windows-msvc
+            artifact: rubiks-cube-3x3-web-windows.exe
+          - os: macos-latest
+            project: 3x3-web
+            bin_name: rubiks-cube-3x3
+            target: x86_64-apple-darwin
+            artifact: rubiks-cube-3x3-web-macos
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -227,4 +252,4 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            ${{ matrix.project }}/target/${{ matrix.target }}/release/rubiks-cube-2x2${{ runner.os == 'Windows' && '.exe' || '' }}
+            ${{ matrix.project }}/target/${{ matrix.target }}/release/${{ matrix.bin_name }}${{ runner.os == 'Windows' && '.exe' || '' }}

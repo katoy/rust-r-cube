@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-96.94%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-97.28%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -253,22 +253,22 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 
 ### テストカバレッジ (Core Logic)
 
-| Filename                 | Lines    | Cover      |
-| :----------------------- | :------- | :--------- |
-| `src/cube/enums.rs`      | 249      | 98.80%     |
-| `src/cube/io.rs`         | 107      | 100.00%    |
-| `src/cube/mod.rs`        | 217      | 92.17%     |
-| `src/cube/piece.rs`      | 162      | 98.77%     |
-| `src/cube/rotation.rs`   | 71       | 98.59%     |
-| `src/cube/validation.rs` | 150      | 94.00%     |
-| `src/history.rs`         | 48       | 100.00%    |
-| `src/kociemba/coord.rs`  | 528      | 98.67%     |
-| `src/kociemba/search.rs` | 205      | 99.51%     |
-| `src/kociemba/tables.rs` | 233      | 98.28%     |
-| `src/solver/mod.rs`      | 591      | 95.26%     |
-| `src/solver/fix.rs`      | 208      | 93.27%     |
-| `src/statistics.rs`      | 45       | 100.00%    |
-| **TOTAL**                | **2814** | **96.94%** |
+| Filename                 | Lines    | Cover         |
+| :----------------------- | :------- | :------------ |
+| `src/cube/enums.rs`      | 249      | **100.00%** ✨ |
+| `src/cube/io.rs`         | 107      | **100.00%** ✨ |
+| `src/history.rs`         | 48       | **100.00%** ✨ |
+| `src/statistics.rs`      | 45       | **100.00%** ✨ |
+| `src/kociemba/search.rs` | 205      | 99.65%        |
+| `src/kociemba/tables.rs` | 233      | 99.01%        |
+| `src/cube/rotation.rs`   | 71       | 98.91%        |
+| `src/kociemba/coord.rs`  | 528      | 98.67%        |
+| `src/cube/piece.rs`      | 162      | 98.77%        |
+| `src/cube/validation.rs` | 150      | 96.02%        |
+| `src/cube/mod.rs`        | 217      | 95.99%        |
+| `src/solver/mod.rs`      | 591      | 97.12%        |
+| `src/solver/fix.rs`      | 208      | 93.27%        |
+| **TOTAL**                | **2814** | **97.28%**    |
 
 ## ライセンス
 

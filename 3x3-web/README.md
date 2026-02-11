@@ -4,9 +4,40 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-96.28%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-96.94%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+## 目次
+
+- [3x3 ルービックキューブ](#3x3-ルービックキューブ)
+  - [目次](#目次)
+  - [特徴](#特徴)
+  - [必要要件](#必要要件)
+    - [デスクトップ版](#デスクトップ版)
+    - [Web版](#web版)
+  - [ビルドと実行](#ビルドと実行)
+    - [デスクトップ版のビルド](#デスクトップ版のビルド)
+    - [Web版のビルド](#web版のビルド)
+  - [使い方](#使い方)
+    - [基本操作](#基本操作)
+    - [6面スキャン入力](#6面スキャン入力)
+    - [ファイルの読み込み/保存](#ファイルの読み込み保存)
+  - [神の数 (God's Number)](#神の数-gods-number)
+  - [アーキテクチャ](#アーキテクチャ)
+    - [探索アルゴリズム（Kociemba Two-Phase）](#探索アルゴリズムkociemba-two-phase)
+  - [プロジェクト構造](#プロジェクト構造)
+    - [主要モジュールの役割](#主要モジュールの役割)
+  - [サンプルキューブファイル](#サンプルキューブファイル)
+    - [ファイル形式](#ファイル形式)
+    - [サンプルファイル](#サンプルファイル)
+      - [`cube_ex001.txt` / `cube_diff2.txt`](#cube_ex001txt--cube_diff2txt)
+      - [`cube_ex001_scrambled.txt`](#cube_ex001_scrambledtxt)
+      - [`cube_god.txt`](#cube_godtxt)
+    - [ファイルの使用方法](#ファイルの使用方法)
+  - [開発・検証](#開発検証)
+    - [テストカバレッジ (Core Logic)](#テストカバレッジ-core-logic)
+  - [ライセンス](#ライセンス)
 
 ## 特徴
 
@@ -103,6 +134,110 @@ trunk build --release
 
 本実装では、各フェーズの最短距離を事前計算した「枝刈りテーブル」を使用し、探索空間を劇的に削減しています。
 
+## プロジェクト構造
+
+```text
+3x3-web/
+├── src/
+│   ├── cube/              # キューブの状態管理とロジック
+│   │   ├── mod.rs         # キューブの基本操作と状態管理
+│   │   ├── enums.rs       # Face, Move, Color などの列挙型
+│   │   ├── io.rs          # ファイル入出力と状態の永続化
+│   │   ├── piece.rs       # ピースの幾何学的表現
+│   │   ├── rotation.rs    # 回転操作の定義と実装
+│   │   └── validation.rs  # キューブ状態の検証とパリティチェック
+│   ├── kociemba/          # Kociemba 2段階アルゴリズム
+│   │   ├── mod.rs         # アルゴリズムのエントリポイント
+│   │   ├── coord.rs       # 座標変換と状態表現
+│   │   ├── search.rs      # IDA* 探索エンジン
+│   │   └── tables.rs      # 枝刈りテーブルの生成と管理
+│   ├── solver/            # ソルバーのメインロジック
+│   │   ├── mod.rs         # 解法探索の統合とオーケストレーション
+│   │   └── fix.rs         # スーパーキューブ向き修正アルゴリズム
+│   ├── gui/               # デスクトップGUI (egui/eframe)
+│   ├── history.rs         # 操作履歴管理 (Undo/Redo)
+│   ├── statistics.rs      # 統計情報の収集
+│   └── lib.rs             # ライブラリのルート
+├── tests/                 # 統合テスト (200+ テストケース)
+├── examples/              # サンプルプログラム
+├── cubes/                 # サンプルキューブファイル
+└── index.html             # Web版のエントリポイント
+```
+
+### 主要モジュールの役割
+
+- **`cube/`**: キューブの物理的な状態と操作を管理。54個のステッカーの色と向きを追跡し、すべての回転操作を実装。
+- **`kociemba/`**: 2段階アルゴリズムの実装。座標変換、探索、枝刈りテーブルを含む。
+- **`solver/`**: 高レベルのソルバーAPI。Kociembaアルゴリズムとスーパーキューブ向き修正を統合し、ユーザーフレンドリーな解法を提供。
+- **`gui/`**: デスクトップ版のGUI実装。3D/2Dビュー、アニメーション、ユーザー入力を処理。
+
+## サンプルキューブファイル
+
+`cubes/` ディレクトリには、テストや検証に使用できるサンプルキューブファイルが含まれています。
+
+### ファイル形式
+
+キューブの状態は以下の形式で保存されます:
+
+```text
+          WWWWWWWWW
+GGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO
+          YYYYYYYYY
+```
+
+各行は以下の面を表します:
+
+- 1行目: Up面 (上面) の9ステッカー
+- 2行目: Left, Front, Right, Back面 (左、前、右、後) の各9ステッカー (スペース区切り)
+- 3行目: Down面 (下面) の9ステッカー
+
+色の表記:
+
+- `W` = White (白)
+- `Y` = Yellow (黄)
+- `G` = Green (緑)
+- `B` = Blue (青)
+- `R` = Red (赤)
+- `O` = Orange (橙)
+
+### サンプルファイル
+
+#### `cube_ex001.txt` / `cube_diff2.txt`
+
+完全に解決済みの状態のキューブファイルです。
+
+標準的な完成状態のキューブ。すべてのステッカーが正しい色と向きで配置されています。
+
+- 用途: 基本動作の確認、リセット後の状態検証
+- 特徴: すべてのセンターが正しい位置にあり、向きも揃っている
+
+#### `cube_ex001_scrambled.txt`
+
+スクランブル済みの状態のキューブファイルです。
+
+ランダムに混ぜられたキューブの状態。ソルバーのテストに使用できます。
+
+- 用途: ソルバーの動作確認、解法時間の計測
+- 特徴: 実際のスクランブル操作によって生成された物理的に有効な状態
+
+#### `cube_god.txt`
+
+"神の数" テストケース (Superflip) のキューブファイルです。
+
+最も有名な20手問題の一つ。すべてのエッジピースが反転している状態で、Kociembaアルゴリズムの性能を試すのに最適です。
+
+- 用途: ソルバーの最大性能テスト、アルゴリズムの検証
+- 特徴: 色は揃っているように見えるが、すべてのエッジの向きが反転
+- 最短解法: 20手 (HTM基準)
+- 期待される解法時間: 0.1〜0.5秒
+
+### ファイルの使用方法
+
+1. GUIで **📂 読込** ボタンをクリック
+2. `cubes/` ディレクトリから目的のファイルを選択
+3. キューブの状態が読み込まれ、3D/2Dビューに反映されます
+4. **解法を探す** ボタンで解法を探索できます
+
 ## 開発・検証
 
 ```bash
@@ -120,19 +255,20 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 
 | Filename                 | Lines    | Cover      |
 | :----------------------- | :------- | :--------- |
-| `src/cube/enums.rs`      | 249      | 100.00%    |
+| `src/cube/enums.rs`      | 249      | 98.80%     |
 | `src/cube/io.rs`         | 107      | 100.00%    |
 | `src/cube/mod.rs`        | 217      | 92.17%     |
 | `src/cube/piece.rs`      | 162      | 98.77%     |
 | `src/cube/rotation.rs`   | 71       | 98.59%     |
-| `src/cube/validation.rs` | 150      | 100.00%    |
+| `src/cube/validation.rs` | 150      | 94.00%     |
 | `src/history.rs`         | 48       | 100.00%    |
 | `src/kociemba/coord.rs`  | 528      | 98.67%     |
 | `src/kociemba/search.rs` | 205      | 99.51%     |
 | `src/kociemba/tables.rs` | 233      | 98.28%     |
-| `src/solver.rs`          | 783      | 92.34%     |
+| `src/solver/mod.rs`      | 591      | 95.26%     |
+| `src/solver/fix.rs`      | 208      | 93.27%     |
 | `src/statistics.rs`      | 45       | 100.00%    |
-| **TOTAL**                | **2798** | **96.28%** |
+| **TOTAL**                | **2814** | **96.94%** |
 
 ## ライセンス
 

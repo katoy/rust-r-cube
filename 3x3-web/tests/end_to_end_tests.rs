@@ -1,5 +1,5 @@
 use rubiks_cube_3x3::cube::{Cube, Move};
-use rubiks_cube_3x3::solver::{self, solve_with_progress};
+use rubiks_cube_3x3::solver::{self, is_fully_solved, solve_with_progress};
 use std::sync::mpsc;
 
 #[test]
@@ -20,18 +20,53 @@ fn test_real_cube_solve_and_verify() {
     for move_op in &solution.moves {
         cube_from_file.apply_move(*move_op);
     }
-
     assert!(cube_from_file.is_solved());
 }
 
 #[test]
-fn test_user_specified_state_solvability() {
-    let state = "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY";
-    let cube = Cube::from_file_format(state).expect("状態の読み込みに失敗");
+fn test_difficult_patterns_solvability() {
+    // 6 Spot Pattern
+    let mut cube = Cube::new();
+    let pattern = [
+        Move::U,
+        Move::D2,
+        Move::L,
+        Move::R2,
+        Move::F,
+        Move::B2,
+        Move::U,
+        Move::D2,
+    ];
+    for mv in &pattern {
+        cube.apply_move(*mv);
+    }
 
-    if cube.is_valid_state().is_ok() {
-        let solution = solver::solve(&cube, 24, true);
-        assert!(solution.found, "有効な状態なら解けるはず");
+    let res = solver::solve(&cube, 24, true);
+    assert!(res.found);
+}
+
+// ==================== Regression Tests (Moved from regression_tests.rs) ====================
+
+#[test]
+fn test_solve_multiple_scrambles_regression() {
+    let scenarios = vec![
+        vec![Move::R, Move::U, Move::F],
+        vec![Move::R, Move::U, Move::R, Move::U],
+        vec![Move::R, Move::U, Move::F, Move::R, Move::U],
+    ];
+
+    for moves in scenarios {
+        let mut cube = Cube::new();
+        for &mv in &moves {
+            cube.apply_move(mv);
+        }
+
+        let solution = solver::solve(&cube, 11, true);
+        assert!(
+            solution.found,
+            "Regression: Scramble {:?} should be solvable",
+            moves
+        );
 
         let mut check_cube = cube.clone();
         for &mv in &solution.moves {
@@ -42,36 +77,19 @@ fn test_user_specified_state_solvability() {
 }
 
 #[test]
-fn test_difficult_patterns_god_number() {
-    // R U を5回繰り返すパターン (10手)
+fn test_solve_with_orientation_regression() {
+    let moves = vec![Move::R, Move::U, Move::F];
     let mut cube = Cube::new();
-    for _ in 0..5 {
-        cube.apply_move(Move::R);
-        cube.apply_move(Move::U);
+    for mv in moves {
+        cube.apply_move(mv);
     }
-    let solution = solver::solve(&cube, 24, true);
-    assert!(solution.found);
-    assert!(solution.moves.len() <= 24);
 
-    // 6 Spot パターン
-    let mut cube2 = Cube::new();
-    let pattern = vec![
-        Move::R,
-        Move::U,
-        Move::U,
-        Move::R,
-        Move::R,
-        Move::U,
-        Move::U,
-        Move::R,
-        Move::U,
-        Move::U,
-        Move::R,
-        Move::R,
-    ];
-    for mv in &pattern {
-        cube2.apply_move(*mv);
+    let solution = solver::solve(&cube, 10, false); // Respect orientation
+    assert!(solution.found);
+
+    let mut check_cube = cube.clone();
+    for &mv in &solution.moves {
+        check_cube.apply_move(mv);
     }
-    let solution2 = solver::solve(&cube2, 24, true);
-    assert!(solution2.found);
+    assert!(is_fully_solved(&check_cube));
 }

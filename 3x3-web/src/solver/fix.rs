@@ -42,6 +42,7 @@ pub fn get_target_oris(cube: &Cube) -> Vec<u8> {
 /// 1. 現在のセンターの向きとターゲットの向きのズレを計算します。
 /// 2. 180度回転が必要な面がある場合、単独で180度回転させる手順を適用します。
 /// 3. 90度回転が必要な面が複数ある場合、ペア（片方を時計回り、もう片方を反時計回り）で修正する手順を適用します。
+///
 /// これらの手順は「真に色保存的」であり、センター以外のピース（エッジ、コーナー）の配置を一切崩しません。
 pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     let mut current_cube = cube.clone();

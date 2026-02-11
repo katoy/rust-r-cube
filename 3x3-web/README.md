@@ -257,18 +257,18 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 | :----------------------- | :------- | :------------ |
 | `src/cube/enums.rs`      | 249      | **100.00%** ✨ |
 | `src/cube/io.rs`         | 107      | **100.00%** ✨ |
-| `src/history.rs`         | 48       | **100.00%** ✨ |
-| `src/statistics.rs`      | 45       | **100.00%** ✨ |
+| `src/history.rs`         | 67       | **100.00%** ✨ |
+| `src/statistics.rs`      | 39       | **100.00%** ✨ |
 | `src/kociemba/search.rs` | 205      | 99.65%        |
 | `src/kociemba/tables.rs` | 233      | 99.01%        |
 | `src/cube/rotation.rs`   | 71       | 98.91%        |
 | `src/kociemba/coord.rs`  | 528      | 98.67%        |
 | `src/cube/piece.rs`      | 162      | 98.77%        |
-| `src/cube/validation.rs` | 150      | 96.02%        |
-| `src/cube/mod.rs`        | 217      | 93.55%        |
-| `src/solver/mod.rs`      | 591      | 96.62%        |
-| `src/solver/fix.rs`      | 208      | 96.63%        |
-| **TOTAL**                | **2814** | **97.55%**    |
+| `src/cube/validation.rs` | 150      | 94.61%        |
+| `src/cube/mod.rs`        | 217      | 71.05%        |
+| `src/solver/mod.rs`      | 621      | 96.30%        |
+| `src/solver/fix.rs`      | 312      | 95.51%        |
+| **TOTAL (Core)**         | **3713** | **94.88%**    |
 
 ## ライセンス
 

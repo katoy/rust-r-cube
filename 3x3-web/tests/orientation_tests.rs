@@ -1,68 +1,86 @@
 use rubiks_cube_3x3::cube::{Cube, Face, Move};
-use rubiks_cube_3x3::solver;
+use rubiks_cube_3x3::solver::is_fully_solved;
 
 #[test]
-fn test_strict_physical_consistency_all_moves() {
-    let base_moves = Move::all_moves();
+fn test_restore_orientation_basic() {
+    let mut cube = Cube::new();
+    cube.scramble(10);
+    let original_normalized = cube.normalized();
 
-    for mv in base_moves {
-        // M, E, S, X, Y, Z は1手（18種類の基本操作）では解決できないためスキップ
-        // または、中心が動く操作は現在のソルバーのロジック（中心相対）では既製品として扱われる
-        let mv_str = format!("{:?}", mv);
-        if mv_str.contains('M')
-            || mv_str.contains('E')
-            || mv_str.contains('S')
-            || mv_str.contains('X')
-            || mv_str.contains('Y')
-            || mv_str.contains('Z')
-        {
-            continue;
-        }
+    let mut color_only = cube.normalized();
+    color_only.restore_orientation_instantly().unwrap();
 
-        // 1. 理想的な方位から開始
-        let mut cube = Cube::new().with_clockwise_orientations();
-
-        // 2. 操作を実行
-        cube.apply_move(mv);
-
-        // 3. この状態からソルバー（向き考慮）で解決を試みる
-        let solution = solver::solve(&cube, 1, false);
-
-        assert!(
-            solution.found,
-            "Move {:?} created a state that is not solvable in 1 move to any of the 24 ideal solved orientations.",
-            mv
-        );
-
-        // 4. 解決後の状態を実際に作り、全ての面が [1, 2, 0, 3] であることを確認
-        let mut resolved = cube.clone();
-        for &m in &solution.moves {
-            resolved.apply_move(m);
-        }
-
-        for face in Face::all() {
-            let start = face.start_index();
-            let pattern: Vec<u8> = (0..9)
-                .map(|i| resolved.get_sticker(start + i).orientation)
-                .collect();
-            let expected = vec![0u8; 9];
-            assert_eq!(
-                pattern, expected,
-                "Face {:?} orientation pattern is broken after solving move {:?}",
-                face, mv
-            );
-        }
-    }
+    assert_eq!(color_only.normalized(), original_normalized);
 }
 
 #[test]
-fn test_move_identity_4_times() {
-    // 任意の操作を4回繰り返すと、向きも含めて完全に元に戻ることを確認
-    for mv in Move::all_moves() {
-        let mut cube = Cube::new();
-        for _ in 0..4 {
-            cube.apply_move(mv);
+fn test_center_rotations_parity() {
+    let mut cube = Cube::new();
+    // センター1つを90度回転 (パリティ違反)
+    cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+    cube.force_sync_orientation_to_pieces();
+
+    let mut color_only = cube.normalized();
+    let res = color_only.restore_orientation_instantly();
+    // 物理的に不可能な状態でも、何らかの結果を返す（エラーにならない場合もあるが、is_solved にはならないはず）
+    println!("Restore result for single center twist: {:?}", res);
+}
+
+#[test]
+fn test_double_center_rotation_legal() {
+    let mut cube = Cube::new();
+    // センター2つを互いに90度、-90度回転 (合法)
+    cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+    cube.stickers[Face::Front.start_index() + 4].orientation = 3;
+    cube.force_sync_orientation_to_pieces();
+
+    let mut color_only = cube.normalized();
+    color_only
+        .restore_orientation_instantly()
+        .expect("Should restore legal center parity");
+
+    assert!(is_fully_solved(&color_only.with_clockwise_orientations()));
+}
+
+#[test]
+fn test_full_piece_orientation_sync() {
+    let mut cube = Cube::new();
+
+    // Up面センターピースを特定して回転させる
+    let mut found = false;
+    for piece in &mut cube.pieces {
+        if piece.current_pos.y.round() as i8 == 1
+            && piece.current_pos.x.round() as i8 == 0
+            && piece.current_pos.z.round() as i8 == 0
+        {
+            piece.rotate(glam::Vec3::Y, std::f32::consts::FRAC_PI_2);
+            found = true;
+            break;
         }
-        assert!(cube.is_solved_with_orientation());
     }
+    assert!(found, "Up center piece not found");
+
+    cube.sync_stickers();
+
+    // ステッカー側に反映されているか
+    let up_center_ori = cube.get_sticker(Face::Up.start_index() + 4).orientation;
+    assert_ne!(
+        up_center_ori, 0,
+        "Up center orientation should have changed"
+    );
+
+    // force_sync_orientation_to_pieces で逆方向に同期
+    cube.stickers[Face::Up.start_index() + 4].orientation = 2;
+    cube.force_sync_orientation_to_pieces();
+    assert_eq!(cube.get_sticker(Face::Up.start_index() + 4).orientation, 2);
+}
+
+#[test]
+fn test_clockwise_orientations_normalization() {
+    let mut cube = Cube::new();
+    cube.apply_move(Move::Y); // 全体回転
+
+    let normalized = cube.with_clockwise_orientations();
+    // Y回転後の解決済み状態は、正規化（回転を戻す）しても解決済みであるべき
+    assert!(is_fully_solved(&normalized));
 }

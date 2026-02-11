@@ -105,7 +105,7 @@ pub fn check_corner_parity(cube: &Cube) -> Result<()> {
     }
 
     let total_twist: u8 = rc.co.iter().sum();
-    if total_twist % 3 != 0 {
+    if !total_twist.is_multiple_of(3) {
         return Err(CubeError::InvalidState(format!(
             "コーナーの向きパリティが不正です (合計捻れ: {})",
             total_twist
@@ -130,7 +130,7 @@ pub fn check_edge_parity(cube: &Cube) -> Result<()> {
     }
 
     let total_flip: u8 = rc.eo.iter().sum();
-    if total_flip % 2 != 0 {
+    if !total_flip.is_multiple_of(2) {
         return Err(CubeError::InvalidState(format!(
             "エッジの向きパリティが不正です (合計反転: {})",
             total_flip
@@ -173,7 +173,7 @@ pub fn check_total_permutation_parity(cube: &Cube) -> Result<()> {
     let cp_parity = get_permutation_parity(&cp_p);
     let ep_parity = get_permutation_parity(&ep_p);
 
-    if (cp_parity + ep_parity) % 2 != 0 {
+    if !(cp_parity + ep_parity).is_multiple_of(2) {
         return Err(CubeError::InvalidState(
             "置換パリティが不正です。コーナーとエッジの配置が物理的に不可能です。".to_string(),
         ));

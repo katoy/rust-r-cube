@@ -913,6 +913,7 @@ impl SolverState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cube::Color;
 
     // ==================== SolverState Tests ====================
 
@@ -1096,5 +1097,29 @@ mod tests {
             solution.message.contains("解が見つかりません")
                 || solution.message.contains("探索深度")
         );
+    }
+
+    #[test]
+    fn test_solver_state_error_coverage() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+        let mut cube = Cube::new();
+        // Break cube distribution
+        cube.stickers[0].color = Color::Yellow;
+        let state = SolverState::new(&cube, 20, false);
+        assert!(state.error().is_some());
+        let _ = state.estimate_progress();
+        let _ = state.get_solution();
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_solver_state_process_chunk_after_finished() {
+        let cube = Cube::new();
+        let mut state = SolverState::new(&cube, 20, false);
+        state.process_chunk(1);
+        assert!(state.finished);
+        let (progress, finished) = state.process_chunk(1);
+        assert_eq!(progress, 0);
+        assert!(finished);
     }
 }

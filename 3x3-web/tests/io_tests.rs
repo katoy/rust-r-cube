@@ -1,5 +1,4 @@
 use rubiks_cube_3x3::cube::{Color, Cube, Face, Move, Sticker};
-use std::collections::HashSet;
 
 #[test]
 fn test_face_opposite() {

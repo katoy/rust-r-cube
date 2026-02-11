@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
+use rubiks_cube_3x3::cube::{Color, Cube, Move};
 use rubiks_cube_3x3::solver::get_orientations_vec;
 
 #[test]
@@ -57,7 +57,7 @@ fn test_move_parity_toggle() {
         c.apply_move(mv);
         let oris = get_orientations_vec(&c);
         let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-        assert!(sum % 2 != 0);
+        assert!(!sum.is_multiple_of(2));
     }
 }
 
@@ -75,7 +75,7 @@ fn test_restore_orientation_instantly() {
     let oris = get_orientations_vec(&test_cube);
     let sum: u32 = oris.iter().map(|&o| o as u32).sum();
     assert!(
-        sum % 2 == 0,
+        sum.is_multiple_of(2),
         "Restored orientation sum should be even for a solvable state"
     );
 }

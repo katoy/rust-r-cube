@@ -32,12 +32,15 @@ fn test_random_scramble_physical_consistency() {
 // === Helpers (Moved from cube_tests.rs or other old files) ===
 
 fn is_opposite(c1: Color, c2: Color) -> bool {
-    match (c1, c2) {
-        (Color::White, Color::Yellow) | (Color::Yellow, Color::White) => true,
-        (Color::Red, Color::Orange) | (Color::Orange, Color::Red) => true,
-        (Color::Blue, Color::Green) | (Color::Green, Color::Blue) => true,
-        _ => false,
-    }
+    matches!(
+        (c1, c2),
+        (Color::White, Color::Yellow)
+            | (Color::Yellow, Color::White)
+            | (Color::Red, Color::Orange)
+            | (Color::Orange, Color::Red)
+            | (Color::Blue, Color::Green)
+            | (Color::Green, Color::Blue)
+    )
 }
 
 fn check_corners_integrity(cube: &Cube) -> Result<(), String> {

@@ -420,6 +420,9 @@ fn test_all_moves_exhaustive_physical() {
         if let Err(e) = check_corners_integrity(&cube) {
             panic!("Corner integrity failed for {}: {}", msg, e);
         }
+        if let Err(e) = check_edges_integrity(&cube) {
+            panic!("Edge integrity failed for {}: {}", msg, e);
+        }
 
         // 特定の操作後の物理状態チェック（U）
         if mv == Move::U {
@@ -454,11 +457,8 @@ fn check_corners_integrity(cube: &Cube) -> Result<(), String> {
     ];
 
     for (name, indices) in corners {
-        let colors: Vec<String> = indices
-            .iter()
-            .map(|&i| format!("{:?}", cube.get_sticker(i).color))
-            .collect();
-        let unique: HashSet<&String> = colors.iter().collect();
+        let colors: Vec<Color> = indices.iter().map(|&i| cube.get_sticker(i).color).collect();
+        let unique: HashSet<Color> = colors.iter().cloned().collect();
 
         if unique.len() != 3 {
             return Err(format!(
@@ -469,8 +469,57 @@ fn check_corners_integrity(cube: &Cube) -> Result<(), String> {
                 indices
             ));
         }
+
+        // 対面の色が含まれていないかチェック
+        for i in 0..3 {
+            for j in i + 1..3 {
+                if is_opposite(colors[i], colors[j]) {
+                    return Err(format!("{}: 対面の色が隣接しています {:?}", name, colors));
+                }
+            }
+        }
     }
     Ok(())
+}
+
+/// エッジキューブの整合性をチェックするヘルパー関数
+fn check_edges_integrity(cube: &Cube) -> Result<(), String> {
+    let edges = vec![
+        ("UR", vec![5, 28]),
+        ("UF", vec![7, 37]),
+        ("UL", vec![3, 19]),
+        ("UB", vec![1, 46]),
+        ("DR", vec![14, 34]),
+        ("DF", vec![10, 43]),
+        ("DL", vec![12, 25]),
+        ("DB", vec![16, 52]),
+        ("FR", vec![41, 30]),
+        ("FL", vec![39, 23]),
+        ("BL", vec![50, 21]),
+        ("BR", vec![48, 32]),
+    ];
+
+    for (name, indices) in edges {
+        let colors: Vec<Color> = indices.iter().map(|&i| cube.get_sticker(i).color).collect();
+
+        if colors[0] == colors[1] {
+            return Err(format!("{}: 同じ色が2つあります {:?}", name, colors));
+        }
+
+        if is_opposite(colors[0], colors[1]) {
+            return Err(format!("{}: 対面の色が隣接しています {:?}", name, colors));
+        }
+    }
+    Ok(())
+}
+
+fn is_opposite(c1: Color, c2: Color) -> bool {
+    match (c1, c2) {
+        (Color::White, Color::Yellow) | (Color::Yellow, Color::White) => true,
+        (Color::Red, Color::Orange) | (Color::Orange, Color::Red) => true,
+        (Color::Blue, Color::Green) | (Color::Green, Color::Blue) => true,
+        _ => false,
+    }
 }
 
 #[test]
@@ -508,6 +557,9 @@ fn test_specific_sequence_corner_integrity() {
         if let Err(e) = check_corners_integrity(&cube) {
             panic!("Step {} ({:?}) broke corner integrity: {}", i + 1, mv, e);
         }
+        if let Err(e) = check_edges_integrity(&cube) {
+            panic!("Step {} ({:?}) broke edge integrity: {}", i + 1, mv, e);
+        }
     }
 }
 
@@ -530,7 +582,13 @@ fn test_random_scramble_corner_integrity() {
 
             if let Err(e) = check_corners_integrity(&cube) {
                 panic!(
-                    "Random test failed (trial {}): {}\nHistory: {:?}",
+                    "Random corner test failed (trial {}): {}\nHistory: {:?}",
+                    i, e, history
+                );
+            }
+            if let Err(e) = check_edges_integrity(&cube) {
+                panic!(
+                    "Random edge test failed (trial {}): {}\nHistory: {:?}",
                     i, e, history
                 );
             }

@@ -4,7 +4,7 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-94%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -32,17 +32,19 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 ## 必要要件
 
-### デスクトップ版
+### [要件] デスクトップ版
+
 - Rust 1.70以上
 
-### Web版
+### [要件] Web版
+
 - Rust 1.70以上
 - wasm32-unknown-unknownターゲット: `rustup target add wasm32-unknown-unknown`
 - Trunk: `cargo install trunk`
 
 ## ビルドと実行
 
-### デスクトップ版
+### [手順] デスクトップ版
 
 ```bash
 # リリースビルド
@@ -52,7 +54,7 @@ cargo build --release
 cargo run --release
 ```
 
-### Web版
+### [手順] Web版
 
 **🌐 オンラインデモ:** [https://katoy.github.io/rust-r-cube/](https://katoy.github.io/rust-r-cube/)
 
@@ -71,11 +73,8 @@ trunk build --release
 Web版は`dist/`フォルダに生成されます。Webサーバーで公開する場合は、このフォルダをデプロイしてください。
 
 > [!NOTE]
-> **Web版の制約事項**
-> - ファイルの保存/読み込みは、ブラウザの標準機能を使用します
 > - 保存: ブラウザのダウンロード機能を使用
 > - 読み込み: 現時点ではテキストを直接入力する形式になります（今後改善予定）
-
 
 ## 使い方
 
@@ -448,14 +447,16 @@ graph TD
 
 | File                     | Regions | Functions |  Lines  |
 | :----------------------- | :-----: | :-------: | :-----: |
-| `src/cube/enums.rs`      | 100.00% |  100.00%  | 100.00% |
-| `src/cube/io.rs`         | 100.00% |  100.00%  | 100.00% |
-| `src/cube/mod.rs`        | 100.00% |  100.00%  | 100.00% |
+| `src/cube/enums.rs`      | 99.05%  |  100.00%  | 99.08%  |
+| `src/cube/io.rs`         | 97.48%  |  100.00%  | 99.04%  |
+| `src/cube/mod.rs`        | 98.36%  |  100.00%  | 97.16%  |
 | `src/cube/rotation.rs`   | 100.00% |  100.00%  | 100.00% |
-| `src/cube/validation.rs` | 100.00% |  100.00%  | 100.00% |
-| `src/solver.rs`          | 99.50%  |  100.00%  | 99.50%  |
-| `src/history.rs`         | 85.00%  |  71.43%   | 80.56%  |
-| `src/error.rs`           | 100.00% |  100.00%  | 100.00% |
+| `src/cube/validation.rs` | 96.52%  |  100.00%  | 90.62%  |
+| `src/solver/mod.rs`      | 90.17%  |  71.43%   | 86.82%  |
+| `src/solver/coord.rs`    | 99.22%  |  100.00%  | 98.75%  |
+| `src/solver/search.rs`   | 94.19%  |  80.00%   | 92.19%  |
+| `src/solver/tables.rs`   | 98.46%  |  100.00%  | 97.67%  |
+| `src/history.rs`         | 84.96%  |  71.43%   | 80.56%  |
 
 
 - **物理的整合性の保証**: 8つのコーナーピースがそれぞれ正しい3色の組み合わせを維持しているかを常に検証するテストスイート (`check_corner_integrity`) を導入済み。

@@ -496,7 +496,7 @@ fn attempt_search(
     #[cfg(target_arch = "wasm32")]
     {
         let mut seed: usize = RANDOM_SEED;
-        let mut next_rn = |s: &mut usize| -> usize {
+        let next_rn = |s: &mut usize| -> usize {
             *s = s.wrapping_mul(LCG_MULTIPLIER).wrapping_add(LCG_INCREMENT);
             (*s / 65536) % 32768
         };
@@ -527,7 +527,7 @@ fn attempt_search(
                 rot,
                 max_depth,
                 ignore_orientation,
-                &mut search,
+                &mut _search,
             ) {
                 match res {
                     TrySolveResult::Perfect(sol) => return Some(sol),

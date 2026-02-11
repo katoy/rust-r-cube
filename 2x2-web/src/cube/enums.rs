@@ -78,6 +78,20 @@ pub enum Color {
     Gray,
 }
 
+impl Color {
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            0 => Color::White,
+            1 => Color::Yellow,
+            2 => Color::Green,
+            3 => Color::Blue,
+            4 => Color::Red,
+            5 => Color::Orange,
+            _ => Color::Gray,
+        }
+    }
+}
+
 /// 1枚のステッカーを表す構造体。
 ///
 /// 色情報（[`Color`]）と、そのステッカーの現在の向き（[`orientation`](Self::orientation)）を保持します。
@@ -116,42 +130,42 @@ impl Sticker {
 /// 接尾辞（なし, p, 2）は回転の量と方向を表します。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Move {
-    /// 右面 時計回り 90度
-    R,
-    /// 右面 反時計回り 90度 (Prime)
-    Rp,
-    /// 右面 180度
-    R2,
-    /// 左面 時計回り 90度
-    L,
-    /// 左面 反時計回り 90度
-    Lp,
-    /// 左面 180度
-    L2,
     /// 上面 時計回り 90度
     U,
-    /// 上面 反時計回り 90度
-    Up,
     /// 上面 180度
     U2,
+    /// 上面 反時計回り 90度 (Prime)
+    Up,
     /// 下面 時計回り 90度
     D,
-    /// 下面 反時計回り 90度
-    Dp,
     /// 下面 180度
     D2,
+    /// 下面 反時計回り 90度 (Prime)
+    Dp,
+    /// 左面 時計回り 90度
+    L,
+    /// 左面 180度
+    L2,
+    /// 左面 反時計回り 90度 (Prime)
+    Lp,
+    /// 右面 時計回り 90度
+    R,
+    /// 右面 180度
+    R2,
+    /// 右面 反時計回り 90度 (Prime)
+    Rp,
     /// 前面 時計回り 90度
     F,
-    /// 前面 反時計回り 90度
-    Fp,
     /// 前面 180度
     F2,
+    /// 前面 反時計回り 90度 (Prime)
+    Fp,
     /// 背面 時計回り 90度
     B,
-    /// 背面 反時計回り 90度
-    Bp,
     /// 背面 180度
     B2,
+    /// 背面 反時計回り 90度 (Prime)
+    Bp,
 }
 
 impl Move {
@@ -159,24 +173,24 @@ impl Move {
     #[must_use]
     pub fn all_moves() -> Vec<Move> {
         vec![
-            Move::R,
-            Move::Rp,
-            Move::R2,
-            Move::L,
-            Move::Lp,
-            Move::L2,
             Move::U,
-            Move::Up,
             Move::U2,
+            Move::Up,
             Move::D,
-            Move::Dp,
             Move::D2,
+            Move::Dp,
+            Move::L,
+            Move::L2,
+            Move::Lp,
+            Move::R,
+            Move::R2,
+            Move::Rp,
             Move::F,
-            Move::Fp,
             Move::F2,
+            Move::Fp,
             Move::B,
-            Move::Bp,
             Move::B2,
+            Move::Bp,
         ]
     }
 

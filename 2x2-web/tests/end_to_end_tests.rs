@@ -17,11 +17,16 @@ fn test_real_cube_solve_and_verify() {
     let (tx, _rx) = mpsc::channel();
     let solution = solve_with_progress(&cube_from_file, 14, true, Some(tx));
 
+    println!("Solution found: {}, moves: {:?}", solution.found, solution.moves);
     assert!(solution.found);
     for move_op in &solution.moves {
         cube_from_file.apply_move(*move_op);
     }
 
+    if !cube_from_file.is_solved() {
+        println!("Cube NOT solved!");
+        println!("{}", cube_from_file.to_file_format());
+    }
     assert!(cube_from_file.is_solved());
 }
 
@@ -47,11 +52,16 @@ fn test_user_specified_state_solvability() {
 
     if cube.is_valid_state().is_ok() {
         let solution = solver::solve(&cube, 11, true);
+        println!("User specified state solution: found={}, moves={:?}", solution.found, solution.moves);
         assert!(solution.found, "有効な状態なら解けるはず");
 
         let mut check_cube = cube.clone();
         for &mv in &solution.moves {
             check_cube.apply_move(mv);
+        }
+        if !check_cube.is_solved() {
+            println!("User specified state NOT solved!");
+            println!("{}", check_cube.to_file_format());
         }
         assert!(check_cube.is_solved());
     }

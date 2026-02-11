@@ -62,14 +62,14 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
 
 /// コーナーの構成ステッカーのインデックス定義 (PrimaryFace(U/D) -> CW1 -> CW2)
 pub const CORNER_STICKERS: [[usize; 3]; 8] = [
-    [2, 9, 16],  // UFL: U2, L1, F0
-    [3, 17, 12], // UFR: U3, F1, R0
-    [1, 13, 20], // UBR: U1, R1, B0
-    [0, 21, 8],  // UBL: U0, B1, L0
-    [4, 18, 11], // DFL: D0, F2, L3
-    [5, 14, 19], // DFR: D1, R2, F3
-    [7, 22, 15], // DBR: D3, B2, R3
-    [6, 10, 23], // DBL: D2, L2, B3
+    [2, 16, 9],  // UFL: U2, F0, L1
+    [3, 12, 17], // UFR: U3, R0, F1
+    [1, 20, 13], // UBR: U1, B0, R1
+    [0, 8, 21],  // UBL: U0, L0, B1
+    [4, 11, 18], // DFL: D0, L3, F2
+    [5, 19, 14], // DFR: D1, F3, R2
+    [7, 15, 22], // DBR: D3, R3, B2
+    [6, 23, 10], // DBL: D2, B3, L2
 ];
 
 /// 対面色かどうかを判定

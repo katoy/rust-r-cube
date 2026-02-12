@@ -2,9 +2,6 @@ pub mod coord;
 pub mod search;
 pub mod tables;
 
-#[cfg(test)]
-mod coord_tests;
-
 use self::coord::RawCube;
 use self::search::Search;
 use crate::cube::{Color, Cube, Move};
@@ -283,74 +280,5 @@ impl SolverState {
         } else {
             0.5
         }
-    }
-}
-
-#[cfg(test)]
-impl Cube {
-    fn apply_sequence(mut self, seq: &[Move]) -> Self {
-        for &m in seq {
-            self.apply_move(m);
-        }
-        self
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::cube::{Cube, Move};
-
-    #[test]
-    fn test_move_translation_diagnostic() {
-        let cube = Cube::new();
-        // Rotate Y (U D')
-        // Top CW (Seen from top): F->L, L->B, B->R, R->F
-        let rot = vec![Move::U, Move::Dp];
-        let mut rotated = cube.clone();
-        for &m in &rot {
-            rotated.apply_move(m);
-        }
-
-        // In rotated cube, turn face at pos 3 (Right)
-        rotated.apply_move(Move::R);
-
-        // The face at pos 3 in rotated was previously face 5 (Back)
-        // Let's verify our get_all_orientations would find this.
-        let orientations = get_all_orientations();
-        let ori = orientations
-            .iter()
-            .find(|o| {
-                let mut c = Cube::new();
-                for &m in &o.rot_moves {
-                    c.apply_move(m);
-                }
-                c == Cube::new().apply_sequence(&rot)
-            })
-            .expect("Should find Y rotation");
-
-        assert_eq!(ori.face_map[3], 5, "Right pos should be original Back face");
-
-        let translated_m = {
-            let face = 3; // Right
-            let offset = 0; // CW
-            let original_face = ori.face_map[face];
-            let all_moves = Move::all_moves();
-            all_moves[original_face as usize * 3 + offset]
-        };
-        assert_eq!(translated_m, Move::B);
-
-        // Verify: original applied with B, then rotated Y, should match rotated
-        let mut original = Cube::new();
-        original.apply_move(Move::B);
-        let mut original_rotated = original.clone();
-        for &m in &rot {
-            original_rotated.apply_move(m);
-        }
-
-        assert_eq!(
-            original_rotated, rotated,
-            "Translated move B should match rotated move R"
-        );
     }
 }

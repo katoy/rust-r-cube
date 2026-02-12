@@ -4,7 +4,7 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-99%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-96%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -584,4 +584,44 @@ cargo bench --no-run
 
 > [!TIP]
 > ベンチマーク結果は前回実行との比較機能が組み込まれており、パフォーマンスの変化を追跡できます。
+
+## 品質とテスト
+
+本プロジェクトは高いコード品質を維持するため、包括的なテストスイートとカバレッジ測定を導入しています。
+
+### テストセットアップ
+
+テストコードは `src/` から完全に分離され、`tests/` ディレクトリに機能ごとに整理されています：
+
+- `tests/cube_tests.rs`: キューブの基本操作、回転ロジック
+- `tests/solver_tests.rs`: 探索アルゴリズム、インクリメンタル状態、ノード制限
+- `tests/validation_tests.rs`: 物理的整合性、コーナーパリティチェック
+- `tests/io_tests.rs`: ファイル・テキスト形式の入出力
+- `tests/history_tests.rs`: 操作履歴、Undo/Redo ロジック
+- `tests/statistics_tests.rs`: 統計情報の記録・計算
+- `tests/workflow_tests.rs`: ファイル操作を含むエンドツーエンドのワークフロー
+
+### コードカバレッジ
+
+コアロジック（`src/gui` および `src/bin` を除く）において、**96.17%** のラインカバレッジを達成しています。
+
+| モジュール              | 行カバレッジ |
+| :---------------------- | :----------- |
+| **全体 (コアロジック)** | **96.17%**   |
+| `cube/rotation.rs`      | 100.00%      |
+| `history.rs`            | 100.00%      |
+| `statistics.rs`         | 100.00%      |
+| `solver/coord.rs`       | 99.22%       |
+| `solver/tables.rs`      | 98.46%       |
+| `solver/mod.rs`         | 97.90%       |
+| `solver/search.rs`      | 96.51%       |
+| `cube/validation.rs`    | 95.65%       |
+| `cube/enums.rs`         | 93.33%       |
+| `cube/mod.rs`           | 90.91%       |
+
+カバレッジの詳細は以下のコマンドで確認できます：
+
+```bash
+cargo llvm-cov --ignore-filename-regex "gui|bin"
+```
 

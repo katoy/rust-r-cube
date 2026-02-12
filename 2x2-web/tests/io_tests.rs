@@ -33,25 +33,6 @@ fn test_file_format_scrambled() {
 }
 
 #[test]
-fn test_validate_colors_valid() {
-    let mut colors = [Color::White; 24];
-    let faces = [
-        (Color::White, 0),
-        (Color::Yellow, 4),
-        (Color::Green, 8),
-        (Color::Blue, 12),
-        (Color::Red, 16),
-        (Color::Orange, 20),
-    ];
-    for (color, start) in faces {
-        for i in 0..4 {
-            colors[start + i] = color;
-        }
-    }
-    assert!(Cube::validate_colors(&colors).is_ok());
-}
-
-#[test]
 fn test_to_file_format_structure() {
     let cube = Cube::new();
     let format = cube.to_file_format();
@@ -104,4 +85,30 @@ fn test_legacy_format_compatibility() {
     let cube = Cube::from_file_format(legacy).expect("Failed to load legacy format");
     // [1,2,0,3] パターンの index 0 は 1
     assert_eq!(cube.stickers[0].orientation, 1);
+}
+
+#[test]
+fn test_io_from_file_format_errors() {
+    // 行数不足
+    assert!(Cube::from_file_format("WWWW\nGGGG").is_err());
+
+    // 1行目のパーツ数不正
+    assert!(Cube::from_file_format("WWW\nGGGG RRRR BBBB OOOO\nYYYY").is_err());
+
+    // 2行目のパーツ数不正
+    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOO\nYYYY").is_err());
+
+    // 3行目のパーツ数不正
+    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOO\nYYY").is_err());
+
+    // 無効な文字
+    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOZ\nYYYY").is_err());
+}
+
+#[test]
+fn test_to_file_format_with_gray() {
+    let mut cube = Cube::new();
+    cube.stickers[0].color = Color::Gray;
+    let s = cube.to_file_format();
+    assert!(s.contains('.'));
 }

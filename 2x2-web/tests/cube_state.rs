@@ -1,5 +1,4 @@
 use rubiks_cube_2x2::cube::{Color, Cube, Move, Sticker};
-use std::collections::HashSet;
 
 #[test]
 fn test_new_cube_is_solved() {
@@ -140,56 +139,6 @@ fn test_sticker_properties() {
 }
 
 #[test]
-fn test_color_enum() {
-    // Debug, Clone, Copy, PartialEq, Eq, Hash の派生を確認
-    let c1 = Color::White;
-    let c2 = c1; // Copy
-    assert_eq!(c1, c2); // PartialEq
-    let _ = format!("{:?}", c1); // Debug
-
-    let mut set = HashSet::new();
-    set.insert(c1); // Hash
-}
-
-#[test]
-fn test_move_display() {
-    let moves = [
-        (Move::R, "R"),
-        (Move::Rp, "R'"),
-        (Move::R2, "R2"),
-        (Move::L, "L"),
-        (Move::Lp, "L'"),
-        (Move::L2, "L2"),
-        (Move::U, "U"),
-        (Move::Up, "U'"),
-        (Move::U2, "U2"),
-        (Move::D, "D"),
-        (Move::Dp, "D'"),
-        (Move::D2, "D2"),
-        (Move::F, "F"),
-        (Move::Fp, "F'"),
-        (Move::F2, "F2"),
-        (Move::B, "B"),
-        (Move::Bp, "B'"),
-        (Move::B2, "B2"),
-    ];
-    for (mv, s) in moves {
-        assert_eq!(format!("{}", mv), s);
-    }
-}
-
-#[test]
-fn test_move_split_to_single() {
-    assert_eq!(Move::R2.split_to_single(), Some(Move::R));
-    assert_eq!(Move::L2.split_to_single(), Some(Move::L));
-    assert_eq!(Move::U2.split_to_single(), Some(Move::U));
-    assert_eq!(Move::D2.split_to_single(), Some(Move::D));
-    assert_eq!(Move::F2.split_to_single(), Some(Move::F));
-    assert_eq!(Move::B2.split_to_single(), Some(Move::B));
-    assert_eq!(Move::R.split_to_single(), None);
-}
-
-#[test]
 fn test_is_solved_with_orientation_mismatch() {
     let cube = Cube::new();
     assert!(cube.is_solved_with_orientation());
@@ -227,4 +176,54 @@ fn test_ru_cycle() {
         cube.apply_move(Move::U);
     }
     assert!(cube.is_solved());
+}
+#[test]
+fn test_cube_extra_coverage() {
+    // Transferred from src/cube/mod.rs
+    // Sticker rotation (Lines 117-124)
+    let mut sticker = Sticker::new(Color::White);
+    sticker.rotate_cw();
+    sticker.rotate_ccw();
+
+    // from_colors (Lines 146-163)
+    let mut colors = [Color::White; 24];
+    // 解決可能な配色を適当に作る
+    let solved = Cube::new();
+    for (i, sticker) in solved.stickers.iter().enumerate() {
+        colors[i] = sticker.color;
+    }
+    let _ = Cube::from_colors(&colors);
+
+    // restore_orientation_instantly fail path (Lines 246-249)
+    let mut cube = Cube::new();
+    // 物理的にありえないコーナー構成を作る。
+    // ただし、validate_colors をパスさせるために全体の各色数は4のままでなければならない。
+    cube.stickers[2].color = Color::Yellow;
+    cube.stickers[4].color = Color::White;
+    let _ = cube.restore_orientation_instantly();
+}
+
+// --- Orientation Tests (merged from orientation_tests.rs) ---
+
+#[test]
+fn test_is_fully_solved_basic() {
+    use rubiks_cube_2x2::solver::is_fully_solved;
+    let cube = Cube::new();
+    assert!(is_fully_solved(&cube));
+
+    let mut cube_rotated = cube.clone();
+    cube_rotated.apply_move(Move::U);
+    cube_rotated.apply_move(Move::Dp);
+    assert!(is_fully_solved(&cube_rotated));
+}
+
+#[test]
+fn test_apply_orientation_solution_various() {
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    let solution = rubiks_cube_2x2::solver::Solution {
+        moves: vec![Move::Rp],
+        found: true,
+    };
+    assert!(cube.apply_orientation_solution(&solution).is_ok());
 }

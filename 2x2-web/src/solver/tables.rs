@@ -32,6 +32,16 @@ impl PruningTable {
             }
         })
     }
+
+    /// CPの枝刈り距離を取得します。
+    pub fn get_cp_dist(&self, cp_idx: usize) -> u8 {
+        self.cp[cp_idx]
+    }
+
+    /// Twistの枝刈り距離を取得します。
+    pub fn get_twist_dist(&self, twist_idx: usize) -> u8 {
+        self.twist[twist_idx]
+    }
 }
 
 fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
@@ -114,15 +124,4 @@ fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
         distance += 1;
     }
     table.into_boxed_slice()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tables_coverage() {
-        let _ = MoveTable::get();
-        let _ = PruningTable::get();
-    }
 }

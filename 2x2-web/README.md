@@ -4,7 +4,7 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-99.49%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-98.93%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -92,7 +92,9 @@ trunk build --release
 - **📂 読込**: 保存したファイルを選択して読み込みます
 
 #### サンプルファイル
+
 プロジェクトには、様々な状態のサンプルファイルが `cubes/` ディレクトリに含まれています：
+
 - [cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_god.txt) - 11手必要な最難関状態
 
 ### 神の数 (God's Number)
@@ -231,10 +233,12 @@ graph LR
 ### 最適化されたソルバー
 
 #### アルゴリズム
+
 - **双方向BFS**: 開始状態と目標状態（24通りの完成状態）の両方から同時に探索することで、探索空間を劇的に削減。
 - **時間計算量**: O(b^(d/2)) - 単方向BFSのO(b^d)と比較して大幅に高速です。
 
 #### パフォーマンス最適化
+
 - **Rayon による並列化**: 各探索層の展開をマルチスレッドで実行。8コア環境において探索時間を大幅に削減。
 - **FxHash**: `rustc-hash` (FxHashMap) を採用し、ハッシュマップの操作を高速化。
 - **容量事前確保**: HashMapとVecDequeの容量を事前に確保し、再ハッシュのコストを削減。
@@ -273,21 +277,28 @@ cargo llvm-cov --summary-only --ignore-filename-regex "gui|bin"
 ```
 
 #### テストカテゴリ
-- `tests/cube_tests.rs`: 基本操作、回転ロジック
-- `tests/solver_tests.rs`: 探索アルゴリズム、インクリメンタル状態、ノード制限
-- `tests/validation_tests.rs`: 物理的整合性、パリティ
-- `tests/io_tests.rs`: ファイル・テキスト形式の入出力
+
+- `tests/cube_enums.rs`: 列挙型の挙動
+- `tests/cube_state.rs`: 基本操作、回転ロジック
+- `tests/cube_validation.rs`: 物理的整合性、パリティ
+- `tests/solver_core.rs`: 探索アルゴリズム
+- `tests/solver_coord.rs`: 座標変換
+- `tests/solver_search.rs`: 探索エンジン
+- `tests/solver_tables.rs`: 枝刈りテーブル
+- `tests/integration.rs`: 結合テスト、リグレッション、ワークフロー
 - `tests/history_tests.rs`: 操作履歴、Undo/Redo
 - `tests/statistics_tests.rs`: 統計情報の記録・計算
-- `tests/workflow_tests.rs`: エンドツーエンドのワークフロー
+- `tests/io_tests.rs`: ファイル・テキスト形式の入出力
 - `tests/wasm_tests.rs`: WASM環境動作検証
+- `tests/web_ui_tests.rs`: Web UI 関連
 
 #### コードカバレッジ状況
-コアロジックにおいて **99.49%** のラインカバレッジを達成しています。
+
+コアロジックにおいて **98.93%** のラインカバレッジを達成しています。
 
 | モジュール              | 行カバレッジ |
 | :---------------------- | :----------- |
-| **全体 (コアロジック)** | **99.49%**   |
+| **全体 (コアロジック)** | **98.93%**   |
 | `cube/enums.rs`         | 100.00%      |
 | `cube/io.rs`            | 100.00%      |
 | `cube/mod.rs`           | 100.00%      |
@@ -296,9 +307,9 @@ cargo llvm-cov --summary-only --ignore-filename-regex "gui|bin"
 | `statistics.rs`         | 100.00%      |
 | `solver/coord.rs`       | 100.00%      |
 | `solver/search.rs`      | 100.00%      |
-| `cube/validation.rs`    | 99.23%       |
+| `cube/validation.rs`    | 100.00%      |
 | `solver/mod.rs`         | 98.48%       |
-| `solver/tables.rs`      | 97.78%       |
+| `solver/tables.rs`      | 96.32%       |
 
 ### ベンチマーク
 
@@ -313,6 +324,7 @@ cargo bench solver_scramble_10
 ```
 
 #### 内容
+
 - `solver_scramble_*`: 指定手数のスクランブル状態の探索速度
 - `cube_*`: 基本操作、クローン、ハッシュ等のコスト
 - `solver_with_orientation` / `ignore_orientation`: 向き考慮の有無による比較

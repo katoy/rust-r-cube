@@ -277,3 +277,18 @@ fn test_move_translation_diagnostic() {
     // Y rotation then R move should be same as B move then Y rotation
     assert_eq!(rotated, target);
 }
+#[test]
+fn test_solver_extra_coverage() {
+    // Transferred from src/solver/mod.rs
+    let cube = Cube::new();
+    let sol = solve(&cube, 11, true);
+    assert!(sol.found);
+
+    let state = SolverState::new(&cube, 11, true);
+    assert!(state.get_solution().is_none());
+    assert!(state.estimate_progress() < 1.0);
+
+    // solve_with_progress
+    let (tx, _rx) = std::sync::mpsc::channel();
+    let _ = solve_with_progress(&cube, 1, true, Some(tx));
+}

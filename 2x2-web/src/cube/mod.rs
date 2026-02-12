@@ -280,36 +280,3 @@ impl Default for Cube {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cube_extra_coverage() {
-        // Sticker rotation (Lines 117-124)
-        let mut sticker = Sticker::new(Color::White);
-        sticker.rotate_cw();
-        sticker.rotate_ccw();
-
-        // from_colors (Lines 146-163)
-        let mut colors = [Color::White; 24];
-        // 解決可能な配色を適当に作る
-        let solved = Cube::new();
-        for (i, sticker) in solved.stickers.iter().enumerate() {
-            colors[i] = sticker.color;
-        }
-        let _ = Cube::from_colors(&colors);
-
-        // restore_orientation_instantly fail path (Lines 246-249)
-        let mut cube = Cube::new();
-        // 物理的にありえないコーナー構成を作る。
-        // ただし、validate_colors をパスさせるために全体の各色数は4のままでなければならない。
-        // UFL(index 2, 16, 9) の White(2) と DFL(index 4, 11, 18) の Yellow(4) を入れ替える。
-        // これにより、UFL は [Yellow, Red, Green], DFL は [White, Green, Red] になり、
-        // どちらも通常ありえない（白・黄がない、または配置が逆）状態になる。
-        cube.stickers[2].color = Color::Yellow;
-        cube.stickers[4].color = Color::White;
-        let _ = cube.restore_orientation_instantly();
-    }
-}

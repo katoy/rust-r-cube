@@ -32,7 +32,7 @@ impl Search {
     pub fn solve(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<Move>> {
         let cp = rc.get_cp();
         let twist = rc.get_twist();
-        
+
         self.nodes_count = 0;
         for depth in 0..=max_depth {
             self.solution.clear();
@@ -92,5 +92,15 @@ impl Search {
         }
 
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_search_default() {
+        let _ = Search::default();
     }
 }

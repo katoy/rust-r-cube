@@ -1,9 +1,7 @@
-use rubiks_cube_2x2::cube::{Color, Cube, Move, Sticker};
+use rubiks_cube_2x2::cube::{Color, Cube, Move};
 use rubiks_cube_2x2::solver::coord::RawCube;
 use rubiks_cube_2x2::solver::search::Search;
-use rubiks_cube_2x2::solver::{
-    self, get_solved_states, is_fully_solved, solve, solve_with_progress, Solution, SolverState,
-};
+use rubiks_cube_2x2::solver::{is_fully_solved, solve, solve_with_progress, Solution, SolverState};
 use std::sync::mpsc;
 
 #[test]

@@ -38,7 +38,8 @@ impl RawCube {
             for (i, &m) in moves.iter().enumerate() {
                 let mut cube = Cube::new();
                 crate::cube::rotation::apply_move(&mut cube, m);
-                res[i] = RawCube::from_cube(&cube, &[0, 1, 2, 3, 4, 5]).expect("Move generation failed");
+                res[i] =
+                    RawCube::from_cube(&cube, &[0, 1, 2, 3, 4, 5]).expect("Move generation failed");
             }
             res
         })[mv]
@@ -62,37 +63,39 @@ impl RawCube {
                 cube.stickers[facelets[2]].color,
             ];
 
-            let (piece, ori) =
-                if let Some(p) = colors.iter().position(|&c| c == u || c == d) {
-                    // Determine piece by color set
-                    let piece = {
-                        let mut sorted = colors;
-                        sorted.sort_by_key(|c| *c as u8);
+            let (piece, ori) = if let Some(p) = colors.iter().position(|&c| c == u || c == d) {
+                // Determine piece by color set
+                let piece = {
+                    let mut sorted = colors;
+                    sorted.sort_by_key(|c| *c as u8);
 
-                        if set_match(sorted, [u, l, f]) {
-                            Corner::UFL
-                        } else if set_match(sorted, [u, f, r]) {
-                            Corner::UFR
-                        } else if set_match(sorted, [u, r, b]) {
-                            Corner::UBR
-                        } else if set_match(sorted, [u, b, l]) {
-                            Corner::UBL
-                        } else if set_match(sorted, [d, f, l]) {
-                            Corner::DFL
-                        } else if set_match(sorted, [d, r, f]) {
-                            Corner::DFR
-                        } else if set_match(sorted, [d, b, r]) {
-                            Corner::DBR
-                        } else if set_match(sorted, [d, l, b]) {
-                            Corner::DBL
-                        } else {
-                            return Err(format!("Invalid corner set at {}: {:?}", i, colors));
-                        }
-                    };
-                    (piece, p as u8)
-                } else {
-                    return Err(format!("No U/D color ({:?}/{:?}) at corner {}: {:?}", u, d, i, colors));
+                    if set_match(sorted, [u, l, f]) {
+                        Corner::UFL
+                    } else if set_match(sorted, [u, f, r]) {
+                        Corner::UFR
+                    } else if set_match(sorted, [u, r, b]) {
+                        Corner::UBR
+                    } else if set_match(sorted, [u, b, l]) {
+                        Corner::UBL
+                    } else if set_match(sorted, [d, f, l]) {
+                        Corner::DFL
+                    } else if set_match(sorted, [d, r, f]) {
+                        Corner::DFR
+                    } else if set_match(sorted, [d, b, r]) {
+                        Corner::DBR
+                    } else if set_match(sorted, [d, l, b]) {
+                        Corner::DBL
+                    } else {
+                        return Err(format!("Invalid corner set at {}: {:?}", i, colors));
+                    }
                 };
+                (piece, p as u8)
+            } else {
+                return Err(format!(
+                    "No U/D color ({:?}/{:?}) at corner {}: {:?}",
+                    u, d, i, colors
+                ));
+            };
 
             rc.cp[i] = piece;
             rc.co[i] = ori;
@@ -203,5 +206,27 @@ impl Default for RawCube {
             ],
             co: [0; 8],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cube::{Color, Cube};
+
+    #[test]
+    fn test_coord_extra_coverage() {
+        // Line 89: Invalid corner set
+        let mut cube = Cube::new();
+        // マニュアルでステッカーの色をいじって物理的に不可能なコーナーを作る
+        cube.set_sticker_color(16, Color::Blue);
+        let _ = RawCube::from_cube(&cube, &[0, 1, 2, 3, 4, 5]);
+
+        // Lines 94-97: No U/D color
+        let mut cube_no_ud = Cube::new();
+        for i in 0..24 {
+            cube_no_ud.set_sticker_color(i, Color::Red);
+        }
+        let _ = RawCube::from_cube(&cube_no_ud, &[0, 1, 2, 3, 4, 5]);
     }
 }

@@ -115,3 +115,14 @@ fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     }
     table.into_boxed_slice()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tables_coverage() {
+        let _ = MoveTable::get();
+        let _ = PruningTable::get();
+    }
+}

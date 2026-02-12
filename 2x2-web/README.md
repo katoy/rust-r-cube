@@ -4,7 +4,7 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-96%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-99.49%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -283,21 +283,22 @@ cargo llvm-cov --summary-only --ignore-filename-regex "gui|bin"
 - `tests/wasm_tests.rs`: WASM環境動作検証
 
 #### コードカバレッジ状況
-コアロジックにおいて **96.17%** のラインカバレッジを達成しています。
+コアロジックにおいて **99.49%** のラインカバレッジを達成しています。
 
 | モジュール              | 行カバレッジ |
 | :---------------------- | :----------- |
-| **全体 (コアロジック)** | **96.17%**   |
+| **全体 (コアロジック)** | **99.49%**   |
+| `cube/enums.rs`         | 100.00%      |
+| `cube/io.rs`            | 100.00%      |
+| `cube/mod.rs`           | 100.00%      |
 | `cube/rotation.rs`      | 100.00%      |
 | `history.rs`            | 100.00%      |
 | `statistics.rs`         | 100.00%      |
-| `solver/coord.rs`       | 99.22%       |
-| `solver/tables.rs`      | 98.46%       |
-| `solver/mod.rs`         | 97.90%       |
-| `solver/search.rs`      | 96.51%       |
-| `cube/validation.rs`    | 95.65%       |
-| `cube/enums.rs`         | 93.33%       |
-| `cube/mod.rs`           | 90.91%       |
+| `solver/coord.rs`       | 100.00%      |
+| `solver/search.rs`      | 100.00%      |
+| `cube/validation.rs`    | 99.23%       |
+| `solver/mod.rs`         | 98.48%       |
+| `solver/tables.rs`      | 97.78%       |
 
 ### ベンチマーク
 

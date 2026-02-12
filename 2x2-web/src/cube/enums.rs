@@ -263,3 +263,21 @@ impl std::fmt::Display for Move {
         write!(f, "{s}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enums_extra_coverage() {
+        // Line 90: Gray color
+        assert_eq!(Color::from_u8(99), Color::Gray);
+
+        // Move inverse and split coverage
+        for m in Move::all_moves() {
+            let inv = m.inverse();
+            let _ = inv.inverse();
+            let _ = m.split_to_single();
+        }
+    }
+}

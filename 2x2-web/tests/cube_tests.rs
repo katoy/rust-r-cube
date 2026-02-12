@@ -218,12 +218,6 @@ fn test_apply_orientation_solution() {
     assert!(cube.apply_orientation_solution(&solution).is_ok());
 }
 
-fn check_sticker_val(cube: &Cube, idx: usize, color: Color, orient: u8, msg: &str) {
-    let s = cube.get_sticker(idx);
-    assert_eq!(s.color, color, "{} idx:{} 色不一致", msg, idx);
-    assert_eq!(s.orientation, orient, "{} idx:{} 向き不一致", msg, idx);
-}
-
 #[test]
 fn test_ru_cycle() {
     // R U の繰り返しの周期性を確認 (105回で元に戻る)

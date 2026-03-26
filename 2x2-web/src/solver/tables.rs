@@ -75,10 +75,11 @@ fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
 fn generate_cp_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let mut table = vec![255u8; 40320];
     table[0] = 0;
-    let mut distance = 0;
+    let mut distance = 0u8;
     let mut count = 1;
+    // 2x2キューブのCP空間は連結なので、BFSは必ず全状態を網羅する。
+    // ループは count が 40320 に達したとき自然に終了する。
     while count < 40320 {
-        let mut found = false;
         for i in 0..40320 {
             if table[i] == distance {
                 for m in 0..18 {
@@ -86,13 +87,9 @@ fn generate_cp_pruning_table(mt: &MoveTable) -> Box<[u8]> {
                     if table[next] == 255 {
                         table[next] = distance + 1;
                         count += 1;
-                        found = true;
                     }
                 }
             }
-        }
-        if !found {
-            break;
         }
         distance += 1;
     }
@@ -102,10 +99,10 @@ fn generate_cp_pruning_table(mt: &MoveTable) -> Box<[u8]> {
 fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let mut table = vec![255u8; 2187];
     table[0] = 0;
-    let mut distance = 0;
+    let mut distance = 0u8;
     let mut count = 1;
+    // Twist空間（2187状態）も連結なので、BFSは必ず全状態を網羅する。
     while count < 2187 {
-        let mut found = false;
         for i in 0..2187 {
             if table[i] == distance {
                 for m in 0..18 {
@@ -113,13 +110,9 @@ fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
                     if table[next] == 255 {
                         table[next] = distance + 1;
                         count += 1;
-                        found = true;
                     }
                 }
             }
-        }
-        if !found {
-            break;
         }
         distance += 1;
     }

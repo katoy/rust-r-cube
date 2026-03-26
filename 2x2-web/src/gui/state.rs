@@ -1,5 +1,4 @@
 use crate::cube::{Color, Cube, Move};
-use crate::gui::app::{AnimationState, EasingMode, SolverTask};
 use crate::gui::renderer_3d::View3D;
 use crate::history::History;
 use crate::solver;
@@ -7,6 +6,116 @@ use crate::statistics::Statistics;
 use std::sync::mpsc::Receiver;
 
 use web_time::Instant;
+
+/// キューブの表示モードを定義します。
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ViewMode {
+    /// 2D 展開図のみ表示
+    TwoD,
+    /// 3D ビューのみ表示
+    ThreeD,
+    /// 2D と 3D を両方表示
+    Both,
+}
+
+/// ユーザーの入力状態を定義します。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputState {
+    /// 通常の状態
+    Normal,
+    /// 6面スキャン入力モード
+    Scanning {
+        /// 現在入力中の面のインデックス (0-5: U, D, L, R, F, B)
+        face_index: usize,
+    },
+}
+
+/// アニメーションのイージング（加減速）モードを定義します。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EasingMode {
+    /// 通常 (加速してから減速)
+    EaseInOut,
+    /// 前半部分 (加速のみ、180度回転の分割前半などで使用)
+    EaseIn,
+    /// 後半部分 (減速のみ、180度回転の分割後半などで使用)
+    EaseOut,
+}
+
+/// 現在実行中のアニメーションの状態を管理する構造体。
+#[derive(Debug, Clone)]
+pub struct AnimationState {
+    /// 実行中の操作
+    pub current_move: Move,
+    /// 進捗率 (0.0 から 1.0)
+    pub progress: f32,
+    /// アニメーション開始時刻
+    pub start_time: Instant,
+    /// アニメーションの総時間（秒）
+    pub duration: f32,
+    /// 使用するイージングモード
+    pub easing: EasingMode,
+}
+
+impl AnimationState {
+    /// 新しいアニメーション状態を作成します（標準の EaseInOut）。
+    pub fn new(mv: Move, duration: f32) -> Self {
+        Self {
+            current_move: mv,
+            progress: 0.0,
+            start_time: Instant::now(),
+            duration,
+            easing: EasingMode::EaseInOut,
+        }
+    }
+
+    /// イージングモードを指定して、新しいアニメーション状態を作成します。
+    pub fn with_easing(mv: Move, duration: f32, easing: EasingMode) -> Self {
+        Self {
+            current_move: mv,
+            progress: 0.0,
+            start_time: Instant::now(),
+            duration,
+            easing,
+        }
+    }
+
+    /// 経過時間に基づいて進捗率を更新します。
+    ///
+    /// # 戻り値
+    ///
+    /// アニメーションが完了した（1.0 に達した）場合は `true` を返します。
+    pub fn update(&mut self) -> bool {
+        if self.duration <= 0.001 {
+            self.progress = 1.0;
+            return true;
+        }
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+        self.progress = (elapsed / self.duration).min(1.0);
+        self.progress >= 1.0
+    }
+
+    /// イージングモードに基づいた現在の進捗率（計算値）を取得します。
+    pub fn eased_progress(&self) -> f32 {
+        let t = self.progress;
+        match self.easing {
+            EasingMode::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    -1.0 + (4.0 - 2.0 * t) * t
+                }
+            }
+            EasingMode::EaseIn => t * t,
+            EasingMode::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
+        }
+    }
+}
+
+/// ソルバーのタスク種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SolverTask {
+    Normal, // 通常の解法探索
+}
 
 /// キューブのコア状態（論理的な状態とビジネスロジック）
 #[derive(Debug, Clone)]
@@ -206,21 +315,6 @@ impl AnimationStateManager {
         self.move_queue.clear();
         self.animation = None;
     }
-}
-
-/// UI表示状態
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewMode {
-    TwoD,
-    ThreeD,
-    Both,
-}
-
-/// 入力状態（通常モード、スキャンモード）
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InputState {
-    Normal,
-    Scanning { face_index: usize },
 }
 
 /// UI状態

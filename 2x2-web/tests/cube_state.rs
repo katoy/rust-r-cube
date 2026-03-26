@@ -185,19 +185,30 @@ fn test_cube_extra_coverage() {
     sticker.rotate_cw();
     sticker.rotate_ccw();
 
-    // from_colors (Lines 146-163)
+    // from_colors 正常パス
     let mut colors = [Color::White; 24];
-    // 解決可能な配色を適当に作る
     let solved = Cube::new();
     for (i, sticker) in solved.stickers.iter().enumerate() {
         colors[i] = sticker.color;
     }
     let _ = Cube::from_colors(&colors);
 
-    // restore_orientation_instantly fail path (Lines 246-249)
+    // from_colors の validate_colors エラーパス（色数不正）
+    // 全部 White にすると Yellow が0個 → validate_colors がエラーを返す
+    let all_white = [Color::White; 24];
+    assert!(Cube::from_colors(&all_white).is_err());
+
+    // from_colors の restore_orientation_instantly エラーパス
+    // 色数は正しいが、コーナー配置が物理的に不正なケース
+    // stickers[2](U面左下)を Yellow に、stickers[4](D面左上)を White に入れ替えると
+    // validate_colors は通るが、restore_orientation_instantly が失敗する
+    let mut invalid_colors = colors;
+    invalid_colors[2] = Color::Yellow;
+    invalid_colors[4] = Color::White;
+    assert!(Cube::from_colors(&invalid_colors).is_err());
+
+    // restore_orientation_instantly fail path (直接呼び出し)
     let mut cube = Cube::new();
-    // 物理的にありえないコーナー構成を作る。
-    // ただし、validate_colors をパスさせるために全体の各色数は4のままでなければならない。
     cube.stickers[2].color = Color::Yellow;
     cube.stickers[4].color = Color::White;
     let _ = cube.restore_orientation_instantly();

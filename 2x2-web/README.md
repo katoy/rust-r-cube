@@ -4,7 +4,7 @@ Rustで実装した2x2ルービックキューブのGUIプログラムです。�
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-98.93%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-100.00%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -281,35 +281,35 @@ cargo llvm-cov --summary-only --ignore-filename-regex "gui|bin"
 - `tests/cube_enums.rs`: 列挙型の挙動
 - `tests/cube_state.rs`: 基本操作、回転ロジック
 - `tests/cube_validation.rs`: 物理的整合性、パリティ
+- `tests/cube_io.rs`: ファイル・テキスト形式の入出力
+- `tests/cube_history.rs`: 操作履歴、Undo/Redo
+- `tests/cube_statistics.rs`: 統計情報の記録・計算
 - `tests/solver_core.rs`: 探索アルゴリズム
 - `tests/solver_coord.rs`: 座標変換
 - `tests/solver_search.rs`: 探索エンジン
 - `tests/solver_tables.rs`: 枝刈りテーブル
 - `tests/integration.rs`: 結合テスト、リグレッション、ワークフロー
-- `tests/history_tests.rs`: 操作履歴、Undo/Redo
-- `tests/statistics_tests.rs`: 統計情報の記録・計算
-- `tests/io_tests.rs`: ファイル・テキスト形式の入出力
-- `tests/wasm_tests.rs`: WASM環境動作検証
-- `tests/web_ui_tests.rs`: Web UI 関連
+- `tests/wasm_core.rs`: WASM環境動作検証
+- `tests/wasm_web_ui.rs`: Web UI 関連
 
 #### コードカバレッジ状況
 
-コアロジックにおいて **98.93%** のラインカバレッジを達成しています。
+コアロジックにおいて **100.00%** のラインカバレッジを達成しています。
 
 | モジュール              | 行カバレッジ |
 | :---------------------- | :----------- |
-| **全体 (コアロジック)** | **98.93%**   |
+| **全体 (コアロジック)** | **100.00%**  |
 | `cube/enums.rs`         | 100.00%      |
 | `cube/io.rs`            | 100.00%      |
 | `cube/mod.rs`           | 100.00%      |
 | `cube/rotation.rs`      | 100.00%      |
+| `cube/validation.rs`    | 100.00%      |
 | `history.rs`            | 100.00%      |
 | `statistics.rs`         | 100.00%      |
 | `solver/coord.rs`       | 100.00%      |
+| `solver/mod.rs`         | 100.00%      |
 | `solver/search.rs`      | 100.00%      |
-| `cube/validation.rs`    | 100.00%      |
-| `solver/mod.rs`         | 98.48%       |
-| `solver/tables.rs`      | 96.32%       |
+| `solver/tables.rs`      | 100.00%      |
 
 ### ベンチマーク
 

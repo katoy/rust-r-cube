@@ -35,7 +35,10 @@ fn test_real_cube_solve_and_verify() {
 
 #[test]
 fn test_cube_god_solvability() {
-    let content = fs::read_to_string("cubes/cube_god.txt").expect("cube_god.txt が見つかりません");
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = manifest_dir.join("cubes").join("cube_god.txt");
+    let content = fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("cube_god.txt が見つかりません: {}", path.display()));
     let cube = Cube::from_file_format(&content).expect("ファイル読み込みに失敗しました");
 
     // 向きを考慮した解決

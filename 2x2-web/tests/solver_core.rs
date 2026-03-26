@@ -292,3 +292,52 @@ fn test_solver_extra_coverage() {
     let (tx, _rx) = std::sync::mpsc::channel();
     let _ = solve_with_progress(&cube, 1, true, Some(tx));
 }
+
+/// ignore_orientation=false のとき、色は揃っているがステッカーの向きが
+/// 期待値と異なるキューブを渡すと、is_solved_with_orientation() が false を返すため
+/// 解法の検証チェック（solver/mod.rs の continue パス）が通ることをカバーする。
+#[test]
+fn test_solve_orientation_mismatch_triggers_continue() {
+    // 解法済みキューブを作成し、全ステッカーの orientation を 0 に強制設定する。
+    // Cube::new() は CLOCKWISE_ORIENTATION_PATTERN = [1, 2, 0, 3] を使うが、
+    // ここでは全て 0 にして「色は正しいが向きが違う」状態を作る。
+    let mut cube = Cube::new();
+    for sticker in &mut cube.stickers {
+        sticker.orientation = 0;
+    }
+
+    // 色は全面揃っているが向きが違う
+    assert!(cube.is_solved());
+    assert!(!cube.is_solved_with_orientation());
+
+    // ignore_orientation=false で解くと、ソルバーは色ベースで 0 手解を返すが
+    // is_solved_with_orientation() が false なので continue し、解なしとなる。
+    let solution = solve(&cube, 11, false);
+    assert!(!solution.found);
+}
+
+/// solve_with_progress を progress_tx=None で呼ぶことで、
+/// None 分岐（tx.send を行わないパス）をカバーする。
+#[test]
+fn test_solve_with_progress_none_tx() {
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    // None を渡すと進捗送信はスキップされるが、解法は正常に動作する
+    let solution = solve_with_progress(&cube, 11, true, None);
+    assert!(solution.found);
+}
+
+/// Gray ステッカーを含むキューブを solve に渡すと、
+/// 色リマップ時に Gray をスキップするパス（solver/mod.rs の if sticker.color != Gray 分岐）を通る。
+#[test]
+fn test_solve_with_gray_stickers_skips_remap() {
+    // 1枚だけ Gray にしたキューブ（is_solved() = false を保ちつつ Gray を含む）
+    // sticker[0] は U 面のコーナーステッカー。Gray にすると UBL コーナーが無効になる。
+    let mut cube = Cube::new();
+    cube.stickers[0].color = Color::Gray;
+    // U 面が [Gray, White, White, White] で is_solved() は false
+    assert!(!cube.is_solved());
+    // RawCube::from_cube が Gray を認識できないため全向きで失敗 → 解なし
+    let solution = solve(&cube, 3, true);
+    assert!(!solution.found);
+}

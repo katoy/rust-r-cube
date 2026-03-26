@@ -177,9 +177,6 @@ pub fn solve(start_cube: &Cube, max_depth: usize, ignore_orientation: bool) -> S
                     || translated_moves.len() < best_moves.as_ref().unwrap().len()
                 {
                     best_moves = Some(translated_moves);
-                    if best_moves.as_ref().unwrap().is_empty() {
-                        break;
-                    }
                 }
             }
         }

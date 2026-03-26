@@ -61,6 +61,17 @@ pub fn is_valid_state(cube: &Cube) -> Result<()> {
 }
 
 /// コーナーの構成ステッカーのインデックス定義 (PrimaryFace(U/D) -> CW1 -> CW2)
+///
+/// 各コーナーは3つのステッカーインデックスで表現される。
+/// - インデックス[0]: U面またはD面（上下面）のステッカー
+/// - インデックス[1]: 時計回り第1隣接面のステッカー
+/// - インデックス[2]: 時計回り第2隣接面のステッカー
+///
+/// 例: `[2, 16, 9]` は UFLコーナー (Up-Front-Left) を表し、
+/// U面のステッカー2番、F面のステッカー16番、L面のステッカー9番で構成される。
+///
+/// この順序は `check_corner_parity` での向き（ツイスト）計算に直結している：
+/// U/D面のステッカーが[0]番にある場合をツイスト0（正常向き）と定義する。
 pub const CORNER_STICKERS: [[usize; 3]; 8] = [
     [2, 16, 9],  // UFL: U2, F0, L1
     [3, 12, 17], // UFR: U3, R0, F1
@@ -72,7 +83,10 @@ pub const CORNER_STICKERS: [[usize; 3]; 8] = [
     [6, 23, 10], // DBL: D2, B3, L2
 ];
 
-/// 対面色かどうかを判定
+/// 2色が対面（反対面）の関係にあるかを判定
+///
+/// ルービックキューブでは対面色のステッカーは同一コーナーに存在しえない。
+/// 対面ペア: White↔Yellow, Red↔Orange, Green↔Blue
 fn is_opposite(c1: Color, c2: Color) -> bool {
     matches!(
         (c1, c2),
@@ -121,6 +135,7 @@ pub fn check_corner_parity(cube: &Cube) -> Result<()> {
         }
 
         let mut sorted_colors = colors;
+        // Color は PartialOrd を実装しないため、Debug文字列でソートして一意なキーを生成する
         sorted_colors.sort_by_key(|c| format!("{:?}", c));
         corner_pieces.push(sorted_colors);
     }

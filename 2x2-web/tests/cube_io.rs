@@ -101,8 +101,14 @@ fn test_io_from_file_format_errors() {
     // 3行目のパーツ数不正
     assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOO\nYYY").is_err());
 
-    // 無効な文字
+    // 2行目に無効な文字
     assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOZ\nYYYY").is_err());
+
+    // 1行目に無効な文字（parse_colors(lines[0])? のエラーパスをカバー）
+    assert!(Cube::from_file_format("WWWZ\nGGGG RRRR BBBB OOOO\nYYYY").is_err());
+
+    // 3行目に無効な文字（parse_colors(lines[2])? のエラーパスをカバー）
+    assert!(Cube::from_file_format("WWWW\nGGGG RRRR BBBB OOOO\nYYYZ").is_err());
 }
 
 #[test]

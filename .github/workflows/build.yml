@@ -28,7 +28,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      - name: Cache sccache
+      - name: Cache sccache binary
+        uses: actions/cache@v4
+        id: sccache-bin
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-sccache-bin-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-bin-
+
+      - name: Cache sccache state
         uses: actions/cache@v4
         id: sccache-cache
         with:
@@ -53,7 +62,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
 
-      - name: Install sccache
+      - name: Install sccache (only on cache miss)
+        if: steps.sccache-bin.outputs.cache-hit != 'true'
         run: |
           cargo install sccache --locked || true
 

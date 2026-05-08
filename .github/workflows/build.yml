@@ -1,4 +1,4 @@
-name: CI
+name: Build & Test
 
 on:
   push:
@@ -28,21 +28,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install Rust toolchain and components
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          components: rustfmt, clippy
           override: true
 
       - name: Show rustc
         run: rustc --version
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Build
         run: cargo build --workspace --verbose

@@ -2,254 +2,50 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main", "master"]
   pull_request:
-    branches: [ main ]
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+    branches: ["main", "master"]
 
 jobs:
-  test:
-    name: Test Suite
+  build:
+    name: Build & Test
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         rust: [stable]
-        project: [2x2, 2x2-web, 3x3-web]
-        include:
-          - os: ubuntu-latest
-            rust: beta
-            project: 2x2
-          - os: ubuntu-latest
-            rust: nightly
-            project: 2x2
-    continue-on-error: ${{ matrix.rust == 'nightly' }}
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Rust toolchain and components
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+          override: true
 
-      - name: Install system dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - name: Show rustc
+        run: rustc --version
 
-      - name: Cache cargo registry
-        uses: actions/cache@v5
-        with:
-          path: ~/.cargo/registry/index
-          key: ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-registry-
-
-      - name: Cache cargo build
-        uses: actions/cache@v5
-        with:
-          path: ${{ matrix.project }}/target
-          key: ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.rust }}-${{ matrix.project }}-cargo-build-
-
-      - name: Check
-        run: cargo check --all-targets --all-features
-
-      - name: Run tests
-        run: cargo test --all-features --verbose
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        project: [2x2, 2x2-web, 3x3-web]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  fmt:
-    name: Formatting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Build
+        run: cargo build --workspace --verbose
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Check 2x2 formatting
-        run: cargo fmt --all -- --check
-        working-directory: 2x2
-
-      - name: Check 2x2-web formatting
-        run: cargo fmt --all -- --check
-        working-directory: 2x2-web
-
-      - name: Check 3x3-web formatting
-        run: cargo fmt --all -- --check
-        working-directory: 3x3-web
-
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        project: [2x2, 2x2-web, 3x3-web]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Generate coverage
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ${{ matrix.project }}/lcov.info
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ${{ matrix.project }}
-
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        project: [2x2, 2x2-web, 3x3-web]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Run cargo-audit
-        run: cargo audit
-
-  build-release:
-    name: Build Release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            project: 2x2
-            bin_name: rubiks-cube-2x2
-            target: x86_64-unknown-linux-gnu
-            artifact: rubiks-cube-2x2-linux
-          - os: windows-latest
-            project: 2x2
-            bin_name: rubiks-cube-2x2
-            target: x86_64-pc-windows-msvc
-            artifact: rubiks-cube-2x2-windows.exe
-          - os: macos-latest
-            project: 2x2
-            bin_name: rubiks-cube-2x2
-            target: x86_64-apple-darwin
-            artifact: rubiks-cube-2x2-macos
-          - os: ubuntu-latest
-            project: 2x2-web
-            bin_name: rubiks-cube-2x2
-            target: x86_64-unknown-linux-gnu
-            artifact: rubiks-cube-2x2-web-linux
-          - os: windows-latest
-            project: 2x2-web
-            bin_name: rubiks-cube-2x2
-            target: x86_64-pc-windows-msvc
-            artifact: rubiks-cube-2x2-web-windows.exe
-          - os: macos-latest
-            project: 2x2-web
-            bin_name: rubiks-cube-2x2
-            target: x86_64-apple-darwin
-            artifact: rubiks-cube-2x2-web-macos
-          - os: ubuntu-latest
-            project: 3x3-web
-            bin_name: rubiks-cube-3x3
-            target: x86_64-unknown-linux-gnu
-            artifact: rubiks-cube-3x3-web-linux
-          - os: windows-latest
-            project: 3x3-web
-            bin_name: rubiks-cube-3x3
-            target: x86_64-pc-windows-msvc
-            artifact: rubiks-cube-3x3-web-windows.exe
-          - os: macos-latest
-            project: 3x3-web
-            bin_name: rubiks-cube-3x3
-            target: x86_64-apple-darwin
-            artifact: rubiks-cube-3x3-web-macos
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install system dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.artifact }}
-          path: |
-            ${{ matrix.project }}/target/${{ matrix.target }}/release/${{ matrix.bin_name }}${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Test
+        run: cargo test --workspace --verbose

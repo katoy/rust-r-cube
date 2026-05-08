@@ -28,6 +28,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
+      - name: Cache sccache
+        uses: actions/cache@v4
+        id: sccache-cache
+        with:
+          path: |
+            ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
       - name: Cache target directory
         uses: actions/cache@v4
         id: cargo-target
@@ -43,15 +53,25 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
 
-      - name: Show rustc
-        run: rustc --version
+      - name: Install sccache
+        run: |
+          cargo install sccache --locked || true
+
+      - name: Show rustc and sccache
+        run: |
+          rustc --version || true
+          which sccache || true
 
       - name: Prefetch dependencies
         run: |
           cargo fetch --locked || true
 
       - name: Build
+        env:
+          RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
         run: cargo build --workspace --verbose
 
       - name: Test
+        env:
+          RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
         run: cargo test --workspace --verbose

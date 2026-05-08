@@ -8,9 +8,7 @@ pub fn validate_colors(colors: &[Color; crate::cube::NUM_STICKERS]) -> Result<()
     let mut counts = [0usize; 7]; // Color Enum の数に合わせて7 (Grayを含む)
     for &color in colors {
         let idx = color as usize;
-        if idx < 7 {
-            counts[idx] += 1;
-        }
+        counts[idx] += 1;
     }
 
     // 各色が4つずつあるかチェック
@@ -142,20 +140,21 @@ pub fn check_corner_parity(cube: &Cube) -> Result<()> {
         ];
 
         // 白または黄色のステッカーを探す
-        let twist = if let Some(pos) = colors
-            .iter()
-            .position(|&c| c == Color::White || c == Color::Yellow)
-        {
-            // 上面/底面(index 0)にあれば 0
-            // 時計回りにずれていれば 1, 反時計回りなら 2
-            // コーナーによって時計回りの定義が異なるが、
-            // 2x2では隣接するコーナー間で「基準面に向かう方向」が逆転するため
-            // スロットのインデックス順 (Up/Down -> SideA -> SideB) を一貫して使えば合計は0 mod 3になる
-            pos
-        } else {
-            return Err(CubeError::InvalidState(
-                "不正な色のコーナーです".to_string(),
-            ));
+        let mut pos_opt = None;
+        for (i, &c) in colors.iter().enumerate() {
+            if c == Color::White || c == Color::Yellow {
+                pos_opt = Some(i);
+                break;
+            }
+        }
+
+        let twist = match pos_opt {
+            Some(pos) => pos,
+            None => {
+                return Err(CubeError::InvalidState(
+                    "不正な色のコーナーです".to_string(),
+                ));
+            }
         };
         total_twist += twist;
     }

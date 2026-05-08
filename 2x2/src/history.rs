@@ -200,6 +200,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_with_capacity() {
+        let mut h = History::with_capacity(2);
+        h.push(Move::R);
+        h.push(Move::U);
+        h.push(Move::F); // 最大サイズ超過 → 最古の操作を削除
+        assert_eq!(h.undo_count(), 2);
+    }
+
+    #[test]
+    fn test_default() {
+        let h = History::default();
+        assert!(!h.can_undo());
+        assert!(!h.can_redo());
+    }
+
+    #[test]
+    fn test_can_undo_empty() {
+        let h = History::new();
+        assert!(!h.can_undo());
+    }
+
+    #[test]
+    fn test_can_redo_empty() {
+        let h = History::new();
+        assert!(!h.can_redo());
+    }
+
+    #[test]
+    fn test_redo_count() {
+        let mut h = History::new();
+        h.push(Move::R);
+        h.push(Move::U);
+        h.undo();
+        assert_eq!(h.redo_count(), 1);
+        h.undo();
+        assert_eq!(h.redo_count(), 2);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut h = History::new();
+        h.push(Move::R);
+        h.undo();
+        h.clear();
+        assert_eq!(h.undo_count(), 0);
+        assert_eq!(h.redo_count(), 0);
+        assert!(!h.can_undo());
+        assert!(!h.can_redo());
+    }
+
+    #[test]
     fn test_push_and_undo() {
         let mut history = History::new();
         history.push(Move::R);

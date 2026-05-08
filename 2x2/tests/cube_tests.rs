@@ -582,6 +582,57 @@ fn test_random_scramble_corner_integrity() {
     }
 }
 
+#[test]
+fn test_move_split_to_single() {
+    // 2回転操作は90度操作に分割できる
+    assert_eq!(Move::R2.split_to_single(), Some(Move::R));
+    assert_eq!(Move::L2.split_to_single(), Some(Move::L));
+    assert_eq!(Move::U2.split_to_single(), Some(Move::U));
+    assert_eq!(Move::D2.split_to_single(), Some(Move::D));
+    assert_eq!(Move::F2.split_to_single(), Some(Move::F));
+    assert_eq!(Move::B2.split_to_single(), Some(Move::B));
+    // 90度操作は分割不可
+    assert_eq!(Move::R.split_to_single(), None);
+    assert_eq!(Move::Rp.split_to_single(), None);
+    assert_eq!(Move::L.split_to_single(), None);
+}
+
+#[test]
+fn test_move_display_2moves() {
+    assert_eq!(format!("{}", Move::R2), "R2");
+    assert_eq!(format!("{}", Move::L2), "L2");
+    assert_eq!(format!("{}", Move::U2), "U2");
+    assert_eq!(format!("{}", Move::D2), "D2");
+    assert_eq!(format!("{}", Move::F2), "F2");
+    assert_eq!(format!("{}", Move::B2), "B2");
+}
+
+#[test]
+fn test_move_inverse_2moves() {
+    // 180度操作の逆は同じ180度操作
+    assert_eq!(Move::R2.inverse(), Move::R2);
+    assert_eq!(Move::L2.inverse(), Move::L2);
+    assert_eq!(Move::U2.inverse(), Move::U2);
+    assert_eq!(Move::D2.inverse(), Move::D2);
+    assert_eq!(Move::F2.inverse(), Move::F2);
+    assert_eq!(Move::B2.inverse(), Move::B2);
+}
+
+#[test]
+fn test_is_solved_with_orientation() {
+    let cube = Cube::new();
+    assert!(cube.is_solved_with_orientation());
+}
+
+#[test]
+fn test_is_solved_with_orientation_wrong() {
+    let mut cube = Cube::new();
+    // CLOCKWISE_ORIENTATION_PATTERN[0] = 1 なので、2に変えると向きが違う
+    cube.stickers[0].orientation = 2;
+    assert!(cube.is_solved()); // 色は揃っている
+    assert!(!cube.is_solved_with_orientation()); // 向きが違う
+}
+
 fn check_sticker_val(cube: &Cube, idx: usize, color: Color, orient: u8, msg: &str) {
     let s = cube.get_sticker(idx);
     assert_eq!(s.color, color, "{} idx:{} 色不一致", msg, idx);

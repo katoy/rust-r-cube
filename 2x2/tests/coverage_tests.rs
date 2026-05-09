@@ -77,7 +77,7 @@ fn test_check_corner_no_white_yellow() {
 fn test_is_solved_with_orientation_when_not_solved() {
     let mut cube = Cube::new();
     cube.apply_move(Move::R); // 色が揃わない状態
-    // is_solved() = false → is_solved_with_orientation() も即 false を返す
+                              // is_solved() = false → is_solved_with_orientation() も即 false を返す
     assert!(!cube.is_solved_with_orientation());
 }
 
@@ -101,8 +101,8 @@ fn test_from_colors_twist_parity_error() {
     let cube = Cube::new();
     let mut colors: [Color; 24] = std::array::from_fn(|i| cube.get_sticker(i).color);
     // [White,Green,Red] → [Red,White,Green] (時計回りに1ねじり)
-    colors[2] = Color::Red;    // was White
-    colors[9] = Color::White;  // was Green
+    colors[2] = Color::Red; // was White
+    colors[9] = Color::White; // was Green
     colors[16] = Color::Green; // was Red
     let result = Cube::from_colors(&colors);
     assert!(result.is_err());
@@ -117,7 +117,7 @@ fn test_check_corner_twist_parity_error() {
     // UFL[2,9,16] を時計回りに1ねじる: [White,Green,Red]→[Red,White,Green]
     // 色数は保持, コーナーの重複なし, 対面色なし, だが twist 合計 = 1 ≢ 0 (mod 3)
     let mut cube = Cube::new();
-    cube.stickers[2].color = Color::Red;   // was White
+    cube.stickers[2].color = Color::Red; // was White
     cube.stickers[9].color = Color::White; // was Green
     cube.stickers[16].color = Color::Green; // was Red
     assert!(cube.is_valid_state().is_err());
@@ -248,7 +248,7 @@ fn test_restore_orientation_instantly_impossible_corner() {
     let c4 = cube.stickers[4].color;
     cube.stickers[9].color = c4;
     cube.stickers[4].color = c9;
-    
+
     // これにより validate_colors はパスするが、
     // UFLコーナーが [White, Yellow, Red] という不正な組み合わせになり、
     // restore_orientation_instantly 内の !found (line 246) に到達する。
@@ -274,12 +274,12 @@ fn test_solve_with_progress_deep() {
     // 確実に depth 4 以上まで探索させるために、神の数(11)のスクランブルを使用
     let god_scramble = "    WGWG\nGRWY BYBR ROBO YOBG\n     OYRW\n";
     let cube = Cube::from_file_format(god_scramble).unwrap();
-    
+
     let (tx, rx) = mpsc::channel();
     // max_depth=11 なら forward_depth=6, backward_depth=5
     // current_depth 0 と 4 で送信されるはず
     let _sol = solver::solve_with_progress(&cube, 11, true, Some(tx));
-    
+
     let progress: Vec<f32> = rx.into_iter().collect();
     assert!(progress.len() >= 2);
 }

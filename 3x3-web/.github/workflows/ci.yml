@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: Lint チェック
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: rustfmt チェック
+        run: cargo fmt --check
+
+      - name: clippy チェック
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    name: テスト実行
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: ユニットテスト実行
+        run: cargo test --lib --no-fail-fast
+
+      - name: 統合テスト実行
+        run: cargo test --test '*' --no-fail-fast
+
+  coverage:
+    name: カバレッジ計測
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: tarpaulin インストール
+        run: cargo install cargo-tarpaulin
+
+      - name: カバレッジ計測（GUI系除外、100%要求）
+        run: |
+          cargo tarpaulin \
+            --out Html \
+            --output-dir coverage \
+            --exclude-files 'src/gui/*' 'src/bin/*' \
+            --timeout 300 \
+            --skip-clean \
+            --fail-under 100 \
+            -- --test-threads=1
+
+      - name: カバレッジレポートアップロード
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  e2e:
+    name: E2E テスト実行
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: E2E テスト実行
+        run: cargo test --test 'end_to_end_tests' --no-fail-fast
+
+  all-checks:
+    name: 全チェック完了確認
+    runs-on: ubuntu-latest
+    needs: [ lint, test, coverage, e2e ]
+    if: always()
+    steps:
+      - name: チェック結果の確認
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "❌ Lint チェックが失敗しました"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "❌ テスト実行が失敗しました"
+            exit 1
+          fi
+          if [[ "${{ needs.coverage.result }}" != "success" ]]; then
+            echo "❌ カバレッジ計測が失敗しました"
+            exit 1
+          fi
+          echo "✅ 全チェック成功"

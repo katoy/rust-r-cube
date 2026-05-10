@@ -265,3 +265,69 @@ fn test_legacy_format_compatibility() {
     let cube = Cube::from_file_format(legacy).expect("Failed to load 3x3 format");
     assert_eq!(cube.stickers[0].orientation, 0);
 }
+
+#[test]
+fn test_from_file_format_invalid_lines() {
+    let invalid = "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n";
+    assert!(Cube::from_file_format(invalid).is_err());
+
+    let invalid2 = "          WWWWWWWWW\n";
+    assert!(Cube::from_file_format(invalid2).is_err());
+}
+
+#[test]
+fn test_from_file_format_invalid_sticker_count() {
+    // Line 1 invalid (too few stickers)
+    let invalid = "          WWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    assert!(Cube::from_file_format(invalid).is_err());
+
+    // Line 2 invalid (too few stickers)
+    let invalid2 =
+        "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    assert!(Cube::from_file_format(invalid2).is_err());
+
+    // Line 3 invalid (too few stickers)
+    let invalid3 =
+        "          WWWWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYY\n";
+    assert!(Cube::from_file_format(invalid3).is_err());
+}
+
+#[test]
+fn test_from_file_format_invalid_color_char() {
+    let invalid =
+        "          WWWWWXWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    assert!(Cube::from_file_format(invalid).is_err());
+}
+
+#[test]
+fn test_file_format_with_gray_stickers() {
+    let gray_format =
+        "          W.WWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    let cube = Cube::from_file_format(gray_format).expect("Should handle gray stickers");
+    assert_eq!(cube.get_sticker(1).color, Color::Gray);
+    assert_eq!(cube.get_sticker(0).color, Color::White);
+}
+
+#[test]
+fn test_from_file_format_accepts_lowercase_chars() {
+    // to_ascii_uppercase 分岐を通す
+    let s = "          wwwwwwwww\nggggggggg rrrrrrrrr bbbbbbbbb ooooooooo\n          yyyyyyyyy\n";
+    let cube = Cube::from_file_format(s).unwrap();
+    assert!(cube.is_valid_state().is_ok());
+}
+
+#[test]
+fn test_from_file_format_gray_skips_orientation_restore() {
+    // has_gray=true 分岐を明示的に確認
+    let s = "          .........\n......... ......... ......... .........\n          .........\n";
+    let cube = Cube::from_file_format(s).unwrap();
+    assert_eq!(cube.stickers.iter().filter(|x| x.color == Color::Gray).count(), 54);
+}
+
+#[test]
+fn test_to_file_format_contains_gray_dot() {
+    let mut cube = Cube::new();
+    cube.stickers[0].color = Color::Gray;
+    let out = cube.to_file_format();
+    assert!(out.contains('.'));
+}

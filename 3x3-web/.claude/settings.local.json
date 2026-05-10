@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo clippy *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo llvm-cov *)",
+      "Bash(rustup component *)",
+      "Bash(rustup toolchain *)",
+      "Bash(rustup show *)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(LLVM_COV=/opt/homebrew/opt/llvm/bin/llvm-cov LLVM_PROFDATA=/opt/homebrew/opt/llvm/bin/llvm-profdata cargo llvm-cov *)",
+      "Bash(wait)",
+      "Bash(kill %1)",
+      "Bash(cargo test *)",
+      "Bash(python3 -c ' *)",
+      "Bash(rustup default *)",
+      "Bash(cargo tarpaulin *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'test: Add additional test cases for coverage improvement *)"
+    ]
+  }
+}

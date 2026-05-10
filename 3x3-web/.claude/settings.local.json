@@ -18,7 +18,8 @@
       "Bash(cargo tarpaulin *)",
       "Bash(git add *)",
       "Bash(git commit -m 'test: Add additional test cases for coverage improvement *)",
-      "Bash(git commit -m 'docs: Save test coverage work summary to memory *)"
+      "Bash(git commit -m 'docs: Save test coverage work summary to memory *)",
+      "Bash(git commit -m 'test: Add debug output and comprehensive edge case tests *)"
     ]
   }
 }

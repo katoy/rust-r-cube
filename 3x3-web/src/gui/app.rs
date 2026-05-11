@@ -558,27 +558,9 @@ impl CubeApp {
                     self.last_solve_duration = Some(duration);
                 }
 
-                if solution.found {
-                    match self.solver_task {
-                        SolverTask::Normal => {
-                            self.solution = Some(solution.moves.clone());
-                            let duration_text = if let Some(d) = self.last_solve_duration {
-                                format!(" ({:.2}秒)", d)
-                            } else {
-                                String::new()
-                            };
-                            self.solution_text =
-                                format!("解法: {} 手{}", solution.moves.len(), duration_text);
-                            self.solution_step = 0;
-                            // 自動実行はしない（ステップ操作で手動実行）
-                        }
-                    }
-                } else {
-                    self.solution = None;
-                    match self.solver_task {
-                        SolverTask::Normal => {
-                            self.solution_text = "解が見つかりませんでした".to_string()
-                        }
+                match self.solver_task {
+                    SolverTask::Normal => {
+                        self.apply_solver_result(&solution);
                     }
                 }
             }
@@ -1146,6 +1128,23 @@ impl CubeApp {
         });
     }
 
+    /// ソルバー結果を画面に反映する
+    fn apply_solver_result(&mut self, solution: &solver::Solution) {
+        if solution.found {
+            self.solution = Some(solution.moves.clone());
+            let duration_text = if let Some(d) = self.last_solve_duration {
+                format!(" ({:.2}秒)", d)
+            } else {
+                String::new()
+            };
+            self.solution_text = format!("解法: {} 手{}", solution.moves.len(), duration_text);
+            self.solution_step = 0;
+        } else {
+            self.solution = None;
+            self.solution_text = "解が見つかりませんでした".to_string();
+        }
+    }
+
     /// キーボード入力を処理
     fn handle_input(&mut self, ctx: &egui::Context) {
         // アニメーション中やソルブ中は入力を受け付けない（オプション）
@@ -1226,24 +1225,14 @@ impl CubeApp {
             if is_complete {
                 // 完了: 結果を取得
                 if let Some(solution) = state.get_solution() {
-                    if solution.found {
-                        self.solution = Some(solution.moves.clone());
-                        let duration_text = if let Some(d) = self.last_solve_duration {
-                            format!(" ({:.2}秒)", d)
-                        } else if let Some(start_time) = self.solving_start_time {
+                    // duration がまだ計算されていない場合は計算する
+                    if self.last_solve_duration.is_none() {
+                        if let Some(start_time) = self.solving_start_time {
                             let duration = start_time.elapsed().as_secs_f32();
                             self.last_solve_duration = Some(duration);
-                            format!(" ({:.2}秒)", duration)
-                        } else {
-                            String::new()
-                        };
-                        self.solution_text =
-                            format!("解法: {} 手{}", solution.moves.len(), duration_text);
-                        self.solution_step = 0;
-                    } else {
-                        self.solution = None;
-                        self.solution_text = "解が見つかりませんでした".to_string();
+                        }
                     }
+                    self.apply_solver_result(&solution);
                 }
 
                 self.solving = false;

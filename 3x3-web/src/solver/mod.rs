@@ -390,30 +390,25 @@ fn attempt_direct_solve(
         }
     }
 
-    // 24通りの回転を試行
+    // 24通りの回転を試行（Perfect を優先し、見つからない場合は最初の ColorOnly を返す）
     let rotations = get_all_rotations();
+    let mut first_color_only = None;
     for rot in &rotations {
         if let Some(res) =
             try_solve_with_rotation(cube, &[], rot, max_depth, ignore_orientation, &mut search)
         {
-            if let TrySolveResult::Perfect(_) = res {
-                return Some(res);
+            match &res {
+                TrySolveResult::Perfect(_) => return Some(res),
+                TrySolveResult::ColorOnly(_) => {
+                    if first_color_only.is_none() {
+                        first_color_only = Some(res);
+                    }
+                }
             }
-            // ColorOnly の場合は後で使うために保持するが、ループは続行して Perfect を探す
-            // (呼び出し元で最初の ColorOnly をキャプチャする)
         }
     }
 
-    // 最初に見つかった ColorOnly を返すための再ループ (効率のため改善の余地ありだが分解を優先)
-    for rot in &rotations {
-        if let Some(res) =
-            try_solve_with_rotation(cube, &[], rot, max_depth, ignore_orientation, &mut search)
-        {
-            return Some(res);
-        }
-    }
-
-    None
+    first_color_only
 }
 
 fn attempt_search(

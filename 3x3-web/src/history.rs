@@ -1,13 +1,14 @@
 use crate::cube::Move;
+use std::collections::VecDeque;
 
 /// 操作履歴を管理する構造体
 #[derive(Debug, Clone)]
 pub struct History {
     /// Undo用スタック（実行済み操作）
-    undo_stack: Vec<Move>,
+    undo_stack: VecDeque<Move>,
 
     /// Redo用スタック（undoされた操作）
-    redo_stack: Vec<Move>,
+    redo_stack: VecDeque<Move>,
 
     /// 履歴の最大サイズ
     max_size: usize,
@@ -51,8 +52,8 @@ impl History {
     #[must_use]
     pub fn with_capacity(max_size: usize) -> Self {
         Self {
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            undo_stack: VecDeque::new(),
+            redo_stack: VecDeque::new(),
             max_size,
         }
     }
@@ -80,11 +81,11 @@ impl History {
     /// assert_eq!(history.undo_count(), 1);
     /// ```
     pub fn push(&mut self, mv: Move) {
-        self.undo_stack.push(mv);
+        self.undo_stack.push_back(mv);
 
         // 最大サイズを超えたら古い操作を削除
         if self.undo_stack.len() > self.max_size {
-            self.undo_stack.remove(0);
+            self.undo_stack.pop_front();
         }
 
         // 新しい操作が追加されたらredoスタックをクリア
@@ -109,8 +110,8 @@ impl History {
     /// assert_eq!(history.undo(), Some(Move::Rp)); // Rの逆操作
     /// ```
     pub fn undo(&mut self) -> Option<Move> {
-        if let Some(mv) = self.undo_stack.pop() {
-            self.redo_stack.push(mv);
+        if let Some(mv) = self.undo_stack.pop_back() {
+            self.redo_stack.push_back(mv);
             Some(mv.inverse())
         } else {
             None
@@ -136,8 +137,8 @@ impl History {
     /// assert_eq!(history.redo(), Some(Move::R)); // 元の操作
     /// ```
     pub fn redo(&mut self) -> Option<Move> {
-        if let Some(mv) = self.redo_stack.pop() {
-            self.undo_stack.push(mv);
+        if let Some(mv) = self.redo_stack.pop_back() {
+            self.undo_stack.push_back(mv);
             Some(mv)
         } else {
             None

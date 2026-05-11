@@ -13,13 +13,21 @@
       "Bash(wait)",
       "Bash(kill %1)",
       "Bash(cargo test *)",
-      "Bash(python3 -c ' *)",
       "Bash(rustup default *)",
       "Bash(cargo tarpaulin *)",
+      "Bash(git add src/)",
+      "Bash(git add tests/)",
+      "Bash(git add .claude/)",
+      "Bash(git add Cargo.*)",
+      "Bash(git add README.md)",
+      "Bash(git add '*.md')",
+      "Bash(git commit -m 'test: Add additional test cases for coverage improvement')",
+      "Bash(git commit -m 'docs: Save test coverage work summary to memory')",
+      "Bash(git commit -m 'test: Add debug output and comprehensive edge case tests')",
+      "Bash(git commit -m 'docs: Add comprehensive coverage report')",
+      "Skill(codex:rescue)",
       "Bash(git add *)",
-      "Bash(git commit -m 'test: Add additional test cases for coverage improvement *)",
-      "Bash(git commit -m 'docs: Save test coverage work summary to memory *)",
-      "Bash(git commit -m 'test: Add debug output and comprehensive edge case tests *)"
+      "Bash(git commit -m ' *)"
     ]
   }
 }

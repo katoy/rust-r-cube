@@ -25,8 +25,11 @@ pub async fn start(canvas_id: &str) -> Result<(), wasm_bindgen::JsValue> {
     let web_options = eframe::WebOptions::default();
 
     // canvas_idからHtmlCanvasElementを取得
-    let window = web_sys::window().expect("windowオブジェクト取得失敗");
-    let document = window.document().expect("documentオブジェクト取得失敗");
+    let window = web_sys::window()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("windowオブジェクト取得失敗"))?;
+    let document = window
+        .document()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("documentオブジェクト取得失敗"))?;
     let canvas = document
         .get_element_by_id(canvas_id)
         .ok_or_else(|| {

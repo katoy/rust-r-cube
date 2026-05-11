@@ -1060,21 +1060,32 @@ impl CubeApp {
         match Blob::new_with_u8_array_sequence_and_options(&blob_parts, &options) {
             Ok(blob) => match Url::create_object_url_with_blob(&blob) {
                 Ok(url) => {
-                    let window = web_sys::window().expect("windowオブジェクト取得失敗");
-                    let document = window.document().expect("documentオブジェクト取得失敗");
+                    if let Some(window) = web_sys::window() {
+                        if let Some(document) = window.document() {
+                            if let Ok(element) = document.create_element("a") {
+                                match element.dyn_into::<HtmlAnchorElement>() {
+                                    Ok(anchor) => {
+                                        anchor.set_href(&url);
+                                        anchor.set_download("cube_state.txt");
+                                        anchor.click();
 
-                    if let Ok(element) = document.create_element("a") {
-                        let anchor: HtmlAnchorElement =
-                            element.dyn_into().expect("a要素へのキャスト失敗");
-                        anchor.set_href(&url);
-                        anchor.set_download("cube_state.txt");
-                        anchor.click();
-
-                        let _ = Url::revoke_object_url(&url);
-                        self.input_error_message =
-                            "ダウンロードを開始しました: cube_state.txt".to_string();
+                                        let _ = Url::revoke_object_url(&url);
+                                        self.input_error_message =
+                                            "ダウンロードを開始しました: cube_state.txt".to_string();
+                                    }
+                                    Err(_) => {
+                                        self.input_error_message =
+                                            "保存エラー: a要素へのキャスト失敗".to_string();
+                                    }
+                                }
+                            } else {
+                                self.input_error_message = "保存エラー: a要素の作成に失敗".to_string();
+                            }
+                        } else {
+                            self.input_error_message = "保存エラー: documentオブジェクト取得失敗".to_string();
+                        }
                     } else {
-                        self.input_error_message = "保存エラー: a要素の作成に失敗".to_string();
+                        self.input_error_message = "保存エラー: windowオブジェクト取得失敗".to_string();
                     }
                 }
                 Err(_) => {

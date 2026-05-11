@@ -49,6 +49,9 @@ extern "C" {
 #[allow(dead_code)]
 const MIN_SCRAMBLE_MOVES: usize = 5;
 
+/// ファイル読み込みの最大サイズ (1 MB)
+const MAX_FILE_SIZE: usize = 1024 * 1024;
+
 /// スクランブルの最大手数
 const MAX_SCRAMBLE_MOVES: usize = 20;
 
@@ -935,6 +938,16 @@ impl CubeApp {
 
     /// ファイルからキューブの状態を読み込み
     pub fn load_from_file(&mut self, path: &str) -> Result<String, String> {
+        let metadata = std::fs::metadata(path)
+            .map_err(|e| format!("ファイル情報の取得に失敗しました: {}", e))?;
+
+        if metadata.len() > MAX_FILE_SIZE as u64 {
+            return Err(format!(
+                "ファイルサイズが大きすぎます (最大: {} MB)",
+                MAX_FILE_SIZE / (1024 * 1024)
+            ));
+        }
+
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("ファイルの読み込みに失敗しました: {}", e))?;
 
@@ -1122,6 +1135,15 @@ impl CubeApp {
 
             if let Some(file_handle) = task.await {
                 let bytes = file_handle.read().await;
+
+                if bytes.len() > MAX_FILE_SIZE {
+                    let _ = tx.send(Err(format!(
+                        "ファイルサイズが大きすぎます (最大: {} MB)",
+                        MAX_FILE_SIZE / (1024 * 1024)
+                    )));
+                    return;
+                }
+
                 let content = String::from_utf8_lossy(&bytes).to_string();
                 let _ = tx.send(Ok(content));
             }

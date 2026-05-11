@@ -67,7 +67,7 @@ impl PruningTable {
 }
 
 fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
-    let mut table = vec![0u16; 2187 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 2187];
     let mut rc = RawCube::default();
     for i in 0..2187 {
         rc.set_twist(i as u16);
@@ -75,18 +75,15 @@ fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_twist();
+                table[i][m * 3 + r] = move_rc.get_twist();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 2187 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 2187] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 2187];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
-    let mut table = vec![0u16; 2048 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 2048];
     let mut rc = RawCube::default();
     for i in 0..2048 {
         rc.set_flip(i as u16);
@@ -94,18 +91,15 @@ fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_flip();
+                table[i][m * 3 + r] = move_rc.get_flip();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 2048 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 2048] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 2048];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
-    let mut table = vec![0u16; 495 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 495];
     let mut rc = RawCube::default();
     for i in 0..495 {
         rc.set_ud_slice(i as u16);
@@ -113,18 +107,15 @@ fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_ud_slice();
+                table[i][m * 3 + r] = move_rc.get_ud_slice();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 495 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 495] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 495];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
-    let mut table = vec![0u16; 40320 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
     let mut rc = RawCube::default();
     for i in 0..40320 {
         rc.set_cp(i as u16);
@@ -132,18 +123,15 @@ fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_cp();
+                table[i][m * 3 + r] = move_rc.get_cp();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 40320 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 40320] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 40320];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
-    let mut table = vec![0u16; 40320 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
     let mut rc = RawCube::default();
     for i in 0..40320 {
         rc.set_ep8(i as u16);
@@ -151,18 +139,15 @@ fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_ep8();
+                table[i][m * 3 + r] = move_rc.get_ep8();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 40320 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 40320] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 40320];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
-    let mut table = vec![0u16; 24 * 18];
+    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 24];
     let mut rc = RawCube::default();
     for i in 0..24 {
         rc.set_slice_p(i as u16);
@@ -170,14 +155,11 @@ fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
             let mut move_rc = rc;
             for r in 0..3 {
                 move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table[i * 18 + m * 3 + r] = move_rc.get_slice_p();
+                table[i][m * 3 + r] = move_rc.get_slice_p();
             }
         }
     }
-    // SAFETY: table は vec![0u16; 24 * 18] から作られた Box<[u16]> で、
-    // [[u16; 18]; 24] と完全にメモリレイアウトが一致するため、transmute は安全
-    let ptr = Box::into_raw(table.into_boxed_slice()) as *mut [[u16; 18]; 24];
-    unsafe { Box::from_raw(ptr) }
+    table.into_boxed_slice().try_into().unwrap()
 }
 
 fn generate_twist_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {

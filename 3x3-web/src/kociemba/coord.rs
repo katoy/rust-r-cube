@@ -8,6 +8,7 @@ pub struct FaceCube {
 
 /// コーナーピース (Kociemba順: 0:UFR, 1:UFL, 2:ULB, 3:UBR, 4:DFR, 5:DLF, 6:DBL, 7:DRB)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Corner {
     UFR = 0,
     UFL,
@@ -21,6 +22,7 @@ pub enum Corner {
 
 /// エッジピース (Kociemba順: 0:UR, 1:UF, 2:UL, 3:UB, 4:DR, 5:DF, 6:DL, 7:DB, 8:FR, 9:FL, 10:BL, 11:BR)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Edge {
     UR = 0,
     UF,

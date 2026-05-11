@@ -324,14 +324,16 @@ fn draw_solver_ui(app: &mut CubeApp, ui: &mut egui::Ui) {
             ui.label(&app.solution_text);
         }
 
-        if let Some(solution) = app.solution.clone() {
-            draw_solution_steps(app, ui, &solution);
+        if let Some(solution) = app.solution.as_deref() {
+            let solution_len = solution.len();
+            draw_solution_steps_ui(app, ui, solution);
+            draw_solution_steps_buttons(app, ui, solution_len);
         }
     }
 }
 
-/// 解法ステップ操作の描画
-fn draw_solution_steps(app: &mut CubeApp, ui: &mut egui::Ui, solution: &[Move]) {
+/// 解法ステップ操作の描画（UI 表示部分）
+fn draw_solution_steps_ui(app: &CubeApp, ui: &mut egui::Ui, solution: &[Move]) {
     let solution_len = solution.len();
     ui.add_space(UI_SPACING_LARGE);
     ui.label("解法ステップ操作:");
@@ -372,6 +374,15 @@ fn draw_solution_steps(app: &mut CubeApp, ui: &mut egui::Ui, solution: &[Move]) 
         ui.colored_label(egui::Color32::GREEN, "完了!");
     }
 
+    ui.add_space(5.0);
+    let progress = app.solution_step as f32 / solution_len as f32;
+    ui.add(
+        egui::ProgressBar::new(progress).text(format!("{}/{}", app.solution_step, solution_len)),
+    );
+}
+
+/// 解法ステップ操作のボタン（操作部分）
+fn draw_solution_steps_buttons(app: &mut CubeApp, ui: &mut egui::Ui, solution_len: usize) {
     ui.add_space(UI_SPACING_SMALL);
     ui.horizontal(|ui| {
         if ui.button("⏮ 最初へ").clicked() {
@@ -391,10 +402,4 @@ fn draw_solution_steps(app: &mut CubeApp, ui: &mut egui::Ui, solution: &[Move]) 
             app.solution_step_to_end();
         }
     });
-
-    ui.add_space(5.0);
-    let progress = app.solution_step as f32 / solution_len as f32;
-    ui.add(
-        egui::ProgressBar::new(progress).text(format!("{}/{}", app.solution_step, solution_len)),
-    );
 }

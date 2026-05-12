@@ -33,7 +33,10 @@
       "mcp__plugin_claude-mem_mcp-search__smart_outline",
       "Bash(cargo check *)",
       "Bash(cargo build *)",
-      "Bash(cargo install *)"
+      "Bash(cargo install *)",
+      "Bash(mkdir -p app)",
+      "Bash(mv app.rs app/mod.rs)",
+      "Bash(mv app_solution.rs app/solution.rs)"
     ]
   }
 }

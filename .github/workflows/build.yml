@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable]
     steps:
       - uses: actions/checkout@v4
@@ -63,21 +63,25 @@ jobs:
 
       - name: Install sccache (only on cache miss)
         if: steps.sccache-bin.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           cargo install sccache --locked
 
       - name: Show rustc and sccache
+        shell: bash
         run: |
           rustc --version || true
           which sccache || true
 
       - name: Prefetch dependencies
+        shell: bash
         run: |
           cd 2x2 && cargo fetch --locked || true
           cd ../2x2-web && cargo fetch --locked || true
           cd ../3x3-web && cargo fetch --locked || true
 
       - name: Build
+        shell: bash
         run: |
           if [ -z "${CARGO_HOME:-}" ]; then
             CARGO_HOME="$HOME/.cargo"
@@ -91,6 +95,7 @@ jobs:
           cd ../3x3-web && cargo build --verbose
 
       - name: Test
+        shell: bash
         run: |
           if [ -z "${CARGO_HOME:-}" ]; then
             CARGO_HOME="$HOME/.cargo"

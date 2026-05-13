@@ -78,9 +78,15 @@ jobs:
       - name: Build
         env:
           RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
-        run: cargo build --workspace --verbose
+        run: |
+          cd 2x2 && cargo build --verbose
+          cd ../2x2-web && cargo build --verbose
+          cd ../3x3-web && cargo build --verbose
 
       - name: Test
         env:
           RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
-        run: cargo test --workspace --verbose
+        run: |
+          cd 2x2 && cargo test --verbose
+          cd ../2x2-web && cargo test --verbose
+          cd ../3x3-web && cargo test --verbose

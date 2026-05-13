@@ -22,7 +22,13 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: |
+          cd 2x2 && cargo fmt --all -- --check
+          cd ../2x2-web && cargo fmt --all -- --check
+          cd ../3x3-web && cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          cd 2x2 && cargo clippy --all-targets --all-features -- -D warnings
+          cd ../2x2-web && cargo clippy --all-targets --all-features -- -D warnings
+          cd ../3x3-web && cargo clippy --all-targets --all-features -- -D warnings

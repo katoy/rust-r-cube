@@ -64,7 +64,7 @@ jobs:
       - name: Install sccache (only on cache miss)
         if: steps.sccache-bin.outputs.cache-hit != 'true'
         run: |
-          cargo install sccache --locked || true
+          cargo install sccache --locked
 
       - name: Show rustc and sccache
         run: |
@@ -79,7 +79,7 @@ jobs:
 
       - name: Build
         env:
-          RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
+          RUSTC_WRAPPER: ${{ env.HOME }}/.cargo/bin/sccache
         run: |
           cd 2x2 && cargo build --verbose
           cd ../2x2-web && cargo build --verbose
@@ -87,7 +87,7 @@ jobs:
 
       - name: Test
         env:
-          RUSTC_WRAPPER: $HOME/.cargo/bin/sccache
+          RUSTC_WRAPPER: ${{ env.HOME }}/.cargo/bin/sccache
         run: |
           cd 2x2 && cargo test --verbose
           cd ../2x2-web && cargo test --verbose

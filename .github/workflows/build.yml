@@ -73,7 +73,9 @@ jobs:
 
       - name: Prefetch dependencies
         run: |
-          cargo fetch --locked || true
+          cd 2x2 && cargo fetch --locked || true
+          cd ../2x2-web && cargo fetch --locked || true
+          cd ../3x3-web && cargo fetch --locked || true
 
       - name: Build
         env:

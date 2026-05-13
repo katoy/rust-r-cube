@@ -2,7 +2,7 @@
 
 Rustで実装された、高性能ソルバー搭載の2x2ルービックキューブプロジェクトです。デスクトップアプリとWebアプリの2つの形態で提供されています。
 
-![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml/badge.svg)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -19,6 +19,11 @@ Rustで実装された、高性能ソルバー搭載の2x2ルービックキュ�
 ### 2. [2x2-web Web版](./2x2-web/)
 ブラウザ上で動作するWebAssemblyベースのアプリケーションです。
 - **特徴**: インストール不要で、ブラウザから手軽にルービックキューブの操作と解決を体験できます。
+- **技術詳細**: WebAssembly (WASM) にコンパイルされ、`trunk` を使用してビルドされます。
+
+### 3. [3x3-web Web版](./3x3-web/)
+ブラウザ上で動作する3x3版のWebAssemblyアプリケーションです。
+- **特徴**: 3x3のシミュレーションとビジュアライゼーションを提供します。
 - **技術詳細**: WebAssembly (WASM) にコンパイルされ、`trunk` を使用してビルドされます。
 
 ## 特徴 (共通)
@@ -62,6 +67,12 @@ GitHub Actions により、すべてのプッシュとプルリクエストに�
 - `cargo clippy`: 静的解析
 - `cargo fmt`: フォーマットチェック
 - `cargo llvm-cov`: テストカバレッジの計測
+
+CI の仕組み（簡単）
+- マトリックスで複数プラットフォーム上で実行します: `ubuntu-latest`, `macos-latest`, `windows-latest`。
+- 並列で各プラットフォームのビルド/テストを行い、プラットフォーム固有の問題を早期検出します。
+- ビルド高速化のため `sccache` を使用しますが、ランナーに sccache が無ければ通常のビルドにフォールバックするようワークフローを構成しています。
+- RUSTC_WRAPPER はランナー環境に依存するため、ワークフロー内で `CARGO_HOME` / `PATH` の設定と存在チェックを行っています。
 
 詳細な開発手順やテスト方法については、各プロジェクトの `README.md` を参照してください。
 

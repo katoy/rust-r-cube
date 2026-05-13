@@ -20,7 +20,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -54,7 +54,7 @@ jobs:
             artifact: rubiks-cube-2x2-macos-aarch64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

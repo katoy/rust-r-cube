@@ -79,7 +79,9 @@ jobs:
 
       - name: Build
         run: |
-          if [ -x "$HOME/.cargo/bin/sccache" ]; then
+          if [ -n "${CARGO_HOME:-}" ] && [ -x "$CARGO_HOME/bin/sccache" ]; then
+            export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache"
+          elif [ -x "$HOME/.cargo/bin/sccache" ]; then
             export RUSTC_WRAPPER="$HOME/.cargo/bin/sccache"
           fi
           cd 2x2 && cargo build --verbose
@@ -88,7 +90,9 @@ jobs:
 
       - name: Test
         run: |
-          if [ -x "$HOME/.cargo/bin/sccache" ]; then
+          if [ -n "${CARGO_HOME:-}" ] && [ -x "$CARGO_HOME/bin/sccache" ]; then
+            export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache"
+          elif [ -x "$HOME/.cargo/bin/sccache" ]; then
             export RUSTC_WRAPPER="$HOME/.cargo/bin/sccache"
           fi
           cd 2x2 && cargo test --verbose

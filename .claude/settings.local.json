@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo clippy *)",
+      "Bash(cargo test *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh run *)",
+      "Bash(cargo fmt *)"
+    ]
+  }
+}

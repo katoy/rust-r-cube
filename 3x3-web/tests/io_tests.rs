@@ -278,7 +278,8 @@ fn test_from_file_format_invalid_lines() {
 #[test]
 fn test_from_file_format_invalid_sticker_count() {
     // Line 1 invalid (too few stickers)
-    let invalid = "          WWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
+    let invalid =
+        "          WWWWWWW\nGGGGGGGGG RRRRRRRRR BBBBBBBBB OOOOOOOOO\n          YYYYYYYYY\n";
     assert!(Cube::from_file_format(invalid).is_err());
 
     // Line 2 invalid (too few stickers)
@@ -321,7 +322,13 @@ fn test_from_file_format_gray_skips_orientation_restore() {
     // has_gray=true 分岐を明示的に確認
     let s = "          .........\n......... ......... ......... .........\n          .........\n";
     let cube = Cube::from_file_format(s).unwrap();
-    assert_eq!(cube.stickers.iter().filter(|x| x.color == Color::Gray).count(), 54);
+    assert_eq!(
+        cube.stickers
+            .iter()
+            .filter(|x| x.color == Color::Gray)
+            .count(),
+        54
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use rubiks_cube_3x3::cube::{Cube, Face, Move};
-use rubiks_cube_3x3::kociemba::{RawCube, Search};
 use rubiks_cube_3x3::kociemba::coord::{Corner, Edge};
+use rubiks_cube_3x3::kociemba::{RawCube, Search};
 use rubiks_cube_3x3::solver::{is_fully_solved, solve, SolverState};
 
 fn assert_solve_helper(

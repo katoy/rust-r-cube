@@ -1,6 +1,6 @@
 use super::CubeApp;
-use crate::cube::{Color, Cube};
 use super::{InputState, MAX_FILE_SIZE};
+use crate::cube::{Color, Cube};
 
 impl CubeApp {
     /// キューブの状態をファイルに保存
@@ -140,7 +140,8 @@ impl CubeApp {
 
                                         let _ = Url::revoke_object_url(&url);
                                         self.input_error_message =
-                                            "ダウンロードを開始しました: cube_state.txt".to_string();
+                                            "ダウンロードを開始しました: cube_state.txt"
+                                                .to_string();
                                     }
                                     Err(_) => {
                                         self.input_error_message =
@@ -148,13 +149,16 @@ impl CubeApp {
                                     }
                                 }
                             } else {
-                                self.input_error_message = "保存エラー: a要素の作成に失敗".to_string();
+                                self.input_error_message =
+                                    "保存エラー: a要素の作成に失敗".to_string();
                             }
                         } else {
-                            self.input_error_message = "保存エラー: documentオブジェクト取得失敗".to_string();
+                            self.input_error_message =
+                                "保存エラー: documentオブジェクト取得失敗".to_string();
                         }
                     } else {
-                        self.input_error_message = "保存エラー: windowオブジェクト取得失敗".to_string();
+                        self.input_error_message =
+                            "保存エラー: windowオブジェクト取得失敗".to_string();
                     }
                 }
                 Err(_) => {

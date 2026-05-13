@@ -1,6 +1,6 @@
 use super::CubeApp;
-use crate::cube::{Color, Cube};
 use super::InputState;
+use crate::cube::{Color, Cube};
 
 impl CubeApp {
     /// スキャンモード開始

@@ -48,9 +48,9 @@ const MIN_SCRAMBLE_MOVES: usize = 5;
 const MAX_FILE_SIZE: usize = 1024 * 1024;
 
 // ロジック分割モジュール
-mod solution;
-mod scanner;
 mod file_io;
+mod scanner;
+mod solution;
 mod solver_control;
 
 /// スクランブルの最大手数
@@ -372,7 +372,6 @@ impl CubeApp {
         self.pending_solution_update = None;
     }
 
-
     /// アニメーション更新
     fn update_animation(&mut self) {
         if let Some(ref mut anim) = self.animation {
@@ -426,7 +425,7 @@ impl CubeApp {
         }
     }
 
-/// キューブの状態を取得
+    /// キューブの状態を取得
     pub fn cube(&self) -> &Cube {
         &self.cube
     }

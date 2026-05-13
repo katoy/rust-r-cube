@@ -1,6 +1,6 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move, Sticker};
-use rubiks_cube_3x3::cube::piece::{Cubie, CubieSticker};
 use glam::{Mat4, Vec3};
+use rubiks_cube_3x3::cube::piece::{Cubie, CubieSticker};
+use rubiks_cube_3x3::cube::{Color, Cube, Face, Move, Sticker};
 
 #[test]
 fn test_new_cube_is_solved() {
@@ -337,12 +337,24 @@ fn test_validate_colors_missing_color_error() {
 fn test_validate_colors_wrong_count_error() {
     let mut colors = [Color::White; 54];
     // 正常配列から1個だけ崩す
-    for color in colors.iter_mut().take(9) { *color = Color::White; }
-    for color in colors.iter_mut().skip(9).take(9) { *color = Color::Yellow; }
-    for color in colors.iter_mut().skip(18).take(9) { *color = Color::Green; }
-    for color in colors.iter_mut().skip(27).take(9) { *color = Color::Blue; }
-    for color in colors.iter_mut().skip(36).take(9) { *color = Color::Red; }
-    for color in colors.iter_mut().skip(45) { *color = Color::Orange; }
+    for color in colors.iter_mut().take(9) {
+        *color = Color::White;
+    }
+    for color in colors.iter_mut().skip(9).take(9) {
+        *color = Color::Yellow;
+    }
+    for color in colors.iter_mut().skip(18).take(9) {
+        *color = Color::Green;
+    }
+    for color in colors.iter_mut().skip(27).take(9) {
+        *color = Color::Blue;
+    }
+    for color in colors.iter_mut().skip(36).take(9) {
+        *color = Color::Red;
+    }
+    for color in colors.iter_mut().skip(45) {
+        *color = Color::Orange;
+    }
     colors[0] = Color::Yellow; // White 8 / Yellow 10
     let err = Cube::validate_colors(&colors).unwrap_err().to_string();
     assert!(err.contains("必要"));
@@ -359,9 +371,18 @@ fn test_cubie_matches_colors_length_mismatch_and_missing_color() {
     let c = Cubie::new(
         Vec3::new(1.0, 1.0, 1.0),
         vec![
-            CubieSticker { initial_normal: Vec3::X, color: Color::Red },
-            CubieSticker { initial_normal: Vec3::Y, color: Color::White },
-            CubieSticker { initial_normal: Vec3::Z, color: Color::Blue },
+            CubieSticker {
+                initial_normal: Vec3::X,
+                color: Color::Red,
+            },
+            CubieSticker {
+                initial_normal: Vec3::Y,
+                color: Color::White,
+            },
+            CubieSticker {
+                initial_normal: Vec3::Z,
+                color: Color::Blue,
+            },
         ],
     );
     assert!(!c.matches_colors(&[Color::Red, Color::White])); // len mismatch
@@ -389,7 +410,14 @@ fn test_rotation_all_middle_layers_keep_color_count() {
     for i in 0..54 {
         *cnt.entry(cube.get_sticker(i).color).or_insert(0usize) += 1;
     }
-    for c in [Color::White, Color::Yellow, Color::Green, Color::Blue, Color::Red, Color::Orange] {
+    for c in [
+        Color::White,
+        Color::Yellow,
+        Color::Green,
+        Color::Blue,
+        Color::Red,
+        Color::Orange,
+    ] {
         assert_eq!(cnt.get(&c).copied().unwrap_or(0), 9);
     }
 }
@@ -416,7 +444,10 @@ fn test_piece_type_detection() {
 #[test]
 fn test_piece_rotate_and_project() {
     let pieces = rubiks_cube_3x3::cube::piece::get_initial_pieces();
-    let mut stickers = [Sticker { color: Color::Gray, orientation: 0 }; 54];
+    let mut stickers = [Sticker {
+        color: Color::Gray,
+        orientation: 0,
+    }; 54];
 
     // 初期状態をプロジェクト
     for piece in &pieces {
@@ -437,7 +468,10 @@ fn test_cube_clone_and_equality() {
 
     for i in 0..54 {
         assert_eq!(cube1.get_sticker(i).color, cube2.get_sticker(i).color);
-        assert_eq!(cube1.get_sticker(i).orientation, cube2.get_sticker(i).orientation);
+        assert_eq!(
+            cube1.get_sticker(i).orientation,
+            cube2.get_sticker(i).orientation
+        );
     }
 }
 

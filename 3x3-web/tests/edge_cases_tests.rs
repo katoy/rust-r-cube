@@ -1,6 +1,6 @@
 use rubiks_cube_3x3::cube::{Color, Cube, Move};
 use rubiks_cube_3x3::kociemba::{RawCube, Search};
-use rubiks_cube_3x3::solver::{solve, is_fully_solved};
+use rubiks_cube_3x3::solver::{is_fully_solved, solve};
 
 /// エッジケースと error 条件を触発するテスト
 
@@ -10,10 +10,10 @@ fn test_color_not_found_error() {
     let mut colors = [Color::White; 54];
     // White を削除し、他の色で補充
     for color in colors.iter_mut().take(9) {
-        *color = Color::Yellow;  // White が 0 個に
+        *color = Color::Yellow; // White が 0 個に
     }
     for color in colors.iter_mut().take(18).skip(9) {
-        *color = Color::Yellow;  // Yellow が 18 個に
+        *color = Color::Yellow; // Yellow が 18 個に
     }
 
     let result = Cube::from_colors(&colors);
@@ -173,9 +173,18 @@ fn test_solve_with_all_moves() {
     // すべての移動方向が含まれるスクランブル
     let mut cube = Cube::new();
     let all_moves = vec![
-        Move::R, Move::L, Move::U, Move::D, Move::F, Move::B,
-        Move::M, Move::E, Move::S,
-        Move::X, Move::Y, Move::Z,
+        Move::R,
+        Move::L,
+        Move::U,
+        Move::D,
+        Move::F,
+        Move::B,
+        Move::M,
+        Move::E,
+        Move::S,
+        Move::X,
+        Move::Y,
+        Move::Z,
     ];
 
     for mv in &all_moves {
@@ -273,11 +282,19 @@ fn test_middle_layer_cycle_order() {
             if cube.is_solved() {
                 found_cycle = true;
                 // ミドルレイヤーは特定の周期を持つ
-                assert!(i > 0 && i <= 8, "Move {:?} should cycle within 1-8 moves", mv);
+                assert!(
+                    i > 0 && i <= 8,
+                    "Move {:?} should cycle within 1-8 moves",
+                    mv
+                );
                 break;
             }
         }
-        assert!(found_cycle, "Move {:?} should return to identity within 8 moves", mv);
+        assert!(
+            found_cycle,
+            "Move {:?} should return to identity within 8 moves",
+            mv
+        );
     }
 }
 
@@ -289,7 +306,7 @@ fn test_search_with_zero_max_nodes() {
 
     let rc = RawCube::from_cube(&cube).unwrap();
     let mut search = Search::new();
-    search.max_nodes = 1;  // 非常に制限
+    search.max_nodes = 1; // 非常に制限
 
     let result = search.solve(&rc, 10);
     // ノード制限でフェイル可能性がある

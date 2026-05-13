@@ -474,7 +474,6 @@ impl CubeApp {
     }
 
     /// 解法の次のステップへ進む
-
     fn setup_custom_fonts(ctx: &egui::Context) {
         tracing::info!("setup_custom_fonts starting");
         let mut fonts = egui::FontDefinitions::default();

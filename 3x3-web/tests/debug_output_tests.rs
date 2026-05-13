@@ -1,6 +1,5 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
+use rubiks_cube_3x3::cube::{Cube, Move};
 use rubiks_cube_3x3::solver::{solve, SolverState};
-use std::io::Write;
 
 /// SOLVER_DEBUG 環境変数を活用したデバッグ出力のテスト
 
@@ -50,7 +49,7 @@ fn test_solver_debug_with_color_only_solution() {
     cube.apply_move(Move::R);
     cube.apply_move(Move::U);
 
-    let result = solve(&cube, 30, false);
+    let _result = solve(&cube, 30, false);
 
     // デバッグパスが実行される
     std::env::remove_var("SOLVER_DEBUG");
@@ -82,7 +81,7 @@ fn test_solver_debug_rotation_attempts() {
     cube.apply_move(Move::X);
     cube.apply_move(Move::R);
 
-    let result = solve(&cube, 15, false);
+    let _result = solve(&cube, 15, false);
     // デバッグ出力が生成される
 
     std::env::remove_var("SOLVER_DEBUG");
@@ -157,7 +156,7 @@ fn test_apply_supercube_fixes_debug() {
     cube.apply_move(Move::X);
     cube.apply_move(Move::Y);
 
-    let result = solve(&cube, 20, false);
+    let _result = solve(&cube, 20, false);
     // apply_supercube_fixes の debug output が実行される可能性がある
 
     std::env::remove_var("SOLVER_DEBUG");

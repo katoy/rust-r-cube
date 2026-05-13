@@ -319,7 +319,7 @@ fn test_restore_orientation_instantly_invalid_centers() {
     // center色を壊して「中心ピースの色配置が不正です」分岐を通す
     cube.stickers[Face::Up.start_index() + 4].color = Color::Yellow;
     let err = cube.restore_orientation_instantly().unwrap_err();
-    assert!(err.to_string().len() > 0); // Just check it has an error
+    assert!(!err.to_string().is_empty()); // Just check it has an error
 }
 
 #[test]
@@ -330,19 +330,19 @@ fn test_validate_colors_missing_color_error() {
         *c = Color::White;
     }
     let err = Cube::validate_colors(&colors).unwrap_err();
-    assert!(err.to_string().len() > 0); // Just check it has an error
+    assert!(!err.to_string().is_empty()); // Just check it has an error
 }
 
 #[test]
 fn test_validate_colors_wrong_count_error() {
     let mut colors = [Color::White; 54];
     // 正常配列から1個だけ崩す
-    for i in 0..9 { colors[i] = Color::White; }
-    for i in 9..18 { colors[i] = Color::Yellow; }
-    for i in 18..27 { colors[i] = Color::Green; }
-    for i in 27..36 { colors[i] = Color::Blue; }
-    for i in 36..45 { colors[i] = Color::Red; }
-    for i in 45..54 { colors[i] = Color::Orange; }
+    for color in colors.iter_mut().take(9) { *color = Color::White; }
+    for color in colors.iter_mut().skip(9).take(9) { *color = Color::Yellow; }
+    for color in colors.iter_mut().skip(18).take(9) { *color = Color::Green; }
+    for color in colors.iter_mut().skip(27).take(9) { *color = Color::Blue; }
+    for color in colors.iter_mut().skip(36).take(9) { *color = Color::Red; }
+    for color in colors.iter_mut().skip(45) { *color = Color::Orange; }
     colors[0] = Color::Yellow; // White 8 / Yellow 10
     let err = Cube::validate_colors(&colors).unwrap_err().to_string();
     assert!(err.contains("必要"));

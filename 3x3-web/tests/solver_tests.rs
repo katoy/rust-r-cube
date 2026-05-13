@@ -195,7 +195,7 @@ fn test_solve_with_various_setup_moves() {
     cube.apply_move(Move::U);
     let result = solve(&cube, 20, false);
     // just verify it either finds or doesn't find solution
-    assert!(result.message.len() > 0);
+    assert!(!result.message.is_empty());
 }
 
 #[test]
@@ -301,11 +301,9 @@ fn test_solve_state_multiple_iterations() {
     }
 
     let mut st = SolverState::new(&cube, 10, false);
-    let mut total_processed = 0;
 
     for _ in 0..5 {
-        let (processed, done) = st.process_chunk(50);
-        total_processed += processed;
+        let (_processed, done) = st.process_chunk(50);
         if done {
             break;
         }

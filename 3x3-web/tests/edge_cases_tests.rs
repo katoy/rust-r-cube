@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
+use rubiks_cube_3x3::cube::{Color, Cube, Move};
 use rubiks_cube_3x3::kociemba::{RawCube, Search};
 use rubiks_cube_3x3::solver::{solve, is_fully_solved};
 
@@ -9,11 +9,11 @@ fn test_color_not_found_error() {
     // 特定の色が完全に欠落している状態
     let mut colors = [Color::White; 54];
     // White を削除し、他の色で補充
-    for i in 0..9 {
-        colors[i] = Color::Yellow;  // White が 0 個に
+    for color in colors.iter_mut().take(9) {
+        *color = Color::Yellow;  // White が 0 個に
     }
-    for i in 9..18 {
-        colors[i] = Color::Yellow;  // Yellow が 18 個に
+    for color in colors.iter_mut().take(18).skip(9) {
+        *color = Color::Yellow;  // Yellow が 18 個に
     }
 
     let result = Cube::from_colors(&colors);
@@ -31,14 +31,14 @@ fn test_invalid_color_counts_mixed() {
     let mut colors = [Color::White; 54];
 
     // White を 8 個に (不足)
-    for i in 0..8 {
-        colors[i] = Color::White;
+    for color in colors.iter_mut().take(8) {
+        *color = Color::White;
     }
     colors[8] = Color::Yellow;
 
     // Yellow を 10 個に (過剰)
-    for i in 9..19 {
-        colors[i] = Color::Yellow;
+    for color in colors.iter_mut().take(19).skip(9) {
+        *color = Color::Yellow;
     }
 
     let result = Cube::from_colors(&colors);
@@ -110,7 +110,7 @@ fn test_solve_depth_boundary_cases() {
     assert!(!result.found);
 
     // 深さ 1: 多くの場合解けない
-    let result = solve(&cube, 1, false);
+    let _result = solve(&cube, 1, false);
     // may or may not be found depending on scramble
 
     // 深さ 3: 高確率で解ける
@@ -138,14 +138,14 @@ fn test_raw_cube_multiply_identity() {
     let mut cube = Cube::new();
     cube.apply_move(Move::R);
 
-    let rc = RawCube::from_cube(&cube).unwrap();
+    let _rc = RawCube::from_cube(&cube).unwrap();
 
     // R と R' を合成すると、ほぼアイデンティティになる
-    let rc_prime = RawCube::from_cube(&Cube::new()).unwrap();
+    let _rc_prime = RawCube::from_cube(&Cube::new()).unwrap();
     for _ in 0..3 {
         cube.apply_move(Move::R);
     }
-    let rc_cubed = RawCube::from_cube(&cube).unwrap();
+    let _rc_cubed = RawCube::from_cube(&cube).unwrap();
 
     // R^4 = I の検証
     let mut test_cube = Cube::new();
@@ -313,8 +313,8 @@ fn test_color_array_conversion() {
     assert!(cube.is_solved());
 
     // ラウンドトリップテスト
-    for i in 0..54 {
+    for (i, &color) in colors_array.iter().enumerate() {
         let sticker = cube.get_sticker(i);
-        assert_eq!(sticker.color, colors_array[i]);
+        assert_eq!(sticker.color, color);
     }
 }

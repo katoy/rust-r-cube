@@ -84,8 +84,8 @@ fn test_restore_orientation_instantly() {
 fn test_missing_color_completely() {
     let mut colors = [Color::White; 54];
     // White を削除し、すべて Yellow に置き換える
-    for i in 0..9 {
-        colors[i] = Color::Yellow;
+    for color in colors.iter_mut().take(9) {
+        *color = Color::Yellow;
     }
     // Yellow が18個、White は0個になる
     let result = Cube::from_colors(&colors);
@@ -99,11 +99,11 @@ fn test_missing_color_completely() {
 fn test_color_count_validation() {
     // Too few of one color, too many of another
     let mut colors = [Color::White; 54];
-    for i in 0..8 {
-        colors[i] = Color::Yellow;
+    for color in colors.iter_mut().take(8) {
+        *color = Color::Yellow;
     }
-    for i in 0..10 {
-        colors[9 + i] = Color::White;
+    for color in colors.iter_mut().skip(9).take(10) {
+        *color = Color::White;
     }
     let result = Cube::from_colors(&colors);
     assert!(result.is_err());

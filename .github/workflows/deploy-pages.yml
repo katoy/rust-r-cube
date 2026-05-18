@@ -70,7 +70,7 @@ jobs:
           cp -r 3x3-web/dist/* final_dist/3x3/
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: final_dist
 

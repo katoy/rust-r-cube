@@ -318,6 +318,22 @@ impl CubeApp {
         );
         cc.egui_ctx.set_style(style);
 
+        // 枝刈りテーブルのウォームアップ
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            tracing::info!("Starting background warmup for pruning tables");
+            std::thread::spawn(|| {
+                let _ = crate::kociemba::PruningTable::get();
+                tracing::info!("Background warmup for pruning tables finished");
+            });
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            tracing::info!("Starting sync warmup for pruning tables");
+            let _ = crate::kociemba::PruningTable::get();
+            tracing::info!("Sync warmup for pruning tables finished");
+        }
+
         tracing::info!("CubeApp::new calling Self::default()");
         let app = Self::default();
         tracing::info!("CubeApp::new finishing");

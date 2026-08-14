@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Cube, Face, Move};
+use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
 use rubiks_cube_3x3::kociemba::coord::{Corner, Edge};
 use rubiks_cube_3x3::kociemba::{RawCube, Search};
 use rubiks_cube_3x3::solver::{is_fully_solved, solve, SolverState};
@@ -159,12 +159,14 @@ fn test_solve_ignore_orientation_flag() {
 
 #[test]
 fn test_search_node_limit_path() {
-    let cube = Cube::new();
+    let mut cube = Cube::new();
+    cube.scramble(10);
     let rc = RawCube::from_cube(&cube).unwrap();
     let mut search = Search::new();
-    search.max_nodes = 0; // node limit 超過分岐
-    let _ = search.solve(&rc, 1);
-    assert!(search.node_count > search.max_nodes || search.node_count == 0);
+    search.max_nodes = 1;
+    let res = search.solve(&rc, 10);
+    assert!(res.is_none());
+    assert!(search.node_count > search.max_nodes);
 }
 
 #[test]
@@ -310,4 +312,77 @@ fn test_solve_state_multiple_iterations() {
     }
 
     assert!(st.get_solution().is_some());
+}
+
+#[test]
+fn test_solve_with_parity_error_for_coverage() {
+    std::env::set_var("SOLVER_DEBUG", "1");
+    let mut cube = Cube::new();
+    cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+    cube.force_sync_orientation_to_pieces();
+    cube.apply_move(Move::R);
+    println!("DEBUG_BEFORE: is_solved = {}", cube.is_solved());
+
+    let sol = solve(&cube, 10, false);
+    println!("DEBUG_AFTER_SOL: is_solved = {}", cube.is_solved());
+    assert!(!sol.found);
+
+    let sol_ignore = solve(&cube, 10, true);
+    println!("DEBUG_AFTER_IGNORE: sol_ignore = {:?}", sol_ignore);
+    assert!(sol_ignore.found);
+
+    std::env::remove_var("SOLVER_DEBUG");
+}
+
+#[test]
+fn test_solve_already_solved_ignore_orientation() {
+    let mut cube = Cube::new();
+    cube.stickers[Face::Up.start_index() + 4].orientation = 2;
+    cube.force_sync_orientation_to_pieces();
+
+    let sol = solve(&cube, 24, true);
+    assert!(sol.found);
+    assert!(sol.message.contains("既に色が揃っています"));
+}
+
+#[test]
+fn test_solve_direct_solved_ignore_orientation_attempt() {
+    let mut cube = Cube::new();
+    cube.apply_move(Move::U);
+
+    let sol = solve(&cube, 24, true);
+    assert!(sol.found);
+    assert!(sol.moves.len() > 0);
+}
+
+#[test]
+fn test_solve_solved_depth_limit_color_only() {
+    let mut cube = Cube::new();
+    cube.stickers[Face::Up.start_index() + 4].orientation = 2;
+    cube.force_sync_orientation_to_pieces();
+
+    let sol = solve(&cube, 2, false);
+    assert!(!sol.found);
+    assert!(sol.message.contains("深度を超えます") || sol.message.contains("深度"));
+}
+
+#[test]
+fn test_solver_fail_solution_normal_parity() {
+    let mut cube = Cube::new();
+    cube.apply_move(Move::R);
+    cube.apply_move(Move::U);
+
+    let sol = solve(&cube, 1, false);
+    assert!(!sol.found);
+    assert!(sol.message.contains("物理的に不可能な状態か") || sol.message.contains("深度"));
+}
+
+#[test]
+fn test_solver_state_error_mapping() {
+    let mut cube = Cube::new();
+    cube.stickers[0].color = Color::Gray;
+
+    let st = SolverState::new(&cube, 10, false);
+    assert!(st.error().is_some());
+    assert!(st.error().unwrap().contains("Invalid"));
 }

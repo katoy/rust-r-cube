@@ -178,3 +178,58 @@ fn test_all_global_moves() {
         assert_eq!(test_cube.stickers.len(), 54);
     }
 }
+
+#[test]
+fn test_color_not_found_error() {
+    let mut cube = Cube::new();
+    // 白の面（0..9）をすべて黄色に書き換えて、白を0個にする
+    for i in 0..9 {
+        cube.stickers[i].color = Color::Yellow;
+    }
+    let res = cube.is_valid_state();
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("が見つかりません"));
+}
+
+#[test]
+fn test_corner_duplicate_error_real() {
+    let mut cube = Cube::new();
+    // コーナー UFR (8, 38, 27) の色を、UFL (6, 20, 36) と同じにする
+    cube.stickers[8].color = cube.stickers[6].color;
+    cube.stickers[38].color = cube.stickers[20].color;
+    cube.stickers[27].color = cube.stickers[36].color;
+
+    let res = rubiks_cube_3x3::cube::validation::check_corner_parity(&cube);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("コーナーピースの重複"));
+}
+
+#[test]
+fn test_edge_duplicate_error_real() {
+    let mut cube = Cube::new();
+    // エッジ UR (5, 28) の色を、UF (7, 37) と同じにする
+    cube.stickers[5].color = cube.stickers[7].color;
+    cube.stickers[28].color = cube.stickers[37].color;
+
+    let res = rubiks_cube_3x3::cube::validation::check_edge_parity(&cube);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("エッジピースの重複"));
+}
+
+#[test]
+fn test_permutation_parity_error_real() {
+    let mut cube = Cube::new();
+    // 2つのエッジのみを入れ替える (UR: 5, 28 と UF: 7, 37)
+    let c5 = cube.stickers[5].color;
+    let c28 = cube.stickers[28].color;
+
+    cube.stickers[5].color = cube.stickers[7].color;
+    cube.stickers[28].color = cube.stickers[37].color;
+
+    cube.stickers[7].color = c5;
+    cube.stickers[37].color = c28;
+
+    let res = cube.is_valid_state();
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("置換パリティが不正"));
+}

@@ -114,3 +114,13 @@ fn is_in_layer(pos: Vec3, axis: Vec3, layer_val: i8) -> bool {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_in_layer_invalid_axis() {
+        assert!(!is_in_layer(Vec3::ZERO, Vec3::ZERO, 0));
+    }
+}

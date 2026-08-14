@@ -320,3 +320,25 @@ fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     }
     table.into_boxed_slice()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pruning_tables_unreachable_break() {
+        let mt = MoveTable {
+            twist: vec![[0u16; 18]; 2187].into_boxed_slice().try_into().unwrap(),
+            flip: vec![[0u16; 18]; 2048].into_boxed_slice().try_into().unwrap(),
+            ud_slice: vec![[0u16; 18]; 495].into_boxed_slice().try_into().unwrap(),
+            cp: vec![[0u16; 18]; 40320].into_boxed_slice().try_into().unwrap(),
+            ep8: vec![[0u16; 18]; 40320].into_boxed_slice().try_into().unwrap(),
+            slice_p: vec![[0u16; 18]; 24].into_boxed_slice().try_into().unwrap(),
+        };
+
+        let _ = generate_twist_slice_pruning_table(&mt);
+        let _ = generate_flip_slice_pruning_table(&mt);
+        let _ = generate_cp_slice_pruning_table(&mt);
+        let _ = generate_ep8_slice_pruning_table(&mt);
+    }
+}

@@ -285,3 +285,12 @@ pub fn idx_to_move(idx: usize) -> Move {
         _ => unreachable!(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[should_panic(expected = "internal error: entered unreachable code")]
+    fn test_to_move_unreachable() {
+        super::idx_to_move(99);
+    }
+}

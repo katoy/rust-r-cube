@@ -272,3 +272,37 @@ fn move_to_geometric_params_for_rot(mv: Move) -> (Vec3, i8, f32) {
         _ => (Vec3::Y, 0, 0.0),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kociemba::Search;
+
+    #[test]
+    fn test_get_target_oris_fallback() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+        let mut cube = Cube::new();
+        cube.stickers[0].color = crate::cube::Color::Gray;
+        let oris = get_target_oris(&cube);
+        assert_eq!(oris, vec![0, 0, 0, 0, 0, 0]);
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+    #[test]
+    fn test_apply_supercube_fixes_impossible_break() {
+        std::env::set_var("SOLVER_DEBUG", "1");
+        let mut cube = Cube::new();
+        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+        cube.force_sync_orientation_to_pieces();
+        let fixes = apply_supercube_fixes(&cube, &mut Search::new());
+        assert!(fixes.is_empty());
+        std::env::remove_var("SOLVER_DEBUG");
+    }
+
+
+    #[test]
+    fn test_apply_rot_to_face_unsupported_move() {
+        let face = apply_rot_to_face(Face::Up, &[Move::R]);
+        assert_eq!(face, Face::Up);
+    }
+}

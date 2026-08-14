@@ -265,3 +265,25 @@ pub fn get_initial_pieces() -> [Cubie; 26] {
 
     pieces.try_into().expect("Must have 26 pieces")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cube::Sticker;
+
+    #[test]
+    fn test_project_to_stickers_internal_normal() {
+        let cubie = Cubie::new(
+            Vec3::new(1.0, 1.0, 1.0),
+            vec![CubieSticker {
+                initial_normal: Vec3::ZERO,
+                color: Color::White,
+            }],
+        );
+
+        let mut stickers = [Sticker::new(Color::Gray); crate::cube::NUM_STICKERS];
+        cubie.project_to_stickers(&mut stickers);
+
+        assert!(stickers.iter().all(|s| s.color == Color::Gray));
+    }
+}

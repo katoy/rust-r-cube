@@ -688,3 +688,46 @@ impl FaceCube {
         Self { f }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_n_choose_k_edge_cases() {
+        assert_eq!(n_choose_k(2, 5), 0);
+        assert_eq!(n_choose_k(2, -1), 0);
+    }
+
+    #[test]
+    fn test_face_cube_from_cube() {
+        let cube = Cube::new();
+        let fc = FaceCube::from_cube(&cube);
+        assert_eq!(fc.f[0], Color::White);
+    }
+
+    #[test]
+    fn test_raw_cube_from_cube_invalid_corners() {
+        let mut cube = Cube::new();
+        cube.stickers[8].color = Color::Gray;
+        let res = RawCube::from_cube(&cube);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_raw_cube_from_cube_invalid_edges() {
+        let mut cube = Cube::new();
+        cube.stickers[5].color = Color::Gray;
+        let res = RawCube::from_cube(&cube);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_edge_orientation_fallback() {
+        let mut cube = Cube::new();
+        cube.stickers[5].color = Color::Green;
+        cube.stickers[28].color = Color::Blue;
+        let res = RawCube::from_cube(&cube);
+        assert!(res.is_err());
+    }
+}

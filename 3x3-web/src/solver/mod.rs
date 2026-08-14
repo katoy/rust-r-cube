@@ -122,9 +122,6 @@ pub fn is_fully_solved(cube: &Cube) -> bool {
 }
 
 pub fn is_orientation_solvable(cube: &Cube) -> bool {
-    if !cube.is_solved() {
-        return false;
-    }
     let oris = get_orientations_vec(cube);
     let total_ori: u32 = oris.iter().map(|&o| o as u32).sum();
     total_ori.is_multiple_of(2)

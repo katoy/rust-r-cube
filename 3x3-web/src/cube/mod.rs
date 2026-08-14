@@ -13,6 +13,12 @@ pub const CLOCKWISE_ORIENTATION_PATTERN: [u8; 9] = [0; 9];
 ///
 /// 54枚のステッカー（[`Sticker`]）をフラットな配列として保持します。
 /// 内部構造は面の順序と各面内のインデックスによって定義されます。
+///
+/// # ⚠️ 開発上の注意 (二重表現の同期)
+///
+/// 本構造体は `stickers`（表示/Kociemba座標用）と `pieces`（3D物理幾何用）の2層で状態を管理しています。
+/// 外部から `pieces` または `stickers` の中身を直接書き換える場合は、状態の不整合を防ぐため、
+/// 必ず直後に `sync_stickers()` を呼び出して同期させてください。
 #[derive(Debug, Clone)]
 pub struct Cube {
     pub stickers: [Sticker; 54],
@@ -157,6 +163,7 @@ impl Cube {
 
     /// キューブの現在の状態（色と向きの組み合わせ）が、物理的に到達可能な有効な状態であるかを判定します。
     pub fn is_valid_state(&self) -> crate::error::Result<()> {
+        self.assert_stickers_synced();
         validation::is_valid_state(self)
     }
 
@@ -378,6 +385,28 @@ impl Cube {
             sticker.orientation = 0;
         }
         new_cube
+    }
+
+    /// デバッグビルド用：`pieces` の状態と `stickers` の状態が同期しているかを検証します。
+    /// 同期漏れバグの早期発見のためのアサーションです。
+    pub fn assert_stickers_synced(&self) {
+        #[cfg(debug_assertions)]
+        {
+            let mut temp_stickers = [Sticker::new(Color::Gray); NUM_STICKERS];
+            for p in &self.pieces {
+                p.project_to_stickers(&mut temp_stickers);
+            }
+            for i in 0..54 {
+                if temp_stickers[i].color != Color::Gray {
+                    assert_eq!(
+                        self.stickers[i].color,
+                        temp_stickers[i].color,
+                        "キューブ状態の同期エラー: インデックス {} において、stickersの色 ({:?}) と pieces から投影された色 ({:?}) が不整合です。状態変更後に sync_stickers() が呼ばれているか確認してください。",
+                        i, self.stickers[i].color, temp_stickers[i].color
+                    );
+                }
+            }
+        }
     }
 }
 

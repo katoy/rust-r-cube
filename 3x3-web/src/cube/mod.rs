@@ -163,7 +163,6 @@ impl Cube {
 
     /// キューブの現在の状態（色と向きの組み合わせ）が、物理的に到達可能な有効な状態であるかを判定します。
     pub fn is_valid_state(&self) -> crate::error::Result<()> {
-        self.assert_stickers_synced();
         validation::is_valid_state(self)
     }
 
@@ -180,11 +179,13 @@ impl Cube {
     /// 回転操作を適用します。
     pub fn apply_move(&mut self, mv: Move) {
         rotation::apply_move(self, mv);
+        self.assert_stickers_synced();
     }
 
     /// 指定回数のランダムな回転操作を適用します。
     pub fn scramble(&mut self, moves: usize) {
         rotation::scramble(self, moves);
+        self.assert_stickers_synced();
     }
 
     /// 現在の色配置に基づいて、物理的に正しいステッカー向（twist）を瞬時に復元します。
@@ -277,6 +278,7 @@ impl Cube {
         self.sync_stickers();
 
         // 最終的なチェック
+        self.assert_stickers_synced();
         self.is_valid_state()
     }
 

@@ -1,4 +1,4 @@
-use crate::cube::{Cube, Move, Face};
+use rubiks_cube_3x3::cube::{Cube, Move, Face};
 
 fn main() {
     let mut cube = Cube::new();

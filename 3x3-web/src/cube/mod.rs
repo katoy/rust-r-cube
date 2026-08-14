@@ -398,13 +398,13 @@ impl Cube {
             for p in &self.pieces {
                 p.project_to_stickers(&mut temp_stickers);
             }
-            for i in 0..54 {
-                if temp_stickers[i].color != Color::Gray {
+            for (i, temp_sticker) in temp_stickers.iter().enumerate() {
+                if temp_sticker.color != Color::Gray {
                     assert_eq!(
                         self.stickers[i].color,
-                        temp_stickers[i].color,
+                        temp_sticker.color,
                         "キューブ状態の同期エラー: インデックス {} において、stickersの色 ({:?}) と pieces から投影された色 ({:?}) が不整合です。状態変更後に sync_stickers() が呼ばれているか確認してください。",
-                        i, self.stickers[i].color, temp_stickers[i].color
+                        i, self.stickers[i].color, temp_sticker.color
                     );
                 }
             }

@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/3x3/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-97.55%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-94.88%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -132,7 +132,7 @@ trunk build --release
 
 ### 本プログラムのパフォーマンス
 
-本ツールのソルバーは、計算速度とメモリエフィエントを重視した Kociemba アルゴリズムを採用しています。
+本ツールのソルバーは、計算速度とメモリ効率を重視した Kociemba アルゴリズムを採用しています。
 
 - **一般的な状態**: 19〜22手程度の解法を **0.1〜0.2秒** で生成します。
 - **Superflip 状態**: 本実装では最短解に近い **22手** の解法を瞬時に生成します。
@@ -168,11 +168,16 @@ trunk build --release
 │   │   ├── mod.rs         # 解法探索の統合とオーケストレーション
 │   │   └── fix.rs         # スーパーキューブ向き修正アルゴリズム
 │   ├── gui/               # デスクトップGUI (egui/eframe)
+│   ├── bin/               # デスクトップ版エントリポイント
+│   │   └── rubiks-cube-3x3.rs
 │   ├── history.rs         # 操作履歴管理 (Undo/Redo)
 │   ├── statistics.rs      # 統計情報の収集
+│   ├── error.rs           # カスタムエラー定義
 │   └── lib.rs             # ライブラリのルート
-├── tests/                 # 統合テスト (200+ テストケース)
-├── examples/              # サンプルプログラム
+├── tests/                 # 統合テスト (180+ テストケース)
+├── examples/              # アルゴリズム検証・サンプルプログラム
+├── benches/               # ベンチマーク
+│   └── solver_benchmarks.rs
 ├── cubes/                 # サンプルキューブファイル
 └── index.html             # Web版のエントリポイント
 ```
@@ -183,6 +188,7 @@ trunk build --release
 - **`kociemba/`**: 2段階アルゴリズムの実装。座標変換、探索、枝刈りテーブルを含む。
 - **`solver/`**: 高レベルのソルバーAPI。Kociembaアルゴリズムとスーパーキューブ向き修正を統合し、ユーザーフレンドリーな解法を提供。
 - **`gui/`**: デスクトップ版のGUI実装。3D/2Dビュー、アニメーション、ユーザー入力を処理。
+- **`error.rs`**: アプリケーション全体のエラーハンドリングを担うエラー型の定義。
 
 ## サンプルキューブファイル
 
@@ -282,6 +288,23 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 | `src/solver/mod.rs`      | 621      | 96.30%        |
 | `src/solver/fix.rs`      | 312      | 95.51%        |
 | **TOTAL (Core)**         | **3713** | **94.88%**    |
+
+## サンプル・検証プログラム (Examples)
+
+`examples/` ディレクトリには、アルゴリズムの挙動確認や性能検証のための実行可能スクリプトが含まれています。主なスクリプトは以下の通りです。
+
+*   **`solve_cube_god.rs`**: "神の数"の検証ケース（Superflip等）をソルバーに通し、実際に解法が導き出せるかテストします。
+    ```bash
+    cargo run --release --example solve_cube_god
+    ```
+*   **`brute_superflip.rs`**: Superflip 状態に対する力まかせ探索とKociembaアルゴリズムの比較を行います。
+    ```bash
+    cargo run --release --example brute_superflip
+    ```
+*   **`check_color_preservation.rs`**: スーパーキューブ解決時の色保存特性（他のパーツの配置を崩さないこと）を検証します。
+    ```bash
+    cargo run --release --example check_color_preservation
+    ```
 
 ## ライセンス
 

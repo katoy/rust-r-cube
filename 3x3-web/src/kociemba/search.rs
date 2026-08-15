@@ -134,8 +134,8 @@ impl Search {
     }
 
     fn get_phase1_dist(&self, twist: u16, flip: u16, slice: u16) -> u8 {
-        let d1 = self.pruning_table.twist_slice[twist as usize * 495 + slice as usize];
-        let d2 = self.pruning_table.flip_slice[flip as usize * 495 + slice as usize];
+        let d1 = self.pruning_table.get_twist_slice(twist as usize, slice as usize);
+        let d2 = self.pruning_table.get_flip_slice(flip as usize, slice as usize);
         d1.max(d2)
     }
 

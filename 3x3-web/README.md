@@ -281,13 +281,13 @@ cargo llvm-cov --ignore-filename-regex "(gui|bin)"
 | `src/history.rs`         | 48       | **100.00%** ✨ |
 | `src/kociemba/tables.rs` | 241      | **100.00%** ✨ |
 | `src/statistics.rs`      | 45       | **100.00%** ✨ |
+| `src/solver/mod.rs`      | 430      | **100.00%** ✨ |
+| `src/cube/mod.rs`        | 219      | **100.00%** ✨ |
 | `src/kociemba/search.rs` | 208      | 99.52%        |
 | `src/kociemba/coord.rs`  | 556      | 98.92%        |
 | `src/cube/rotation.rs`   | 74       | 98.65%        |
-| `src/solver/mod.rs`      | 441      | 97.73%        |
-| `src/solver/fix.rs`      | 229      | 93.45%        |
-| `src/cube/mod.rs`        | 232      | 84.91%        |
-| **TOTAL (Core)**         | **2717** | **97.50%**    |
+| `src/solver/fix.rs`      | 202      | 98.51% (製品コード部 100%) |
+| **TOTAL (Core)**         | **2666** | **99.59%** 🎉 |
 
 ## サンプル・検証プログラム (Examples)
 

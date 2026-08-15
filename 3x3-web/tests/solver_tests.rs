@@ -351,7 +351,7 @@ fn test_solve_direct_solved_ignore_orientation_attempt() {
 
     let sol = solve(&cube, 24, true);
     assert!(sol.found);
-    assert!(sol.moves.len() > 0);
+    assert!(!sol.moves.is_empty());
 }
 
 #[test]

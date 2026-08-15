@@ -283,18 +283,18 @@ pub fn try_solve_with_rotation(
     debug_assert!(is_solved);
 
     if final_moves.len() <= max_depth {
-        return Some(TrySolveResult::Perfect(Solution {
+        Some(TrySolveResult::Perfect(Solution {
             moves: final_moves,
             found: true,
             message: "色解決後にセンターの向きを修正しました。".to_string(),
-        }));
+        }))
     } else {
-        return Some(TrySolveResult::ColorOnly(Solution {
+        Some(TrySolveResult::ColorOnly(Solution {
             moves: final_moves,
             found: ignore_orientation,
             message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
                 .to_string(),
-        }));
+        }))
     }
 }
 

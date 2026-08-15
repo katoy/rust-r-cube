@@ -46,6 +46,16 @@ pub struct PruningTable {
     pub ud_slice_x2: Box<[u16; 495]>,
 }
 
+type SymmetryMaps = (
+    Box<[u16; 2187]>,
+    Box<[bool; 2187]>,
+    Box<[bool; 2187]>,
+    Box<[u16; 2048]>,
+    Box<[bool; 2048]>,
+    Box<[bool; 2048]>,
+    Box<[u16; 495]>,
+);
+
 impl MoveTable {
     /// 移動テーブルを取得します。初回呼び出し時に生成（事前計算）されます。
     pub fn get() -> &'static MoveTable {
@@ -205,15 +215,7 @@ fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_x2_maps() -> (
-    Box<[u16; 2187]>,
-    Box<[bool; 2187]>,
-    Box<[bool; 2187]>,
-    Box<[u16; 2048]>,
-    Box<[bool; 2048]>,
-    Box<[bool; 2048]>,
-    Box<[u16; 495]>,
-) {
+fn generate_x2_maps() -> SymmetryMaps {
     use crate::kociemba::coord::Corner;
     use crate::kociemba::coord::Edge;
 
@@ -355,11 +357,11 @@ fn generate_twist_slice_pruning_table(
 
     while count < total_size {
         let mut found = false;
-        for c in 0..num_classes {
+        for (c, &s1_u16) in class_to_twist.iter().enumerate() {
+            let s1 = s1_u16 as usize;
             for s2 in 0..size2 {
                 let idx = c * size2 + s2;
                 if table[idx] == distance {
-                    let s1 = class_to_twist[c] as usize;
                     for m in 0..18 {
                         let ns1 = mt.twist[s1][m] as usize;
                         let ns2 = mt.ud_slice[s2][m] as usize;
@@ -419,11 +421,11 @@ fn generate_flip_slice_pruning_table(
 
     while count < total_size {
         let mut found = false;
-        for c in 0..num_classes {
+        for (c, &s1_u16) in class_to_flip.iter().enumerate() {
+            let s1 = s1_u16 as usize;
             for s2 in 0..size2 {
                 let idx = c * size2 + s2;
                 if table[idx] == distance {
-                    let s1 = class_to_flip[c] as usize;
                     for m in 0..18 {
                         let ns1 = mt.flip[s1][m] as usize;
                         let ns2 = mt.ud_slice[s2][m] as usize;

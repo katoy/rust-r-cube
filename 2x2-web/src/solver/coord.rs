@@ -208,3 +208,113 @@ impl Default for RawCube {
         }
     }
 }
+
+/// グループA {UFL(0), UFR(1), UBR(2), UBL(3)} の位置と向きを統合したインデックス (0..136079) を取得します。
+pub fn get_group_a_idx(rc: &RawCube) -> usize {
+    let mut pos = [0; 4];
+    for (p, val) in pos.iter_mut().enumerate() {
+        *val = rc.cp.iter().position(|&c| c as usize == p).unwrap_or(0);
+    }
+    let mut pos_idx = 0;
+    for i in 0..4 {
+        let mut k = pos[i];
+        for j in 0..i {
+            if pos[j] < pos[i] {
+                k -= 1;
+            }
+        }
+        pos_idx = pos_idx * (8 - i) + k;
+    }
+
+    let mut ori_idx = 0;
+    for &p_pos in &pos {
+        ori_idx = ori_idx * 3 + rc.co[p_pos] as usize;
+    }
+
+    pos_idx * 81 + ori_idx
+}
+
+/// グループB {DFL(4), DFR(5), DBR(6), DBL(7)} の位置と向きを統合したインデックス (0..136079) を取得します。
+pub fn get_group_b_idx(rc: &RawCube) -> usize {
+    let mut pos = [0; 4];
+    for (p, val) in pos.iter_mut().enumerate() {
+        *val = rc.cp.iter().position(|&c| c as usize == p + 4).unwrap_or(0);
+    }
+    let mut pos_idx = 0;
+    for i in 0..4 {
+        let mut k = pos[i];
+        for j in 0..i {
+            if pos[j] < pos[i] {
+                k -= 1;
+            }
+        }
+        pos_idx = pos_idx * (8 - i) + k;
+    }
+
+    let mut ori_idx = 0;
+    for &p_pos in &pos {
+        ori_idx = ori_idx * 3 + rc.co[p_pos] as usize;
+    }
+
+    pos_idx * 81 + ori_idx
+}
+
+/// グループC {UFL(0), UBR(2), DFL(4), DBR(6)} の位置と向きを統合したインデックス (0..136079) を取得します。
+pub fn get_group_c_idx(rc: &RawCube) -> usize {
+    let mut pos = [0; 4];
+    let targets = [0, 2, 4, 6];
+    for p in 0..4 {
+        pos[p] = rc
+            .cp
+            .iter()
+            .position(|&c| c as usize == targets[p])
+            .unwrap_or(0);
+    }
+    let mut pos_idx = 0;
+    for i in 0..4 {
+        let mut k = pos[i];
+        for j in 0..i {
+            if pos[j] < pos[i] {
+                k -= 1;
+            }
+        }
+        pos_idx = pos_idx * (8 - i) + k;
+    }
+
+    let mut ori_idx = 0;
+    for &p_pos in &pos {
+        ori_idx = ori_idx * 3 + rc.co[p_pos] as usize;
+    }
+
+    pos_idx * 81 + ori_idx
+}
+
+/// グループD {UFR(1), UBL(3), DFR(5), DBL(7)} の位置と向きを統合したインデックス (0..136079) を取得します。
+pub fn get_group_d_idx(rc: &RawCube) -> usize {
+    let mut pos = [0; 4];
+    let targets = [1, 3, 5, 7];
+    for p in 0..4 {
+        pos[p] = rc
+            .cp
+            .iter()
+            .position(|&c| c as usize == targets[p])
+            .unwrap_or(0);
+    }
+    let mut pos_idx = 0;
+    for i in 0..4 {
+        let mut k = pos[i];
+        for j in 0..i {
+            if pos[j] < pos[i] {
+                k -= 1;
+            }
+        }
+        pos_idx = pos_idx * (8 - i) + k;
+    }
+
+    let mut ori_idx = 0;
+    for &p_pos in &pos {
+        ori_idx = ori_idx * 3 + rc.co[p_pos] as usize;
+    }
+
+    pos_idx * 81 + ori_idx
+}

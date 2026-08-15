@@ -9,6 +9,10 @@ pub struct MoveTable {
 pub struct PruningTable {
     pub cp: Box<[u8]>,
     pub twist: Box<[u8]>,
+    pub group_a: Box<[u8]>,
+    pub group_b: Box<[u8]>,
+    pub group_c: Box<[u8]>,
+    pub group_d: Box<[u8]>,
 }
 
 impl MoveTable {
@@ -29,6 +33,10 @@ impl PruningTable {
             PruningTable {
                 cp: generate_cp_pruning_table(mt),
                 twist: generate_twist_pruning_table(mt),
+                group_a: generate_group_a_pruning_table(),
+                group_b: generate_group_b_pruning_table(),
+                group_c: generate_group_c_pruning_table(),
+                group_d: generate_group_d_pruning_table(),
             }
         })
     }
@@ -116,5 +124,121 @@ fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
         }
         distance += 1;
     }
+    table.into_boxed_slice()
+}
+
+fn generate_group_a_pruning_table() -> Box<[u8]> {
+    use super::coord::get_group_a_idx;
+    use std::collections::VecDeque;
+
+    let mut table = vec![255u8; 136080];
+    let start_idx = get_group_a_idx(&RawCube::default());
+    table[start_idx] = 0; // 初期状態
+    let mut q = VecDeque::new();
+    q.push_back((RawCube::default(), 0u8));
+    let mut visited_count = 1;
+
+    while let Some((rc, dist)) = q.pop_front() {
+        for m in 0..18 {
+            let next_rc = rc.multiply(move_cube_18(m));
+            let next_idx = get_group_a_idx(&next_rc);
+            if table[next_idx] == 255 {
+                table[next_idx] = dist + 1;
+                visited_count += 1;
+                q.push_back((next_rc, dist + 1));
+            }
+        }
+    }
+    assert_eq!(
+        visited_count, 136080,
+        "Group A pruning table did not visit all states!"
+    );
+    table.into_boxed_slice()
+}
+
+fn generate_group_b_pruning_table() -> Box<[u8]> {
+    use super::coord::get_group_b_idx;
+    use std::collections::VecDeque;
+
+    let mut table = vec![255u8; 136080];
+    let start_idx = get_group_b_idx(&RawCube::default());
+    table[start_idx] = 0; // 初期状態
+    let mut q = VecDeque::new();
+    q.push_back((RawCube::default(), 0u8));
+    let mut visited_count = 1;
+
+    while let Some((rc, dist)) = q.pop_front() {
+        for m in 0..18 {
+            let next_rc = rc.multiply(move_cube_18(m));
+            let next_idx = get_group_b_idx(&next_rc);
+            if table[next_idx] == 255 {
+                table[next_idx] = dist + 1;
+                visited_count += 1;
+                q.push_back((next_rc, dist + 1));
+            }
+        }
+    }
+    assert_eq!(
+        visited_count, 136080,
+        "Group B pruning table did not visit all states!"
+    );
+    table.into_boxed_slice()
+}
+
+fn generate_group_c_pruning_table() -> Box<[u8]> {
+    use super::coord::get_group_c_idx;
+    use std::collections::VecDeque;
+
+    let mut table = vec![255u8; 136080];
+    let start_idx = get_group_c_idx(&RawCube::default());
+    table[start_idx] = 0; // 初期状態
+    let mut q = VecDeque::new();
+    q.push_back((RawCube::default(), 0u8));
+    let mut visited_count = 1;
+
+    while let Some((rc, dist)) = q.pop_front() {
+        for m in 0..18 {
+            let next_rc = rc.multiply(move_cube_18(m));
+            let next_idx = get_group_c_idx(&next_rc);
+            if table[next_idx] == 255 {
+                table[next_idx] = dist + 1;
+                visited_count += 1;
+                q.push_back((next_rc, dist + 1));
+            }
+        }
+    }
+    assert_eq!(
+        visited_count, 136080,
+        "Group C pruning table did not visit all states!"
+    );
+    table.into_boxed_slice()
+}
+
+fn generate_group_d_pruning_table() -> Box<[u8]> {
+    use super::coord::get_group_d_idx;
+    use std::collections::VecDeque;
+
+    let mut table = vec![255u8; 136080];
+    let start_idx = get_group_d_idx(&RawCube::default());
+    table[start_idx] = 0; // 初期状態
+    let mut q = VecDeque::new();
+    q.push_back((RawCube::default(), 0u8));
+    let mut visited_count = 1;
+
+    while let Some((rc, dist)) = q.pop_front() {
+        for m in 0..18 {
+            let next_rc = rc.multiply(move_cube_18(m));
+            let next_idx = get_group_d_idx(&next_rc);
+            if table[next_idx] == 255 {
+                table[next_idx] = dist + 1;
+                visited_count += 1;
+                q.push_back((next_rc, dist + 1));
+            }
+        }
+    }
+    assert_eq!(
+        visited_count, 136080,
+        "Group D pruning table did not visit all states!"
+    );
     table.into_boxed_slice()
 }

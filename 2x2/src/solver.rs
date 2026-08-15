@@ -6,7 +6,6 @@ use std::sync::OnceLock;
 
 /// デフォルトの最大探索深度
 pub const DEFAULT_MAX_DEPTH: usize = 11;
-const PROGRESS_UPDATE_INTERVAL: usize = 4;
 const ESTIMATED_STATES_MAX: usize = 1_000_000;
 
 /// BFS探索で使用する状態マップ: 状態 → その状態に到達した操作（根はNone）
@@ -203,20 +202,22 @@ fn solve_internal(
     }
 
     let all_moves = Move::all_moves();
-    let forward_depth = max_depth.div_ceil(2);
-    let backward_depth = max_depth - forward_depth;
-    let total_depth = forward_depth + backward_depth;
 
-    // --- 順方向探索 ---
+    let forward_depth = max_depth.div_ceil(2);
     #[allow(clippy::cast_possible_truncation)]
     let estimated_states = all_moves
         .len()
         .pow(forward_depth as u32)
         .min(ESTIMATED_STATES_MAX);
-    let mut forward_dist: StateMap =
-        FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
-    let mut forward_queue: StateQueue = VecDeque::with_capacity(estimated_states);
 
+    // 順方向と逆方向の探索データを定義
+    let mut forward_queue = VecDeque::with_capacity(estimated_states);
+    let mut forward_dist = FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
+
+    let mut backward_queue = VecDeque::with_capacity(estimated_states);
+    let mut backward_dist = FxHashMap::with_capacity_and_hasher(estimated_states, rustc_hash::FxBuildHasher);
+
+    // 初期状態のセット
     let start_key = if ignore_orientation {
         start_cube.normalized()
     } else {
@@ -225,96 +226,98 @@ fn solve_internal(
     forward_queue.push_back(start_key.clone());
     forward_dist.insert(start_key, None);
 
-    let mut current_depth = 0;
-    while current_depth < forward_depth {
-        if forward_queue.is_empty() {
-            break;
-        }
-
-        // 進捗送信
-        if let Some(ref tx) = progress_tx {
-            if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
-                #[allow(clippy::cast_precision_loss)]
-                let progress = (current_depth as f32) / (total_depth as f32);
-                let _ = tx.send(progress);
-            }
-        }
-
-        expand_layer(
-            &mut forward_queue,
-            &mut forward_dist,
-            &all_moves,
-            ignore_orientation,
-        );
-        current_depth += 1;
-    }
-
-    // --- 逆方向探索 ---
-    #[allow(clippy::cast_possible_truncation)]
-    let estimated_backward_states = all_moves
-        .len()
-        .pow(backward_depth as u32)
-        .min(ESTIMATED_STATES_MAX);
-    let mut backward_queue: StateQueue = VecDeque::with_capacity(estimated_backward_states);
-    let mut backward_map: StateMap =
-        FxHashMap::with_capacity_and_hasher(estimated_backward_states, rustc_hash::FxBuildHasher);
-
     for solved in get_solved_states() {
         let s_key = if ignore_orientation {
             solved.normalized()
         } else {
             solved.clone()
         };
-        if !backward_map.contains_key(&s_key) {
-            if forward_dist.contains_key(&s_key) {
-                if let Some(ref tx) = progress_tx {
-                    let _ = tx.send(1.0);
-                }
-                return Solution {
-                    moves: reconstruct_path_forward(&forward_dist, &s_key, ignore_orientation),
-                    found: true,
-                };
-            }
-            backward_map.insert(s_key.clone(), None);
+        if !backward_dist.contains_key(&s_key) {
+            backward_dist.insert(s_key.clone(), None);
             backward_queue.push_back(s_key);
         }
     }
 
-    let mut current_depth = 0;
-    while !backward_queue.is_empty() && current_depth <= backward_depth {
-        // 進捗送信
-        if let Some(ref tx) = progress_tx {
-            if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
-                #[allow(clippy::cast_precision_loss)]
-                let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
-                let _ = tx.send(progress);
-            }
-        }
+    let mut forward_depth = 0;
+    let mut backward_depth = 0;
+    let total_depth = max_depth;
 
-        // 衝突判定
-        for curr in &backward_queue {
-            if forward_dist.contains_key(curr) {
-                let mut moves = reconstruct_path_forward(&forward_dist, curr, ignore_orientation);
-                let rev_moves = reconstruct_path_backward(&backward_map, curr, ignore_orientation);
-                moves.extend(rev_moves);
-                if let Some(ref tx) = progress_tx {
-                    let _ = tx.send(1.0);
-                }
-                return Solution { moves, found: true };
-            }
-        }
-
-        if current_depth == backward_depth {
+    while forward_depth + backward_depth < total_depth {
+        if forward_queue.is_empty() || backward_queue.is_empty() {
             break;
         }
 
-        expand_layer(
-            &mut backward_queue,
-            &mut backward_map,
-            &all_moves,
-            ignore_orientation,
-        );
-        current_depth += 1;
+        // 進捗報告
+        if let Some(ref tx) = progress_tx {
+            #[allow(clippy::cast_precision_loss)]
+            let progress = (forward_depth + backward_depth) as f32 / total_depth as f32;
+            let _ = tx.send(progress);
+        }
+
+        // どちらを展開するか選択（サイズが小さい方）
+        let expand_forward = if forward_queue.is_empty() {
+            false
+        } else if backward_queue.is_empty() {
+            true
+        } else {
+            forward_queue.len() <= backward_queue.len()
+        };
+
+        if expand_forward {
+            let next_entries = expand_layer_single(
+                &mut forward_queue,
+                &forward_dist,
+                &all_moves,
+                ignore_orientation,
+            );
+
+            for (next_key, val) in next_entries {
+                if !forward_dist.contains_key(&next_key) {
+                    forward_dist.insert(next_key.clone(), val);
+                    
+                    // 衝突判定
+                    if backward_dist.contains_key(&next_key) {
+                        if let Some(ref tx) = progress_tx {
+                            let _ = tx.send(1.0);
+                        }
+                        let mut moves = reconstruct_path_forward(&forward_dist, &next_key, ignore_orientation);
+                        let rev_moves = reconstruct_path_backward(&backward_dist, &next_key, ignore_orientation);
+                        moves.extend(rev_moves);
+                        return Solution { moves, found: true };
+                    }
+                    
+                    forward_queue.push_back(next_key);
+                }
+            }
+            forward_depth += 1;
+        } else {
+            let next_entries = expand_layer_single(
+                &mut backward_queue,
+                &backward_dist,
+                &all_moves,
+                ignore_orientation,
+            );
+
+            for (next_key, val) in next_entries {
+                if !backward_dist.contains_key(&next_key) {
+                    backward_dist.insert(next_key.clone(), val);
+                    
+                    // 衝突判定
+                    if forward_dist.contains_key(&next_key) {
+                        if let Some(ref tx) = progress_tx {
+                            let _ = tx.send(1.0);
+                        }
+                        let mut moves = reconstruct_path_forward(&forward_dist, &next_key, ignore_orientation);
+                        let rev_moves = reconstruct_path_backward(&backward_dist, &next_key, ignore_orientation);
+                        moves.extend(rev_moves);
+                        return Solution { moves, found: true };
+                    }
+                    
+                    backward_queue.push_back(next_key);
+                }
+            }
+            backward_depth += 1;
+        }
     }
 
     if let Some(ref tx) = progress_tx {
@@ -327,52 +330,67 @@ fn solve_internal(
     }
 }
 
-/// BFSの一つの層を展開します（Rayonによる並列化版）。
-fn expand_layer(
+/// BFSの一つの層を展開します。
+fn expand_layer_single(
     queue: &mut StateQueue,
-    dist: &mut StateMap,
+    dist: &StateMap,
     all_moves: &[Move],
     ignore_orientation: bool,
-) {
+) -> Vec<(Cube, Option<Move>)> {
     use rayon::prelude::*;
 
-    // 現在の層の全ノードをベクタに取り出す（並列処理のため）
     let current_nodes: Vec<Cube> = queue.drain(..).collect();
 
-    // 並列に次の層を生成
-    type SearchEntry = (Cube, Option<Move>);
-    let next_entries: Vec<SearchEntry> = current_nodes
-        .par_iter()
-        .flat_map_iter(|curr| {
-            let last_mv = dist.get(curr).and_then(|&m| m);
-            all_moves.iter().filter_map(move |&mv| {
-                // 枝刈り：直前の逆操作を回避
-                if let Some(last) = last_mv {
-                    if last == mv.inverse() {
-                        return None;
+    // スレッド起動のオーバーヘッドを避けるため、ノード数が少ない場合はシングルスレッドで処理
+    const PARALLEL_THRESHOLD: usize = 1000;
+    if current_nodes.len() < PARALLEL_THRESHOLD {
+        current_nodes
+            .iter()
+            .flat_map(|curr| {
+                let last_mv = dist.get(curr).and_then(|&m| m);
+                all_moves.iter().filter_map(move |&mv| {
+                    if let Some(last) = last_mv {
+                        if last == mv.inverse() {
+                            return None;
+                        }
                     }
-                }
 
-                let mut next = curr.clone();
-                next.apply_move(mv);
-                let next_key = if ignore_orientation {
-                    next.normalized()
-                } else {
-                    next
-                };
+                    let mut next = curr.clone();
+                    next.apply_move(mv);
+                    let next_key = if ignore_orientation {
+                        next.normalized()
+                    } else {
+                        next
+                    };
 
-                Some((next_key, Some(mv)))
+                    Some((next_key, Some(mv)))
+                })
             })
-        })
-        .collect();
+            .collect()
+    } else {
+        current_nodes
+            .par_iter()
+            .flat_map_iter(|curr| {
+                let last_mv = dist.get(curr).and_then(|&m| m);
+                all_moves.iter().filter_map(move |&mv| {
+                    if let Some(last) = last_mv {
+                        if last == mv.inverse() {
+                            return None;
+                        }
+                    }
 
-    // 生成されたエントリを逐次的に dist に追加
-    // (重複チェックが必要なため、ここからはメインスレッドで実行)
-    for (next_key, val) in next_entries {
-        if !dist.contains_key(&next_key) {
-            dist.insert(next_key.clone(), val);
-            queue.push_back(next_key);
-        }
+                    let mut next = curr.clone();
+                    next.apply_move(mv);
+                    let next_key = if ignore_orientation {
+                        next.normalized()
+                    } else {
+                        next
+                    };
+
+                    Some((next_key, Some(mv)))
+                })
+            })
+            .collect()
     }
 }
 

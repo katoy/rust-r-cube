@@ -318,17 +318,16 @@ fn test_solve_state_multiple_iterations() {
 fn test_solve_with_parity_error_for_coverage() {
     std::env::set_var("SOLVER_DEBUG", "1");
     let mut cube = Cube::new();
-    cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+    cube.stickers[Face::Up.start_index() + 4].orientation = 1; // 1
     cube.force_sync_orientation_to_pieces();
-    cube.apply_move(Move::R);
-    println!("DEBUG_BEFORE: is_solved = {}", cube.is_solved());
+    cube.apply_move(Move::R2); // 180度回転 ➔ 偶数パリティの自転 ➔ 合計パリティは奇数の3
 
     let sol = solve(&cube, 10, false);
-    println!("DEBUG_AFTER_SOL: is_solved = {}", cube.is_solved());
+    println!("DEBUG_COVERAGE_SOL: sol = {:?}", sol);
     assert!(!sol.found);
 
     let sol_ignore = solve(&cube, 10, true);
-    println!("DEBUG_AFTER_IGNORE: sol_ignore = {:?}", sol_ignore);
+    println!("DEBUG_COVERAGE_IGNORE: sol_ignore = {:?}", sol_ignore);
     assert!(sol_ignore.found);
 
     std::env::remove_var("SOLVER_DEBUG");
@@ -385,4 +384,24 @@ fn test_solver_state_error_mapping() {
     let st = SolverState::new(&cube, 10, false);
     assert!(st.error().is_some());
     assert!(st.error().unwrap().contains("Invalid"));
+}
+
+#[test]
+fn test_solve_attempt_search_color_only() {
+    std::env::set_var("SOLVER_DEBUG", "1");
+    let mut cube = Cube::new();
+    // 6つのセンターすべてを 90度回転させ、向き修正に24手以上かかるようにする
+    for face in Face::all() {
+        cube.stickers[face.start_index() + 4].orientation = 1;
+    }
+    cube.force_sync_orientation_to_pieces();
+    cube.apply_move(Move::R2);
+    cube.apply_move(Move::U2);
+
+    // depth=3 で探索 (ignore_orientation=false)。向き修正が深度を超えるため、ColorOnly を見つけさせる
+    let sol = solve(&cube, 3, false);
+    println!("DEBUG_ATTEMPT_SEARCH_SOL: sol = {:?}", sol);
+    assert!(!sol.found);
+    assert!(sol.message.contains("探索深度を超えます") || sol.message.contains("解が見つかりませんでした"));
+    std::env::remove_var("SOLVER_DEBUG");
 }

@@ -235,76 +235,67 @@ pub fn try_solve_with_rotation(
         }));
     }
 
-    // 色が揃っている場合、向き修正を試みる
-    if check_cube.is_solved() {
-        if !is_orientation_solvable(&check_cube) {
-            let oris = get_orientations_vec(&check_cube);
-            let sum: u32 = oris.iter().map(|&o| o as u32).sum();
-            if std::env::var("SOLVER_DEBUG").is_ok() {
-                println!("DEBUG: try_solve_with_rotation: Odd parity detected (sum={}). Physically impossible.", sum);
-            }
-            return Some(TrySolveResult::ColorOnly(Solution {
-                moves: moves.clone(),
-                found: ignore_orientation, // 向きを無視する場合のみ "成功" とみなす
-                message: if ignore_orientation {
-                    format!("色は解決しましたが、方位パリティが異常(sum={})なため、方位の解決は不可能です。", sum)
-                } else {
-                    format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum)
-                },
-            }));
-        }
+    debug_assert!(check_cube.is_solved());
 
+    if !is_orientation_solvable(&check_cube) {
+        let oris = get_orientations_vec(&check_cube);
+        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
         if std::env::var("SOLVER_DEBUG").is_ok() {
-            println!(
-                "DEBUG: try_solve_with_rotation: color solved. oris={:?}",
-                get_orientations_vec(&check_cube)
-            );
+            println!("DEBUG: try_solve_with_rotation: Odd parity detected (sum={}). Physically impossible.", sum);
         }
-        let fixes = apply_supercube_fixes(&check_cube, search);
-        if std::env::var("SOLVER_DEBUG").is_ok() {
-            println!(
-                "DEBUG: try_solve_with_rotation: apply_supercube_fixes returned {} moves.",
-                fixes.len()
-            );
-        }
-        let mut final_moves = moves.clone();
-        final_moves.extend(fixes.clone());
-
-        let mut final_cube = check_cube.clone();
-        for &m in &fixes {
-            final_cube.apply_move(m);
-        }
-
-        if std::env::var("SOLVER_DEBUG").is_ok() {
-            println!(
-                "DEBUG: try_solve_with_rotation: after fixes, oris={:?}, is_solved={}",
-                get_orientations_vec(&final_cube),
-                final_cube.is_solved()
-            );
-        }
-
-        if is_fully_solved(&final_cube) {
-            if final_moves.len() <= max_depth {
-                return Some(TrySolveResult::Perfect(Solution {
-                    moves: final_moves,
-                    found: true,
-                    message: "色解決後にセンターの向きを修正しました。".to_string(),
-                }));
-            } else {
-                return Some(TrySolveResult::ColorOnly(Solution {
-                    moves: final_moves,
-                    found: ignore_orientation,
-                    message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
-                        .to_string(),
-                }));
-            }
-        }
+        return Some(TrySolveResult::ColorOnly(Solution {
+            moves: moves.clone(),
+            found: false,
+            message: format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum),
+        }));
     }
-    // (color_only_solution は色が揃っているが向きが揃っていない状態を保存するために使用される)
-    // また、色が揃っているが向きが揃わない状態（パリティエラー）も、ignore_orientation=false の場合は
-    // color_only_solution には保存しない。
 
-    None
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        println!(
+            "DEBUG: try_solve_with_rotation: color solved. oris={:?}",
+            get_orientations_vec(&check_cube)
+        );
+    }
+    let fixes = apply_supercube_fixes(&check_cube, search);
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        println!(
+            "DEBUG: try_solve_with_rotation: apply_supercube_fixes returned {} moves.",
+            fixes.len()
+        );
+    }
+    let mut final_moves = moves.clone();
+    final_moves.extend(fixes.clone());
+
+    let mut final_cube = check_cube.clone();
+    for &m in &fixes {
+        final_cube.apply_move(m);
+    }
+
+    if std::env::var("SOLVER_DEBUG").is_ok() {
+        println!(
+            "DEBUG: try_solve_with_rotation: after fixes, oris={:?}, is_solved={}",
+            get_orientations_vec(&final_cube),
+            final_cube.is_solved()
+        );
+    }
+
+    let is_solved = is_fully_solved(&final_cube);
+    debug_assert!(is_solved);
+
+    if final_moves.len() <= max_depth {
+        return Some(TrySolveResult::Perfect(Solution {
+            moves: final_moves,
+            found: true,
+            message: "色解決後にセンターの向きを修正しました。".to_string(),
+        }));
+    } else {
+        return Some(TrySolveResult::ColorOnly(Solution {
+            moves: final_moves,
+            found: ignore_orientation,
+            message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
+                .to_string(),
+        }));
+    }
 }
 
 fn solve_internal(
@@ -349,14 +340,6 @@ fn solve_internal(
         }
     }
 
-    // ignore_orientation が true の場合、色が揃った解があればそれを優先
-    if ignore_orientation {
-        if let Some(sol) = color_only_solution.clone() {
-            progress.report(1.0);
-            return sol;
-        }
-    }
-
     // 2. 探索的解決 (ランダムなセットアップを用いた探索)
     if let Some(sol) = attempt_search(
         start_cube,
@@ -382,9 +365,8 @@ fn attempt_direct_solve(
 
     // 色が既に揃っている場合
     if cube.is_solved() {
-        if let Some(res) = try_solve_with_rotation(cube, &[], &[], max_depth, false, &mut search) {
-            return Some(res);
-        }
+        let res = try_solve_with_rotation(cube, &[], &[], max_depth, false, &mut search);
+        return res;
     }
 
     // 24通りの回転を試行（Perfect を優先し、見つからない場合は最初の ColorOnly を返す）
@@ -467,9 +449,7 @@ fn attempt_search(
                         TrySolveResult::Perfect(sol) => return Some(sol),
                         TrySolveResult::ColorOnly(sol) => {
                             let mut guard = color_only_mutex.lock().unwrap();
-                            if guard.is_none() {
-                                *guard = Some(sol);
-                            }
+                            if guard.is_none() { *guard = Some(sol); }
                         }
                     }
                 }

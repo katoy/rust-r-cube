@@ -1,4 +1,4 @@
-use rubiks_cube_3x3::cube::{Color, Cube, Move};
+use rubiks_cube_3x3::cube::{Color, Cube, Face, Move};
 use rubiks_cube_3x3::solver::get_orientations_vec;
 
 #[test]
@@ -232,4 +232,75 @@ fn test_permutation_parity_error_real() {
     let res = cube.is_valid_state();
     assert!(res.is_err());
     assert!(res.unwrap_err().to_string().contains("置換パリティが不正"));
+}
+
+#[test]
+fn test_is_solved_with_orientation_false() {
+    let mut cube = Cube::new();
+    cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+    cube.force_sync_orientation_to_pieces();
+    assert!(!cube.is_solved_with_orientation());
+}
+
+#[test]
+fn test_restore_orientation_invalid_centers() {
+    let mut cube = Cube::new();
+    // Uセンター(4; White) と Dセンター(13; Yellow) の色を入れ替える
+    // 全体の色数は正しいが、センターの位置関係が不正になる
+    cube.stickers[4].color = Color::Yellow;
+    cube.stickers[13].color = Color::White;
+    let res = cube.restore_orientation_instantly();
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("中心ピースの色配置が不正"));
+}
+
+#[test]
+fn test_restore_orientation_invalid_piece_color_combination() {
+    let mut cube = Cube::new();
+    // URエッジのU面(5; White) と FRエッジのF面(30; Red) のステッカー色を入れ替える。
+    // これにより全体のステッカー色数は正しく維持されるが、URエッジが Red-Red という物理的に存在しない色の組み合わせになる。
+    let c1 = cube.stickers[5].color;
+    let c2 = cube.stickers[30].color;
+    cube.stickers[5].color = c2;
+    cube.stickers[30].color = c1;
+    let res = cube.restore_orientation_instantly();
+    if let Err(ref e) = res {
+        println!("DEBUG_INVALID_PIECE_ERR: {:?}", e);
+    }
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("ピースが見つかりません"));
+}
+
+#[test]
+fn test_apply_orientation_solution() {
+    let mut cube = Cube::new();
+    let sol = rubiks_cube_3x3::solver::Solution {
+        moves: vec![],
+        found: true,
+        message: "".to_string(),
+    };
+    let res = cube.apply_orientation_solution(&sol);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_force_sync_orientation_invalid_val() {
+    let mut cube = Cube::new();
+    cube.stickers[4].orientation = 9; // 無効な向き
+    cube.force_sync_orientation_to_pieces();
+}
+
+#[test]
+#[should_panic(expected = "キューブ状態の同期エラー")]
+fn test_assert_stickers_synced_panic() {
+    let mut cube = Cube::new();
+    // sync_stickers を呼ばずにステッカーの色だけを書き換えて不整合を起こす
+    cube.stickers[0].color = Color::Gray;
+    cube.assert_stickers_synced();
+}
+
+#[test]
+fn test_cube_default() {
+    let cube = Cube::default();
+    assert!(cube.is_solved());
 }

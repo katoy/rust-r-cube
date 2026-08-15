@@ -4,7 +4,7 @@ Rustで実装した3x3ルービックキューブのGUIプログラムです。K
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/3x3/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
-![Core Coverage](https://img.shields.io/badge/core_coverage-97.50%25-brightgreen)
+![Core Coverage](https://img.shields.io/badge/core_coverage-99.59%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.80%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

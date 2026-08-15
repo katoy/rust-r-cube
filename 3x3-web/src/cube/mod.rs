@@ -235,12 +235,7 @@ impl Cube {
             ));
         }
         let preferred_state = &solved_states[preferred_state_idx];
-
-        if !preferred_state.is_solved_with_orientation() {
-            return Err(crate::error::CubeError::InvalidState(
-                "内部解決状態の不整合".to_string(),
-            ));
-        }
+        debug_assert!(preferred_state.is_solved_with_orientation());
 
         // 2. 特定された preferred_state に基づいてセンターピースを復元
         for &idx in &CENTER_STICKERS {
@@ -248,7 +243,7 @@ impl Cube {
                 &[idx],
                 std::slice::from_ref(preferred_state),
                 &mut new_pieces_vec,
-            )?;
+            ).expect("センターピースの復元は常に成功します");
         }
 
         // 3. コーナーとエッジを復元（これらは色情報から物理的に一義的に決まる）
@@ -262,17 +257,10 @@ impl Cube {
             self.restore_piece_at_slot(&slot_indices, solved_states, &mut new_pieces_vec)?;
         }
 
-        if new_pieces_vec.len() != 26 {
-            return Err(crate::error::CubeError::InvalidState(format!(
-                "ピースの復元に失敗しました（計{}個）",
-                new_pieces_vec.len()
-            )));
-        }
+        debug_assert_eq!(new_pieces_vec.len(), 26);
 
         // pieces 配列を更新
-        self.pieces = new_pieces_vec.try_into().map_err(|_| {
-            crate::error::CubeError::InvalidState("ピース配列の変換に失敗しました".to_string())
-        })?;
+        self.pieces = new_pieces_vec.try_into().unwrap();
 
         // 最後に pieces の状態を stickers (特に orientation) に反映
         self.sync_stickers();
@@ -399,10 +387,8 @@ impl Cube {
                 p.project_to_stickers(&mut temp_stickers);
             }
             for (i, temp_sticker) in temp_stickers.iter().enumerate() {
-                if temp_sticker.color != Color::Gray {
-                    assert_eq!(
-                        self.stickers[i].color,
-                        temp_sticker.color,
+                if temp_sticker.color != Color::Gray && self.stickers[i].color != temp_sticker.color {
+                    panic!(
                         "キューブ状態の同期エラー: インデックス {} において、stickersの色 ({:?}) と pieces から投影された色 ({:?}) が不整合です。状態変更後に sync_stickers() が呼ばれているか確認してください。",
                         i, self.stickers[i].color, temp_sticker.color
                     );

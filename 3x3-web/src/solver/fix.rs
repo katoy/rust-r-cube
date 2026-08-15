@@ -31,9 +31,6 @@ pub fn get_target_oris(cube: &Cube) -> Vec<u8> {
             return get_orientations_vec(s);
         }
     }
-    if std::env::var("SOLVER_DEBUG").is_ok() {
-        println!("DEBUG: get_target_oris: No match found! Falling back to Pattern 0.");
-    }
     vec![0, 0, 0, 0, 0, 0]
 }
 
@@ -49,14 +46,9 @@ pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
     let mut final_moves = Vec::new();
     let target_oris = get_target_oris(cube);
 
-    for iter in 0..12 {
+    for _ in 0..12 {
         let oris = get_orientations_vec(&current_cube);
-        if std::env::var("SOLVER_DEBUG").is_ok() {
-            println!(
-                "DEBUG: apply_supercube_fixes: iter={}, oris={:?}, target={:?}",
-                iter, oris, target_oris
-            );
-        }
+
         if oris == target_oris {
             break;
         }
@@ -106,31 +98,11 @@ pub fn apply_supercube_fixes(cube: &Cube, _search: &mut Search) -> Vec<Move> {
                 }
             }
         } else {
-            if std::env::var("SOLVER_DEBUG").is_ok() {
-                println!(
-                    "DEBUG: apply_supercube_fixes: breaking at iter {} with d90s.len={}",
-                    iter,
-                    d90s.len()
-                );
-            }
             break;
         };
 
-        if std::env::var("SOLVER_DEBUG").is_ok() {
-            let oris_before = get_orientations_vec(&current_cube);
-            for &m in &fix {
-                current_cube.apply_move(m);
-            }
-            println!(
-                "DEBUG: apply_supercube_fixes: applied fix of len {}. Oris: {:?} -> {:?}",
-                fix.len(),
-                oris_before,
-                get_orientations_vec(&current_cube)
-            );
-        } else {
-            for &m in &fix {
-                current_cube.apply_move(m);
-            }
+        for &m in &fix {
+            current_cube.apply_move(m);
         }
         final_moves.extend(fix);
     }
@@ -150,19 +122,17 @@ pub fn is_opposite_face(f1: Face, f2: Face) -> bool {
 }
 
 pub fn get_buffer_face(f1: Face, f2: Face) -> Face {
-    for &f in &[
+    [
         Face::Up,
         Face::Down,
         Face::Front,
         Face::Back,
         Face::Right,
         Face::Left,
-    ] {
-        if !is_opposite_face(f1, f) && !is_opposite_face(f2, f) && f != f1 && f != f2 {
-            return f;
-        }
-    }
-    Face::Up
+    ]
+    .into_iter()
+    .find(|&f| !is_opposite_face(f1, f) && !is_opposite_face(f2, f) && f != f1 && f != f2)
+    .unwrap_or(Face::Up)
 }
 
 fn get_fix_180(face: Face) -> Vec<Move> {
@@ -206,24 +176,20 @@ fn get_fix_90_pair(f_cw: Face, f_ccw: Face) -> Vec<Move> {
 }
 
 pub fn get_setup_to_up(face: Face) -> Vec<Move> {
-    for rot in get_all_rotations() {
-        let result_face = apply_rot_to_face(face, &rot);
-        if result_face == Face::Up {
-            return rot.to_vec();
-        }
-    }
-    vec![]
+    get_all_rotations()
+        .into_iter()
+        .find(|rot| apply_rot_to_face(face, rot) == Face::Up)
+        .unwrap_or_default()
 }
 
 pub fn get_setup_to_up_right(f_up: Face, f_right: Face) -> Vec<Move> {
-    for rot in get_all_rotations() {
-        if apply_rot_to_face(f_up, &rot) == Face::Up
-            && apply_rot_to_face(f_right, &rot) == Face::Right
-        {
-            return rot.to_vec();
-        }
-    }
-    vec![]
+    get_all_rotations()
+        .into_iter()
+        .find(|rot| {
+            apply_rot_to_face(f_up, rot) == Face::Up
+                && apply_rot_to_face(f_right, rot) == Face::Right
+        })
+        .unwrap_or_default()
 }
 
 pub fn apply_rot_to_face(face: Face, rot: &[Move]) -> Face {
@@ -276,28 +242,25 @@ fn move_to_geometric_params_for_rot(mv: Move) -> (Vec3, i8, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kociemba::Search;
 
     #[test]
     fn test_get_target_oris_fallback() {
-        std::env::set_var("SOLVER_DEBUG", "1");
         let mut cube = Cube::new();
-        cube.stickers[0].color = crate::cube::Color::Gray;
+        cube.stickers[4].color = crate::cube::Color::Gray; // センター(4)を Gray にしてマッチを失敗させる
         let oris = get_target_oris(&cube);
         assert_eq!(oris, vec![0, 0, 0, 0, 0, 0]);
-        std::env::remove_var("SOLVER_DEBUG");
     }
 
     #[test]
     fn test_apply_supercube_fixes_impossible_break() {
-        std::env::set_var("SOLVER_DEBUG", "1");
         let mut cube = Cube::new();
-        cube.stickers[Face::Up.start_index() + 4].orientation = 1;
+        cube.stickers[Face::Up.start_index() + 4].orientation = 1; // 奇数パリティを仕込んで break に到達させる
         cube.force_sync_orientation_to_pieces();
-        let fixes = apply_supercube_fixes(&cube, &mut Search::new());
+        let fixes = apply_supercube_fixes(&cube, &mut crate::kociemba::Search::new());
         assert!(fixes.is_empty());
-        std::env::remove_var("SOLVER_DEBUG");
     }
+
+
 
 
     #[test]

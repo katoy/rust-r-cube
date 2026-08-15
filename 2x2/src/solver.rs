@@ -9,8 +9,8 @@ pub const DEFAULT_MAX_DEPTH: usize = 11;
 const PROGRESS_UPDATE_INTERVAL: usize = 4;
 const ESTIMATED_STATES_MAX: usize = 1_000_000;
 
-/// BFS探索で使用する状態マップ: 状態 → (その状態に到達した操作, 親の状態)
-type StateMap = FxHashMap<Cube, (Option<Move>, Option<Cube>)>;
+/// BFS探索で使用する状態マップ: 状態 → その状態に到達した操作（根はNone）
+type StateMap = FxHashMap<Cube, Option<Move>>;
 
 /// BFS探索で使用する状態キュー
 type StateQueue = VecDeque<Cube>;
@@ -208,7 +208,6 @@ fn solve_internal(
     let total_depth = forward_depth + backward_depth;
 
     // --- 順方向探索 ---
-    // forward_depthは最大11なのu32へのキャストは安全
     #[allow(clippy::cast_possible_truncation)]
     let estimated_states = all_moves
         .len()
@@ -224,7 +223,7 @@ fn solve_internal(
         start_cube.clone()
     };
     forward_queue.push_back(start_key.clone());
-    forward_dist.insert(start_key, (None, None));
+    forward_dist.insert(start_key, None);
 
     let mut current_depth = 0;
     while current_depth < forward_depth {
@@ -235,7 +234,6 @@ fn solve_internal(
         // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
-                // current_depthとtotal_depthは最大11程度なのf32で十分
                 #[allow(clippy::cast_precision_loss)]
                 let progress = (current_depth as f32) / (total_depth as f32);
                 let _ = tx.send(progress);
@@ -252,7 +250,6 @@ fn solve_internal(
     }
 
     // --- 逆方向探索 ---
-    // backward_depthは最大11なのu32へのキャストは安全
     #[allow(clippy::cast_possible_truncation)]
     let estimated_backward_states = all_moves
         .len()
@@ -274,11 +271,11 @@ fn solve_internal(
                     let _ = tx.send(1.0);
                 }
                 return Solution {
-                    moves: reconstruct_path_forward(&forward_dist, &s_key),
+                    moves: reconstruct_path_forward(&forward_dist, &s_key, ignore_orientation),
                     found: true,
                 };
             }
-            backward_map.insert(s_key.clone(), (None, None));
+            backward_map.insert(s_key.clone(), None);
             backward_queue.push_back(s_key);
         }
     }
@@ -288,7 +285,6 @@ fn solve_internal(
         // 進捗送信
         if let Some(ref tx) = progress_tx {
             if current_depth % PROGRESS_UPDATE_INTERVAL == 0 {
-                // forward_depthとcurrent_depthは最大11程度なのf32で十分
                 #[allow(clippy::cast_precision_loss)]
                 let progress = (forward_depth + current_depth) as f32 / (total_depth as f32);
                 let _ = tx.send(progress);
@@ -298,8 +294,8 @@ fn solve_internal(
         // 衝突判定
         for curr in &backward_queue {
             if forward_dist.contains_key(curr) {
-                let mut moves = reconstruct_path_forward(&forward_dist, curr);
-                let rev_moves = reconstruct_path_backward(&backward_map, curr);
+                let mut moves = reconstruct_path_forward(&forward_dist, curr, ignore_orientation);
+                let rev_moves = reconstruct_path_backward(&backward_map, curr, ignore_orientation);
                 moves.extend(rev_moves);
                 if let Some(ref tx) = progress_tx {
                     let _ = tx.send(1.0);
@@ -344,16 +340,16 @@ fn expand_layer(
     let current_nodes: Vec<Cube> = queue.drain(..).collect();
 
     // 並列に次の層を生成
-    type SearchEntry = (Cube, (Option<Move>, Option<Cube>));
-    let next_entries: Vec<Vec<SearchEntry>> = current_nodes
+    type SearchEntry = (Cube, Option<Move>);
+    let next_entries: Vec<SearchEntry> = current_nodes
         .par_iter()
-        .map(|curr| {
-            let mut results = Vec::new();
-            for &mv in all_moves {
+        .flat_map_iter(|curr| {
+            let last_mv = dist.get(curr).and_then(|&m| m);
+            all_moves.iter().filter_map(move |&mv| {
                 // 枝刈り：直前の逆操作を回避
-                if let Some(&(Some(last_mv), _)) = dist.get(curr) {
-                    if last_mv == mv.inverse() {
-                        continue;
+                if let Some(last) = last_mv {
+                    if last == mv.inverse() {
+                        return None;
                     }
                 }
 
@@ -365,32 +361,34 @@ fn expand_layer(
                     next
                 };
 
-                // ここではまだ dist に追加せず、候補として保持
-                results.push((next_key, (Some(mv), Some(curr.clone()))));
-            }
-            results
+                Some((next_key, Some(mv)))
+            })
         })
         .collect();
 
     // 生成されたエントリを逐次的に dist に追加
     // (重複チェックが必要なため、ここからはメインスレッドで実行)
-    for results in next_entries {
-        for (next_key, val) in results {
-            if !dist.contains_key(&next_key) {
-                dist.insert(next_key.clone(), val);
-                queue.push_back(next_key);
-            }
+    for (next_key, val) in next_entries {
+        if !dist.contains_key(&next_key) {
+            dist.insert(next_key.clone(), val);
+            queue.push_back(next_key);
         }
     }
 }
 
-fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {
+fn reconstruct_path_forward(dist: &StateMap, target: &Cube, ignore_orientation: bool) -> Vec<Move> {
     let mut path = Vec::new();
-    let mut curr = target;
-    while let Some(&(maybe_mv, ref parent_opt)) = dist.get(curr) {
-        if let (Some(mv), Some(ref p)) = (maybe_mv, parent_opt) {
+    let mut curr = target.clone();
+    while let Some(&maybe_mv) = dist.get(&curr) {
+        if let Some(mv) = maybe_mv {
             path.push(mv);
-            curr = p;
+            let mut parent = curr;
+            parent.apply_move(mv.inverse());
+            curr = if ignore_orientation {
+                parent.normalized()
+            } else {
+                parent
+            };
         } else {
             break;
         }
@@ -399,13 +397,23 @@ fn reconstruct_path_forward(dist: &StateMap, target: &Cube) -> Vec<Move> {
     path
 }
 
-fn reconstruct_path_backward(dist: &StateMap, target: &Cube) -> Vec<Move> {
+fn reconstruct_path_backward(
+    dist: &StateMap,
+    target: &Cube,
+    ignore_orientation: bool,
+) -> Vec<Move> {
     let mut path = Vec::new();
-    let mut curr = target;
-    while let Some(&(maybe_mv, ref parent_opt)) = dist.get(curr) {
-        if let (Some(mv), Some(ref p)) = (maybe_mv, parent_opt) {
+    let mut curr = target.clone();
+    while let Some(&maybe_mv) = dist.get(&curr) {
+        if let Some(mv) = maybe_mv {
             path.push(mv.inverse());
-            curr = p;
+            let mut parent = curr;
+            parent.apply_move(mv.inverse());
+            curr = if ignore_orientation {
+                parent.normalized()
+            } else {
+                parent
+            };
         } else {
             break;
         }

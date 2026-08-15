@@ -391,3 +391,37 @@ fn test_coverage_gap_solver_not_found_with_progress() {
     let progress: Vec<f32> = rx.into_iter().collect();
     assert!(progress.contains(&1.0));
 }
+
+#[test]
+fn test_check_corner_parity_invalid_corner_color_gray() {
+    let mut cube = Cube::new();
+    // UFL [2, 9, 16] を対面色にならず、かつ白・黄を含まない組み合わせ [Red, Green, Gray] にする。
+    cube.stickers[2].color = Color::Red;
+    cube.stickers[9].color = Color::Green;
+    cube.stickers[16].color = Color::Gray;
+
+    // validation::check_corner_parity を直接呼び出すことで、
+    // 前段の is_valid_state() 内の validate_colors() (色数チェック) でエラーにならずに、
+    // 不正なコーナー色の判定（pos_opt = None）へ到達させます。
+    let result = rubiks_cube_2x2::cube::validation::check_corner_parity(&cube);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_coverage_gap_solver_forward_queue_empty_real() {
+    // ほとんどの色が Gray で、1つだけが Red のキューブを作成する。
+    // これにより is_solved() = false になり、かつ向き無視 (ignore_orientation = true) での
+    // 状態空間のサイズが最大 24 個（Redステッカーの位置）に制限されます。
+    let mut cube = Cube::new();
+    for sticker in &mut cube.stickers {
+        sticker.color = Color::Gray;
+        sticker.orientation = 0;
+    }
+    cube.stickers[0].color = Color::Red; // 1つだけRedにする
+
+    // 向き無視 (true), 最大深度 10 (forward_depth = 5) で探索。
+    // 状態空間が非常に小さいため、すぐに全探索が完了してキューが空になり、
+    // queue.is_empty() による break が確実に走ります。
+    let sol = solver::solve(&cube, 10, true);
+    assert!(!sol.found);
+}

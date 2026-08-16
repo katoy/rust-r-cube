@@ -297,7 +297,7 @@ pub fn draw_cube_3d(
             painter.add(egui::Shape::convex_polygon(
                 face.points.clone(),
                 face.color,
-                Stroke::new(1.0, Color32::BLACK), // 枠線
+                Stroke::new(1.0_f32, Color32::BLACK), // 枠線
             ));
 
             // 編集中の面をハイライト表示
@@ -310,7 +310,7 @@ pub fn draw_cube_3d(
                     painter.add(egui::Shape::convex_polygon(
                         face.points.clone(),
                         Color32::TRANSPARENT,
-                        Stroke::new(3.0, Color32::from_rgb(255, 140, 0)),
+                        Stroke::new(3.0_f32, Color32::from_rgb(255, 140, 0)),
                     ));
                 }
             }

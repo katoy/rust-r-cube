@@ -402,6 +402,9 @@ fn test_solve_attempt_search_color_only() {
     let sol = solve(&cube, 3, false);
     println!("DEBUG_ATTEMPT_SEARCH_SOL: sol = {:?}", sol);
     assert!(!sol.found);
-    assert!(sol.message.contains("探索深度を超えます") || sol.message.contains("解が見つかりませんでした"));
+    assert!(
+        sol.message.contains("探索深度を超えます")
+            || sol.message.contains("解が見つかりませんでした")
+    );
     std::env::remove_var("SOLVER_DEBUG");
 }

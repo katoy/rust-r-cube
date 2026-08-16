@@ -77,10 +77,30 @@ impl PruningTable {
         static TABLE: OnceLock<PruningTable> = OnceLock::new();
         let move_table = MoveTable::get();
         TABLE.get_or_init(|| {
-            let (twist_class, twist_sym, twist_self_sym, flip_class, flip_sym, flip_self_sym, ud_slice_x2) = generate_x2_maps();
+            let (
+                twist_class,
+                twist_sym,
+                twist_self_sym,
+                flip_class,
+                flip_sym,
+                flip_self_sym,
+                ud_slice_x2,
+            ) = generate_x2_maps();
             PruningTable {
-                twist_slice: generate_twist_slice_pruning_table(move_table, &twist_class, &twist_sym, &twist_self_sym, &ud_slice_x2),
-                flip_slice: generate_flip_slice_pruning_table(move_table, &flip_class, &flip_sym, &flip_self_sym, &ud_slice_x2),
+                twist_slice: generate_twist_slice_pruning_table(
+                    move_table,
+                    &twist_class,
+                    &twist_sym,
+                    &twist_self_sym,
+                    &ud_slice_x2,
+                ),
+                flip_slice: generate_flip_slice_pruning_table(
+                    move_table,
+                    &flip_class,
+                    &flip_sym,
+                    &flip_self_sym,
+                    &ud_slice_x2,
+                ),
                 cp_slice: generate_cp_slice_pruning_table(move_table),
                 ep8_slice: generate_ep8_slice_pruning_table(move_table),
                 twist_class,
@@ -546,24 +566,64 @@ mod tests {
     #[test]
     fn test_pruning_tables_unreachable_break() {
         let mt = MoveTable {
-            twist: vec![[0u16; 18]; 2187].into_boxed_slice().try_into().unwrap(),
-            flip: vec![[0u16; 18]; 2048].into_boxed_slice().try_into().unwrap(),
+            twist: vec![[0u16; 18]; 2187]
+                .into_boxed_slice()
+                .try_into()
+                .unwrap(),
+            flip: vec![[0u16; 18]; 2048]
+                .into_boxed_slice()
+                .try_into()
+                .unwrap(),
             ud_slice: vec![[0u16; 18]; 495].into_boxed_slice().try_into().unwrap(),
-            cp: vec![[0u16; 18]; 40320].into_boxed_slice().try_into().unwrap(),
-            ep8: vec![[0u16; 18]; 40320].into_boxed_slice().try_into().unwrap(),
+            cp: vec![[0u16; 18]; 40320]
+                .into_boxed_slice()
+                .try_into()
+                .unwrap(),
+            ep8: vec![[0u16; 18]; 40320]
+                .into_boxed_slice()
+                .try_into()
+                .unwrap(),
             slice_p: vec![[0u16; 18]; 24].into_boxed_slice().try_into().unwrap(),
         };
 
-        let (twist_class, twist_sym, twist_self_sym, flip_class, flip_sym, flip_self_sym, ud_slice_x2) = generate_x2_maps();
-        let _ = generate_twist_slice_pruning_table(&mt, &twist_class, &twist_sym, &twist_self_sym, &ud_slice_x2);
-        let _ = generate_flip_slice_pruning_table(&mt, &flip_class, &flip_sym, &flip_self_sym, &ud_slice_x2);
+        let (
+            twist_class,
+            twist_sym,
+            twist_self_sym,
+            flip_class,
+            flip_sym,
+            flip_self_sym,
+            ud_slice_x2,
+        ) = generate_x2_maps();
+        let _ = generate_twist_slice_pruning_table(
+            &mt,
+            &twist_class,
+            &twist_sym,
+            &twist_self_sym,
+            &ud_slice_x2,
+        );
+        let _ = generate_flip_slice_pruning_table(
+            &mt,
+            &flip_class,
+            &flip_sym,
+            &flip_self_sym,
+            &ud_slice_x2,
+        );
         let _ = generate_cp_slice_pruning_table(&mt);
         let _ = generate_ep8_slice_pruning_table(&mt);
     }
 
     #[test]
     fn test_x2_symmetry_maps() {
-        let (twist_class, _twist_sym, _twist_self_sym, flip_class, _flip_sym, _flip_self_sym, _ud_slice_x2) = generate_x2_maps();
+        let (
+            twist_class,
+            _twist_sym,
+            _twist_self_sym,
+            flip_class,
+            _flip_sym,
+            _flip_self_sym,
+            _ud_slice_x2,
+        ) = generate_x2_maps();
         let max_twist_class = twist_class.iter().max().unwrap();
         assert_eq!(*max_twist_class, 1106);
 
@@ -575,7 +635,7 @@ mod tests {
     fn test_pruning_table_symmetry_getters() {
         let pruning = PruningTable::get();
         let (_, _, _, _, _, _, ud_slice_x2) = generate_x2_maps();
-        
+
         for t in 0..2187 {
             let mut rc = RawCube::default();
             rc.set_twist(t as u16);
@@ -583,19 +643,45 @@ mod tests {
                 use crate::kociemba::coord::Corner;
                 use crate::kociemba::coord::Edge;
                 let x2_cube = RawCube {
-                    cp: [Corner::DBL, Corner::DRB, Corner::DFR, Corner::DLF, Corner::ULB, Corner::UBR, Corner::UFR, Corner::UFL],
+                    cp: [
+                        Corner::DBL,
+                        Corner::DRB,
+                        Corner::DFR,
+                        Corner::DLF,
+                        Corner::ULB,
+                        Corner::UBR,
+                        Corner::UFR,
+                        Corner::UFL,
+                    ],
                     co: [0, 0, 0, 0, 0, 0, 0, 0],
-                    ep: [Edge::DL, Edge::DB, Edge::DR, Edge::DF, Edge::UL, Edge::UB, Edge::UR, Edge::UF, Edge::BL, Edge::BR, Edge::FR, Edge::FL],
+                    ep: [
+                        Edge::DL,
+                        Edge::DB,
+                        Edge::DR,
+                        Edge::DF,
+                        Edge::UL,
+                        Edge::UB,
+                        Edge::UR,
+                        Edge::UF,
+                        Edge::BL,
+                        Edge::BR,
+                        Edge::FR,
+                        Edge::FL,
+                    ],
                     eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 };
                 rc.multiply(&x2_cube).get_twist() as usize
             };
-            
+
             for s in [0, 100, 200, 300, 494] {
                 let d1 = pruning.get_twist_slice(t, s);
                 let sym_s = ud_slice_x2[s] as usize;
                 let d2 = pruning.get_twist_slice(sym_t, sym_s);
-                assert_eq!(d1, d2, "twist={} と sym_twist={} (slice={}, sym_slice={}) で距離が一致しません", t, sym_t, s, sym_s);
+                assert_eq!(
+                    d1, d2,
+                    "twist={} と sym_twist={} (slice={}, sym_slice={}) で距離が一致しません",
+                    t, sym_t, s, sym_s
+                );
             }
         }
     }

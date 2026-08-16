@@ -246,7 +246,10 @@ pub fn try_solve_with_rotation(
         return Some(TrySolveResult::ColorOnly(Solution {
             moves: moves.clone(),
             found: false,
-            message: format!("方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。", sum),
+            message: format!(
+                "方位パリティが異常(sum={})なため、解決できません。物理的に不可能な状態です。",
+                sum
+            ),
         }));
     }
 
@@ -292,8 +295,7 @@ pub fn try_solve_with_rotation(
         Some(TrySolveResult::ColorOnly(Solution {
             moves: final_moves,
             found: ignore_orientation,
-            message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。"
-                .to_string(),
+            message: "色は揃いましたが、向きの修正を含めると探索深度を超えます。".to_string(),
         }))
     }
 }
@@ -449,7 +451,9 @@ fn attempt_search(
                         TrySolveResult::Perfect(sol) => return Some(sol),
                         TrySolveResult::ColorOnly(sol) => {
                             let mut guard = color_only_mutex.lock().unwrap();
-                            if guard.is_none() { *guard = Some(sol); }
+                            if guard.is_none() {
+                                *guard = Some(sol);
+                            }
                         }
                     }
                 }

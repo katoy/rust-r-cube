@@ -243,7 +243,8 @@ impl Cube {
                 &[idx],
                 std::slice::from_ref(preferred_state),
                 &mut new_pieces_vec,
-            ).expect("センターピースの復元は常に成功します");
+            )
+            .expect("センターピースの復元は常に成功します");
         }
 
         // 3. コーナーとエッジを復元（これらは色情報から物理的に一義的に決まる）
@@ -387,7 +388,8 @@ impl Cube {
                 p.project_to_stickers(&mut temp_stickers);
             }
             for (i, temp_sticker) in temp_stickers.iter().enumerate() {
-                if temp_sticker.color != Color::Gray && self.stickers[i].color != temp_sticker.color {
+                if temp_sticker.color != Color::Gray && self.stickers[i].color != temp_sticker.color
+                {
                     panic!(
                         "キューブ状態の同期エラー: インデックス {} において、stickersの色 ({:?}) と pieces から投影された色 ({:?}) が不整合です。状態変更後に sync_stickers() が呼ばれているか確認してください。",
                         i, self.stickers[i].color, temp_sticker.color

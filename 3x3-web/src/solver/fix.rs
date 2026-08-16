@@ -260,9 +260,6 @@ mod tests {
         assert!(fixes.is_empty());
     }
 
-
-
-
     #[test]
     fn test_apply_rot_to_face_unsupported_move() {
         let face = apply_rot_to_face(Face::Up, &[Move::R]);

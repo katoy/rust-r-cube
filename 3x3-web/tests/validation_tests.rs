@@ -201,7 +201,10 @@ fn test_corner_duplicate_error_real() {
 
     let res = rubiks_cube_3x3::cube::validation::check_corner_parity(&cube);
     assert!(res.is_err());
-    assert!(res.unwrap_err().to_string().contains("コーナーピースの重複"));
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("コーナーピースの重複"));
 }
 
 #[test]
@@ -251,7 +254,10 @@ fn test_restore_orientation_invalid_centers() {
     cube.stickers[13].color = Color::White;
     let res = cube.restore_orientation_instantly();
     assert!(res.is_err());
-    assert!(res.unwrap_err().to_string().contains("中心ピースの色配置が不正"));
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("中心ピースの色配置が不正"));
 }
 
 #[test]
@@ -268,7 +274,10 @@ fn test_restore_orientation_invalid_piece_color_combination() {
         println!("DEBUG_INVALID_PIECE_ERR: {:?}", e);
     }
     assert!(res.is_err());
-    assert!(res.unwrap_err().to_string().contains("ピースが見つかりません"));
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("ピースが見つかりません"));
 }
 
 #[test]

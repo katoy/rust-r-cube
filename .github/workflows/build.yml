@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache Cargo registry and git index
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: cargo-registry
         with:
           path: |
@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Cache sccache binary
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: sccache-bin
         with:
           path: ~/.cargo/bin
@@ -38,7 +38,7 @@ jobs:
             ${{ runner.os }}-sccache-bin-
 
       - name: Cache sccache state
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: sccache-cache
         with:
           path: |
@@ -48,7 +48,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Cache target directory
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: cargo-target
         with:
           path: target

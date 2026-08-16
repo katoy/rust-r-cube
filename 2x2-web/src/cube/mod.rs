@@ -280,3 +280,6 @@ impl Default for Cube {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests_coverage;

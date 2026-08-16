@@ -1,6 +1,6 @@
 # 2x2 ルービックキューブ
 
-Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速な双方向BFSソルバー機能を搭載しています。
+Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速なパターンデータベース（枝刈りテーブル）と IDA* ソルバー機能を搭載しています。
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
 ![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
@@ -73,8 +73,8 @@ trunk build --release
 - **スクランブル**: キューブをランダムに5〜10手混ぜます
 - **リセット**: キューブを初期状態（完成状態）に戻します
 - **解决設定**:
-  - **向き無視**: 各面の色さえ揃えば完成とみなします (最大深度: 11)
-  - **向きも揃える**: 色に加えて、ステッカーの矢印まで全て初期状態に揃えます (最大深度: 11)
+  - **向き無視**: 各面の色さえ揃えば完成とみなします (最大深度: 14)
+  - **向きも揃える**: 色に加えて、ステッカーの矢印まで全て初期状態に揃えます (最大深度: 14)
 
 - **解法を探す**: 現在の状態から最短解を探索します
 
@@ -131,7 +131,7 @@ graph TB
 
     subgraph "🧩 コアロジック"
         CORE1[cube/mod.rs<br/>キューブ状態管理]
-        CORE2[solver/mod.rs<br/>二方向探索]
+        CORE2[solver/mod.rs<br/>IDA* / 枝刈りテーブル探索]
         CORE3[history.rs<br/>Undo/Redo]
         CORE4[statistics.rs<br/>統計情報]
     end

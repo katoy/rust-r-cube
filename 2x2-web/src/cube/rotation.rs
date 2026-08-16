@@ -1,4 +1,5 @@
-use super::{Cube, Move};
+use super::{Color, Cube, Move};
+use std::sync::OnceLock;
 
 struct MoveData {
     face_idx: usize,
@@ -64,34 +65,7 @@ const MOVE_DATA_TABLE: [(Move, MoveData); 6] = [
     ),
 ];
 
-/// 指定された回転操作をキューブに適用します。
-///
-/// この関数は2x2ルービックキューブの6つの面（U, D, L, R, F, B）に対する
-/// 回転操作を実行します。90度回転、逆回転（90度反時計回り）、
-/// 180度回転の3種類がサポートされています。
-///
-/// # 引数
-///
-/// - `cube` - 操作対象のキューブへの可変参照
-/// - `mv` - 実行する回転操作（Move enum）
-///
-/// # 例
-///
-/// ```
-/// use rubiks_cube_2x2::cube::{Cube, Move};
-/// use rubiks_cube_2x2::cube::rotation::apply_move;
-///
-/// let mut cube = Cube::new();
-/// apply_move(&mut cube, Move::R);  // R面を90度時計回り
-/// apply_move(&mut cube, Move::Up); // U面を90度反時計回り
-/// ```
-///
-/// # 実装詳細
-///
-/// - 90度回転（R, L, U, D, F, B）: 基本回転を1回実行
-/// - 180度回転（R2, L2, U2, D2, F2, B2）: 基本回転を2回実行
-/// - 逆回転（Rp, Lp, Up, Dp, Fp, Bp）: 基本回転を3回実行
-pub fn apply_move(cube: &mut Cube, mv: Move) {
+fn apply_move_slow(cube: &mut Cube, mv: Move) {
     let base_move = match mv {
         Move::U | Move::Up | Move::U2 => Move::U,
         Move::D | Move::Dp | Move::D2 => Move::D,
@@ -152,6 +126,91 @@ fn rotate_internal(cube: &mut Cube, face: usize, od: u8, cycle: &[usize; 8], rot
         for _ in 0..rot[i] {
             cube.stickers[cycle[i]].rotate_cw();
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct MoveMapping {
+    source_indices: [u8; 24],
+    orientation_deltas: [u8; 24],
+}
+
+static MOVE_MAPPINGS: OnceLock<[MoveMapping; 18]> = OnceLock::new();
+
+fn generate_move_mappings() -> [MoveMapping; 18] {
+    let all_moves = Move::all_moves();
+    let mut mappings = [MoveMapping {
+        source_indices: [0; 24],
+        orientation_deltas: [0; 24],
+    }; 18];
+
+    for &mv in &all_moves {
+        let mv_idx = mv as usize;
+        let mut source_indices = [0u8; 24];
+        let mut orientation_deltas = [0u8; 24];
+
+        for i in 0..24 {
+            let mut test_cube = Cube::new();
+            for s in &mut test_cube.stickers {
+                s.color = Color::White;
+                s.orientation = 0;
+            }
+            test_cube.stickers[i].color = Color::Gray;
+
+            apply_move_slow(&mut test_cube, mv);
+
+            let mut dest_idx = 0;
+            for (d, s) in test_cube.stickers.iter().enumerate() {
+                if s.color == Color::Gray {
+                    dest_idx = d;
+                    break;
+                }
+            }
+
+            source_indices[dest_idx] = i as u8;
+            orientation_deltas[dest_idx] = test_cube.stickers[dest_idx].orientation;
+        }
+
+        mappings[mv_idx] = MoveMapping {
+            source_indices,
+            orientation_deltas,
+        };
+    }
+
+    mappings
+}
+
+/// 指定された回転操作をキューブに適用します。
+///
+/// この関数は2x2ルービックキューブの6つの面（U, D, L, R, F, B）に対する
+/// 回転操作を実行します。90度回転、逆回転（90度反時計回り）、
+/// 180度回転の3種類がサポートされています。
+///
+/// # 引数
+///
+/// - `cube` - 操作対象のキューブへの可変参照
+/// - `mv` - 実行する回転操作（Move enum）
+///
+/// # 例
+///
+/// ```
+/// use rubiks_cube_2x2::cube::{Cube, Move};
+/// use rubiks_cube_2x2::cube::rotation::apply_move;
+///
+/// let mut cube = Cube::new();
+/// apply_move(&mut cube, Move::R);  // R面を90度時計回り
+/// apply_move(&mut cube, Move::Up); // U面を90度反時計回り
+/// ```
+pub fn apply_move(cube: &mut Cube, mv: Move) {
+    let mappings = MOVE_MAPPINGS.get_or_init(generate_move_mappings);
+    let mapping = &mappings[mv as usize];
+
+    let old_stickers = cube.stickers;
+    for i in 0..24 {
+        let src = mapping.source_indices[i] as usize;
+        let mut sticker = old_stickers[src];
+        sticker.orientation = (sticker.orientation + mapping.orientation_deltas[i]) % 4;
+        cube.stickers[i] = sticker;
     }
 }
 

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+  "description": "完成状態。すべてのステッカーが正しい位置にあります。",
+  "scramble": "",
+  "solution_moves": [],
+  "solution_length": 0,
+  "notes": "キューブ状態の基準。ソルバーのテストに使用されます。"
+}

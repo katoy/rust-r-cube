@@ -10,7 +10,7 @@ fn main() {
     let mut lengths = Vec::new();
     for seed in 1..=1000 {
         let state = cube::facelets(&cube::apply(&RawCube::default(), &cube::scramble(seed)));
-        let result = solve_state(&state, 5000).expect("must solve");
+        let result = solve_state(&state, 5000, true).expect("must solve");
         times.push(result.elapsed_ms);
         lengths.push(result.moves.len());
     }

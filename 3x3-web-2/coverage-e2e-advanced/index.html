@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced E2E Coverage Report</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    h1 { color: #333; border-bottom: 3px solid #007acc; padding-bottom: 10px; }
+    h2 { color: #555; margin-top: 30px; }
+    .metric {
+      display: inline-block;
+      background: #f0f4f8;
+      padding: 15px 20px;
+      margin: 10px 10px 10px 0;
+      border-radius: 5px;
+      border-left: 4px solid #007acc;
+    }
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #007acc;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      margin-top: 5px;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #333; color: white; font-weight: bold; }
+    tr:hover { background: #f5f5f5; }
+    .timing { color: #28a745; font-weight: bold; }
+    .summary { background: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }
+    .error { color: #dc3545; }
+    .warning { color: #ffc107; }
+    .info { color: #17a2b8; }
+    .success { color: #28a745; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Advanced E2E Coverage Report</h1>
+
+  <div class="summary">
+    <h2>📊 テスト概要</h2>
+    <p><strong>テスト日時:</strong> 2026/9/12 13:03:51</p>
+    <p><strong>ページURL:</strong> http://127.0.0.1:5173/</p>
+    <p><strong>計測方法:</strong> UI 操作ベースの WASM 呼び出し追跡</p>
+  </div>
+
+  <h2>📈 パフォーマンス指標</h2>
+  <div>
+    <div class="metric">
+      <div class="metric-value">5</div>
+      <div class="metric-label">実行操作数</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value">2979ms</div>
+      <div class="metric-label">総実行時間</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value">596ms</div>
+      <div class="metric-label">平均実行時間</div>
+    </div>
+  </div>
+
+  <h2>📋 操作ログ</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>操作</th>
+        <th>実行時間</th>
+        <th>開始時刻</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td><strong>page_load</strong></td>
+          <td class="timing">1322ms</td>
+          <td>13:03:48</td>
+        </tr>
+      
+        <tr>
+          <td><strong>scramble</strong></td>
+          <td class="timing">350ms</td>
+          <td>13:03:49</td>
+        </tr>
+      
+        <tr>
+          <td><strong>solve</strong></td>
+          <td class="timing">280ms</td>
+          <td>13:03:50</td>
+        </tr>
+      
+        <tr>
+          <td><strong>playback</strong></td>
+          <td class="timing">676ms</td>
+          <td>13:03:50</td>
+        </tr>
+      
+        <tr>
+          <td><strong>reset</strong></td>
+          <td class="timing">351ms</td>
+          <td>13:03:51</td>
+        </tr>
+      
+    </tbody>
+  </table>
+
+  <h2>📝 コンソールログ</h2>
+  <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">
+    <pre style="margin: 0; font-family: 'Monaco', monospace; font-size: 12px;">
+[DEBUG] [vite] connecting...
+[DEBUG] [vite] connected.
+[WARNING] [.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due
+[WARNING] [.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due
+[WARNING] [.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due
+[WARNING] [.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due
+      </pre>
+  </div>
+
+  <h2>✅ テスト完了</h2>
+  <p class="success">すべての操作が正常に完了しました。</p>
+</body>
+</html>
+  

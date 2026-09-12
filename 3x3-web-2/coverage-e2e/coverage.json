@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-09-12T04:03:44.883Z",
+  "method": "Browser DevTools Protocol (CDP)",
+  "files": [],
+  "wasmCallLog": [
+    "initialize (via app startup)",
+    "scramble (via UI button)",
+    "solve (via UI button)",
+    "apply_moves (via solution playback)"
+  ]
+}

@@ -4,4 +4,5 @@
 /pkg/
 /test-results/
 /playwright-report/
+/benchmark-results/
 .DS_Store

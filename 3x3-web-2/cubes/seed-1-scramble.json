@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "state": null,
+  "description": "シード値 1 で生成されたランダムスクランブル。WASM の scramble(1) 関数で生成される擬似乱数ベースのスクランブルです。",
+  "scramble_seed": 1,
+  "scramble": null,
+  "solution_moves": null,
+  "solution_length": null,
+  "notes": "WASM の scramble() 関数はシード値に基づいた決定的なランダムスクランブルを生成します。同じシード値なら同じスクランブルが得られます。",
+  "generation_method": "wasm.scramble(1) を実行して生成",
+  "use_case": "テスト、ベンチマーク、デバッグ（再現可能な結果）"
+}

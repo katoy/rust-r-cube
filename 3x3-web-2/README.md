@@ -7,16 +7,38 @@ Rustで解き、3Dでたどる、ブラウザ完結の3×3ルービックキュ�
 
 必要環境：Rust（動作確認 1.93）、`wasm32-unknown-unknown`、wasm-pack、Node.js（22.12以上）、npm。
 
+初回のみ環境のセットアップが必要です：
+
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-pack --locked
+```
+
+### スクリプトで起動（推奨）
+
+起動スクリプトを実行すると、依存パッケージ（`node_modules`）や WASM（`pkg/`）の存在を確認・必要に応じて自動ビルドし、開発サーバーを起動します。
+
+```sh
+./start.sh
+# または
+npm start
+```
+
+オプション：
+- `./start.sh -b`（または `--build`）：WASM を強制再ビルドしてから起動
+- `./start.sh -p`（または `--preview`）：プロダクション用にビルドしてプレビューサーバーを起動
+- `./start.sh -h`（または `--help`）：使い方の確認
+
+### 手動での起動手順
+
+```sh
 npm ci
 npm run wasm
 npm run dev
 ```
 
 表示されたローカルURLを開いてください。通常は http://127.0.0.1:5173 です。
-Rustを変更した場合は `npm run wasm` を再実行します。初回だけビルド用ツールの取得が必要です。
+Rustを変更した場合は `npm run wasm`（または `./start.sh -b`）を実行します。
 
 ```sh
 npm run build       # Rust/WASM・型検査・Webビルド → dist/

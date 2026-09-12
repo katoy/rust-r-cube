@@ -9,7 +9,7 @@ const TABLE_BYTES: Option<&[u8]> = Some(include_bytes!(concat!(env!("OUT_DIR"), 
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, serde::Deserialize)]
 pub struct ResultData {
     pub state: String,
     pub moves: Vec<String>,
@@ -32,16 +32,29 @@ fn result(state: &str, moves: &[usize], elapsed_ms: f64, nodes: u64) -> Result<R
         nodes,
     })
 }
-pub fn solve_state(state: &str, budget_ms: u32) -> Result<ResultData, String> {
+pub fn solve_state(state: &str, budget_ms: u32, include_orientation: bool) -> Result<ResultData, String> {
     let cube = cube::parse_state(state)?;
     let start = web_time::Instant::now();
     let mut search = search::Search::new(budget_ms.min(30000));
     let moves = search
         .solve(&cube)
         .ok_or_else(|| "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned())?;
-    if cube::apply(&cube, &moves) != coord::RawCube::default() {
+
+    // 完成状態を確認
+    let result_cube = cube::apply(&cube, &moves);
+    let is_solved = if include_orientation {
+        // 向き情報を含める: 完全に解けているか確認
+        result_cube == coord::RawCube::default()
+    } else {
+        // 色だけを確認: 向き情報を無視して色だけが揃っているか確認
+        // すべてのステッカーの色が正しい位置にあるかをチェック
+        cube::facelets(&result_cube) == cube::SOLVED
+    };
+
+    if !is_solved {
         return Err("解法の検証に失敗しました。".into());
     }
+
     result(
         state,
         &moves,
@@ -79,7 +92,31 @@ pub fn scramble(seed: u32) -> String {
 }
 #[wasm_bindgen]
 pub fn solve(state: &str, budget_ms: u32) -> Result<String, JsValue> {
-    json(solve_state(state, budget_ms))
+    json(solve_state(state, budget_ms, true))
+}
+
+#[wasm_bindgen]
+pub fn solve_with_orientation(state: &str, budget_ms: u32, include_orientation: bool) -> Result<String, JsValue> {
+    json(solve_state(state, budget_ms, include_orientation))
+}
+
+/// キューブのピース向き情報を JSON で返す
+/// コーナーの向き: 0=正常, 1=時計回り90°, 2=反時計回り90°
+/// エッジの向き: 0=正常, 1=反転
+#[wasm_bindgen]
+pub fn get_orientations(state: &str) -> Result<String, JsValue> {
+    let raw_cube = cube::parse_state(state).map_err(|e| JsValue::from_str(&e))?;
+
+    let corner_orientations: Vec<usize> = raw_cube.co.iter().map(|&o| o as usize).collect();
+    let edge_orientations: Vec<usize> = raw_cube.eo.iter().map(|&o| o as usize).collect();
+
+    let result = serde_json::json!({
+        "corners": corner_orientations,
+        "edges": edge_orientations,
+    });
+
+    serde_json::to_string(&result)
+        .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
 }
 
 #[cfg(test)]

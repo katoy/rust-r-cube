@@ -148,7 +148,7 @@ impl PruningTable {
     }
 }
 
-fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
+pub(crate) fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 2187];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -164,7 +164,7 @@ fn generate_twist_move_table() -> Box<[[u16; 18]; 2187]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
+pub(crate) fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 2048];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -180,7 +180,7 @@ fn generate_flip_move_table() -> Box<[[u16; 18]; 2048]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
+pub(crate) fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 495];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -196,7 +196,7 @@ fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
+pub(crate) fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -212,7 +212,7 @@ fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
+pub(crate) fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -228,7 +228,7 @@ fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
+pub(crate) fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
     let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 24];
     let mut rc = RawCube::default();
     for (i, table_i) in table.iter_mut().enumerate() {
@@ -244,7 +244,7 @@ fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-fn generate_x2_maps() -> SymmetryMaps {
+pub(crate) fn generate_x2_maps() -> SymmetryMaps {
     use crate::coord::Corner;
     use crate::coord::Edge;
 
@@ -358,7 +358,7 @@ fn generate_x2_maps() -> SymmetryMaps {
     )
 }
 
-fn generate_twist_slice_pruning_table(
+pub(crate) fn generate_twist_slice_pruning_table(
     mt: &MoveTable,
     twist_class: &[u16; 2187],
     twist_sym: &[bool; 2187],
@@ -422,7 +422,7 @@ fn generate_twist_slice_pruning_table(
     table.into_boxed_slice()
 }
 
-fn generate_flip_slice_pruning_table(
+pub(crate) fn generate_flip_slice_pruning_table(
     mt: &MoveTable,
     flip_class: &[u16; 2048],
     flip_sym: &[bool; 2048],
@@ -486,7 +486,7 @@ fn generate_flip_slice_pruning_table(
     table.into_boxed_slice()
 }
 
-fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
+pub(crate) fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let size1 = 40320;
     let size2 = 24;
     let total_size = size1 * size2;
@@ -527,7 +527,7 @@ fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     table.into_boxed_slice()
 }
 
-fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
+pub(crate) fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let size1 = 40320;
     let size2 = 24;
     let total_size = size1 * size2;

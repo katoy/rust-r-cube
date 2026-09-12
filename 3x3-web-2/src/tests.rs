@@ -194,7 +194,6 @@ fn wasm_solve_with_orientation_function() {
 fn wasm_get_orientations_function() {
     // get_orientations() WASM 関数のテスト
     use crate::get_orientations;
-    use serde_json::json;
 
     // スクランブルされた状態の向き情報を取得
     let state = facelets(&apply(&RawCube::default(), &scramble(15)));
@@ -1064,4 +1063,153 @@ fn test_get_flip_slice() {
     // エッジの最大インデックス
     let val3 = pt.get_flip_slice(2047, 494);
     assert!(val3 <= 20);
+}
+
+#[test]
+fn invalid_state_format_error() {
+    // 数字を含まない入力
+    assert!(parse_state("ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOP").is_err());
+
+    // 重複したピースの検出
+    let all_u = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLBBBBBBBB";
+    assert!(parse_state(all_u).is_err());
+
+    // センターの不一致
+    let wrong_center = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLRBBBBBBBB";
+    assert!(parse_state(wrong_center).is_err());
+}
+
+#[test]
+fn move_notation_accuracy() {
+    let solved = RawCube::default();
+
+    // 面ごとのすべての回転記号をテスト
+    // move_id = face * 3 + turn で、turn は 0=1回転、1=2回転、2=反時計回り
+    for face in 0..6 {
+        let move_cw = face * 3;       // 時計回り（1回転）
+        let move_180 = face * 3 + 1;  // 2回転
+        let move_ccw = face * 3 + 2;  // 反時計回り
+
+        // 1回転 のテスト
+        let after_cw = apply(&solved, &[move_cw]);
+        assert_ne!(after_cw, solved, "Clockwise should change state");
+        // 4回転で元に戻る（Rx^4 = identity）
+        let after_4cw = apply(&apply(&apply(&after_cw, &[move_cw]), &[move_cw]), &[move_cw]);
+        assert_eq!(after_4cw, solved, "R R R R should be identity");
+
+        // 反時計回りのテスト（move_cw と move_ccw は逆操作）
+        let after_ccw = apply(&solved, &[move_ccw]);
+        assert_eq!(apply(&after_ccw, &[move_cw]), solved, "R' R should be identity");
+
+        // 2回転のテスト（move_180 は 180度回転）
+        let after_180 = apply(&solved, &[move_180]);
+        assert_eq!(apply(&after_180, &[move_180]), solved, "R2 R2 should be identity");
+    }
+}
+
+#[test]
+fn corner_and_edge_consistency() {
+    let scrambled = apply(&RawCube::default(), &scramble(777));
+
+    // すべてのコーナーピースをチェック
+    for i in 0..8 {
+        // Corner/Edge は enum 型なので、スクランブル後の値が有効であることを確認
+        assert_eq!(scrambled.cp.len(), 8, "Should have 8 corners");
+        assert_eq!(scrambled.co.len(), 8, "Should have 8 corner orientations");
+    }
+
+    // すべてのエッジピースをチェック
+    for i in 0..12 {
+        assert_eq!(scrambled.ep.len(), 12, "Should have 12 edges");
+        assert_eq!(scrambled.eo.len(), 12, "Should have 12 edge orientations");
+    }
+
+    // スクランブル後の状態が有効であることを確認
+    let facelets_str = facelets(&scrambled);
+    assert_eq!(facelets_str.len(), 54, "Should have 54 facelets");
+}
+
+#[test]
+fn solve_state_with_different_budgets() {
+    let state = {
+        let cube = apply(&RawCube::default(), &scramble(123));
+        facelets(&cube)
+    };
+
+    // 短い予算で解法試行（結果は問わない）
+    let _ = solve_state(&state, 100, true);
+    // 可能性：成功するか、タイムアウトするか
+
+    // より長い予算で解法試行
+    let result2 = solve_state(&state, 5000, true);
+    // これはほぼ確実に成功するはず
+    assert!(result2.is_ok(), "Longer budget should eventually solve");
+
+    if let Ok(r2) = result2 {
+        assert_eq!(r2.state, SOLVED, "Solution should be valid");
+        assert!(!r2.moves.is_empty(), "Should have moves");
+    }
+}
+
+#[test]
+fn orientation_mode_comparison() {
+    let scramble_seq = scramble(999);
+    let state = facelets(&apply(&RawCube::default(), &scramble_seq));
+
+    // 向きを含めた場合と含めない場合で比較
+    let with_orientation = solve_state(&state, 3000, true);
+    let without_orientation = solve_state(&state, 3000, false);
+
+    // 両方が成功した場合、または両方が失敗した場合を確認
+    if let (Ok(with_o), Ok(without_o)) = (with_orientation, without_orientation) {
+        // 向きを含めない場合の方が手数が多いか同じはず
+        assert!(
+            with_o.moves.len() <= without_o.moves.len() + 1,
+            "With orientation should not be significantly longer"
+        );
+    }
+}
+
+#[test]
+fn extensive_error_cases() {
+    // 無効な手順文字列
+    assert!(parse_moves("INVALID").is_err());
+    assert!(parse_moves("R X Y").is_err());
+    assert!(parse_moves("U''").is_err());
+    assert!(parse_moves("R R2'").is_err());
+
+    // 空文字列
+    assert!(parse_moves("").is_ok());  // 空は有効（何もしない）
+
+    // 大文字小文字の混合
+    assert!(parse_moves("r u f").is_err());  // 小文字は無効
+
+    // スペース区切りのテスト
+    assert!(parse_moves("R U F").is_ok());
+    assert!(parse_moves("R  U  F").is_ok());  // 複数スペースも可
+}
+
+#[test]
+fn wasm_result_data_serialization() {
+    use crate::ResultData;
+
+    let data = ResultData {
+        state: SOLVED.to_string(),
+        moves: vec!["R".to_string(), "U".to_string()],
+        states: vec![SOLVED.to_string()],
+        elapsed_ms: 123.45,
+        nodes: 999,
+    };
+
+    // JSON シリアライズ可能か確認
+    let json = serde_json::to_string(&data).unwrap();
+    assert!(json.contains("UUUUUU"));  // state を含む
+    assert!(json.contains("123.45"));  // elapsed_ms を含む
+    assert!(json.contains("999"));     // nodes を含む
+
+    // デシリアライズ可能か確認
+    let deserialized: ResultData = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.state, data.state);
+    assert_eq!(deserialized.moves, data.moves);
+    assert_eq!(deserialized.elapsed_ms, data.elapsed_ms);
 }

@@ -52,7 +52,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startScramble,
       });
       console.log(
-        `✓ スクランブル完了 - 状態: ${scrambleState?.substring(0, 20)}...`
+        `✓ スクランブル完了 - 状態: ${scrambleState?.substring(0, 20)}...`,
       );
 
       // 解法実行
@@ -62,16 +62,14 @@ test.describe("Advanced E2E Coverage Tracking", () => {
       await expect(page.locator("#solution-content")).toBeVisible({
         timeout: 15000,
       });
-      const solutionLength = await page
-        .locator(".solution-move")
-        .count();
+      const solutionLength = await page.locator(".solution-move").count();
       operationLog.push({
         timestamp: startSolve,
         operation: "solve",
         duration: Date.now() - startSolve,
       });
       console.log(
-        `✓ 解法探索完了 - 手数: ${solutionLength} 手 (${operationLog[operationLog.length - 1].duration}ms)`
+        `✓ 解法探索完了 - 手数: ${solutionLength} 手 (${operationLog[operationLog.length - 1].duration}ms)`,
       );
 
       // 解法再生
@@ -95,7 +93,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
           duration: Date.now() - startPlayback,
         });
         console.log(
-          `✓ 解法再生完了 (${operationLog[operationLog.length - 1].duration}ms)`
+          `✓ 解法再生完了 (${operationLog[operationLog.length - 1].duration}ms)`,
         );
       }
 
@@ -110,7 +108,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startReset,
       });
       console.log(
-        `✓ リセット完了 (${operationLog[operationLog.length - 1].duration}ms)`
+        `✓ リセット完了 (${operationLog[operationLog.length - 1].duration}ms)`,
       );
 
       // レポート生成
@@ -294,7 +292,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startScramble,
       });
       console.log(
-        `✓ 向きモード有効でスクランブル完了 (${operationLog[0].duration}ms)`
+        `✓ 向きモード有効でスクランブル完了 (${operationLog[0].duration}ms)`,
       );
 
       // 解法
@@ -311,7 +309,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startSolve,
       });
       console.log(
-        `✓ 向きモード有効で解法完了 - ${moves} 手 (${operationLog[1].duration}ms)`
+        `✓ 向きモード有効で解法完了 - ${moves} 手 (${operationLog[1].duration}ms)`,
       );
 
       // 向きモードを無効化
@@ -331,7 +329,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startScramble2,
       });
       console.log(
-        `✓ 向きモード無効でスクランブル完了 (${operationLog[2].duration}ms)`
+        `✓ 向きモード無効でスクランブル完了 (${operationLog[2].duration}ms)`,
       );
 
       // 解法（向きモード無効）
@@ -348,7 +346,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         duration: Date.now() - startSolve2,
       });
       console.log(
-        `✓ 向きモード無効で解法完了 - ${moves2} 手 (${operationLog[3].duration}ms)`
+        `✓ 向きモード無効で解法完了 - ${moves2} 手 (${operationLog[3].duration}ms)`,
       );
 
       generateOrientationReport(operationLog);
@@ -368,7 +366,7 @@ test.describe("Advanced E2E Coverage Tracking", () => {
 function generateAdvancedReport(
   operationLog: { timestamp: number; operation: string; duration?: number }[],
   consoleLogs: { type: string; message: string }[],
-  url: string
+  url: string,
 ) {
   // ディレクトリ作成
   if (!fs.existsSync(COVERAGE_DIR)) {
@@ -376,7 +374,10 @@ function generateAdvancedReport(
   }
 
   // 統計情報
-  const totalTime = operationLog.reduce((sum, op) => sum + (op.duration || 0), 0);
+  const totalTime = operationLog.reduce(
+    (sum, op) => sum + (op.duration || 0),
+    0,
+  );
   const avgTime = operationLog.length > 0 ? totalTime / operationLog.length : 0;
 
   const html = `
@@ -481,16 +482,15 @@ function generateAdvancedReport(
 
   <h2>📝 コンソールログ</h2>
   <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">
-    ${consoleLogs.length > 0
-      ? `<pre style="margin: 0; font-family: 'Monaco', monospace; font-size: 12px;">
+    ${
+      consoleLogs.length > 0
+        ? `<pre style="margin: 0; font-family: 'Monaco', monospace; font-size: 12px;">
 ${consoleLogs
-  .map(
-    (log) =>
-      `[${log.type.toUpperCase()}] ${log.message.substring(0, 100)}`
-  )
+  .map((log) => `[${log.type.toUpperCase()}] ${log.message.substring(0, 100)}`)
   .join("\n")}
       </pre>`
-      : `<p style="color: #999;">コンソールログなし</p>`}
+        : `<p style="color: #999;">コンソールログなし</p>`
+    }
   </div>
 
   <h2>✅ テスト完了</h2>
@@ -517,8 +517,8 @@ ${consoleLogs
         consoleLogs,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   console.log(`✅ 詳細レポート生成完了:`);
@@ -535,7 +535,7 @@ function generateWasmCoverageReport(
     operation: string;
     result?: string;
     duration?: number;
-  }[]
+  }[],
 ) {
   // ディレクトリ作成
   if (!fs.existsSync(COVERAGE_DIR)) {
@@ -622,15 +622,15 @@ function generateWasmCoverageReport(
       </tr>
     </thead>
     <tbody>
-      \${operationLog
+      ${operationLog
         .map(
-          (op) => \`
+          (op) => `
         <tr>
-          <td><strong>\${op.operation}</strong></td>
-          <td class="success">\${op.result || "OK"}</td>
-          <td>\${op.duration ? op.duration + "ms" : "—"}</td>
+          <td><strong>${op.operation}</strong></td>
+          <td class="success">${op.result || "OK"}</td>
+          <td>${op.duration ? op.duration + "ms" : "—"}</td>
         </tr>
-      \`
+      `,
         )
         .join("")}
     </tbody>
@@ -641,12 +641,12 @@ function generateWasmCoverageReport(
   <p>lib.rs のカバレッジ：E2E テストでフルカバー</p>
 </body>
 </html>
-  \`;
+  `;
 
   const reportPath = path.join(COVERAGE_DIR, "wasm-coverage.html");
   fs.writeFileSync(reportPath, html);
 
-  console.log(\`✅ WASM カバレッジレポート生成完了: \${reportPath}\`);
+  console.log(`✅ WASM カバレッジレポート生成完了: ${reportPath}`);
 }
 
 /**
@@ -658,7 +658,7 @@ function generateOrientationReport(
     operation: string;
     mode: string;
     duration?: number;
-  }[]
+  }[],
 ) {
   // ディレクトリ作成
   if (!fs.existsSync(COVERAGE_DIR)) {
@@ -666,8 +666,12 @@ function generateOrientationReport(
   }
 
   // モード別分析
-  const withOrientation = operationLog.filter((op) => op.mode === "with_orientation");
-  const withoutOrientation = operationLog.filter((op) => op.mode === "without_orientation");
+  const withOrientation = operationLog.filter(
+    (op) => op.mode === "with_orientation",
+  );
+  const withoutOrientation = operationLog.filter(
+    (op) => op.mode === "without_orientation",
+  );
 
   const html = `
 <!DOCTYPE html>
@@ -757,7 +761,7 @@ function generateOrientationReport(
           <td><strong>${op.mode}</strong></td>
           <td>${op.duration || 0}ms</td>
         </tr>
-      `
+      `,
         )
         .join("")}
     </tbody>

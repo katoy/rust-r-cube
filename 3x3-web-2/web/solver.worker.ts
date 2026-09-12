@@ -1,4 +1,8 @@
-import init, { initialize, solve, solve_with_orientation } from "../pkg/cube_studio";
+import init, {
+  initialize,
+  solve,
+  solve_with_orientation,
+} from "../pkg/cube_studio";
 import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
 import type { Request, Reply } from "./model";
 const send = (reply: Reply) => self.postMessage(reply);
@@ -10,9 +14,19 @@ async function start() {
     self.onmessage = ({ data }: MessageEvent<Request>) => {
       try {
         const includeOrientation = data.includeOrientation !== false;
-        const result = includeOrientation
-          ? solve(data.state, data.budget)
-          : solve_with_orientation(data.state, data.budget, false);
+        const centersStr =
+          includeOrientation && data.centerRotations
+            ? data.centerRotations
+                .map((r) => Math.round(r / (Math.PI / 2)).toString())
+                .join(",")
+            : undefined;
+        const result = solve_with_orientation(
+          data.state,
+          data.budget,
+          includeOrientation,
+          centersStr,
+        );
+
         send({
           kind: "result",
           id: data.id,

@@ -1,7 +1,7 @@
 use crate::{
-    coord::{move_cube_18, RawCube, CoordCube},
+    coord::{move_cube_18, CoordCube, RawCube},
     cube::*,
-    solve_state,
+    solve_state, supercube,
 };
 
 #[test]
@@ -150,12 +150,12 @@ fn wasm_validate_function() {
     use crate::validate;
 
     // 解かれた状態は true
-    assert_eq!(validate(SOLVED).unwrap(), true);
+    assert!(validate(SOLVED).unwrap());
 
     // スクランブルされた状態は false
     let cube = apply(&RawCube::default(), &scramble(10));
     let state_str = facelets(&cube);
-    assert_eq!(validate(&state_str).unwrap(), false);
+    assert!(!validate(&state_str).unwrap());
 }
 
 #[test]
@@ -180,12 +180,12 @@ fn wasm_solve_with_orientation_function() {
     let state = facelets(&apply(&RawCube::default(), &scramble(8)));
 
     // 向き情報を含めて解く
-    let result_json = solve_with_orientation(&state, 10000, true).unwrap();
+    let result_json = solve_with_orientation(&state, 10000, true, None).unwrap();
     let result: ResultData = serde_json::from_str(&result_json).unwrap();
     assert_eq!(result.state, SOLVED);
 
     // 向き情報を除いて解く
-    let result_json = solve_with_orientation(&state, 10000, false).unwrap();
+    let result_json = solve_with_orientation(&state, 10000, false, None).unwrap();
     let result: ResultData = serde_json::from_str(&result_json).unwrap();
     assert_eq!(result.state, SOLVED);
 }
@@ -222,7 +222,11 @@ fn solve_state_with_various_scrambles() {
 
         // 向き情報を除く
         let result = solve_state(&state, 30000, false).unwrap();
-        assert_eq!(result.state, SOLVED, "Failed to solve (color-only) with seed {}", seed);
+        assert_eq!(
+            result.state, SOLVED,
+            "Failed to solve (color-only) with seed {}",
+            seed
+        );
     }
 }
 
@@ -375,7 +379,7 @@ fn tables_encode_decode_roundtrip() {
 #[test]
 fn tables_cp_slice_pruning_generation() {
     // CP-Slice 枝刈りテーブル生成をテスト
-    use crate::tables::{MoveTable, generate_cp_slice_pruning_table};
+    use crate::tables::{generate_cp_slice_pruning_table, MoveTable};
 
     let mt = MoveTable::get();
     let cp_slice = generate_cp_slice_pruning_table(mt);
@@ -385,7 +389,7 @@ fn tables_cp_slice_pruning_generation() {
 #[test]
 fn tables_ep8_slice_pruning_generation() {
     // EP8-Slice 枝刈りテーブル生成をテスト
-    use crate::tables::{MoveTable, generate_ep8_slice_pruning_table};
+    use crate::tables::{generate_ep8_slice_pruning_table, MoveTable};
 
     let mt = MoveTable::get();
     let ep8_slice = generate_ep8_slice_pruning_table(mt);
@@ -404,7 +408,11 @@ fn complete_end_to_end_multiple_seeds() {
         let solution_without = solve_state(&state, 5000, false);
 
         assert!(solution_with.is_ok(), "Failed to solve with seed {}", seed);
-        assert!(solution_without.is_ok(), "Failed to solve without orientation for seed {}", seed);
+        assert!(
+            solution_without.is_ok(),
+            "Failed to solve without orientation for seed {}",
+            seed
+        );
 
         if let Ok(sol) = solution_with {
             assert_eq!(sol.state, SOLVED);
@@ -428,7 +436,10 @@ fn superflip_solvable_in_20_moves() {
     let superflip_state = facelets(&superflip_cube);
 
     // スクランブルされた状態であることを確認
-    assert_ne!(superflip_state, SOLVED, "Test state should not be solved state");
+    assert_ne!(
+        superflip_state, SOLVED,
+        "Test state should not be solved state"
+    );
 
     // スクランブル状態が 30秒以内に解けることを確認
     let result = solve_state(&superflip_state, 30000, true);
@@ -436,7 +447,10 @@ fn superflip_solvable_in_20_moves() {
 
     if let Ok(solution) = result {
         // 解法の最終状態が完成であることを確認
-        assert_eq!(solution.state, SOLVED, "Solution should result in solved state");
+        assert_eq!(
+            solution.state, SOLVED,
+            "Solution should result in solved state"
+        );
 
         // 解法が 25手以内であることを確認（20手前後が目安）
         assert!(
@@ -446,20 +460,17 @@ fn superflip_solvable_in_20_moves() {
         );
 
         // 解法の詳細をログ出力
-        println!(
-            "Special state solved in {} moves",
-            solution.moves.len()
-        );
+        println!("Special state solved in {} moves", solution.moves.len());
     }
 }
 
 #[test]
 fn superflip_variations() {
     // スーパーフリップの異なるバリエーションをテスト
-    let superflip_sequences = vec![
-        "M' U M' U M' U2 M U M U2 M U M U2",  // クラシック
-        "R U' R U R U R U' R' U' R2",         // バリエーション 1
-        "M U M U2 M U M",                     // バリエーション 2
+    let superflip_sequences = [
+        "M' U M' U M' U2 M U M U2 M U M U2", // クラシック
+        "R U' R U R U R U' R' U' R2",        // バリエーション 1
+        "M U M U2 M U M",                    // バリエーション 2
     ];
 
     for (idx, sequence) in superflip_sequences.iter().enumerate() {
@@ -472,15 +483,15 @@ fn superflip_variations() {
         let state = facelets(&cube);
 
         // スクランブルされた状態であることを確認
-        assert_ne!(state, SOLVED, "Variation {} should create scrambled state", idx);
+        assert_ne!(
+            state, SOLVED,
+            "Variation {} should create scrambled state",
+            idx
+        );
 
         // 解法できることを確認
         let result = solve_state(&state, 10000, true);
-        assert!(
-            result.is_ok(),
-            "Variation {} should be solvable",
-            idx
-        );
+        assert!(result.is_ok(), "Variation {} should be solvable", idx);
 
         if let Ok(solution) = result {
             assert_eq!(solution.state, SOLVED);
@@ -507,7 +518,8 @@ fn solves_one_thousand_scrambles() {
         let cube = apply(&RawCube::default(), &scramble(seed));
         let state = facelets(&cube);
         assert_eq!(parse_state(&state).unwrap(), cube);
-        let solution = solve_state(&state, 5000, true).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+        let solution =
+            solve_state(&state, 5000, true).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
         assert_eq!(solution.state, SOLVED, "seed {seed}");
     }
 }
@@ -523,7 +535,7 @@ fn timeout_on_hard_scrambles() {
     // 非常に短いタイムアウトで解法を試みる
     let state = facelets(&apply(&RawCube::default(), &scramble(500)));
     let result = solve_state(&state, 1, true); // 1ms のタイムアウト
-    // タイムアウトするか、非常に高速に解く
+                                               // タイムアウトするか、非常に高速に解く
     match result {
         Ok(sol) => {
             // 高速に解けた場合、解法は有効
@@ -547,8 +559,7 @@ fn solves_with_orientation_mode_true() {
 #[test]
 fn solves_with_orientation_mode_false() {
     let state = facelets(&apply(&RawCube::default(), &scramble(100)));
-    let solution_without_orientation =
-        solve_state(&state, 10000, false).unwrap();
+    let solution_without_orientation = solve_state(&state, 10000, false).unwrap();
     assert_eq!(solution_without_orientation.state, SOLVED);
     // 向きを無視したモードでも、ステッカーの色は揃う
     assert_eq!(solution_without_orientation.state, SOLVED);
@@ -604,7 +615,12 @@ fn complex_algorithms_are_invertible() {
         });
 
         let backward = apply(&forward, &reverse);
-        assert_eq!(backward, RawCube::default(), "Failed for algorithm: {}", alg);
+        assert_eq!(
+            backward,
+            RawCube::default(),
+            "Failed for algorithm: {}",
+            alg
+        );
     }
 }
 #[test]
@@ -614,7 +630,11 @@ fn scramble_produces_different_states() {
         let cube = apply(&RawCube::default(), &scramble(seed));
         states.insert(facelets(&cube));
     }
-    assert_eq!(states.len(), 10, "All scrambles should produce different states");
+    assert_eq!(
+        states.len(),
+        10,
+        "All scrambles should produce different states"
+    );
 }
 #[test]
 fn all_move_cube_18_patterns_covered() {
@@ -625,10 +645,16 @@ fn all_move_cube_18_patterns_covered() {
             let move_cube = move_cube_18(move_idx);
 
             // それぞれの動きが有効な RawCube であることを確認
-            assert!(!move_cube.cp.iter().any(|&c| c as usize >= 8),
-                   "Invalid corner piece at move {}", move_idx);
-            assert!(!move_cube.ep.iter().any(|&e| e as usize >= 12),
-                   "Invalid edge piece at move {}", move_idx);
+            assert!(
+                !move_cube.cp.iter().any(|&c| c as usize >= 8),
+                "Invalid corner piece at move {}",
+                move_idx
+            );
+            assert!(
+                !move_cube.ep.iter().any(|&e| e as usize >= 12),
+                "Invalid edge piece at move {}",
+                move_idx
+            );
 
             // 動きを 2 回適用すると別の動きに、3 回で逆動き、4 回で元に戻る
             let twice = move_cube.multiply(move_cube);
@@ -636,12 +662,19 @@ fn all_move_cube_18_patterns_covered() {
             let four_times = thrice.multiply(move_cube);
 
             // 4 回で恒等変換に戻る（U, D, F, B）か 2 回で戻る（R, L）
-            if face == 1 || face == 4 { // R, L
-                assert_eq!(twice.multiply(&twice), RawCube::default(),
-                          "R/L move should have period 2");
+            if face == 1 || face == 4 {
+                // R, L
+                assert_eq!(
+                    twice.multiply(&twice),
+                    RawCube::default(),
+                    "R/L move should have period 2"
+                );
             } else {
-                assert_eq!(four_times, RawCube::default(),
-                          "U/D/F/B move should have period 4");
+                assert_eq!(
+                    four_times,
+                    RawCube::default(),
+                    "U/D/F/B move should have period 4"
+                );
             }
         }
     }
@@ -667,10 +700,14 @@ fn facelets_have_correct_sticker_count() {
     assert_eq!(f.len(), 54);
 
     // 各面のステッカー数
-    for face in 0..6 {
-        let face_char = FACES[face] as char;
+    for &face_byte in FACES.iter().take(6) {
+        let face_char = face_byte as char;
         let count = f.chars().filter(|&ch| ch == face_char).count();
-        assert_eq!(count, 9, "Face {} should have exactly 9 stickers", face_char);
+        assert_eq!(
+            count, 9,
+            "Face {} should have exactly 9 stickers",
+            face_char
+        );
     }
 }
 #[test]
@@ -780,7 +817,10 @@ fn single_move_affects_cube_state() {
     let default = RawCube::default();
     let moved = apply(&default, &[0]); // R
     assert_ne!(moved, default);
-    assert_eq!(facelets(&moved), "UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB");
+    assert_eq!(
+        facelets(&moved),
+        "UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB"
+    );
 }
 
 // ========================
@@ -811,7 +851,7 @@ fn test_solve_state_orientation_false() {
     assert!(result.is_ok());
     let solution = result.unwrap();
     assert_eq!(solution.state, SOLVED);
-    assert!(!solution.moves.is_empty() || solution.moves.is_empty());  // always true, covers the else path
+    assert!(!solution.moves.is_empty() || solution.moves.is_empty()); // always true, covers the else path
 }
 
 #[test]
@@ -837,7 +877,7 @@ fn test_solve_state_invalid_state() {
 fn test_solve_state_unsolvable_with_orientation() {
     // solve_state() 解けない状態を orientation=true で実行
     let mut c = RawCube::default();
-    c.cp.swap(0, 1);  // コーナーパリティを崩す
+    c.cp.swap(0, 1); // コーナーパリティを崩す
     let state = facelets(&c);
 
     let result = crate::solve_state(&state, 1000, true);
@@ -913,7 +953,7 @@ fn test_multiply_operation() {
     // multiply() の基本的なテスト
     let default = RawCube::default();
     let moved = default.multiply(&default);
-    assert_eq!(moved, default);  // default と default の乗算は default
+    assert_eq!(moved, default); // default と default の乗算は default
 }
 
 #[test]
@@ -1038,7 +1078,7 @@ fn test_get_twist_slice() {
 
     // 任意のインデックスで値を取得できる
     let val1 = pt.get_twist_slice(0, 0);
-    assert!(val1 <= 20);  // 枝刈り値は 20 以下
+    assert!(val1 <= 20); // 枝刈り値は 20 以下
 
     let val2 = pt.get_twist_slice(100, 50);
     assert!(val2 <= 20);
@@ -1055,7 +1095,7 @@ fn test_get_flip_slice() {
 
     // 任意のインデックスで値を取得できる
     let val1 = pt.get_flip_slice(0, 0);
-    assert!(val1 <= 20);  // 枝刈り値は 20 以下
+    assert!(val1 <= 20); // 枝刈り値は 20 以下
 
     let val2 = pt.get_flip_slice(100, 50);
     assert!(val2 <= 20);
@@ -1086,24 +1126,35 @@ fn move_notation_accuracy() {
     // 面ごとのすべての回転記号をテスト
     // move_id = face * 3 + turn で、turn は 0=1回転、1=2回転、2=反時計回り
     for face in 0..6 {
-        let move_cw = face * 3;       // 時計回り（1回転）
-        let move_180 = face * 3 + 1;  // 2回転
-        let move_ccw = face * 3 + 2;  // 反時計回り
+        let move_cw = face * 3; // 時計回り（1回転）
+        let move_180 = face * 3 + 1; // 2回転
+        let move_ccw = face * 3 + 2; // 反時計回り
 
         // 1回転 のテスト
         let after_cw = apply(&solved, &[move_cw]);
         assert_ne!(after_cw, solved, "Clockwise should change state");
         // 4回転で元に戻る（Rx^4 = identity）
-        let after_4cw = apply(&apply(&apply(&after_cw, &[move_cw]), &[move_cw]), &[move_cw]);
+        let after_4cw = apply(
+            &apply(&apply(&after_cw, &[move_cw]), &[move_cw]),
+            &[move_cw],
+        );
         assert_eq!(after_4cw, solved, "R R R R should be identity");
 
         // 反時計回りのテスト（move_cw と move_ccw は逆操作）
         let after_ccw = apply(&solved, &[move_ccw]);
-        assert_eq!(apply(&after_ccw, &[move_cw]), solved, "R' R should be identity");
+        assert_eq!(
+            apply(&after_ccw, &[move_cw]),
+            solved,
+            "R' R should be identity"
+        );
 
         // 2回転のテスト（move_180 は 180度回転）
         let after_180 = apply(&solved, &[move_180]);
-        assert_eq!(apply(&after_180, &[move_180]), solved, "R2 R2 should be identity");
+        assert_eq!(
+            apply(&after_180, &[move_180]),
+            solved,
+            "R2 R2 should be identity"
+        );
     }
 }
 
@@ -1111,17 +1162,22 @@ fn move_notation_accuracy() {
 fn corner_and_edge_consistency() {
     let scrambled = apply(&RawCube::default(), &scramble(777));
 
-    // すべてのコーナーピースをチェック
+    assert_eq!(scrambled.cp.len(), 8, "Should have 8 corners");
+    assert_eq!(scrambled.co.len(), 8, "Should have 8 corner orientations");
     for i in 0..8 {
-        // Corner/Edge は enum 型なので、スクランブル後の値が有効であることを確認
-        assert_eq!(scrambled.cp.len(), 8, "Should have 8 corners");
-        assert_eq!(scrambled.co.len(), 8, "Should have 8 corner orientations");
+        assert!(
+            scrambled.co[i] < 3,
+            "Corner orientation must be in range 0..3"
+        );
     }
 
-    // すべてのエッジピースをチェック
+    assert_eq!(scrambled.ep.len(), 12, "Should have 12 edges");
+    assert_eq!(scrambled.eo.len(), 12, "Should have 12 edge orientations");
     for i in 0..12 {
-        assert_eq!(scrambled.ep.len(), 12, "Should have 12 edges");
-        assert_eq!(scrambled.eo.len(), 12, "Should have 12 edge orientations");
+        assert!(
+            scrambled.eo[i] < 2,
+            "Edge orientation must be in range 0..2"
+        );
     }
 
     // スクランブル後の状態が有効であることを確認
@@ -1179,14 +1235,14 @@ fn extensive_error_cases() {
     assert!(parse_moves("R R2'").is_err());
 
     // 空文字列
-    assert!(parse_moves("").is_ok());  // 空は有効（何もしない）
+    assert!(parse_moves("").is_ok()); // 空は有効（何もしない）
 
     // 大文字小文字の混合
-    assert!(parse_moves("r u f").is_err());  // 小文字は無効
+    assert!(parse_moves("r u f").is_err()); // 小文字は無効
 
     // スペース区切りのテスト
     assert!(parse_moves("R U F").is_ok());
-    assert!(parse_moves("R  U  F").is_ok());  // 複数スペースも可
+    assert!(parse_moves("R  U  F").is_ok()); // 複数スペースも可
 }
 
 #[test]
@@ -1203,13 +1259,94 @@ fn wasm_result_data_serialization() {
 
     // JSON シリアライズ可能か確認
     let json = serde_json::to_string(&data).unwrap();
-    assert!(json.contains("UUUUUU"));  // state を含む
-    assert!(json.contains("123.45"));  // elapsed_ms を含む
-    assert!(json.contains("999"));     // nodes を含む
+    assert!(json.contains("UUUUUU")); // state を含む
+    assert!(json.contains("123.45")); // elapsed_ms を含む
+    assert!(json.contains("999")); // nodes を含む
 
     // デシリアライズ可能か確認
     let deserialized: ResultData = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.state, data.state);
     assert_eq!(deserialized.moves, data.moves);
     assert_eq!(deserialized.elapsed_ms, data.elapsed_ms);
+}
+
+#[test]
+fn test_supercube_centers() {
+    let solved = RawCube::default();
+
+    // 180° single center
+    let moves = supercube::rotate_center_180(0);
+    let res = apply(&solved, &moves);
+    assert_eq!(res, solved, "180 deg U should leave cube solved!");
+
+    // Test supercube::solve_center_orientations on all 2048 valid configurations!
+    let mut tested = 0;
+    for c0 in 0..4 {
+        for c1 in 0..4 {
+            for c2 in 0..4 {
+                for c3 in 0..4 {
+                    for c4 in 0..4 {
+                        for c5 in 0..4 {
+                            if (c0 + c1 + c2 + c3 + c4 + c5) % 2 != 0 {
+                                continue;
+                            }
+                            let needed = [c0, c1, c2, c3, c4, c5];
+                            let moves = supercube::solve_center_orientations(needed);
+
+                            // Apply to solved cube
+                            let res = apply(&solved, &moves);
+                            assert_eq!(res, solved, "Moves must leave cube solved");
+
+                            // Verify net turns of moves match needed:
+                            let mut net = [0i32; 6];
+                            for &m in &moves {
+                                let face = m / 3;
+                                let t: i32 = match m % 3 {
+                                    0 => 1,
+                                    1 => 2,
+                                    2 => -1,
+                                    _ => 0,
+                                };
+                                net[face] = (net[face] + t).rem_euclid(4);
+                            }
+                            for f in 0..6 {
+                                assert_eq!(
+                                    (needed[f] + net[f]) % 4,
+                                    0,
+                                    "Face {} must be 0 mod 4 for needed={:?}",
+                                    f,
+                                    needed
+                                );
+                            }
+                            tested += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(tested, 2048);
+
+    // Test solve_state_with_centers where cube has misoriented centers:
+    // e.g. U was turned: initial centers = [3, 0, 1, 0, 0, 0] (U -90°, F +90°)
+    let state = SOLVED;
+    let sol = crate::solve_state_with_centers(state, 5000, true, Some([3, 0, 1, 0, 0, 0])).unwrap();
+    assert_eq!(sol.state, SOLVED);
+    let mut final_centers: [i32; 6] = [3, 0, 1, 0, 0, 0];
+    for mv_str in &sol.moves {
+        let m = parse_moves(mv_str).unwrap()[0];
+        let f = m / 3;
+        let t: i32 = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
+        final_centers[f] = (final_centers[f] + t).rem_euclid(4);
+    }
+    assert_eq!(
+        final_centers,
+        [0, 0, 0, 0, 0, 0],
+        "All centers must be oriented to 0!"
+    );
 }

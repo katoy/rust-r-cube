@@ -67,7 +67,7 @@ test.describe("E2E Coverage with CDP", () => {
       // レポートが生成されたことを確認
       expect(fs.existsSync(path.join(COVERAGE_DIR, "index.html"))).toBe(true);
       expect(fs.existsSync(path.join(COVERAGE_DIR, "coverage.json"))).toBe(
-        true
+        true,
       );
     } finally {
       // coverage API はクリーンアップ不要
@@ -99,9 +99,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
 
       if (ranges.length > 0) {
         ranges.forEach((range: any) => {
-          const startLine = text
-            .substring(0, range.start)
-            .split("\n").length - 1;
+          const startLine =
+            text.substring(0, range.start).split("\n").length - 1;
           const endLine = text.substring(0, range.end).split("\n").length - 1;
 
           for (let i = startLine; i <= endLine; i++) {
@@ -177,7 +176,7 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
         .sort(
           (a, b) =>
             parseFloat(b.percentage as string) -
-            parseFloat(a.percentage as string)
+            parseFloat(a.percentage as string),
         )
         .map((stat) => {
           let className = "low";
@@ -224,8 +223,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
         wasmCallLog,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   console.log(`✅ カバレッジレポート生成完了:`);

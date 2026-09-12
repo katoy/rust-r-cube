@@ -34,17 +34,14 @@ test.describe("Complete WASM and Tables Coverage", () => {
     for (const scenario of scenarios) {
       const passed = await page.evaluate(async (seed) => {
         const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
-        const solved =
-          "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 
         try {
           // scramble()
           const scrambled = wasm.scramble(seed);
 
           // apply_moves()
-          const state = JSON.parse(
-            wasm.apply_moves(solved, scrambled)
-          ).state;
+          const state = JSON.parse(wasm.apply_moves(solved, scrambled)).state;
 
           // validate()
           const isValid = !wasm.validate(state);
@@ -55,10 +52,10 @@ test.describe("Complete WASM and Tables Coverage", () => {
 
           // solve_with_orientation()
           const withOrient = JSON.parse(
-            wasm.solve_with_orientation(state, 5000, true)
+            wasm.solve_with_orientation(state, 5000, true),
           );
           const withoutOrient = JSON.parse(
-            wasm.solve_with_orientation(state, 5000, false)
+            wasm.solve_with_orientation(state, 5000, false),
           );
 
           // get_orientations()
@@ -100,7 +97,13 @@ test.describe("Complete WASM and Tables Coverage", () => {
     });
 
     const testsPassed = await page.evaluate(async () => {
-      const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+      const wasm =
+        (window as any).cube_studio ||
+        (await (async () => {
+          const m = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+          await m.default({ module_or_path: "/pkg/cube_studio_bg.wasm" });
+          return m;
+        })());
       const tests: boolean[] = [];
 
       // 無効な状態
@@ -116,8 +119,7 @@ test.describe("Complete WASM and Tables Coverage", () => {
       tests.push(largeScramble.length > 0);
 
       // すべての面での動き
-      const solved =
-        "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+      const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
       const moves = ["R", "U", "F", "D", "L", "B"];
       for (const move of moves) {
         try {
@@ -142,9 +144,14 @@ test.describe("Complete WASM and Tables Coverage", () => {
     });
 
     const metrics = await page.evaluate(async () => {
-      const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
-      const solved =
-        "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+      const wasm =
+        (window as any).cube_studio ||
+        (await (async () => {
+          const m = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+          await m.default({ module_or_path: "/pkg/cube_studio_bg.wasm" });
+          return m;
+        })());
+      const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 
       // 複数の状態で解法時間を計測
       const times: number[] = [];

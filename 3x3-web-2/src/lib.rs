@@ -2,6 +2,7 @@
 pub mod coord;
 pub mod cube;
 pub mod search;
+pub mod supercube;
 mod tables;
 
 const TABLE_BYTES: Option<&[u8]> = Some(include_bytes!(concat!(env!("OUT_DIR"), "/tables.bin")));
@@ -32,13 +33,45 @@ fn result(state: &str, moves: &[usize], elapsed_ms: f64, nodes: u64) -> Result<R
         nodes,
     })
 }
-pub fn solve_state(state: &str, budget_ms: u32, include_orientation: bool) -> Result<ResultData, String> {
+pub fn solve_state(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+) -> Result<ResultData, String> {
+    solve_state_with_centers(state, budget_ms, include_orientation, None)
+}
+
+pub fn solve_state_with_centers(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+    initial_centers: Option<[i32; 6]>,
+) -> Result<ResultData, String> {
     let cube = cube::parse_state(state)?;
     let start = web_time::Instant::now();
     let mut search = search::Search::new(budget_ms.min(30000));
-    let moves = search
+    let mut moves = search
         .solve(&cube)
         .ok_or_else(|| "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned())?;
+
+    if include_orientation {
+        if let Some(initial) = initial_centers {
+            // センターの向き（Supercube仕様）を解く
+            let mut centers = initial;
+            for &m in &moves {
+                let f = m / 3;
+                let t = match m % 3 {
+                    0 => 1,
+                    1 => 2,
+                    2 => -1,
+                    _ => 0,
+                };
+                centers[f] = (centers[f] + t).rem_euclid(4);
+            }
+            let center_fixes = supercube::solve_center_orientations(centers);
+            moves.extend(center_fixes);
+        }
+    }
 
     // 完成状態を確認
     let result_cube = cube::apply(&cube, &moves);
@@ -47,7 +80,6 @@ pub fn solve_state(state: &str, budget_ms: u32, include_orientation: bool) -> Re
         result_cube == coord::RawCube::default()
     } else {
         // 色だけを確認: 向き情報を無視して色だけが揃っているか確認
-        // すべてのステッカーの色が正しい位置にあるかをチェック
         cube::facelets(&result_cube) == cube::SOLVED
     };
 
@@ -96,8 +128,26 @@ pub fn solve(state: &str, budget_ms: u32) -> Result<String, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn solve_with_orientation(state: &str, budget_ms: u32, include_orientation: bool) -> Result<String, JsValue> {
-    json(solve_state(state, budget_ms, include_orientation))
+pub fn solve_with_orientation(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+    centers_str: Option<String>,
+) -> Result<String, JsValue> {
+    let initial_centers = centers_str.and_then(|s| {
+        let nums: Vec<i32> = s.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+        if nums.len() == 6 {
+            Some([nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]])
+        } else {
+            None
+        }
+    });
+    json(solve_state_with_centers(
+        state,
+        budget_ms,
+        include_orientation,
+        initial_centers,
+    ))
 }
 
 /// キューブのピース向き情報を JSON で返す

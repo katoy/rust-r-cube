@@ -20,7 +20,7 @@ test.describe("Comprehensive E2E Coverage", () => {
 
       // validate() - 完成状態
       try {
-        const isValid = !wasm.validate(solved);
+        const isValid = wasm.validate(solved);
         console.log("✓ validate(solved):", isValid);
         return { validated: isValid };
       } catch (e) {
@@ -51,7 +51,9 @@ test.describe("Comprehensive E2E Coverage", () => {
           tests[`scramble(${seed})`] = {
             type: typeof scramble,
             length: scramble.length,
-            hasValidMoves: scramble.split(" ").every((m: string) => /^[URFDLB][2']?$/.test(m)),
+            hasValidMoves: scramble
+              .split(" ")
+              .every((m: string) => /^[URFDLB][2']?$/.test(m)),
           };
         }
 
@@ -114,7 +116,9 @@ test.describe("Comprehensive E2E Coverage", () => {
       try {
         // 簡単なスクランブル
         const simpleScramble = "R U F";
-        const simpleState = JSON.parse(wasm.apply_moves(solved, simpleScramble)).state;
+        const simpleState = JSON.parse(
+          wasm.apply_moves(solved, simpleScramble),
+        ).state;
 
         // solve() - 通常の解法
         const solutionNormal = JSON.parse(wasm.solve(simpleState, 5000));
@@ -126,7 +130,9 @@ test.describe("Comprehensive E2E Coverage", () => {
         };
 
         // solve_with_orientation() - 向きを含める場合
-        const withOrient = JSON.parse(wasm.solve_with_orientation(simpleState, 5000, true));
+        const withOrient = JSON.parse(
+          wasm.solve_with_orientation(simpleState, 5000, true),
+        );
         tests["solve_with_orientation(true)"] = {
           isSolved: withOrient.state === solved,
           movesLength: withOrient.moves.length,
@@ -134,7 +140,7 @@ test.describe("Comprehensive E2E Coverage", () => {
 
         // solve_with_orientation() - 向きを含めない場合
         const withoutOrient = JSON.parse(
-          wasm.solve_with_orientation(simpleState, 5000, false)
+          wasm.solve_with_orientation(simpleState, 5000, false),
         );
         tests["solve_with_orientation(false)"] = {
           isSolved: withoutOrient.state === solved,
@@ -186,7 +192,9 @@ test.describe("Comprehensive E2E Coverage", () => {
       edgesCount: 12,
     });
     expect(results["multiple_seeds_solve"].length).toBe(3);
-    expect(results["multiple_seeds_solve"].every((r: any) => r.isSolved)).toBe(true);
+    expect(results["multiple_seeds_solve"].every((r: any) => r.isSolved)).toBe(
+      true,
+    );
   });
 
   test("エラーハンドリングと境界値", async ({ page }) => {
@@ -268,7 +276,9 @@ test.describe("Comprehensive E2E Coverage", () => {
       isString: true,
     });
     expect(results["all_face_rotations"].length).toBe(18); // 6面 × 3修飾子
-    expect(results["all_face_rotations"].every((t: any) => t.success)).toBe(true);
+    expect(results["all_face_rotations"].every((t: any) => t.success)).toBe(
+      true,
+    );
   });
 
   test("パフォーマンスと一貫性の検証", async ({ page }) => {
@@ -295,7 +305,9 @@ test.describe("Comprehensive E2E Coverage", () => {
       // 逆操作で元の状態に戻るか
       const scramble = "R U F";
       const scrambled = JSON.parse(wasm.apply_moves(solved, scramble)).state;
-      const reversed = JSON.parse(wasm.apply_moves(scrambled, "F' U' R'")).state;
+      const reversed = JSON.parse(
+        wasm.apply_moves(scrambled, "F' U' R'"),
+      ).state;
       tests["reversible_operations"] = {
         returnToSolved: reversed === solved,
       };
@@ -312,7 +324,9 @@ test.describe("Comprehensive E2E Coverage", () => {
       // 回転操作のコンポーズ
       const viaCompose = JSON.parse(wasm.apply_moves(solved, "R U R U")).state;
       const viaSeparate1 = JSON.parse(wasm.apply_moves(solved, "R U")).state;
-      const viaSeparate2 = JSON.parse(wasm.apply_moves(viaSeparate1, "R U")).state;
+      const viaSeparate2 = JSON.parse(
+        wasm.apply_moves(viaSeparate1, "R U"),
+      ).state;
       tests["operation_compose"] = {
         consistent: viaCompose === viaSeparate2,
       };

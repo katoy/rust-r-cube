@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { ARROW_COLORS, inverse, FACES } from "../web/model";
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 async function ready(page: Page) {
   await page.goto("/");
@@ -270,9 +271,7 @@ test("orientation mode toggle correctly changes solve behavior", async ({
   await page.locator("#include-orientation").check();
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
-  const moveCountWithOrientation = await page
-    .locator(".solution-move")
-    .count();
+  const moveCountWithOrientation = await page.locator(".solution-move").count();
   expect(moveCountWithOrientation).toBeGreaterThan(0);
 
   // 解法の最後まで進む
@@ -318,7 +317,9 @@ test("orientation mode unchecked solves to color-only completion", async ({
 
   // 向きを無視したモードで解く
   await page.locator("#solve").click();
-  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 15000,
+  });
 
   // 最後の状態で色が揃っているか確認
   await page.locator(".solution-move").last().click();
@@ -329,22 +330,33 @@ test("arrow indicators display piece orientation", async ({ page }) => {
   await ready(page);
   await page.locator("#reduced-motion").check();
 
+  // 3Dシーンに54本の矢印が存在することを確認（6面 × 9セル = 54セルすべて）
+  const arrowCount = await page.evaluate(
+    () => (window as any).cube_scene?.getArrowCount() ?? 0,
+  );
+  expect(arrowCount).toBe(54);
+
   // スクランブルして矢印表示を生成
   await page.locator("#scramble").click();
 
-  // 3D シーンに矢印メッシュが追加されているか確認
-  // SVG または Canvas 要素で確認
-  const scene = page.locator("#scene");
-  await expect(scene).toBeVisible();
+  // スクランブル後も矢印が54本存在することを確認
+  const scrambledArrowCount = await page.evaluate(
+    () => (window as any).cube_scene?.getArrowCount() ?? 0,
+  );
+  expect(scrambledArrowCount).toBe(54);
 
-  // スクリーンショットを撮って矢印が表示されているか確認
+  // スクリーンショットを撮影
   await page.screenshot({
     path: "test-results/arrows-visible.png",
     fullPage: false,
   });
 
-  // リセット後、矢印が更新されることを確認
+  // リセット後、矢印が維持されることを確認
   await page.locator("#reset").click();
+  const resetArrowCount = await page.evaluate(
+    () => (window as any).cube_scene?.getArrowCount() ?? 0,
+  );
+  expect(resetArrowCount).toBe(54);
 
   await page.screenshot({
     path: "test-results/arrows-reset.png",
@@ -408,7 +420,7 @@ test("persistence saves and loads state correctly", async ({ page }) => {
 test("large number of moves is handled correctly", async ({ page }) => {
   await ready(page);
   await page.locator("#reduced-motion").check();
-  
+
   // 多数の動きを入力
   const largeMoves = "R U R' U' ".repeat(20).trim();
   await page.getByRole("tab", { name: "手順を入力" }).click();
@@ -419,8 +431,10 @@ test("large number of moves is handled correctly", async ({ page }) => {
 
   // 解法を探す
   await page.locator("#solve").click();
-  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 20000 });
-  
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 20000,
+  });
+
   // 解法が存在することを確認
   const moveCount = await page.locator(".solution-move").count();
   expect(moveCount).toBeGreaterThan(0);
@@ -464,17 +478,24 @@ test("arrows are displayed on initial solved state", async ({ page }) => {
   await ready(page);
   await page.locator("#reduced-motion").check();
 
-  // 初期画面（SOLVED 状態）で矢印グループが存在するか確認
-  const hasArrows = await page.evaluate(() => {
-    // グローバル scene オブジェクトにアクセス（TypeScript の scene.ts で公開されている場合）
-    // または、Canvas の描画内容から矢印が存在するか判断
-    const canvas = document.querySelector("canvas");
-    return canvas !== null && canvas.width > 0 && canvas.height > 0;
+  // 初期画面（SOLVED 状態）で矢印が54本存在し、すべて揃っている状態（グリーン: ARROW_COLORS.NORMAL）であることを検証
+  const arrowInfo = await page.evaluate(() => {
+    const scene = (window as any).cube_scene;
+    const arrows = scene?.getArrows() ?? [];
+    return {
+      count: arrows.length,
+      colors: arrows.map((a: any) =>
+        (a.material?.color ?? a.cone?.material?.color).getHex(),
+      ),
+    };
   });
 
-  expect(hasArrows).toBe(true);
+  expect(arrowInfo.count).toBe(54);
+  expect(arrowInfo.colors.every((c: number) => c === ARROW_COLORS.NORMAL)).toBe(
+    true,
+  );
 
-  // 矢印が実際に描画されていることをスクリーンショットで確認
+  // スクリーンショット保存
   await page.screenshot({
     path: "test-results/arrows-initial.png",
   });
@@ -484,9 +505,17 @@ test("arrows update after scramble", async ({ page }) => {
   await ready(page);
   await page.locator("#reduced-motion").check();
 
-  // 初期状態のスクリーンショット
-  const initialState = await state(page);
-  expect(initialState).toBe(SOLVED);
+  // 初期状態
+  const initialColors = await page.evaluate(() => {
+    const arrows = (window as any).cube_scene?.getArrows() ?? [];
+    return arrows.map((a: any) =>
+      (a.material?.color ?? a.cone?.material?.color).getHex(),
+    );
+  });
+  expect(initialColors.length).toBe(54);
+  expect(initialColors.every((c: number) => c === ARROW_COLORS.NORMAL)).toBe(
+    true,
+  );
 
   await page.screenshot({
     path: "test-results/arrows-before-scramble.png",
@@ -495,22 +524,23 @@ test("arrows update after scramble", async ({ page }) => {
   // スクランブル実行
   await page.locator("#scramble").click();
 
-  // 状態が変わったことを確認
-  const scrambledState = await state(page);
-  expect(scrambledState).not.toBe(SOLVED);
+  // スクランブル後の矢印（ピースの向きが乱れたため、グリーン以外の警告色が含まれる）
+  const scrambledColors = await page.evaluate(() => {
+    const arrows = (window as any).cube_scene?.getArrows() ?? [];
+    return arrows.map((a: any) =>
+      (a.material?.color ?? a.cone?.material?.color).getHex(),
+    );
+  });
 
-  // スクランブル後のスクリーンショット（矢印が更新されているはず）
+  expect(scrambledColors.length).toBe(54);
+  // スクランブル後はねじれ・反転が生じるため、一部の矢印の色が変化している
+  expect(scrambledColors.some((c: number) => c !== ARROW_COLORS.NORMAL)).toBe(
+    true,
+  );
+
   await page.screenshot({
     path: "test-results/arrows-after-scramble.png",
   });
-
-  // Canvas が更新されていることを確認
-  const canvasExists = await page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    return canvas !== null && canvas.width > 0 && canvas.height > 0;
-  });
-
-  expect(canvasExists).toBe(true);
 });
 
 test("arrows visibility persists during solve", async ({ page }) => {
@@ -520,7 +550,6 @@ test("arrows visibility persists during solve", async ({ page }) => {
   // スクランブル
   await page.locator("#scramble").click();
 
-  // 矢印が表示されている状態をスクリーンショット
   await page.screenshot({
     path: "test-results/arrows-before-solve.png",
   });
@@ -529,7 +558,12 @@ test("arrows visibility persists during solve", async ({ page }) => {
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
 
-  // 解法中のスクリーンショット（矢印が表示されたままか確認）
+  // 解法中の矢印存在確認
+  const duringSolveArrowCount = await page.evaluate(
+    () => (window as any).cube_scene?.getArrowCount() ?? 0,
+  );
+  expect(duringSolveArrowCount).toBe(54);
+
   await page.screenshot({
     path: "test-results/arrows-during-solve.png",
   });
@@ -538,8 +572,256 @@ test("arrows visibility persists during solve", async ({ page }) => {
   await page.locator(".solution-move").last().click();
   expect(await state(page)).toBe(SOLVED);
 
-  // 解法完了後のスクリーンショット（矢印が最終状態で表示されている）
+  // 解法完了後はすべてのピースの向きが揃い、全54本がグリーンに戻る
+  const solvedColors = await page.evaluate(() => {
+    const arrows = (window as any).cube_scene?.getArrows() ?? [];
+    return arrows.map((a: any) =>
+      (a.material?.color ?? a.cone?.material?.color).getHex(),
+    );
+  });
+  expect(solvedColors.length).toBe(54);
+  expect(solvedColors.every((c: number) => c === ARROW_COLORS.NORMAL)).toBe(
+    true,
+  );
+
   await page.screenshot({
     path: "test-results/arrows-after-solve.png",
   });
+});
+
+test("arrow orientations update correctly on all faces for all moves (U, R, F, D, L, B, inverses, doubles)", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator("#reduced-motion").check();
+
+  const getArrowData = async () => {
+    return page.evaluate(() => {
+      const scene = (window as any).cube_scene;
+      const arrows = scene?.getArrows() ?? [];
+      return arrows.map((a: any) => ({
+        stickerIdx: a.userData?.stickerIdx as number,
+        color: (
+          a.material?.color ?? a.cone?.material?.color
+        ).getHex() as number,
+        rotAngle: a.userData?.rotAngle as number,
+        kind: a.userData?.kind as "corner" | "edge" | "center",
+        pieceIdx: a.userData?.pieceIdx as number,
+      }));
+    });
+  };
+
+  // 1. 初期状態: 全54セルが揃っている（グリーン: ARROW_COLORS.NORMAL, rotAngle: 0）
+  let arrows = await getArrowData();
+  expect(arrows.length).toBe(54);
+  expect(
+    arrows.every(
+      (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+    ),
+  ).toBe(true);
+
+  // 2. U 操作: セル表面に印刷されているため、U面上の9セルすべて（センター含む）の矢印が +90度（π/2）回転する
+  await page.locator('[data-move="U"]').click();
+  arrows = await getArrowData();
+
+  await page.screenshot({
+    path: "test-results/arrows-after-u-move.png",
+  });
+
+  // U面の9セル（インデックス 0..8）はすべて π/2（約1.5708 rad）回転
+  const uFaceArrows = arrows.filter((a) => a.stickerIdx < 9);
+  expect(uFaceArrows.length).toBe(9);
+  expect(
+    uFaceArrows.every((a) => Math.abs(a.rotAngle - Math.PI / 2) < 1e-4),
+  ).toBe(true);
+
+  // U' (Shift+U) で元に戻る（全54セルが 0 rad, グリーン）
+  await page.keyboard.press("Shift+U");
+  arrows = await getArrowData();
+  expect(
+    arrows.every(
+      (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+    ),
+  ).toBe(true);
+
+  // 3. U2 操作: U面上の9セルすべての矢印が 180度（π rad）回転する
+  await algorithm(page, "U2");
+  arrows = await getArrowData();
+  const u2FaceArrows = arrows.filter((a) => a.stickerIdx < 9);
+  expect(u2FaceArrows.length).toBe(9);
+  expect(
+    u2FaceArrows.every((a) => Math.abs(Math.abs(a.rotAngle) - Math.PI) < 1e-4),
+  ).toBe(true);
+
+  // U2 で元に戻す
+  await algorithm(page, "U2");
+  arrows = await getArrowData();
+  expect(
+    arrows.every(
+      (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+    ),
+  ).toBe(true);
+
+  // 4. 全6面（U, R, F, D, L, B）の各操作で、その面の9セルがすべて +90度（π/2）回転し、
+  //    4回回転で完全に元通りになることを全操作で検証
+  const faceChars = ["U", "R", "F", "D", "L", "B"];
+  for (let f = 0; f < 6; f++) {
+    const face = faceChars[f];
+    // 1回回転
+    await algorithm(page, face);
+    arrows = await getArrowData();
+
+    // その面の9セル（f * 9 .. f * 9 + 8）はすべて π/2 回転している
+    const faceArrows = arrows.filter(
+      (a) => a.stickerIdx >= f * 9 && a.stickerIdx < (f + 1) * 9,
+    );
+    expect(faceArrows.length).toBe(9);
+    expect(
+      faceArrows.every((a) => Math.abs(a.rotAngle - Math.PI / 2) < 1e-4),
+    ).toBe(true);
+
+    // 逆回転（face'）で直ちに全54セルが元通り（0 rad, グリーン）に復帰
+    await algorithm(page, face + "'");
+    arrows = await getArrowData();
+    expect(
+      arrows.every(
+        (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+      ),
+    ).toBe(true);
+
+    // 4回回転（face * 4）で全54セルが元通り（0 rad, グリーン）に復帰
+    await algorithm(page, `${face} ${face} ${face} ${face}`);
+    arrows = await getArrowData();
+    expect(
+      arrows.every(
+        (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+      ),
+    ).toBe(true);
+  }
+});
+
+test("all 18 basic moves correctly update arrow orientations on all faces", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator("#reduced-motion").check();
+
+  const getArrowData = async () => {
+    return page.evaluate(() => {
+      const scene = (window as any).cube_scene;
+      const arrows = scene?.getArrows() ?? [];
+      return arrows.map((a: any) => ({
+        stickerIdx: a.userData?.stickerIdx as number,
+        color: (
+          a.material?.color ?? a.cone?.material?.color
+        ).getHex() as number,
+        rotAngle: a.userData?.rotAngle as number,
+        kind: a.userData?.kind as "corner" | "edge" | "center",
+        pieceIdx: a.userData?.pieceIdx as number,
+      }));
+    });
+  };
+
+  // 全18操作: 6面 × ["", "'", "2"]
+  const faces = ["U", "R", "F", "D", "L", "B"];
+  const suffixes = ["", "'", "2"];
+
+  for (let f = 0; f < 6; f++) {
+    const face = faces[f];
+    for (const suffix of suffixes) {
+      const move = face + suffix;
+
+      // 1. 操作を実行
+      await algorithm(page, move);
+      const arrows = await getArrowData();
+      expect(arrows.length).toBe(54);
+
+      // 期待される回転角 (rad)
+      const expectedAngle =
+        suffix === "" ? Math.PI / 2 : suffix === "'" ? -Math.PI / 2 : Math.PI;
+
+      // 回転した面 (f * 9 .. f * 9 + 8) の9セルすべての矢印が expectedAngle であること
+      const turnedFaceArrows = arrows.filter(
+        (a) => a.stickerIdx >= f * 9 && a.stickerIdx < (f + 1) * 9,
+      );
+      expect(turnedFaceArrows.length).toBe(9);
+      expect(
+        turnedFaceArrows.every(
+          (a) =>
+            Math.abs(Math.abs(a.rotAngle) - Math.abs(expectedAngle)) < 1e-4,
+        ),
+      ).toBe(true);
+
+      // 反対面（U:D, R:L, F:B, D:U, L:R, B:F）の9セルは、全く動かないため 0 rad（正常色）のままであること
+      const oppositeFaceIdx = [3, 4, 5, 0, 1, 2][f];
+      const oppositeFaceArrows = arrows.filter(
+        (a) =>
+          a.stickerIdx >= oppositeFaceIdx * 9 &&
+          a.stickerIdx < (oppositeFaceIdx + 1) * 9,
+      );
+      expect(oppositeFaceArrows.length).toBe(9);
+      expect(
+        oppositeFaceArrows.every(
+          (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+        ),
+      ).toBe(true);
+
+      // 2. 逆操作を実行して元に戻す
+      await algorithm(page, inverse(move));
+      const resetArrows = await getArrowData();
+      expect(resetArrows.length).toBe(54);
+      expect(
+        resetArrows.every(
+          (a) => a.color === ARROW_COLORS.NORMAL && Math.abs(a.rotAngle) < 1e-4,
+        ),
+      ).toBe(true);
+    }
+  }
+});
+
+test("orientation mode solves cube so that all centers are also oriented correctly to 0", async ({
+  page,
+}) => {
+  await ready(page);
+
+  // 1. 向きモードをONにし、reduced-motionを有効にする
+  await page.locator("#reduced-motion").check();
+  await page.locator("#include-orientation").check();
+
+  // 2. 操作を実行（例: U 操作で U センターが回転する）
+  await algorithm(page, "U R U' R'");
+
+  // 3. 解法探索を実行
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
+
+  // 4. 解法の最後まで進む
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 5. 全 54 セルの矢印が完全に NORMAL (緑、0 rad) に揃っていることを検証
+  const arrowData = await page.evaluate(() => {
+    const scene = (window as any).cube_scene;
+    const arrows = scene?.getArrows() ?? [];
+    return arrows.map((a: any) => ({
+      stickerIdx: a.userData?.stickerIdx as number,
+      color: (a.material?.color ?? a.cone?.material?.color).getHex() as number,
+      rotAngle: a.userData?.rotAngle as number,
+    }));
+  });
+
+  expect(arrowData.length).toBe(54);
+  for (const arrow of arrowData) {
+    expect(arrow.color).toBe(ARROW_COLORS.NORMAL);
+    expect(Math.abs(arrow.rotAngle)).toBeLessThan(1e-4);
+  }
+
+  // 6. 全 6 面の centerRotations がすべて 0 であることを検証
+  const centerRotations = await page.evaluate(() => {
+    const scene = (window as any).cube_scene;
+    return scene.centerRotations;
+  });
+  expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });

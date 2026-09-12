@@ -1,5 +1,6 @@
 import "./style.css";
-import init, { apply_moves, validate, scramble } from "../pkg/cube_studio";
+import init, * as cubeStudio from "../pkg/cube_studio";
+const { apply_moves, validate, scramble } = cubeStudio;
 import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
 import { SOLVED, FACES, inverse, instruction, type ResultData } from "./model";
 import { mount, icon, net } from "./view";
@@ -69,6 +70,9 @@ function persist() {
 function replace(next: string, record = true) {
   stop();
   cancelSearch();
+  if (next === SOLVED) {
+    scene?.resetCenterRotations();
+  }
   if (record && state !== next) {
     history.push(state);
     if (history.length > 200) history.shift();
@@ -151,6 +155,7 @@ function fallback() {
 }
 try {
   scene = new CubeScene($("scene"));
+  (window as any).cube_scene = scene;
   $("scene").addEventListener("render-failed", fallback);
 } catch {
   fallback();
@@ -211,7 +216,15 @@ async function play() {
   ) {
     await seek(step + 1);
     if (reduced.checked)
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          Math.max(
+            30,
+            Math.round(Number($<HTMLSelectElement>("speed").value) / 10),
+          ),
+        ),
+      );
   }
   if (solution === data && run === playbackRun) {
     playing = false;
@@ -243,13 +256,17 @@ async function applyAlgorithm(algorithm: string, animate = true) {
       scene &&
       !reduced.checked
     );
-    refresh();
-    if (inMotion)
+    if (inMotion) {
+      refresh();
       await scene!.turn(
         result.moves[0],
         state,
         Number($<HTMLSelectElement>("speed").value),
       );
+    } else {
+      result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+      refresh();
+    }
     if (token === motion) {
       inMotion = false;
       refresh();
@@ -279,7 +296,14 @@ async function solve(budget = 5000) {
       $("solver-note").textContent =
         `探索中 · ${((performance.now() - start) / 1000).toFixed(1)} 秒 / ${budget / 1000} 秒`;
     }, 100);
-    const result = await solver.solve(state, at, budget, includeOrientation.checked);
+    const result = await solver.solve(
+      state,
+      at,
+      budget,
+      includeOrientation.checked,
+      scene ? [...scene.centerRotations] : undefined,
+    );
+
     if (revision !== at) return;
     solution = result;
     step = 0;
@@ -496,6 +520,7 @@ refresh();
 async function start() {
   try {
     await init({ module_or_path: wasmUrl });
+    (window as any).cube_studio = cubeStudio;
     mainReady = true;
     try {
       const raw = localStorage.getItem(storageKey);

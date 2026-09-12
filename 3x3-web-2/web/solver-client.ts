@@ -58,7 +58,13 @@ export class SolverClient {
       }
     };
   }
-  solve(state: string, revision: number, budget: number, includeOrientation = true) {
+  solve(
+    state: string,
+    revision: number,
+    budget: number,
+    includeOrientation = true,
+    centerRotations?: number[],
+  ) {
     if (!this.ready)
       return Promise.reject(new Error("エンジンの準備完了をお待ちください。"));
     this.disposeRequest();
@@ -72,9 +78,18 @@ export class SolverClient {
           ),
         budget + 1500,
       );
-      this.worker!.postMessage({ kind: "solve", id, revision, state, budget, includeOrientation });
+      this.worker!.postMessage({
+        kind: "solve",
+        id,
+        revision,
+        state,
+        budget,
+        includeOrientation,
+        centerRotations,
+      });
     });
   }
+
   cancel() {
     this.restart();
   }

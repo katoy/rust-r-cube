@@ -1,34 +1,34 @@
 {
-  "timestamp": "2026-09-12T04:03:51.671Z",
+  "timestamp": "2026-09-12T20:39:36.645Z",
   "url": "http://127.0.0.1:5173/",
-  "totalTime": 2979,
-  "averageTime": 595.8,
+  "totalTime": 3073,
+  "averageTime": 614.6,
   "operationCount": 5,
   "operations": [
     {
-      "timestamp": 1789185828667,
+      "timestamp": 1789245573547,
       "operation": "page_load",
-      "duration": 1322
+      "duration": 1264
     },
     {
-      "timestamp": 1789185829989,
+      "timestamp": 1789245574811,
       "operation": "scramble",
-      "duration": 350
+      "duration": 348
     },
     {
-      "timestamp": 1789185830339,
+      "timestamp": 1789245575159,
       "operation": "solve",
-      "duration": 280
+      "duration": 271
     },
     {
-      "timestamp": 1789185830619,
+      "timestamp": 1789245575430,
       "operation": "playback",
-      "duration": 676
+      "duration": 846
     },
     {
-      "timestamp": 1789185831295,
+      "timestamp": 1789245576276,
       "operation": "reset",
-      "duration": 351
+      "duration": 344
     }
   ],
   "consoleLogs": [
@@ -39,22 +39,6 @@
     {
       "type": "debug",
       "message": "[vite] connected."
-    },
-    {
-      "type": "warning",
-      "message": "[.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
-    },
-    {
-      "type": "warning",
-      "message": "[.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
-    },
-    {
-      "type": "warning",
-      "message": "[.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
-    },
-    {
-      "type": "warning",
-      "message": "[.WebGL-0x1040043d800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
     }
   ]
 }

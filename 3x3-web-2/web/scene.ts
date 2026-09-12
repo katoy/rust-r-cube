@@ -1,34 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { COLORS, FACES } from "./model";
-
-// ピース位置定義
-const CORNERS = [
-  [8, 9, 20],
-  [6, 18, 38],
-  [0, 36, 47],
-  [2, 45, 11],
-  [29, 26, 15],
-  [27, 44, 24],
-  [33, 53, 42],
-  [35, 17, 51],
-];
-
-const EDGES = [
-  [5, 10],
-  [7, 19],
-  [3, 37],
-  [1, 46],
-  [32, 16],
-  [28, 25],
-  [30, 43],
-  [34, 52],
-  [23, 12],
-  [21, 41],
-  [50, 39],
-  [48, 14],
-];
+import { COLORS, FACES, getCellArrowInfo, ARROW_COLORS } from "./model";
 
 const normal = [
   new THREE.Vector3(0, 1, 0),
@@ -37,6 +10,15 @@ const normal = [
   new THREE.Vector3(0, -1, 0),
   new THREE.Vector3(-1, 0, 0),
   new THREE.Vector3(0, 0, -1),
+];
+
+const faceUp = [
+  new THREE.Vector3(0, 0, -1), // 0: U (奥方向)
+  new THREE.Vector3(0, 1, 0), // 1: R (上)
+  new THREE.Vector3(0, 1, 0), // 2: F (上)
+  new THREE.Vector3(0, 0, 1), // 3: D (手前方向)
+  new THREE.Vector3(0, 1, 0), // 4: L (上)
+  new THREE.Vector3(0, 1, 0), // 5: B (上)
 ];
 function position(face: number, row: number, col: number) {
   return new THREE.Vector3(
@@ -62,6 +44,8 @@ export class CubeScene {
   >[] = [];
   private pieces: THREE.Object3D[] = [];
   private arrowGroup = new THREE.Group(); // 矢印グループ
+  centerRotations: number[] = [0, 0, 0, 0, 0, 0];
+  private centerLabels: THREE.Mesh[] = [];
   private active?: {
     layer: THREE.Group;
     axis: THREE.Vector3;
@@ -147,22 +131,31 @@ export class CubeScene {
           canvas.height = 128;
           const ctx = canvas.getContext("2d")!;
           ctx.fillStyle = "#16231f";
-          ctx.font = "500 46px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(FACES[f], 64, 66);
+          ctx.font = "700 32px sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+          ctx.fillText(FACES[f], 14, 12);
           const texture = new THREE.CanvasTexture(canvas);
           const label = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.5, 0.5),
+            new THREE.PlaneGeometry(0.855, 0.855),
             new THREE.MeshBasicMaterial({
               map: texture,
               transparent: true,
               depthWrite: false,
             }),
           );
-          label.position.copy(mesh.position).addScaledVector(normal[f], 0.016);
-          label.quaternion.copy(mesh.quaternion);
-          // Orient the face labels upright in the same frame as the facelet grid.
+          label.position.copy(mesh.position).addScaledVector(normal[f], 0.017);
+          const n = normal[f];
+          const baseUp = faceUp[f].clone();
+          const zAxis = n.clone().normalize();
+          const yAxis = baseUp.clone().normalize();
+          const xAxis = new THREE.Vector3()
+            .crossVectors(yAxis, zAxis)
+            .normalize();
+          const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+          label.quaternion.setFromRotationMatrix(rotMatrix);
+          label.renderOrder = 9;
+          this.centerLabels[f] = label;
           this.add(label);
         }
       }
@@ -235,46 +228,153 @@ export class CubeScene {
       );
     });
     // 矢印を更新
-    this.updateArrows();
+    this.updateArrows(state);
   }
 
-  private updateArrows() {
+  getArrowCount(): number {
+    return this.getArrows().length;
+  }
+
+  getArrows(): THREE.Mesh[] {
+    return (this.arrowGroup.children as THREE.Mesh[]).filter(
+      (m) => m.userData?.stickerIdx !== undefined && !m.userData?.isOutline,
+    );
+  }
+
+  applyMoveToCenters(move: string) {
+    const f = FACES.indexOf(move[0]);
+    if (f >= 0) {
+      const dAngle = move.endsWith("2")
+        ? Math.PI
+        : move.endsWith("'")
+          ? -Math.PI / 2
+          : Math.PI / 2;
+      this.centerRotations[f] =
+        (this.centerRotations[f] + dAngle) % (2 * Math.PI);
+      this.updateCenterLabels();
+    }
+  }
+
+  resetCenterRotations() {
+    this.centerRotations.fill(0);
+    this.updateCenterLabels();
+  }
+
+  private updateCenterLabels() {
+    for (let f = 0; f < 6; f++) {
+      const label = this.centerLabels[f];
+      if (!label) continue;
+      const angle = this.centerRotations[f] ?? 0;
+      const n = normal[f];
+      const baseUp = faceUp[f].clone().applyAxisAngle(n, angle);
+      const zAxis = n.clone().normalize();
+      const yAxis = baseUp.clone().normalize();
+      const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+      const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+      label.quaternion.setFromRotationMatrix(rotMatrix);
+    }
+  }
+
+  private updateArrows(state?: string) {
     // 既存の矢印を削除
     this.arrowGroup.clear();
+    if (!state || state.length < 54) return;
 
-    // コーナーピースの矢印を作成
-    CORNERS.forEach((indices, i) => {
-      const center = this.getCenter(indices);
-      const firstPos = this.stickers[indices[0]].position;
-      const direction = new THREE.Vector3().subVectors(firstPos, center).normalize();
+    this.updateCenterLabels();
 
-      const arrow = new THREE.ArrowHelper(
-        direction,
-        center,
-        0.3,
-        0xff9800,
-        0.15,
-        0.1,
-      );
-      this.arrowGroup.add(arrow);
+    const arrowInfo = getCellArrowInfo(state, this.centerRotations);
+
+    // セル表面に貼り付ける矢印の共通ジオメトリ
+    const stemW = 0.05;
+    const stemH = 0.16;
+    const headW = 0.15;
+    const headH = 0.22;
+    const notch = 0.03;
+
+    // 内側のカラー矢印
+    const arrowShape = new THREE.Shape();
+    arrowShape.moveTo(-stemW, -stemH);
+    arrowShape.lineTo(stemW, -stemH);
+    arrowShape.lineTo(stemW, notch);
+    arrowShape.lineTo(headW, notch);
+    arrowShape.lineTo(0, headH);
+    arrowShape.lineTo(-headW, notch);
+    arrowShape.lineTo(-stemW, notch);
+    arrowShape.closePath();
+    const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
+
+    // 外側の暗色アウトライン（あらゆるステッカー地色から矢印をくっきり際立たせる）
+    const o = 0.022;
+    const outlineShape = new THREE.Shape();
+    outlineShape.moveTo(-(stemW + o), -(stemH + o));
+    outlineShape.lineTo(stemW + o, -(stemH + o));
+    outlineShape.lineTo(stemW + o, notch - o * 0.4);
+    outlineShape.lineTo(headW + o * 1.3, notch - o * 0.4);
+    outlineShape.lineTo(0, headH + o * 1.3);
+    outlineShape.lineTo(-(headW + o * 1.3), notch - o * 0.4);
+    outlineShape.lineTo(-(stemW + o), notch - o * 0.4);
+    outlineShape.closePath();
+    const outlineGeometry = new THREE.ShapeGeometry(outlineShape);
+
+    const outlineMaterial = new THREE.MeshBasicMaterial({
+      color: ARROW_COLORS.OUTLINE,
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
 
-    // エッジピースの矢印を作成
-    EDGES.forEach((indices, i) => {
-      const center = this.getCenter(indices);
-      const firstPos = this.stickers[indices[0]].position;
-      const direction = new THREE.Vector3().subVectors(firstPos, center).normalize();
+    // 全54セルの矢印を配置（各セルの表面に印刷された向き・角度）
+    for (let i = 0; i < 54; i++) {
+      const stickerMesh = this.stickers[i];
+      const faceIdx = Math.floor(i / 9);
+      const n = normal[faceIdx];
+      const angle = arrowInfo.angles[i];
+      const color = arrowInfo.colors[i];
+      const kind = arrowInfo.kinds[i];
+      const pieceIdx = arrowInfo.pieceIndices[i];
 
-      const arrow = new THREE.ArrowHelper(
-        direction,
-        center,
-        0.25,
-        0x9c27b0,
-        0.12,
-        0.08,
-      );
-      this.arrowGroup.add(arrow);
-    });
+      // 共通の回転姿勢（面の基準上方向から angle 回転）
+      const baseUp = faceUp[faceIdx].clone();
+      const targetDir = baseUp.applyAxisAngle(n, angle);
+      const zAxis = n.clone().normalize();
+      const yAxis = targetDir.clone().normalize();
+      const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+      const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+
+      // 1. 暗色アウトラインメッシュ（背景ステッカーとの境界を明確化）
+      const outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
+      outlineMesh.userData = { isOutline: true, stickerIdx: i };
+      outlineMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.015);
+      outlineMesh.quaternion.setFromRotationMatrix(rotMatrix);
+      outlineMesh.renderOrder = 10;
+      this.arrowGroup.add(outlineMesh);
+
+      // 2. 内側のカラー矢印メッシュ
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      const arrowMesh = new THREE.Mesh(arrowGeometry, mat);
+      arrowMesh.userData = {
+        stickerIdx: i,
+        color,
+        rotAngle: angle,
+        kind,
+        pieceIdx,
+      };
+
+      // セル表面から 0.017 浮かせ、アウトラインの前面に密着して表示
+      arrowMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.017);
+      arrowMesh.quaternion.setFromRotationMatrix(rotMatrix);
+      arrowMesh.renderOrder = 11;
+
+      this.arrowGroup.add(arrowMesh);
+    }
   }
 
   private getCenter(indices: number[]): THREE.Vector3 {
@@ -287,10 +387,12 @@ export class CubeScene {
   }
   async turn(move: string, state: string, duration: number) {
     this.finish();
+    this.applyMoveToCenters(move);
     if (duration <= 0) {
       this.show(state, this.next);
       return;
     }
+    this.arrowGroup.visible = false;
     const axis = normal[FACES.indexOf(move[0])];
     const layer = new THREE.Group();
     this.root.add(layer);
@@ -323,6 +425,7 @@ export class CubeScene {
       mesh.quaternion.copy(mesh.userData.rotation);
     }
     this.root.remove(active.layer);
+    this.arrowGroup.visible = true;
     active.finish();
   }
   private frame(time: number) {

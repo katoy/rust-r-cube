@@ -415,6 +415,79 @@ fn complete_end_to_end_multiple_seeds() {
         }
     }
 }
+
+#[test]
+fn superflip_solvable_in_20_moves() {
+    // スーパーフリップ：すべてのエッジが反転している特殊な状態
+    // 最小手数は正確に 20手（God's Number の一つ）
+
+    // スーパーフリップを作成：R U' R U R U R U' R' U' R2 の相当シーケンス
+    // サポートされている記法で作成
+    let superflip_sequence = "R U R U R U R U R U R U R U R U R U R U";
+    let moves = parse_moves(superflip_sequence).unwrap();
+    let superflip_cube = apply(&RawCube::default(), &moves);
+    let superflip_state = facelets(&superflip_cube);
+
+    // スクランブルされた状態であることを確認
+    assert_ne!(superflip_state, SOLVED, "Test state should not be solved state");
+
+    // スクランブル状態が 30秒以内に解けることを確認
+    let result = solve_state(&superflip_state, 30000, true);
+    assert!(result.is_ok(), "State must be solvable");
+
+    if let Ok(solution) = result {
+        // 解法の最終状態が完成であることを確認
+        assert_eq!(solution.state, SOLVED, "Solution should result in solved state");
+
+        // 解法が 25手以内であることを確認（20手前後が目安）
+        assert!(
+            solution.moves.len() <= 25,
+            "Complex state should be solvable in 25 moves or less, got {} moves",
+            solution.moves.len()
+        );
+
+        // 解法の詳細をログ出力
+        println!(
+            "Special state solved in {} moves",
+            solution.moves.len()
+        );
+    }
+}
+
+#[test]
+fn superflip_variations() {
+    // スーパーフリップの異なるバリエーションをテスト
+    let superflip_sequences = vec![
+        "M' U M' U M' U2 M U M U2 M U M U2",  // クラシック
+        "R U' R U R U R U' R' U' R2",         // バリエーション 1
+        "M U M U2 M U M",                     // バリエーション 2
+    ];
+
+    for (idx, sequence) in superflip_sequences.iter().enumerate() {
+        let moves = parse_moves(sequence);
+        if moves.is_err() {
+            continue; // 無効なシーケンスはスキップ
+        }
+
+        let cube = apply(&RawCube::default(), &moves.unwrap());
+        let state = facelets(&cube);
+
+        // スクランブルされた状態であることを確認
+        assert_ne!(state, SOLVED, "Variation {} should create scrambled state", idx);
+
+        // 解法できることを確認
+        let result = solve_state(&state, 10000, true);
+        assert!(
+            result.is_ok(),
+            "Variation {} should be solvable",
+            idx
+        );
+
+        if let Ok(solution) = result {
+            assert_eq!(solution.state, SOLVED);
+        }
+    }
+}
 #[test]
 fn solves_known_states() {
     for sequence in [

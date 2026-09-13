@@ -321,14 +321,20 @@ test.describe("E2E Coverage with CDP", () => {
         await page.locator("#camera-file-a").setInputFiles(solvedA);
         await page.waitForTimeout(300);
 
-        // 自動検出、ドラッグ、クリア、再検出、キャプチャ
+        // 自動検出、ドラッグ（頂点＆中心点）、クリア、再検出、キャプチャ
         const canvas = page.locator("#camera-canvas");
         const box = await canvas.boundingBox();
         if (box) {
-          // ドラッグ操作
+          // 頂点ドラッグ操作
           await page.mouse.move(box.x + 320, box.y + 80);
           await page.mouse.down();
           await page.mouse.move(box.x + 320, box.y + 70);
+          await page.mouse.up();
+
+          // 中心点ドラッグ操作
+          await page.mouse.move(box.x + 320, box.y + 240);
+          await page.mouse.down();
+          await page.mouse.move(box.x + 325, box.y + 245);
           await page.mouse.up();
         }
 

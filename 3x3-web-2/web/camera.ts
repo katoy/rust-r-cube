@@ -117,9 +117,10 @@ export class TwoViewCamera {
   private sourceUrlB?: string;
   private currentView: "A" | "B" = "A";
   private points: Point[] = [];
+  private centerPoint?: Point;
   private faces: Partial<Record<(typeof FACES)[number], string>> = {};
-  private draggingIndex = -1;
-  private hoverIndex = -1;
+  private draggingIndex = -1; // 0..5: points, 6: centerPoint
+  private hoverIndex = -1; // 0..5: points, 6: centerPoint
   private dragMoved = false;
 
   constructor(private apply: Apply) {
@@ -135,16 +136,25 @@ export class TwoViewCamera {
       };
     };
 
+    const findHitTarget = (x: number, y: number) => {
+      // 外周6点または中心点（pointsが6点ある場合）から判定
+      // 中心点を優先または判定対象に含める
+      if (this.points.length === 6) {
+        const center = this.centerPoint ?? computeCenter(this.points);
+        if (Math.hypot(center.x - x, center.y - y) <= 22) {
+          return 6;
+        }
+      }
+      return this.points.findIndex((p) => Math.hypot(p.x - x, p.y - y) <= 22);
+    };
+
     const handlePointerDown = (clientX: number, clientY: number) => {
       const activeImage = this.activeImage;
       if (!activeImage) return;
       const { x, y } = toCanvasCoords(clientX, clientY);
       this.dragMoved = false;
 
-      // 既存のポイントで半径22px以内にあるものを探索
-      const hit = this.points.findIndex(
-        (p) => Math.hypot(p.x - x, p.y - y) <= 22,
-      );
+      const hit = findHitTarget(x, y);
       if (hit !== -1) {
         this.draggingIndex = hit;
         canvas.style.cursor = "grabbing";
@@ -161,13 +171,15 @@ export class TwoViewCamera {
 
       if (this.draggingIndex !== -1) {
         this.dragMoved = true;
-        this.points[this.draggingIndex] = { x, y };
+        if (this.draggingIndex === 6) {
+          this.centerPoint = { x, y };
+        } else {
+          this.points[this.draggingIndex] = { x, y };
+        }
         this.draw();
         this.update();
       } else {
-        const hit = this.points.findIndex(
-          (p) => Math.hypot(p.x - x, p.y - y) <= 22,
-        );
+        const hit = findHitTarget(x, y);
         this.hoverIndex = hit;
         canvas.style.cursor = hit !== -1 ? "grab" : "crosshair";
         this.draw();
@@ -272,6 +284,7 @@ export class TwoViewCamera {
     if (clearButton) {
       clearButton.onclick = () => {
         this.points = [];
+        this.centerPoint = undefined;
         this.draw();
         this.update();
       };
@@ -345,6 +358,7 @@ export class TwoViewCamera {
   open() {
     this.faces = {};
     this.points = [];
+    this.centerPoint = undefined;
     this.currentView = "A";
     this.imageA = undefined;
     this.imageB = undefined;
@@ -367,6 +381,7 @@ export class TwoViewCamera {
     if (this.currentView === view && this.points.length === 0) return;
     this.currentView = view;
     this.points = [];
+    this.centerPoint = undefined;
     this.renderImage();
     this.autoDetectOutline();
   }
@@ -412,6 +427,7 @@ export class TwoViewCamera {
     const activeImage = this.activeImage;
     if (!activeImage) {
       this.points = [];
+      this.centerPoint = undefined;
       this.draw();
       this.update();
       return;
@@ -419,6 +435,7 @@ export class TwoViewCamera {
     // まず画像をCanvasに描画した上で検出
     this.draw();
     this.points = detectCubeOutline(this.canvas, activeImage);
+    this.centerPoint = undefined;
     this.draw();
     this.update();
   }
@@ -433,7 +450,11 @@ export class TwoViewCamera {
         x: point.x * scaleX,
         y: point.y * scaleY,
       }));
-      const center = computeCenter(pts);
+      const rawCenter = this.centerPoint ?? computeCenter(this.points);
+      const center = {
+        x: rawCenter.x * scaleX,
+        y: rawCenter.y * scaleY,
+      };
       const [p1, p2, p3, p4, p5, p6] = pts;
 
       if (this.currentView === "A") {
@@ -455,6 +476,7 @@ export class TwoViewCamera {
       }
 
       this.points = [];
+      this.centerPoint = undefined;
       this.draw();
       this.update();
 
@@ -522,14 +544,9 @@ export class TwoViewCamera {
 
     // 6点揃ったら、中央点と各面の境界線を描画
     if (this.points.length === 6) {
-      const center = computeCenter(this.points);
-
-      // 中央点
-      context.fillStyle = "#facc15";
-      context.beginPath();
-      context.arc(center.x, center.y, 6, 0, Math.PI * 2);
-      context.fill();
-      context.fillText("中心", center.x + 10, center.y + 5);
+      const center = this.centerPoint ?? computeCenter(this.points);
+      const isCenterHovered =
+        this.hoverIndex === 6 || this.draggingIndex === 6;
 
       // 境界Y字線 (center -> P2, center -> P4, center -> P6)
       context.strokeStyle = "#facc15";
@@ -542,6 +559,25 @@ export class TwoViewCamera {
       context.moveTo(center.x, center.y);
       context.lineTo(this.points[5].x, this.points[5].y); // P6 (左上)
       context.stroke();
+
+      // 中央点ハンドル
+      context.beginPath();
+      context.arc(center.x, center.y, isCenterHovered ? 12 : 9, 0, Math.PI * 2);
+      context.fillStyle = isCenterHovered
+        ? "rgba(250, 204, 21, 0.4)"
+        : "rgba(250, 204, 21, 0.25)";
+      context.fill();
+
+      context.beginPath();
+      context.arc(center.x, center.y, isCenterHovered ? 7 : 5, 0, Math.PI * 2);
+      context.fillStyle = "#facc15";
+      context.fill();
+      context.strokeStyle = "#1e261e";
+      context.lineWidth = 2;
+      context.stroke();
+
+      context.fillStyle = "#ffffff";
+      context.fillText("中心", center.x + 10, center.y + 5);
     }
 
     // 各頂点の描画（ドラッグハンドル）
@@ -634,7 +670,7 @@ export class TwoViewCamera {
       const facesText =
         this.currentView === "A" ? "上面・右面・前面" : "下面・左面・背面";
       $("camera-help").textContent =
-        `画像${this.currentView}の6角を自動検出しました（各角をドラッグして微調整可能）。「この画像を読み取る」を押すと3面（${facesText}）を一括認識します。`;
+        `画像${this.currentView}の6角と中心点を自動検出しました（外周6角・中心点をドラッグして微調整可能）。「この3面を読み取る」を押すと3面（${facesText}）を一括認識します。`;
     }
     $("camera-error").textContent = "";
   }

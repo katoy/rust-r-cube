@@ -229,6 +229,15 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.waitForTimeout(100);
     await expect(page.locator("#camera-capture")).not.toBeDisabled();
 
+    // 中心点 (x=320, y=240 付近) をつかんでドラッグ微調整できる
+    const centerX = box.x + box.width * (320 / 640);
+    const centerY = box.y + box.height * (240 / 480);
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 10, centerY + 10);
+    await page.mouse.up();
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
+
     await page.locator("#camera-close").click();
   });
 

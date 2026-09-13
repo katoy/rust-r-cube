@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-09-13T19:13:01.379Z",
+  "timestamp": "2026-09-13T19:29:41.868Z",
   "method": "Browser DevTools Protocol (CDP)",
   "files": [
     {
-      "url": "http://127.0.0.1:5173/web/main.ts?t=1789282996273",
+      "url": "http://127.0.0.1:5173/web/main.ts?t=1789327728407",
       "covered": 581,
       "total": 581,
       "percentage": "100.00"
@@ -21,39 +21,27 @@
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/pkg/cube_studio.js?t=1789282996273",
+      "url": "http://127.0.0.1:5173/pkg/cube_studio.js?t=1789327728407",
       "covered": 366,
       "total": 366,
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/pkg/cube_studio_bg.wasm?import&t=1789282996273&url",
-      "covered": 2,
-      "total": 2,
-      "percentage": "100.00"
-    },
-    {
-      "url": "http://127.0.0.1:5173/web/editor.ts?t=1789282996273",
+      "url": "http://127.0.0.1:5173/web/editor.ts?t=1789327728407",
       "covered": 162,
       "total": 162,
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/web/model.ts?t=1789244925880",
-      "covered": 367,
-      "total": 367,
+      "url": "http://127.0.0.1:5173/pkg/cube_studio_bg.wasm?import&t=1789327728407&url",
+      "covered": 2,
+      "total": 2,
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/web/centers.ts?t=1789282996273",
-      "covered": 38,
-      "total": 38,
-      "percentage": "100.00"
-    },
-    {
-      "url": "http://127.0.0.1:5173/web/camera.ts?t=1789282989537",
-      "covered": 601,
-      "total": 601,
+      "url": "http://127.0.0.1:5173/web/camera.ts?t=1789327709192",
+      "covered": 638,
+      "total": 638,
       "percentage": "100.00"
     },
     {
@@ -63,15 +51,9 @@
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/web/view.ts?t=1789280998891",
-      "covered": 91,
-      "total": 91,
-      "percentage": "100.00"
-    },
-    {
-      "url": "http://127.0.0.1:5173/web/image-sampler.ts?t=1789271100198",
-      "covered": 75,
-      "total": 75,
+      "url": "http://127.0.0.1:5173/web/model.ts?t=1789244925880",
+      "covered": 367,
+      "total": 367,
       "percentage": "100.00"
     },
     {
@@ -81,21 +63,39 @@
       "percentage": "100.00"
     },
     {
+      "url": "http://127.0.0.1:5173/web/image-sampler.ts?t=1789271100198",
+      "covered": 75,
+      "total": 75,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/centers.ts?t=1789327728407",
+      "covered": 38,
+      "total": 38,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/view.ts?t=1789280998891",
+      "covered": 91,
+      "total": 91,
+      "percentage": "100.00"
+    },
+    {
       "url": "http://127.0.0.1:5173/web/scene.ts?t=1789265701583",
       "covered": 407,
       "total": 407,
       "percentage": "100.00"
     },
     {
-      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three.js?v=fd662a73",
-      "covered": 3,
-      "total": 3,
-      "percentage": "100.00"
-    },
-    {
       "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three_addons_geometries_RoundedBoxGeometry__js.js?v=fd662a73",
       "covered": 132,
       "total": 132,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three.js?v=fd662a73",
+      "covered": 3,
+      "total": 3,
       "percentage": "100.00"
     },
     {
@@ -130,8 +130,8 @@
     },
     {
       "url": "http://127.0.0.1:5173/web/camera.ts",
-      "covered": 601,
-      "total": 601,
+      "covered": 638,
+      "total": 638,
       "percentage": "100.00"
     },
     {

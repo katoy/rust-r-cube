@@ -7,6 +7,7 @@ import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
 import { ColorEditor } from "./editor";
 import { SolverClient } from "./solver-client";
+import { TwoViewCamera } from "./camera";
 import {
   automaticCenters,
   centerTurns,
@@ -139,7 +140,7 @@ function refresh() {
   $<HTMLButtonElement>("redo").disabled = !mainReady || future.length === 0;
   document
     .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#save,#load",
+      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load",
     )
     .forEach((b) => (b.disabled = !mainReady));
   $("solution-empty").hidden = !!solution;
@@ -364,11 +365,13 @@ async function solve(budget = 5000) {
 const editor = new ColorEditor(validate, (s, centers) =>
   replace(s, true, centers),
 );
+const camera = new TwoViewCamera((s) => editor.open(s, automaticCenters(s)));
 $("edit-colors").onclick = () => {
   stop();
   refresh();
   editor.open(state, centerRotations);
 };
+$("camera-colors").onclick = () => camera.open();
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);
 $("cancel").onclick = () => {

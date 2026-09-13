@@ -86,26 +86,31 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
 
   // ファイル別統計
   const stats = coverage
-    .filter((entry) => entry && entry.url && entry.text)
+    .filter((entry) => entry && entry.url && (entry.text || entry.source))
     .map((entry) => {
       const url = entry.url;
-      const text = entry.text || "";
-      const ranges = entry.ranges || [];
+      const text = entry.text || entry.source || "";
+      const ranges =
+        entry.ranges ||
+        entry.functions?.flatMap((fn: any) => fn.ranges || []) ||
+        [];
 
       // カバー済み行数を計算
       const lines = text.split("\n");
-      let coveredLines = 0;
+      const covered = new Set<number>();
       let totalLines = 0;
 
       if (ranges.length > 0) {
         ranges.forEach((range: any) => {
-          const startLine =
-            text.substring(0, range.start).split("\n").length - 1;
-          const endLine = text.substring(0, range.end).split("\n").length - 1;
+          if (range.count === 0) return;
+          const start = range.start ?? range.startOffset;
+          const end = range.end ?? range.endOffset;
+          const startLine = text.substring(0, start).split("\n").length - 1;
+          const endLine = text.substring(0, end).split("\n").length - 1;
 
           for (let i = startLine; i <= endLine; i++) {
             if (lines[i] && lines[i].trim().length > 0) {
-              coveredLines++;
+              covered.add(i);
             }
           }
         });
@@ -116,10 +121,10 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
 
       return {
         url,
-        covered: coveredLines,
+        covered: covered.size,
         total: totalLines,
         percentage:
-          totalLines > 0 ? ((coveredLines / totalLines) * 100).toFixed(2) : "0",
+          totalLines > 0 ? ((covered.size / totalLines) * 100).toFixed(2) : "0",
       };
     });
 

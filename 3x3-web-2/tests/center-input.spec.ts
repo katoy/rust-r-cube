@@ -180,3 +180,23 @@ test("clearing colors preserves manually specified center directions", async ({
   await expect(page.locator("#editor-error")).not.toBeEmpty();
   await expect(page.getByLabel("U センターの向き")).toHaveValue("2");
 });
+
+test("two-view image input opens with camera and file capture controls", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByRole("tab", { name: "色を入力" }).click();
+  await page.locator("#camera-colors").click();
+  await expect(page.locator("#camera-editor")).toBeVisible();
+  await expect(page.locator("#camera-file-a")).toHaveAttribute(
+    "capture",
+    "environment",
+  );
+  await expect(page.locator("#camera-file-b")).toHaveAttribute(
+    "capture",
+    "environment",
+  );
+  await expect(page.locator("#camera-capture")).toBeDisabled();
+  await page.locator("#camera-close").click();
+  await expect(page.locator("#camera-editor")).not.toBeVisible();
+});

@@ -31,7 +31,12 @@
       "Bash(xxd /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/cubes/superflip.json)",
       "mcp__tokensave__tokensave_search",
       "Bash(chmod +x /tmp/analyze_coverage.sh)",
-      "Bash(/tmp/analyze_coverage.sh)"
+      "Bash(/tmp/analyze_coverage.sh)",
+      "Bash(npm install *)",
+      "Bash(rtk npx *)",
+      "Bash(node *)",
+      "Bash(rtk playwright *)",
+      "Bash(npx playwright *)"
     ]
   }
 }

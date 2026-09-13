@@ -1,7 +1,116 @@
 {
-  "timestamp": "2026-09-13T00:39:09.155Z",
+  "timestamp": "2026-09-13T03:15:21.657Z",
   "method": "Browser DevTools Protocol (CDP)",
-  "files": [],
+  "files": [
+    {
+      "url": "http://127.0.0.1:5173/web/main.ts?t=1789266933378",
+      "covered": 568,
+      "total": 568,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "covered": 1255,
+      "total": 1255,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/style.css?t=1789266885243",
+      "covered": 6,
+      "total": 6,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/pkg/cube_studio.js?t=1789266897656",
+      "covered": 366,
+      "total": 366,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/editor.ts?t=1789266897656",
+      "covered": 162,
+      "total": 162,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/pkg/cube_studio_bg.wasm?t=1789266897656&import&url",
+      "covered": 2,
+      "total": 2,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/camera.ts?t=1789266933378",
+      "covered": 140,
+      "total": 140,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/solver-client.ts?t=1789244948151",
+      "covered": 79,
+      "total": 79,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/model.ts?t=1789244925880",
+      "covered": 367,
+      "total": 367,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/vite/dist/client/env.mjs",
+      "covered": 19,
+      "total": 19,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/centers.ts?t=1789266897656",
+      "covered": 38,
+      "total": 38,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/view.ts?t=1789266817745",
+      "covered": 91,
+      "total": 91,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/image-sampler.ts",
+      "covered": 74,
+      "total": 74,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/web/scene.ts?t=1789265701583",
+      "covered": 407,
+      "total": 407,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three.js?v=fd662a73",
+      "covered": 3,
+      "total": 3,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three_addons_geometries_RoundedBoxGeometry__js.js?v=fd662a73",
+      "covered": 132,
+      "total": 132,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three_addons_controls_OrbitControls__js.js?v=fd662a73",
+      "covered": 1122,
+      "total": 1122,
+      "percentage": "100.00"
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/three.module-Bj7iJlUn.js?v=fd662a73",
+      "covered": 52821,
+      "total": 52821,
+      "percentage": "100.00"
+    }
+  ],
   "wasmCallLog": [
     "initialize (via app startup)",
     "scramble (via UI button)",

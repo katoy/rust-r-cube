@@ -11,7 +11,6 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
         [-1, 0, 0], // L
         [0, 0, -1], // B
     ];
-    let face_chars = b"URFDLB";
     let base_alg =
         "R U R' U' R' F R2 U' R' U' R U R' F' R' L D R F' R' F R F R2 D' R F R F' R' L' R";
 
@@ -25,11 +24,8 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
     if is_adjacent(a, b) {
         // Map (U, F) to (u, f)
         // base_alg rotates u by -1, f by +1.
-        let (u, f, invert) = if delta_a == -1 {
-            (a, b, false)
-        } else {
-            (a, b, true)
-        };
+        let (u, f) = (a, b);
+        let invert = delta_a == 1;
 
         let r_vec = [
             normals[u][1] * normals[f][2] - normals[u][2] * normals[f][1],
@@ -37,52 +33,14 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
             normals[u][0] * normals[f][1] - normals[u][1] * normals[f][0],
         ];
         let r = (0..6).find(|&i| normals[i] == r_vec).unwrap();
-        let d = match u {
-            0 => 3,
-            1 => 4,
-            2 => 5,
-            3 => 0,
-            4 => 1,
-            _ => 2,
-        };
-        let l = match r {
-            0 => 3,
-            1 => 4,
-            2 => 5,
-            3 => 0,
-            4 => 1,
-            _ => 2,
-        };
-        let b_opp = match f {
-            0 => 3,
-            1 => 4,
-            2 => 5,
-            3 => 0,
-            4 => 1,
-            _ => 2,
-        };
-        let map = [u, r, f, d, l, b_opp];
-
-        let remapped_moves: String = base_alg
-            .split_whitespace()
-            .map(|token| {
-                let old_face = match token.as_bytes()[0] {
-                    b'U' => 0,
-                    b'R' => 1,
-                    b'F' => 2,
-                    b'D' => 3,
-                    b'L' => 4,
-                    b'B' => 5,
-                    _ => 0,
-                };
-                let new_face = face_chars[map[old_face]] as char;
-                let suffix = &token[1..];
-                format!("{}{}", new_face, suffix)
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        let mv = parse_moves(&remapped_moves).unwrap();
+        // Opposite faces in URFDLB order: U↔D, R↔L, F↔B.
+        let opposite = [3, 4, 5, 0, 1, 2];
+        let map = [u, r, f, opposite[u], opposite[r], opposite[f]];
+        let mv: Vec<usize> = parse_moves(base_alg)
+            .unwrap()
+            .into_iter()
+            .map(|m| map[m / 3] * 3 + m % 3)
+            .collect();
         if invert {
             mv.iter().rev().map(|&m| m / 3 * 3 + (2 - m % 3)).collect()
         } else {
@@ -116,42 +74,23 @@ pub fn rotate_center_180(face: usize) -> Vec<usize> {
 
 /// Cancel adjacent redundant moves (e.g. R R' -> nothing, U U -> U2)
 pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
-    let mut res: Vec<usize> = Vec::new();
+    let mut reduced: Vec<usize> = Vec::new();
     for &m in moves {
-        let f = m / 3;
-        let t = match m % 3 {
-            0 => 1,
-            1 => 2,
-            2 => 3,
-            _ => 0,
-        };
-        if let Some(&last) = res.last() {
-            let lf = last / 3;
-            if lf == f {
-                let lt = match last % 3 {
-                    0 => 1,
-                    1 => 2,
-                    2 => 3,
-                    _ => 0,
-                };
-                res.pop();
-                let combined = (lt + t) % 4;
-                if combined > 0 {
-                    let new_m = f * 3
-                        + match combined {
-                            1 => 0,
-                            2 => 1,
-                            3 => 2,
-                            _ => 0,
-                        };
-                    res.push(new_m);
+        let face = m / 3;
+        if let Some(&last) = reduced.last() {
+            if last / 3 == face {
+                reduced.pop();
+                // Move suffixes 0, 1, 2 encode one, two, three quarter turns.
+                let combined_turns = (last % 3 + 1 + m % 3 + 1) % 4;
+                if combined_turns != 0 {
+                    reduced.push(face * 3 + combined_turns - 1);
                 }
                 continue;
             }
         }
-        res.push(m);
+        reduced.push(m);
     }
-    res
+    reduced
 }
 
 /// Solves remaining center rotations so that all 6 centers have 0 rotation mod 4.

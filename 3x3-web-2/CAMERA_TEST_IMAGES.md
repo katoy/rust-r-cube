@@ -121,20 +121,43 @@ const PADDING = 10;        // 画像の余白
 const BORDER = 2;          // セル間の枠線幅
 ```
 
+### 画像の仕様
+
+- **サイズ**: 640 × 480 ピクセル
+- **投影**: 等角投影（アイソメトリック）による3Dキューブ表示
+- **ビューA**: U（上面）, R（右面）, F（前面）の3面立体ビュー
+- **ビューB**: D（下面）, L（左面）, B（背面）の3面立体ビュー
+- **背景**: グレー（#e5e7e6）
+- **セル間**: 2 ピクセルの境界線（#1b1e1d）
+
 ## マニフェストの形式
 
 ```json
 {
-  "generated": "2026-09-13T03:21:36.743Z",
-  "cellSize": 20,
-  "gridSize": 3,
+  "generated": "2026-09-13T03:37:58.061Z",
+  "imageWidth": 640,
+  "imageHeight": 480,
   "totalStates": 5,
+  "views": {
+    "A": {
+      "faces": ["U", "R", "F"],
+      "corners": {
+        "U": [{ "x": 320, "y": 80 }, ...],
+        "F": [...],
+        "R": [...]
+      }
+    },
+    "B": {
+      "faces": ["D", "L", "B"],
+      "corners": { ... }
+    }
+  },
   "images": {
     "solved": {
       "viewA": "solved-view-a.png",
-      "viewB": "solved-view-b.png"
-    },
-    // ... その他の状態
+      "viewB": "solved-view-b.png",
+      "expectedState": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
+    }
   }
 }
 ```

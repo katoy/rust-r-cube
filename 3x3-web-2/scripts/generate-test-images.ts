@@ -1,11 +1,14 @@
 /**
  * カメラ入力テスト用の画像を自動生成
- * 複数のキューブ状態に対応した PNG 画像を生成する
+ * 実写写真（黒フレーム、角丸ステッカー、八角形センター、光沢、接地影）に準拠した画像を生成する
  */
 
 import { createCanvas } from "canvas";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COLORS: Record<string, string> = {
   U: "#eeeade", // 白
@@ -17,143 +20,298 @@ const COLORS: Record<string, string> = {
   "?": "#454b49", // グレー
 };
 
-const FACES = "URFDLB";
-const CELL_SIZE = 20;
-const STICKERS_PER_FACE = 9;
-const GRID_SIZE = 3;
-const PADDING = 10;
-const BORDER = 2;
+const WIDTH = 640;
+const HEIGHT = 480;
+const cx = 320;
+const cy = 240;
+const L = 160;
+
+// アイソメトリック投影の3軸ベクトル（上から見下ろす対角アングル）
+const vL = { x: -L * Math.cos(Math.PI / 6), y: -L * Math.sin(Math.PI / 6) };
+const vR = { x: L * Math.cos(Math.PI / 6), y: -L * Math.sin(Math.PI / 6) };
+const vD = { x: 0, y: L };
+
+const O = { x: cx, y: cy };
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+// ビューA: 上面=U, 前面左=F, 前面右=R
+const CORNERS_VIEW_A: Record<string, Point[]> = {
+  U: [
+    { x: Math.round(O.x + vL.x + vR.x), y: Math.round(O.y + vL.y + vR.y) }, // topLeft: B-L-U
+    { x: Math.round(O.x + vR.x), y: Math.round(O.y + vR.y) }, // topRight: B-R-U
+    { x: Math.round(O.x), y: Math.round(O.y) }, // bottomRight: F-R-U
+    { x: Math.round(O.x + vL.x), y: Math.round(O.y + vL.y) }, // bottomLeft: F-L-U
+  ],
+  F: [
+    { x: Math.round(O.x + vL.x), y: Math.round(O.y + vL.y) }, // topLeft: F-L-U
+    { x: Math.round(O.x), y: Math.round(O.y) }, // topRight: F-R-U
+    { x: Math.round(O.x + vD.x), y: Math.round(O.y + vD.y) }, // bottomRight: F-R-D
+    { x: Math.round(O.x + vL.x + vD.x), y: Math.round(O.y + vL.y + vD.y) }, // bottomLeft: F-L-D
+  ],
+  R: [
+    { x: Math.round(O.x), y: Math.round(O.y) }, // topLeft: F-R-U
+    { x: Math.round(O.x + vR.x), y: Math.round(O.y + vR.y) }, // topRight: B-R-U
+    { x: Math.round(O.x + vR.x + vD.x), y: Math.round(O.y + vR.y + vD.y) }, // bottomRight: B-R-D
+    { x: Math.round(O.x + vD.x), y: Math.round(O.y + vD.y) }, // bottomLeft: F-R-D
+  ],
+};
+
+// ビューB: 上面=D, 前面左=L, 前面右=B
+const CORNERS_VIEW_B: Record<string, Point[]> = {
+  D: [
+    { x: Math.round(O.x + vL.x), y: Math.round(O.y + vL.y) }, // topLeft: F-L-D
+    { x: Math.round(O.x + vL.x + vR.x), y: Math.round(O.y + vL.y + vR.y) }, // topRight: F-R-D
+    { x: Math.round(O.x + vR.x), y: Math.round(O.y + vR.y) }, // bottomRight: B-R-D
+    { x: Math.round(O.x), y: Math.round(O.y) }, // bottomLeft: B-L-D
+  ],
+  L: [
+    { x: Math.round(O.x + vD.x), y: Math.round(O.y + vD.y) }, // topLeft: B-L-U
+    { x: Math.round(O.x + vL.x + vD.x), y: Math.round(O.y + vL.y + vD.y) }, // topRight: F-L-U
+    { x: Math.round(O.x + vL.x), y: Math.round(O.y + vL.y) }, // bottomRight: F-L-D
+    { x: Math.round(O.x), y: Math.round(O.y) }, // bottomLeft: B-L-D
+  ],
+  B: [
+    { x: Math.round(O.x + vR.x + vD.x), y: Math.round(O.y + vR.y + vD.y) }, // topLeft: B-R-U
+    { x: Math.round(O.x + vD.x), y: Math.round(O.y + vD.y) }, // topRight: B-L-U
+    { x: Math.round(O.x), y: Math.round(O.y) }, // bottomRight: B-L-D
+    { x: Math.round(O.x + vR.x), y: Math.round(O.y + vR.y) }, // bottomLeft: B-R-D
+  ],
+};
 
 interface CubeState {
   name: string;
   state: string;
 }
 
-/**
- * キューブ状態 - state は 54 文字で各面 9 ステッカー
- */
 const CUBE_STATES: CubeState[] = [
   {
     name: "solved",
-    state: "UUUUUUUUURRRRRRRRFFFFFFFDDDDDDDDDLLLLLLLLBBBBBBBB",
+    state: "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
   },
   {
     name: "superflip",
-    state: "UUUUUUUUURRRRRRRRFFFFFFFDDDDDDDDDLLLLLLLLBBBBBBBB", // 簡略版（実際はもっと複雑）
+    state: "RFUUUUDDFUBBRRFFLFRRRFFBFFDDDRDDUDDUURBLLLLLLLRBUBBLBB",
   },
   {
     name: "scrambled-1",
-    state: "URFDLBURDLBFURDLBFURDLFBFURDLBURDLFBUDLBFURDLFBUR",
+    state: "DRBUULUBRDBLDRLFLFBDFUFLDRRRBUBDFUDLBFRDLRLUBUFLUBRDFF",
   },
   {
     name: "mixed-colors",
-    state: "UUUURRRRFFFFDDDDDLLLLUUUURRRRFFFFDDDDDLLLLBBBBBBB",
+    state: "UDUDUDUDURLRLRLRLRFBFBFBFBFDUDUDUDUDLRLRLRLRLBFBFBFBFB",
   },
   {
     name: "partial",
-    state: "UUUUUUUU???????U????????F????F??DDDDDDDD???????B",
+    state: "UUUU?UUUURRRR?RRRR????F????????D????LLLL?LLLL????B????",
   },
 ];
 
-/**
- * 16 進数カラーコードを { r, g, b } オブジェクトに変換
- */
-function hexToRgb(
-  hex: string
-): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) throw new Error(`Invalid hex color: ${hex}`);
+function interpolate(p1: Point, p2: Point, t: number): Point {
   return {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16),
+    x: p1.x + (p2.x - p1.x) * t,
+    y: p1.y + (p2.y - p1.y) * t,
   };
 }
 
-/**
- * キューブ面を Canvas に描画
- */
-function drawCubeFace(
-  ctx: CanvasRenderingContext2D,
-  startX: number,
-  startY: number,
-  faceIndex: number,
-  state: string
-) {
-  const faceStart = faceIndex * STICKERS_PER_FACE;
-  const faceColors = state.slice(faceStart, faceStart + STICKERS_PER_FACE);
-
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const cellIndex = row * GRID_SIZE + col;
-      const color = faceColors[cellIndex];
-      const hexColor = COLORS[color] || COLORS["?"];
-
-      const x = startX + col * (CELL_SIZE + BORDER);
-      const y = startY + row * (CELL_SIZE + BORDER);
-
-      // セルを描画
-      ctx.fillStyle = hexColor;
-      ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
-
-      // 枠線を描画
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
-    }
-  }
+function getPoint(corners: Point[], u: number, v: number): Point {
+  const [topLeft, topRight, bottomRight, bottomLeft] = corners;
+  const top = interpolate(topLeft, topRight, u);
+  const bottom = interpolate(bottomLeft, bottomRight, u);
+  return interpolate(top, bottom, v);
 }
 
-/**
- * 2 ビュー（2 つの角度）からキューブを描画
- */
-function generateTwoViewImage(state: string): {
-  viewA: Buffer;
-  viewB: Buffer;
-} {
-  const faceWidth = GRID_SIZE * CELL_SIZE + (GRID_SIZE - 1) * BORDER;
-  const faceHeight = GRID_SIZE * CELL_SIZE + (GRID_SIZE - 1) * BORDER;
+function drawRoundedQuad(
+  ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
+  p0: Point,
+  p1: Point,
+  p2: Point,
+  p3: Point,
+  roundness = 0.2,
+) {
+  const pts = [p0, p1, p2, p3];
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const prev = pts[(i + 3) % 4];
+    const curr = pts[i];
+    const next = pts[(i + 1) % 4];
+    const start = interpolate(curr, prev, roundness);
+    const end = interpolate(curr, next, roundness);
+    if (i === 0) {
+      ctx.moveTo(start.x, start.y);
+    } else {
+      ctx.lineTo(start.x, start.y);
+    }
+    ctx.quadraticCurveTo(curr.x, curr.y, end.x, end.y);
+  }
+  ctx.closePath();
+}
 
-  // ビュー A: 3 面を横に並べる
-  const canvasA = createCanvas(
-    faceWidth * 3 + PADDING * 4,
-    faceHeight + PADDING * 2
+function renderPhotoRealisticCube(
+  ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
+  cornersView: Record<string, Point[]>,
+  face1: string,
+  face2: string,
+  face3: string,
+  colors1: string,
+  colors2: string,
+  colors3: string,
+) {
+  // 1. 背景
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+  bg.addColorStop(0, "#eae6de");
+  bg.addColorStop(0.35, "#dad4c7");
+  bg.addColorStop(1, "#bcb5a6");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(70, 60, 50, 0.025)";
+  ctx.lineWidth = 1;
+  for (let y = 0; y < HEIGHT; y += 3) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(WIDTH, y + Math.sin(y * 0.03) * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 2. 接地影
+  ctx.save();
+  const shadowGrad = ctx.createRadialGradient(
+    O.x,
+    O.y + vD.y + 12,
+    15,
+    O.x,
+    O.y + vD.y + 15,
+    195,
   );
+  shadowGrad.addColorStop(0, "rgba(20, 18, 22, 0.65)");
+  shadowGrad.addColorStop(0.3, "rgba(40, 38, 45, 0.38)");
+  shadowGrad.addColorStop(0.7, "rgba(80, 75, 85, 0.12)");
+  shadowGrad.addColorStop(1, "rgba(100, 95, 105, 0)");
+  ctx.fillStyle = shadowGrad;
+  ctx.beginPath();
+  ctx.ellipse(O.x, O.y + vD.y + 14, 190, 64, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 3. キューブ本体（黒プラスチックフレーム・角丸外枠）
+  const drawFaceBase = (corners: Point[], shade: string) => {
+    ctx.save();
+    ctx.fillStyle = shade;
+    drawRoundedQuad(ctx, corners[0], corners[1], corners[2], corners[3], 0.05);
+    ctx.fill();
+    ctx.strokeStyle = "#08080a";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawFaceBase(cornersView[face1], "#222528");
+  drawFaceBase(cornersView[face2], "#18191c");
+  drawFaceBase(cornersView[face3], "#111214");
+
+  // 4. 実写風ステッカー描画（写真通りの角丸＆センター八角形）
+  const drawStickers = (corners: Point[], faceColors: string) => {
+    const margin = 0.07;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        const colorChar = faceColors[r * 3 + c] || "?";
+        const hex = COLORS[colorChar] || COLORS["?"];
+
+        const u0 = c / 3 + margin / 3;
+        const u1 = (c + 1) / 3 - margin / 3;
+        const v0 = r / 3 + margin / 3;
+        const v1 = (r + 1) / 3 - margin / 3;
+
+        const p00 = getPoint(corners, u0, v0);
+        const p10 = getPoint(corners, u1, v0);
+        const p11 = getPoint(corners, u1, v1);
+        const p01 = getPoint(corners, u0, v1);
+
+        const isCenter = r === 1 && c === 1;
+        const roundness = isCenter ? 0.38 : 0.22;
+
+        ctx.save();
+        drawRoundedQuad(ctx, p00, p10, p11, p01, roundness);
+
+        ctx.fillStyle = hex;
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        const gloss = ctx.createLinearGradient(p00.x, p00.y, p11.x, p11.y);
+        gloss.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+        gloss.addColorStop(0.4, "rgba(255, 255, 255, 0)");
+        gloss.addColorStop(1, "rgba(0, 0, 0, 0.05)");
+        ctx.fillStyle = gloss;
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+  };
+
+  drawStickers(cornersView[face1], colors1);
+  drawStickers(cornersView[face2], colors2);
+  drawStickers(cornersView[face3], colors3);
+
+  // 5. ヴィネット
+  ctx.save();
+  const vignette = ctx.createRadialGradient(
+    WIDTH / 2,
+    HEIGHT / 2,
+    WIDTH * 0.35,
+    WIDTH / 2,
+    HEIGHT / 2,
+    WIDTH * 0.65,
+  );
+  vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vignette.addColorStop(1, "rgba(25, 20, 15, 0.22)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.restore();
+}
+
+function generateTwoViewImage(state: string) {
+  const faceU = state.slice(0, 9);
+  const faceR = state.slice(9, 18);
+  const faceF = state.slice(18, 27);
+  const faceD = state.slice(27, 36);
+  const faceL = state.slice(36, 45);
+  const faceB = state.slice(45, 54);
+
+  const canvasA = createCanvas(WIDTH, HEIGHT);
   const ctxA = canvasA.getContext("2d");
-  ctxA.fillStyle = "#f0f0f0";
-  ctxA.fillRect(0, 0, canvasA.width, canvasA.height);
-
-  // ビュー A: U, R, F 面
-  const facesA = [0, 1, 2]; // U, R, F
-  facesA.forEach((faceIndex, i) => {
-    drawCubeFace(
-      ctxA,
-      PADDING + i * (faceWidth + PADDING),
-      PADDING,
-      faceIndex,
-      state
-    );
-  });
-
-  // ビュー B: D, L, B 面
-  const canvasB = createCanvas(
-    faceWidth * 3 + PADDING * 4,
-    faceHeight + PADDING * 2
+  renderPhotoRealisticCube(
+    ctxA,
+    CORNERS_VIEW_A,
+    "U",
+    "F",
+    "R",
+    faceU,
+    faceF,
+    faceR,
   );
-  const ctxB = canvasB.getContext("2d");
-  ctxB.fillStyle = "#f0f0f0";
-  ctxB.fillRect(0, 0, canvasB.width, canvasB.height);
 
-  const facesB = [3, 4, 5]; // D, L, B
-  facesB.forEach((faceIndex, i) => {
-    drawCubeFace(
-      ctxB,
-      PADDING + i * (faceWidth + PADDING),
-      PADDING,
-      faceIndex,
-      state
-    );
-  });
+  const canvasB = createCanvas(WIDTH, HEIGHT);
+  const ctxB = canvasB.getContext("2d");
+  renderPhotoRealisticCube(
+    ctxB,
+    CORNERS_VIEW_B,
+    "D",
+    "L",
+    "B",
+    faceD,
+    faceL,
+    faceB,
+  );
 
   return {
     viewA: canvasA.toBuffer("image/png"),
@@ -161,41 +319,23 @@ function generateTwoViewImage(state: string): {
   };
 }
 
-/**
- * テスト画像を生成して保存
- */
-async function generateTestImages() {
-  const outputDir = path.join(
-    path.dirname(__filename),
-    "../test-images"
-  );
+export async function generateTestImages() {
+  const outputDir = path.join(__dirname, "../test-images");
 
-  // 出力ディレクトリを作成
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  console.log(`📸 カメラテスト画像生成開始`);
-  console.log(`📁 出力先: ${outputDir}\n`);
-
   const imageManifest: Record<
     string,
-    { viewA: string; viewB: string }
+    { viewA: string; viewB: string; expectedState: string }
   > = {};
 
   for (const cubeState of CUBE_STATES) {
-    console.log(`⚙️  生成中: ${cubeState.name}`);
-
     const { viewA, viewB } = generateTwoViewImage(cubeState.state);
 
-    const viewAPath = path.join(
-      outputDir,
-      `${cubeState.name}-view-a.png`
-    );
-    const viewBPath = path.join(
-      outputDir,
-      `${cubeState.name}-view-b.png`
-    );
+    const viewAPath = path.join(outputDir, `${cubeState.name}-view-a.png`);
+    const viewBPath = path.join(outputDir, `${cubeState.name}-view-b.png`);
 
     fs.writeFileSync(viewAPath, viewA);
     fs.writeFileSync(viewBPath, viewB);
@@ -203,33 +343,33 @@ async function generateTestImages() {
     imageManifest[cubeState.name] = {
       viewA: `${cubeState.name}-view-a.png`,
       viewB: `${cubeState.name}-view-b.png`,
+      expectedState: cubeState.state,
     };
-
-    console.log(`   ✅ ${cubeState.name} 生成完了`);
   }
 
-  // マニフェストファイルを生成
   const manifestPath = path.join(outputDir, "manifest.json");
   fs.writeFileSync(
     manifestPath,
     JSON.stringify(
       {
         generated: new Date().toISOString(),
-        cellSize: CELL_SIZE,
-        gridSize: GRID_SIZE,
+        imageWidth: WIDTH,
+        imageHeight: HEIGHT,
         totalStates: CUBE_STATES.length,
+        views: {
+          A: {
+            faces: ["U", "R", "F"],
+            corners: CORNERS_VIEW_A,
+          },
+          B: {
+            faces: ["D", "L", "B"],
+            corners: CORNERS_VIEW_B,
+          },
+        },
         images: imageManifest,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
-
-  console.log(`\n✨ 画像生成完了！`);
-  console.log(`📊 生成された画像:`);
-  console.log(`   - 状態数: ${CUBE_STATES.length}`);
-  console.log(`   - ビュー数: ${CUBE_STATES.length * 2}`);
-  console.log(`   - マニフェスト: ${manifestPath}`);
 }
-
-generateTestImages().catch(console.error);

@@ -1,9 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   loadImageManifest,
+  loadFullManifest,
   getTestImagePath,
+  getFaceCorners,
+  getExpectedState,
+  getEditorState,
   openCameraEditor,
   uploadTestImage,
+  captureFaceOnTestImage,
 } from "./test-utils";
 
 async function ready(page: Page) {
@@ -13,15 +18,30 @@ async function ready(page: Page) {
 }
 
 test.describe("カメラ入力 - 画像処理テスト", () => {
-  test("マニフェストが存在し、すべての画像ファイルが揃っている", async () => {
-    const manifest = loadImageManifest();
+  test("マニフェストが存在し、すべての画像ファイルと立体座標が揃っている", async () => {
+    const fullManifest = loadFullManifest();
 
-    expect(manifest).toBeDefined();
+    expect(fullManifest).toBeDefined();
+    expect(fullManifest.views.A.faces).toEqual(["U", "R", "F"]);
+    expect(fullManifest.views.B.faces).toEqual(["D", "L", "B"]);
+
+    for (const face of ["U", "R", "F"]) {
+      const corners = fullManifest.views.A.corners[face];
+      expect(corners).toHaveLength(4);
+    }
+
+    for (const face of ["D", "L", "B"]) {
+      const corners = fullManifest.views.B.corners[face];
+      expect(corners).toHaveLength(4);
+    }
+
+    const manifest = loadImageManifest();
     expect(Object.keys(manifest).length).toBeGreaterThan(0);
 
     for (const [name, images] of Object.entries(manifest)) {
       expect(images.viewA).toBeTruthy();
       expect(images.viewB).toBeTruthy();
+      expect(images.expectedState).toHaveLength(54);
 
       const pathA = getTestImagePath(name, "A");
       const pathB = getTestImagePath(name, "B");
@@ -38,7 +58,6 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     const viewAPath = getTestImagePath("solved", "A");
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
 
-    // 画像が Canvas に読み込まれたかを確認
     await expect(page.locator("#camera-canvas")).toBeVisible();
     await page.waitForTimeout(300);
 
@@ -54,17 +73,14 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await ready(page);
     await openCameraEditor(page);
 
-    // ビューA をアップロード
     const viewAPath = getTestImagePath("solved", "A");
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // ビューB をアップロード
     const viewBPath = getTestImagePath("solved", "B");
     await page.locator("#camera-file-b").setInputFiles(viewBPath);
     await page.waitForTimeout(300);
 
-    // Canvas が表示されていることを確認
     await expect(page.locator("#camera-canvas")).toBeVisible();
 
     await page.locator("#camera-close").click();
@@ -86,9 +102,7 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-close").click();
   });
 
-  test("四隅をクリックしてキャプチャボタンを有効にできる", async ({
-    page,
-  }) => {
+  test("四隅をクリックしてキャプチャボタンを有効にできる", async ({ page }) => {
     await ready(page);
     await openCameraEditor(page);
 
@@ -99,31 +113,16 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     // キャプチャボタンは最初は無効
     await expect(page.locator("#camera-capture")).toBeDisabled();
 
-    // Canvas に四隅をクリック
-    const canvas = page.locator("#camera-canvas");
-    const box = await canvas.boundingBox();
-    expect(box).toBeTruthy();
+    // U面の正確な4隅をクリック
+    await captureFaceOnTestImage(page, "U");
 
-    if (box) {
-      const corners = [
-        { x: box.x + 5, y: box.y + 5 }, // 左上
-        { x: box.x + box.width - 5, y: box.y + 5 }, // 右上
-        { x: box.x + box.width - 5, y: box.y + box.height - 5 }, // 右下
-        { x: box.x + 5, y: box.y + box.height - 5 }, // 左下
-      ];
-
-      for (const corner of corners) {
-        await page.mouse.click(corner.x, corner.y);
-      }
-
-      // 4 点クリック後、キャプチャボタンが有効になる
-      await expect(page.locator("#camera-capture")).not.toBeDisabled();
-    }
+    // 読み取り完了後、入力済み進捗が 1/6 面になる
+    await expect(page.locator("#camera-progress")).toContainText("1 / 6");
 
     await page.locator("#camera-close").click();
   });
 
-  test("全 6 面をキャプチャしてから apply が有効になる", async ({
+  test("全 6 面を正確な四隅指定でキャプチャしてから apply が有効になる", async ({
     page,
   }) => {
     await ready(page);
@@ -132,43 +131,17 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     const viewAPath = getTestImagePath("solved", "A");
     const viewBPath = getTestImagePath("solved", "B");
 
-    // apply ボタンは最初は無効
     await expect(page.locator("#camera-apply")).toBeDisabled();
-
-    // 最初は 0/6
     await expect(page.locator("#camera-progress")).toContainText("0 / 6");
 
     // ビュー A をアップロード（U, R, F 面）
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // 各面をクリックしてキャプチャ
-    const canvas = page.locator("#camera-canvas");
-    const faces = ["U", "R", "F"];
-
-    for (const face of faces) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(200);
-
-      const box = await canvas.boundingBox();
-      if (box) {
-        const corners = [
-          { x: box.x + 5, y: box.y + 5 },
-          { x: box.x + box.width - 5, y: box.y + 5 },
-          { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-          { x: box.x + 5, y: box.y + box.height - 5 },
-        ];
-
-        for (const corner of corners) {
-          await page.mouse.click(corner.x, corner.y);
-        }
-
-        await page.locator("#camera-capture").click();
-        await page.waitForTimeout(200);
-      }
+    for (const face of ["U", "R", "F"]) {
+      await captureFaceOnTestImage(page, face);
     }
 
-    // 3/6 になった
     await expect(page.locator("#camera-progress")).toContainText("3 / 6");
     await expect(page.locator("#camera-apply")).toBeDisabled();
 
@@ -176,39 +149,17 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-b").setInputFiles(viewBPath);
     await page.waitForTimeout(300);
 
-    const facesB = ["D", "L", "B"];
-    for (const face of facesB) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(200);
-
-      const box = await canvas.boundingBox();
-      if (box) {
-        const corners = [
-          { x: box.x + 5, y: box.y + 5 },
-          { x: box.x + box.width - 5, y: box.y + 5 },
-          { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-          { x: box.x + 5, y: box.y + box.height - 5 },
-        ];
-
-        for (const corner of corners) {
-          await page.mouse.click(corner.x, corner.y);
-        }
-
-        await page.locator("#camera-capture").click();
-        await page.waitForTimeout(200);
-      }
+    for (const face of ["D", "L", "B"]) {
+      await captureFaceOnTestImage(page, face);
     }
 
-    // 6/6 になった
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
-
-    // apply が有効になった
     await expect(page.locator("#camera-apply")).not.toBeDisabled();
 
     await page.locator("#camera-close").click();
   });
 
-  test("キャプチャをキャンセルして別のビューに切り替えられる", async ({
+  test("キャプチャをキャンセルして別の面に切り替えるとポイントがリセットされる", async ({
     page,
   }) => {
     await ready(page);
@@ -218,25 +169,16 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // U 面で 4 点クリック
+    // U 面で 1 点だけクリック
     await page.locator("#camera-face").selectOption("U");
     const canvas = page.locator("#camera-canvas");
     const box = await canvas.boundingBox();
 
     if (box) {
-      const corners = [
-        { x: box.x + 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-        { x: box.x + 5, y: box.y + box.height - 5 },
-      ];
-
-      for (const corner of corners) {
-        await page.mouse.click(corner.x, corner.y);
-      }
+      await page.mouse.click(box.x + 50, box.y + 50);
     }
 
-    // R 面に切り替えると、U 面のクリックがリセット
+    // R 面に切り替えるとポイント入力がリセットされる
     await page.locator("#camera-face").selectOption("R");
     await expect(page.locator("#camera-capture")).toBeDisabled();
 
@@ -247,258 +189,173 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await ready(page);
     await openCameraEditor(page);
 
-    // エラー表示領域が存在することを確認
     const errorElement = page.locator("#camera-error");
     await expect(errorElement).toBeAttached();
 
-    // 正常な画像をアップロード時にはエラーはクリア
     const viewAPath = getTestImagePath("solved", "A");
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // エラーテキストが空であることを確認
     await expect(errorElement).toHaveText("");
 
     await page.locator("#camera-close").click();
   });
 });
 
-test.describe("カメラ入力 - エンドツーエンドテスト", () => {
-  test("solved 状態を画像から認識して apply できる", async ({ page }) => {
+test.describe("カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証）", () => {
+  test("solved 状態を画像から認識して色入力および3Dキューブへ正しく反映できる", async ({
+    page,
+  }) => {
     await ready(page);
-    await page.getByRole("tab", { name: "色を入力" }).click();
-    await page.locator("#camera-colors").click();
-    await expect(page.locator("#camera-editor")).toBeVisible();
+    await openCameraEditor(page);
 
-    // テスト画像をアップロード
-    const viewAPath = getTestImagePath("solved", "A");
-    const viewBPath = getTestImagePath("solved", "B");
+    const expectedState = getExpectedState("solved");
 
-    // ビューA のアップロードと面キャプチャ
-    await page.locator("#camera-file-a").setInputFiles(viewAPath);
-    await page.waitForTimeout(300);
+    // ビューA のアップロードと U, R, F 面キャプチャ
+    await uploadTestImage(page, "solved", "A");
+    for (const face of ["U", "R", "F"]) {
+      await captureFaceOnTestImage(page, face);
+    }
 
-    const canvas = page.locator("#camera-canvas");
-    const captureUFace = async () => {
-      const box = await canvas.boundingBox();
-      if (!box) return;
+    // ビューB のアップロードと D, L, B 面キャプチャ
+    await uploadTestImage(page, "solved", "B");
+    for (const face of ["D", "L", "B"]) {
+      await captureFaceOnTestImage(page, face);
+    }
 
-      const corners = [
-        { x: box.x + 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-        { x: box.x + 5, y: box.y + box.height - 5 },
-      ];
-
-      for (const corner of corners) {
-        await page.mouse.click(corner.x, corner.y);
-      }
-    };
-
-    // U 面
-    await page.locator("#camera-face").selectOption("U");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // R 面
-    await page.locator("#camera-face").selectOption("R");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // F 面
-    await page.locator("#camera-face").selectOption("F");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // ビューB をアップロード
-    await page.locator("#camera-file-b").setInputFiles(viewBPath);
-    await page.waitForTimeout(300);
-
-    // D 面
-    await page.locator("#camera-face").selectOption("D");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // L 面
-    await page.locator("#camera-face").selectOption("L");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // B 面
-    await page.locator("#camera-face").selectOption("B");
-    await captureUFace();
-    await page.locator("#camera-capture").click();
-    await page.waitForTimeout(200);
-
-    // すべてキャプチャ完了、apply
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await page.locator("#camera-apply").click();
 
-    // エディタが閉じられる
+    // カメラエディタが閉じられ、色入力エディタが開く
     await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
 
-    // キューブが更新されたことを確認
-    await expect(page.locator("#scene")).toBeVisible();
+    // 色入力エディタ（#editor-net）に反映された全54ステッカーが期待ステートと完全一致するか検証
+    const editorState = await getEditorState(page);
+    expect(editorState).toBe(expectedState);
+
+    // 色入力エディタの反映ボタンを押してメイン画面のキューブへ適用
+    await page.locator("#editor-apply").click();
+    await expect(page.locator("#editor")).not.toBeVisible();
+
+    // メインシーンの state が solved であることを検証
+    await expect(page.locator("#scene")).toHaveAttribute(
+      "data-state",
+      expectedState,
+    );
   });
 
-  test("scrambled-1 状態を画像から認識できる", async ({ page }) => {
+  test("scrambled-1 状態を対角画像から正確に認識できる", async ({ page }) => {
     await ready(page);
-    await page.getByRole("tab", { name: "色を入力" }).click();
-    await page.locator("#camera-colors").click();
-    await expect(page.locator("#camera-editor")).toBeVisible();
+    await openCameraEditor(page);
 
-    const viewAPath = getTestImagePath("scrambled-1", "A");
-    const viewBPath = getTestImagePath("scrambled-1", "B");
+    const expectedState = getExpectedState("scrambled-1");
 
-    await page.locator("#camera-file-a").setInputFiles(viewAPath);
-    await page.waitForTimeout(300);
-
-    // キャプチャロジック（共通化可能）
-    const canvas = page.locator("#camera-canvas");
-    const captureAllFaces = async (faceList: string[]) => {
-      for (const face of faceList) {
-        await page.locator("#camera-face").selectOption(face);
-        await page.waitForTimeout(100);
-
-        const box = await canvas.boundingBox();
-        if (box) {
-          const corners = [
-            { x: box.x + 5, y: box.y + 5 },
-            { x: box.x + box.width - 5, y: box.y + 5 },
-            { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-            { x: box.x + 5, y: box.y + box.height - 5 },
-          ];
-
-          for (const corner of corners) {
-            await page.mouse.click(corner.x, corner.y);
-          }
-
-          await page.locator("#camera-capture").click();
-          await page.waitForTimeout(100);
-        }
-      }
-    };
-
-    await captureAllFaces(["U", "R", "F"]);
-
-    // ビューB
-    await page.locator("#camera-file-b").setInputFiles(viewBPath);
-    await page.waitForTimeout(300);
-
-    await captureAllFaces(["D", "L", "B"]);
-
-    // apply
-    await page.locator("#camera-apply").click();
-    await expect(page.locator("#camera-editor")).not.toBeVisible();
-  });
-
-  test("mixed-colors 状態を処理できる", async ({ page }) => {
-    await ready(page);
-    await page.getByRole("tab", { name: "色を入力" }).click();
-    await page.locator("#camera-colors").click();
-
-    const viewAPath = getTestImagePath("mixed-colors", "A");
-    const viewBPath = getTestImagePath("mixed-colors", "B");
-
-    await page.locator("#camera-file-a").setInputFiles(viewAPath);
-    await page.waitForTimeout(300);
-
-    const canvas = page.locator("#camera-canvas");
-
-    // 複数面をキャプチャする共通ロジック
-    const captureAndClick = async () => {
-      const box = await canvas.boundingBox();
-      if (!box) return;
-
-      const corners = [
-        { x: box.x + 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-        { x: box.x + 5, y: box.y + box.height - 5 },
-      ];
-
-      for (const corner of corners) {
-        await page.mouse.click(corner.x, corner.y);
-      }
-    };
-
+    await uploadTestImage(page, "scrambled-1", "A");
     for (const face of ["U", "R", "F"]) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(100);
-      await captureAndClick();
-      await page.locator("#camera-capture").click();
-      await page.waitForTimeout(100);
+      await captureFaceOnTestImage(page, face);
     }
 
-    await page.locator("#camera-file-b").setInputFiles(viewBPath);
-    await page.waitForTimeout(300);
-
+    await uploadTestImage(page, "scrambled-1", "B");
     for (const face of ["D", "L", "B"]) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(100);
-      await captureAndClick();
-      await page.locator("#camera-capture").click();
-      await page.waitForTimeout(100);
+      await captureFaceOnTestImage(page, face);
     }
 
+    await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await page.locator("#camera-apply").click();
+
     await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const editorState = await getEditorState(page);
+    expect(editorState).toBe(expectedState);
+
+    // キューブに反映
+    await page.locator("#editor-apply").click();
+    await expect(page.locator("#editor")).not.toBeVisible();
+
+    await expect(page.locator("#scene")).toHaveAttribute(
+      "data-state",
+      expectedState,
+    );
   });
 
-  test("partial 状態（未入力を含む）を処理できる", async ({ page }) => {
+  test("superflip 状態を対角画像から正確に認識できる", async ({ page }) => {
     await ready(page);
-    await page.getByRole("tab", { name: "色を入力" }).click();
-    await page.locator("#camera-colors").click();
+    await openCameraEditor(page);
 
-    const viewAPath = getTestImagePath("partial", "A");
-    const viewBPath = getTestImagePath("partial", "B");
+    const expectedState = getExpectedState("superflip");
 
-    await page.locator("#camera-file-a").setInputFiles(viewAPath);
-    await page.waitForTimeout(300);
-
-    const canvas = page.locator("#camera-canvas");
-
-    const captureAndClick = async () => {
-      const box = await canvas.boundingBox();
-      if (!box) return;
-
-      const corners = [
-        { x: box.x + 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + 5 },
-        { x: box.x + box.width - 5, y: box.y + box.height - 5 },
-        { x: box.x + 5, y: box.y + box.height - 5 },
-      ];
-
-      for (const corner of corners) {
-        await page.mouse.click(corner.x, corner.y);
-      }
-    };
-
+    await uploadTestImage(page, "superflip", "A");
     for (const face of ["U", "R", "F"]) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(100);
-      await captureAndClick();
-      await page.locator("#camera-capture").click();
-      await page.waitForTimeout(100);
+      await captureFaceOnTestImage(page, face);
     }
 
-    await page.locator("#camera-file-b").setInputFiles(viewBPath);
-    await page.waitForTimeout(300);
-
+    await uploadTestImage(page, "superflip", "B");
     for (const face of ["D", "L", "B"]) {
-      await page.locator("#camera-face").selectOption(face);
-      await page.waitForTimeout(100);
-      await captureAndClick();
-      await page.locator("#camera-capture").click();
-      await page.waitForTimeout(100);
+      await captureFaceOnTestImage(page, face);
+    }
+
+    await expect(page.locator("#camera-progress")).toContainText("6 / 6");
+    await page.locator("#camera-apply").click();
+
+    await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const editorState = await getEditorState(page);
+    expect(editorState).toBe(expectedState);
+  });
+
+  test("mixed-colors 状態を対角画像から正確に認識できる", async ({ page }) => {
+    await ready(page);
+    await openCameraEditor(page);
+
+    const expectedState = getExpectedState("mixed-colors");
+
+    await uploadTestImage(page, "mixed-colors", "A");
+    for (const face of ["U", "R", "F"]) {
+      await captureFaceOnTestImage(page, face);
+    }
+
+    await uploadTestImage(page, "mixed-colors", "B");
+    for (const face of ["D", "L", "B"]) {
+      await captureFaceOnTestImage(page, face);
     }
 
     await page.locator("#camera-apply").click();
+
     await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const editorState = await getEditorState(page);
+    expect(editorState).toBe(expectedState);
+  });
+
+  test("partial 状態（未入力を含む）を対角画像から正確に認識できる", async ({
+    page,
+  }) => {
+    await ready(page);
+    await openCameraEditor(page);
+
+    const expectedState = getExpectedState("partial");
+
+    await uploadTestImage(page, "partial", "A");
+    for (const face of ["U", "R", "F"]) {
+      await captureFaceOnTestImage(page, face);
+    }
+
+    await uploadTestImage(page, "partial", "B");
+    for (const face of ["D", "L", "B"]) {
+      await captureFaceOnTestImage(page, face);
+    }
+
+    await page.locator("#camera-apply").click();
+
+    await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const editorState = await getEditorState(page);
+    expect(editorState).toBe(expectedState);
+    expect(editorState).toContain("?");
   });
 });

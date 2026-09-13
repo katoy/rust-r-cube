@@ -365,7 +365,13 @@ async function solve(budget = 5000) {
 const editor = new ColorEditor(validate, (s, centers) =>
   replace(s, true, centers),
 );
-const camera = new TwoViewCamera((s) => editor.open(s, automaticCenters(s)));
+const camera = new TwoViewCamera((s) => {
+  let centers = [0, 0, 0, 0, 0, 0];
+  try {
+    centers = automaticCenters(s);
+  } catch {}
+  editor.open(s, centers);
+});
 $("edit-colors").onclick = () => {
   stop();
   refresh();

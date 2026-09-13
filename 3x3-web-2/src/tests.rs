@@ -1350,3 +1350,85 @@ fn test_supercube_centers() {
         "All centers must be oriented to 0!"
     );
 }
+
+#[test]
+fn test_superflip_orientation_solve_length() {
+    let superflip_seq = "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U";
+    let moves = parse_moves(superflip_seq).unwrap();
+    let cube = apply(&RawCube::default(), &moves);
+    let state = facelets(&cube);
+
+    // scramble 手順によって生じる各面センターの累積回転を計算
+    let mut initial_centers = [0i32; 6];
+    for &m in &moves {
+        let f = m / 3;
+        let t = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
+        initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
+    }
+
+    let sol = crate::solve_state_with_centers(&state, 5000, true, Some(initial_centers)).unwrap();
+    println!(
+        "Superflip solved with orientation in {} moves: {:?}",
+        sol.moves.len(),
+        sol.moves
+    );
+    assert!(
+        sol.moves.len() <= 24,
+        "Superflip should be solvable with orientation in 24 moves or less, got {}",
+        sol.moves.len()
+    );
+}
+
+#[test]
+fn test_easy_5_moves_length() {
+    let seq = "R U F";
+    let moves = parse_moves(seq).unwrap();
+    let cube = apply(&RawCube::default(), &moves);
+    let state = facelets(&cube);
+
+    let mut initial_centers = [0i32; 6];
+    for &m in &moves {
+        let f = m / 3;
+        let t = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
+        initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
+    }
+
+    // 手動で F' U' R' を適用してみる
+    let inv_moves = parse_moves("F' U' R'").unwrap();
+    let mut test_cube = cube;
+    let mut test_centers = initial_centers;
+    for &m in &inv_moves {
+        test_cube = test_cube.multiply(crate::coord::move_cube_18(m));
+        let f = m / 3;
+        let t = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
+        test_centers[f] = (test_centers[f] + t).rem_euclid(4);
+    }
+    println!(
+        "Manual F' U' R': is_solved={}, centers={:?}",
+        test_cube == RawCube::default(),
+        test_centers
+    );
+
+    let sol = crate::solve_state_with_centers(&state, 5000, true, Some(initial_centers)).unwrap();
+    println!("R U F solved in {} moves: {:?}", sol.moves.len(), sol.moves);
+    assert!(
+        sol.moves.len() <= 3,
+        "R U F should be solved in 3 moves, got {}",
+        sol.moves.len()
+    );
+}

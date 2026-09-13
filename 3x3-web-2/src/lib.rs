@@ -49,10 +49,29 @@ pub fn solve_state_with_centers(
 ) -> Result<ResultData, String> {
     let cube = cube::parse_state(state)?;
     let start = web_time::Instant::now();
-    let mut search = search::Search::new(budget_ms.min(30000));
-    let mut moves = search
-        .solve(&cube)
-        .ok_or_else(|| "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned())?;
+    let mut total_nodes = 0u64;
+    let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
+        let mut search_oriented =
+            search::Search::new((budget_ms / 2).min(15000)).with_target_centers(centers);
+        let res = search_oriented.solve(&cube);
+        total_nodes += search_oriented.nodes;
+        res
+    } else {
+        None
+    };
+
+    let mut moves = if let Some(m) = moves_opt {
+        m
+    } else {
+        let elapsed_ms = start.elapsed().as_millis() as u32;
+        let remaining_budget = budget_ms.saturating_sub(elapsed_ms).min(30000);
+        let mut search = search::Search::new(remaining_budget);
+        let m = search.solve(&cube).ok_or_else(|| {
+            "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
+        })?;
+        total_nodes += search.nodes;
+        m
+    };
 
     if include_orientation {
         if let Some(initial) = initial_centers {
@@ -91,7 +110,7 @@ pub fn solve_state_with_centers(
         state,
         &moves,
         start.elapsed().as_secs_f64() * 1000.0,
-        search.nodes,
+        total_nodes,
     )
 }
 fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {

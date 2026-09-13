@@ -178,6 +178,17 @@ async function seek(target: number, animate = true) {
   state = nextState;
   revision++;
   persist();
+  if (!move && scene) {
+    if (target > old) {
+      for (let i = old; i < target; i++) {
+        scene.applyMoveToCenters(data.moves[i]);
+      }
+    } else if (target < old) {
+      for (let i = old - 1; i >= target; i--) {
+        scene.applyMoveToCenters(inverse(data.moves[i]));
+      }
+    }
+  }
   inMotion = !!(animate && move && scene && !reduced.checked);
   refresh();
   if (inMotion && move)
@@ -340,7 +351,9 @@ $("scramble").onclick = () => {
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   const algorithm = scramble(seed);
   const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
+  scene?.resetCenterRotations();
   replace(result.state);
+  result.moves.forEach((m) => scene?.applyMoveToCenters(m));
   $("scramble-text").textContent = algorithm;
 };
 $("apply-algorithm").onclick = () =>
@@ -592,24 +605,54 @@ async function initializePresets() {
           }
           const data = await response.json();
 
-          // scramble がある場合は適用、state がある場合はそのまま使用
-          if (data.scramble && (data.state === null || !data.state)) {
+          // scramble_seed がある場合は WASM の scramble() で生成
+          if (typeof data.scramble_seed === "number") {
             try {
+              const algorithm = scramble(data.scramble_seed);
               const result: ResultData = JSON.parse(
-                apply_moves(SOLVED, data.scramble),
+                apply_moves(SOLVED, algorithm),
               );
+              scene?.resetCenterRotations();
               replace(result.state);
+              result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+              $("scramble-text").textContent = algorithm;
+              refresh();
+            } catch (scrambleError) {
+              throw new Error(
+                `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+              );
+            }
+          }
+          // scramble 文字列がある場合
+          else if (typeof data.scramble === "string" && data.scramble.trim()) {
+            try {
+              const cleanedScramble = data.scramble.replace(
+                /(\b[URFDLB])\s+(\d|')/g,
+                "$1$2",
+              );
+              const result: ResultData = JSON.parse(
+                apply_moves(SOLVED, cleanedScramble),
+              );
+              scene?.resetCenterRotations();
+              replace(result.state);
+              result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+              $("scramble-text").textContent = cleanedScramble;
+              refresh();
             } catch (scrambleError) {
               throw new Error(
                 `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
               );
             }
-          } else if (data.state && typeof data.state === "string") {
+          }
+          // state 文字列がある場合
+          else if (typeof data.state === "string" && data.state.trim()) {
             validate(data.state);
+            scene?.resetCenterRotations();
             replace(data.state);
+            refresh();
           } else {
             throw new Error(
-              `無効なデータ形式: state=${typeof data.state}, scramble=${typeof data.scramble}`,
+              `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
             );
           }
 
@@ -617,7 +660,6 @@ async function initializePresets() {
         } catch (error) {
           const errorMsg =
             error instanceof Error ? error.message : String(error);
-          message(`プリセット読み込みエラー: ${errorMsg}`);
           presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
         }
       };

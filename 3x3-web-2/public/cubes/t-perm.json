@@ -2,7 +2,7 @@
   "version": 1,
   "state": null,
   "description": "T-Permutation パターン。速解きキューブの最後の層（OLL/PLL）で一般的に現れるパターンです。",
-  "scramble": "R U R' U' R' F R 2 U' R' U' R U R' F'",
+  "scramble": "R U R' U' R' F R2 U' R' U' R U R' F'",
   "solution_moves": null,
   "solution_length": 6,
   "notes": "PLL（Permutation of Last Layer）のアルゴリズム。速解きコミュニティでは頻繁に現れるパターンです。",

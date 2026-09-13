@@ -460,6 +460,7 @@ test("speed setting affects playback duration", async ({ page }) => {
   await page.locator("#reset").click();
   await page.locator("#scramble").click();
   await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible();
 
   // 低速設定
   await page.locator("#speed").selectOption("1000");
@@ -824,4 +825,130 @@ test("orientation mode solves cube so that all centers are also oriented correct
     return scene.centerRotations;
   });
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
+});
+
+test("superflip preset solves with orientation in 24 moves or less", async ({
+  page,
+}) => {
+  await ready(page);
+
+  // 1. 向きモードをONにし、reduced-motionを有効にする
+  await page.locator("#reduced-motion").check();
+  await page.locator("#include-orientation").check();
+
+  // 2. プリセットタブを開き、スーパーフリップを選択
+  await page.locator("#tab-presets").click();
+  await page.locator("button", { hasText: "スーパーフリップ" }).click();
+  await expect(page.locator("#preset-status")).toContainText(
+    "スーパーフリップ を読み込みました",
+  );
+
+  // 3. 解法探索を実行
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
+
+  // 4. 手数が24手以内であることを検証
+  const moves = await page.locator(".solution-move").allTextContents();
+  expect(moves.length).toBeLessThanOrEqual(24);
+
+  // 5. 解法の最後まで進む
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 6. 全 54 セルの矢印が完全に NORMAL (緑、0 rad) に揃っていることを検証
+  const arrowData = await page.evaluate(() => {
+    const scene = (window as any).cube_scene;
+    const arrows = scene?.getArrows() ?? [];
+    return arrows.map((a: any) => ({
+      stickerIdx: a.userData?.stickerIdx as number,
+      color: (a.material?.color ?? a.cone?.material?.color).getHex() as number,
+      rotAngle: a.userData?.rotAngle as number,
+    }));
+  });
+
+  expect(arrowData.length).toBe(54);
+  for (const arrow of arrowData) {
+    expect(arrow.color).toBe(ARROW_COLORS.NORMAL);
+    expect(Math.abs(arrow.rotAngle)).toBeLessThan(1e-4);
+  }
+
+  // 7. 全 6 面の centerRotations がすべて 0 であることを検証
+  const centerRotations = await page.evaluate(() => {
+    const scene = (window as any).cube_scene;
+    return scene.centerRotations;
+  });
+  expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
+});
+
+test("all presets can be loaded and solved within optimal move bounds", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator("#reduced-motion").check();
+
+  const presets = [
+    {
+      label: "完成状態",
+      expectedMovesMax: 0,
+      description: "0 moves (already solved)",
+    },
+    {
+      label: "簡単（5手）",
+      expectedMovesMax: 5,
+      description: "3 to 5 moves",
+    },
+    {
+      label: "T-Permutation",
+      expectedMovesMax: 14,
+      description: "at most 14 moves",
+    },
+    {
+      label: "スーパーフリップ",
+      expectedMovesMax: 24,
+      description: "at most 24 moves (God's number 20)",
+    },
+    {
+      label: "ランダム（seed=1）",
+      expectedMovesMax: 25,
+      description: "at most 25 moves",
+    },
+  ];
+
+  for (const preset of presets) {
+    // プリセットタブを開いて選択
+    await page.locator("#tab-presets").click();
+    await page
+      .locator("#preset-buttons button", { hasText: preset.label })
+      .click();
+    await expect(page.locator("#preset-status")).toContainText(
+      `${preset.label} を読み込みました`,
+      { timeout: 5000 },
+    );
+
+    // 解法探索を実行
+    await page.locator("#solve").click();
+
+    if (preset.expectedMovesMax === 0) {
+      // 完成状態は 0 手
+      expect(await state(page)).toBe(SOLVED);
+      const moves = await page.locator(".solution-move").allTextContents();
+      expect(moves.length).toBe(0);
+    } else {
+      await expect(page.locator("#solution-content")).toBeVisible({
+        timeout: 10000,
+      });
+      const moves = await page.locator(".solution-move").allTextContents();
+      console.log(
+        `Preset '${preset.label}' solved in ${moves.length} moves (${preset.description}):`,
+        moves.join(" "),
+      );
+      expect(moves.length).toBeLessThanOrEqual(preset.expectedMovesMax);
+
+      // 解法の最後まで進んで完成状態を検証
+      await page.locator(".solution-move").last().click();
+      expect(await state(page)).toBe(SOLVED);
+    }
+  }
 });

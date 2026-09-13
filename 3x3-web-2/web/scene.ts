@@ -392,13 +392,23 @@ export class CubeScene {
       this.show(state, this.next);
       return;
     }
-    this.arrowGroup.visible = false;
     const axis = normal[FACES.indexOf(move[0])];
     const layer = new THREE.Group();
     this.root.add(layer);
     this.pieces
       .filter((mesh) => mesh.position.dot(axis) > 0.5)
       .forEach((mesh) => layer.attach(mesh));
+
+    // 回転する層に属する矢印（カラー矢印およびアウトライン）を layer に attach
+    const movingArrows = (this.arrowGroup.children as THREE.Object3D[]).filter(
+      (mesh) => {
+        const pos = new THREE.Vector3();
+        mesh.getWorldPosition(pos);
+        return pos.dot(axis) > 0.5;
+      },
+    );
+    movingArrows.forEach((mesh) => layer.attach(mesh));
+
     const angle =
       ((move.endsWith("2") ? 2 : move.endsWith("'") ? -1 : 1) * -Math.PI) / 2;
     await new Promise<void>((resolve) => {
@@ -425,7 +435,6 @@ export class CubeScene {
       mesh.quaternion.copy(mesh.userData.rotation);
     }
     this.root.remove(active.layer);
-    this.arrowGroup.visible = true;
     active.finish();
   }
   private frame(time: number) {

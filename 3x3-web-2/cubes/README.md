@@ -56,7 +56,7 @@ const result = wasm.validate(solved);  // true を返す
 - **特異性**: コーナーピースは正しい位置だが、すべてのエッジが反転
 - **生成方法**: 
   ```
-  R U' R U R U R U' R' U' R 2 U R U' R' U' R 2 U
+  R U' R U R U R U' R' U' R2 U R U' R' U' R2 U
   ```
 
 **数学的意義**：

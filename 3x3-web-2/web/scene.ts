@@ -241,25 +241,6 @@ export class CubeScene {
     );
   }
 
-  applyMoveToCenters(move: string) {
-    const f = FACES.indexOf(move[0]);
-    if (f >= 0) {
-      const dAngle = move.endsWith("2")
-        ? Math.PI
-        : move.endsWith("'")
-          ? -Math.PI / 2
-          : Math.PI / 2;
-      this.centerRotations[f] =
-        (this.centerRotations[f] + dAngle) % (2 * Math.PI);
-      this.updateCenterLabels();
-    }
-  }
-
-  resetCenterRotations() {
-    this.centerRotations.fill(0);
-    this.updateCenterLabels();
-  }
-
   private updateCenterLabels() {
     for (let f = 0; f < 6; f++) {
       const label = this.centerLabels[f];
@@ -387,7 +368,6 @@ export class CubeScene {
   }
   async turn(move: string, state: string, duration: number) {
     this.finish();
-    this.applyMoveToCenters(move);
     if (duration <= 0) {
       this.show(state, this.next);
       return;

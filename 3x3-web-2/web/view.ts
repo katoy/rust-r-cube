@@ -52,8 +52,8 @@ export function mount() {
     <div class="workspace-footer"><span>${icon("check")} 解法は、実際に揃うことを検証してから表示します。</span><div><button id="save" class="text-button">${icon("download")} 保存</button><button id="load" class="text-button">${icon("upload")} 読込</button><input id="file" type="file" accept=".json,application/json" hidden /></div></div>
     <footer><span>CUBE STUDIO <span class="footer-separator">/</span> A LITTLE ORDER IN THE CHAOS.</span><label><input id="reduced-motion" type="checkbox" /> 動きを減らす</label></footer>
   </main>
-  <dialog id="editor"><div class="dialog-header"><div><p class="eyebrow">COLOR YOUR CUBE</p><h2>実物の色を、ここに。</h2></div><button id="editor-close" class="icon-button" aria-label="色入力を閉じる">${icon("close")}</button></div><p>白いセンターを上、緑を前に。各面を正面から見た色を入力してください。</p><div class="editor-layout"><div><div id="palette" aria-label="入力する色"></div><div id="editor-net" class="cube-net"></div><button id="clear-colors" class="text-button">センター以外を未入力にする</button></div><div class="face-guide"><div class="guide-head"><button id="guide-prev" class="icon-button" aria-label="前の面">${icon("back")}</button><strong id="guide-title"></strong><button id="guide-next" class="icon-button" aria-label="次の面">${icon("next")}</button></div><p id="guide-orientation"></p><div id="guide-grid" class="face-grid"></div><small>面を選んで、上のパレットの色で塗ります。</small></div></div><p id="editor-error" role="status"></p><div class="dialog-footer"><span id="color-count"></span><button id="editor-apply" class="primary">この状態を使う ${icon("arrow")}</button></div></dialog>
-  <dialog id="help-dialog"><div class="dialog-header"><h2>ひと回しずつ、使ってみよう。</h2><button id="help-close" class="icon-button" aria-label="使い方を閉じる">${icon("close")}</button></div><ol class="help-list"><li><strong>キューブを準備</strong><p>スクランブルで試すか、実物の6面の色を入力します。手順を入力して状態をつくることもできます。</p></li><li><strong>解法を探す</strong><p>探索はブラウザ内で完結します。配色は外部に送信されません。探索中も視点を動かせます。</p></li><li><strong>手順をたどる</strong><p>再生ボタンで自動再生、左右ボタンで1手ずつ確認。回転記号を選ぶと、その手の直後に移動します。</p></li></ol><p class="help-note">U＝上、R＝右、F＝前、D＝下、L＝左、B＝後ろ。′ は逆回転、2 は180°です。時計回りは、回す面を正面から見た向きです。</p><p class="help-note">キーボード：U R F D L B で回転、Shiftで逆回転。Spaceで再生／停止、← →で前後の手順。</p><p class="help-note">通常の6色3×3専用です。センターの矢印方向は扱いません。高速な2段階探索を使用し、最短解は保証しません。</p></dialog>`;
+  <dialog id="editor"><div class="dialog-header"><div><p class="eyebrow">COLOR YOUR CUBE</p><h2>実物の色を、ここに。</h2></div><button id="editor-close" class="icon-button" aria-label="色入力を閉じる">${icon("close")}</button></div><p>白いセンターを上、緑を前に。各面を正面から見た色を入力してください。</p><div class="editor-layout"><div><div id="palette" aria-label="入力する色"></div><div id="editor-net" class="cube-net"></div><button id="clear-colors" class="text-button">センター以外を未入力にする</button></div><div class="face-guide"><div class="guide-head"><button id="guide-prev" class="icon-button" aria-label="前の面">${icon("back")}</button><strong id="guide-title"></strong><button id="guide-next" class="icon-button" aria-label="次の面">${icon("next")}</button></div><p id="guide-orientation"></p><div id="guide-grid" class="face-grid"></div><small>面を選んで、上のパレットの色で塗ります。</small></div></div><section class="center-input" aria-labelledby="center-heading"><h3 id="center-heading">センターの向き</h3><p>各面のガイドを正面から見て、上向きが0°、時計回りに90°ずつです。</p><div id="center-controls"></div><button id="auto-centers" class="secondary">配色に合う向きを自動設定</button><p>自動設定は解ける向きの一例です。実物の矢印は推定できないため、矢印付きキューブは実物に合わせて指定してください。</p><p id="center-mode" role="status"></p></section><p id="editor-error" role="status"></p><div class="dialog-footer"><span id="color-count"></span><button id="editor-apply" class="primary">この状態を使う ${icon("arrow")}</button></div></dialog>
+  <dialog id="help-dialog"><div class="dialog-header"><h2>ひと回しずつ、使ってみよう。</h2><button id="help-close" class="icon-button" aria-label="使い方を閉じる">${icon("close")}</button></div><ol class="help-list"><li><strong>キューブを準備</strong><p>スクランブルで試すか、実物の6面の色を入力します。手順を入力して状態をつくることもできます。</p></li><li><strong>解法を探す</strong><p>探索はブラウザ内で完結します。配色は外部に送信されません。探索中も視点を動かせます。</p></li><li><strong>手順をたどる</strong><p>再生ボタンで自動再生、左右ボタンで1手ずつ確認。回転記号を選ぶと、その手の直後に移動します。</p></li></ol><p class="help-note">U＝上、R＝右、F＝前、D＝下、L＝左、B＝後ろ。′ は逆回転、2 は180°です。時計回りは、回す面を正面から見た向きです。</p><p class="help-note">キーボード：U R F D L B で回転、Shiftで逆回転。Spaceで再生／停止、← →で前後の手順。</p><p class="help-note">6色3×3に対応しています。センターの矢印方向は色入力画面で指定できます。高速な2段階探索を使用し、最短解は保証しません。</p></dialog>`;
 }
 export function net(
   host: HTMLElement,
@@ -61,6 +61,7 @@ export function net(
   editable = false,
   onPaint?: (index: number) => void,
   active = -1,
+  centers?: number[],
 ) {
   host.replaceChildren();
   [...FACES].forEach((face, f) => {
@@ -77,7 +78,8 @@ export function net(
       cell.className = "sticker";
       cell.dataset.index = String(f * 9 + i);
       cell.dataset.color = state[f * 9 + i];
-      cell.textContent = i === 4 ? face : "";
+      cell.textContent =
+        i === 4 ? (centers ? ["↑", "→", "↓", "←"][centers[f]] : face) : "";
       if (active === f) cell.classList.add("active-face");
       cell.setAttribute(
         "aria-label",

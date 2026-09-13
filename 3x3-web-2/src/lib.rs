@@ -48,6 +48,15 @@ pub fn solve_state_with_centers(
     initial_centers: Option<[i32; 6]>,
 ) -> Result<ResultData, String> {
     let cube = cube::parse_state(state)?;
+    if let (true, Some(centers)) = (include_orientation, initial_centers) {
+        let center_parity = centers.iter().map(|c| c.rem_euclid(4)).sum::<i32>() % 2;
+        if center_parity as usize != cube::parity(&cube.cp.map(|c| c as u8)) {
+            return Err(
+                "センターの向きと配色が整合しません。向きを確認するか、自動設定してください。"
+                    .into(),
+            );
+        }
+    }
     let start = web_time::Instant::now();
     let mut total_nodes = 0u64;
     let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
@@ -127,6 +136,14 @@ pub fn initialize() {
 pub fn validate(state: &str) -> Result<bool, JsValue> {
     cube::parse_state(state)
         .map(|c| c == coord::RawCube::default())
+        .map_err(|e| JsValue::from_str(&e))
+}
+/// Required parity of the sum of center quarter turns. Each face quarter turn
+/// changes both this sum's parity and the corner permutation's parity.
+#[wasm_bindgen]
+pub fn center_parity(state: &str) -> Result<u8, JsValue> {
+    cube::parse_state(state)
+        .map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
         .map_err(|e| JsValue::from_str(&e))
 }
 #[wasm_bindgen]

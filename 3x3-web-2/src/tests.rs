@@ -1441,3 +1441,23 @@ fn test_easy_5_moves_length() {
         sol.moves.len()
     );
 }
+
+#[test]
+fn center_input_parity_matches_legal_moves() {
+    for seed in 1..=20 {
+        let moves = scramble(seed);
+        let state = facelets(&apply(&RawCube::default(), &moves));
+        let expected = moves.iter().map(|m| m % 3 + 1).sum::<usize>() % 2;
+        assert_eq!(crate::center_parity(&state).unwrap() as usize, expected);
+    }
+    assert_eq!(crate::center_parity(SOLVED).unwrap(), 0);
+}
+
+#[test]
+fn incompatible_center_input_is_rejected_before_search() {
+    let error =
+        crate::solve_state_with_centers(SOLVED, 0, true, Some([1, 0, 0, 0, 0, 0])).unwrap_err();
+    assert!(error.contains("センター"), "{error}");
+    // Color-only solving does not constrain center orientation.
+    assert!(crate::solve_state_with_centers(SOLVED, 0, false, Some([1, 0, 0, 0, 0, 0])).is_ok());
+}

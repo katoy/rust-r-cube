@@ -1132,3 +1132,38 @@ dialog > p {
     scroll-behavior: auto !important;
   }
 }
+
+.center-input {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+.center-input h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.center-input p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+#center-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+#center-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+#center-controls select {
+  width: 100%;
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  #center-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

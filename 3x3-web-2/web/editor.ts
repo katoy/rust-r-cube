@@ -1,5 +1,6 @@
 import { FACES, NAMES, COLORS, FACE_NAMES } from "./model";
 import { net } from "./view";
+import { automaticCenters, centerTurns, centersFromInput } from "./centers";
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const orientation = [
@@ -14,9 +15,11 @@ export class ColorEditor {
   private draft = "";
   private color = "U";
   private face = 0;
+  private turns = [0, 0, 0, 0, 0, 0];
+  private manualCenters = false;
   constructor(
     private validate: (s: string) => boolean,
-    private apply: (s: string) => void,
+    private apply: (s: string, centers: number[]) => void,
   ) {
     $("editor-close").onclick = () => $<HTMLDialogElement>("editor").close();
     $("guide-prev").onclick = () => {
@@ -31,18 +34,29 @@ export class ColorEditor {
       this.draft = [...FACES].map((f) => "????" + f + "????").join("");
       this.render();
     };
+    $("auto-centers").onclick = () => {
+      try {
+        this.turns = centerTurns(automaticCenters(this.draft));
+        this.manualCenters = false;
+        this.render();
+      } catch (error) {
+        $("editor-error").textContent = String(error);
+      }
+    };
     $("editor-apply").onclick = () => {
       try {
         this.validate(this.draft);
-        this.apply(this.draft);
+        this.apply(this.draft, centersFromInput(this.draft, this.turns));
         $<HTMLDialogElement>("editor").close();
       } catch (error) {
         $("editor-error").textContent = String(error);
       }
     };
   }
-  open(state: string) {
+  open(state: string, centers: number[]) {
     this.draft = state;
+    this.turns = centerTurns(centers);
+    this.manualCenters = false;
     this.face = 0;
     $("editor-error").textContent = "";
     this.render();
@@ -52,6 +66,13 @@ export class ColorEditor {
     this.draft =
       this.draft.slice(0, index) + this.color + this.draft.slice(index + 1);
     this.face = Math.floor(index / 9);
+    if (!this.manualCenters) {
+      try {
+        this.turns = centerTurns(automaticCenters(this.draft));
+      } catch {
+        // Incomplete colors are validated when the user applies the draft.
+      }
+    }
     this.render();
     document
       .querySelector<HTMLElement>(`#${source} [data-index="${index}"]`)
@@ -87,6 +108,7 @@ export class ColorEditor {
       true,
       (i) => this.paint(i, "editor-net"),
       this.face,
+      this.turns,
     );
     $("guide-title").textContent =
       `${this.face + 1} / 6　${FACES[this.face]} · ${FACE_NAMES[FACES[this.face]]}`;
@@ -99,7 +121,8 @@ export class ColorEditor {
       cell.className = "sticker";
       cell.dataset.color = this.draft[index];
       cell.dataset.index = String(index);
-      cell.textContent = i === 4 ? FACES[this.face] : "";
+      cell.textContent =
+        i === 4 ? ["↑", "→", "↓", "←"][this.turns[this.face]] : "";
       cell.disabled = i === 4;
       cell.setAttribute(
         "aria-label",
@@ -108,6 +131,34 @@ export class ColorEditor {
       cell.onclick = () => this.paint(index, "guide-grid");
       grid.append(cell);
     }
+    const controls = $("center-controls");
+    controls.replaceChildren();
+    [...FACES].forEach((face, i) => {
+      const label = document.createElement("label");
+      label.textContent = `${face} · ${NAMES[face]}`;
+      const select = document.createElement("select");
+      select.id = `center-${face}`;
+      select.setAttribute("aria-label", `${face} センターの向き`);
+      for (let t = 0; t < 4; t++) {
+        const option = document.createElement("option");
+        option.value = String(t);
+        option.textContent = `${["↑", "→", "↓", "←"][t]} ${t * 90}°`;
+        select.append(option);
+      }
+      select.value = String(this.turns[i]);
+      select.onchange = () => {
+        this.turns[i] = Number(select.value);
+        this.manualCenters = true;
+        this.face = i;
+        this.render();
+        $(`center-${face}`).focus();
+      };
+      label.append(select);
+      controls.append(label);
+    });
+    $("center-mode").textContent = this.manualCenters
+      ? "手動入力：配色を変更しても指定した向きを保持します。"
+      : "配色を変更すると、センターの向きも自動設定します。";
     const count = [...this.draft].filter((c) => c !== "?").length;
     $("color-count").textContent = `${count} / 54 マス入力済み`;
     $("editor-error").textContent = "";

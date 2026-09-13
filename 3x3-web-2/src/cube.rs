@@ -104,7 +104,7 @@ pub fn parse_state(text: &str) -> Result<RawCube, String> {
     }
     Ok(cube)
 }
-fn parity(p: &[u8]) -> usize {
+pub(crate) fn parity(p: &[u8]) -> usize {
     (0..p.len())
         .map(|i| (i + 1..p.len()).filter(|j| p[i] > p[*j]).count())
         .sum::<usize>()

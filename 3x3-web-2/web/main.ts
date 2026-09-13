@@ -7,6 +7,19 @@ import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
 import { ColorEditor } from "./editor";
 import { SolverClient } from "./solver-client";
+import {
+  automaticCenters,
+  centerTurns,
+  centersFromInput,
+  rotateCenters,
+} from "./centers";
+
+type CubeSnapshot = { state: string; centerTurns: number[] };
+let centerRotations = [0, 0, 0, 0, 0, 0];
+const snapshot = (): CubeSnapshot => ({
+  state,
+  centerTurns: centerTurns(centerRotations),
+});
 
 mount();
 const $ = <T extends HTMLElement>(id: string) =>
@@ -25,8 +38,8 @@ let solution: ResultData | undefined,
   playbackRun = 0;
 let scene: CubeScene | undefined,
   modifier = "",
-  history: string[] = [],
-  future: string[] = [];
+  history: CubeSnapshot[] = [],
+  future: CubeSnapshot[] = [];
 let solver: SolverClient | undefined,
   interval = 0;
 const reduced = $<HTMLInputElement>("reduced-motion");
@@ -56,7 +69,7 @@ function persist() {
       storageKey,
       JSON.stringify({
         version: 1,
-        state,
+        ...snapshot(),
         reducedMotion: reduced.checked,
         speed: $<HTMLSelectElement>("speed").value,
       }),
@@ -67,18 +80,25 @@ function persist() {
     );
   }
 }
-function replace(next: string, record = true) {
+function replace(
+  next: string,
+  record = true,
+  centers = automaticCenters(next),
+) {
   stop();
   cancelSearch();
-  if (next === SOLVED) {
-    scene?.resetCenterRotations();
-  }
-  if (record && state !== next) {
-    history.push(state);
+  const nextTurns = centerTurns(centers);
+  if (
+    record &&
+    (state !== next ||
+      centerTurns(centerRotations).some((t, i) => t !== nextTurns[i]))
+  ) {
+    history.push(snapshot());
     if (history.length > 200) history.shift();
     future = [];
   }
   state = next;
+  centerRotations = [...centers];
   revision++;
   solution = undefined;
   step = 0;
@@ -88,11 +108,23 @@ function replace(next: string, record = true) {
 }
 function refresh() {
   const next = solution?.moves[step] || "";
-  if (!inMotion) scene?.show(state, next);
-  net($("fallback-net"), state);
+  if (scene) {
+    scene.centerRotations = [...centerRotations];
+    if (!inMotion) scene.show(state, next);
+  }
+  net(
+    $("fallback-net"),
+    state,
+    false,
+    undefined,
+    -1,
+    centerTurns(centerRotations),
+  );
   $("cube-status").textContent =
     state === SOLVED
-      ? "完成状態"
+      ? centerTurns(centerRotations).some((t) => t !== 0)
+        ? "色は完成・センターの向きあり"
+        : "完成状態"
       : solution
         ? `${step} / ${solution.moves.length} 手`
         : "スクランブル状態";
@@ -177,18 +209,12 @@ async function seek(target: number, animate = true) {
   step = target;
   state = nextState;
   revision++;
+  const traversed =
+    target > old
+      ? data.moves.slice(old, target)
+      : data.moves.slice(target, old).reverse().map(inverse);
+  centerRotations = rotateCenters(centerRotations, traversed);
   persist();
-  if (!move && scene) {
-    if (target > old) {
-      for (let i = old; i < target; i++) {
-        scene.applyMoveToCenters(data.moves[i]);
-      }
-    } else if (target < old) {
-      for (let i = old - 1; i >= target; i--) {
-        scene.applyMoveToCenters(inverse(data.moves[i]));
-      }
-    }
-  }
   inMotion = !!(animate && move && scene && !reduced.checked);
   refresh();
   if (inMotion && move)
@@ -248,13 +274,17 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     const result: ResultData = JSON.parse(apply_moves(state, algorithm));
     stop();
     cancelSearch();
-    const old = state;
-    if (old !== result.state) {
-      history.push(old);
+    const nextCenters = rotateCenters(centerRotations, result.moves);
+    if (
+      state !== result.state ||
+      nextCenters.some((angle, i) => angle !== centerRotations[i])
+    ) {
+      history.push(snapshot());
       if (history.length > 200) history.shift();
       future = [];
     }
     state = result.state;
+    centerRotations = nextCenters;
     revision++;
     solution = undefined;
     step = 0;
@@ -275,7 +305,6 @@ async function applyAlgorithm(algorithm: string, animate = true) {
         Number($<HTMLSelectElement>("speed").value),
       );
     } else {
-      result.moves.forEach((m) => scene?.applyMoveToCenters(m));
       refresh();
     }
     if (token === motion) {
@@ -312,7 +341,7 @@ async function solve(budget = 5000) {
       at,
       budget,
       includeOrientation.checked,
-      scene ? [...scene.centerRotations] : undefined,
+      [...centerRotations],
     );
 
     if (revision !== at) return;
@@ -332,11 +361,13 @@ async function solve(budget = 5000) {
   }
 }
 
-const editor = new ColorEditor(validate, (s) => replace(s));
+const editor = new ColorEditor(validate, (s, centers) =>
+  replace(s, true, centers),
+);
 $("edit-colors").onclick = () => {
   stop();
   refresh();
-  editor.open(state);
+  editor.open(state, centerRotations);
 };
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);
@@ -351,9 +382,7 @@ $("scramble").onclick = () => {
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   const algorithm = scramble(seed);
   const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
-  scene?.resetCenterRotations();
-  replace(result.state);
-  result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+  replace(result.state, true, rotateCenters([0, 0, 0, 0, 0, 0], result.moves));
   $("scramble-text").textContent = algorithm;
 };
 $("apply-algorithm").onclick = () =>
@@ -378,15 +407,15 @@ $("double").onclick = () => setModifier("2");
 $("undo").onclick = () => {
   const prev = history.pop();
   if (prev) {
-    future.push(state);
-    replace(prev, false);
+    future.push(snapshot());
+    replace(prev.state, false, centersFromInput(prev.state, prev.centerTurns));
   }
 };
 $("redo").onclick = () => {
   const next = future.pop();
   if (next) {
-    history.push(state);
-    replace(next, false);
+    history.push(snapshot());
+    replace(next.state, false, centersFromInput(next.state, next.centerTurns));
   }
 };
 $("reset").onclick = () => replace(SOLVED);
@@ -450,9 +479,12 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
   };
 });
 $("save").onclick = () => {
-  const blob = new Blob([JSON.stringify({ version: 1, state }, null, 2)], {
-    type: "application/json",
-  });
+  const blob = new Blob(
+    [JSON.stringify({ version: 1, ...snapshot() }, null, 2)],
+    {
+      type: "application/json",
+    },
+  );
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -483,7 +515,14 @@ $<HTMLInputElement>("file").onchange = async () => {
       throw new Error(
         "読込中にキューブが変更されました。もう一度読み込んでください。",
       );
-    replace(data.state);
+    replace(
+      data.state,
+      true,
+      centersFromInput(
+        data.state,
+        "centerTurns" in data ? data.centerTurns : undefined,
+      ),
+    );
   } catch (error) {
     message(String(error));
   } finally {
@@ -542,7 +581,9 @@ async function start() {
         if (data.version !== 1 || typeof data.state !== "string")
           throw new Error("format");
         validate(data.state);
+        const restoredCenters = centersFromInput(data.state, data.centerTurns);
         state = data.state;
+        centerRotations = restoredCenters;
         if (typeof data.reducedMotion === "boolean")
           reduced.checked = data.reducedMotion;
         if (["1000", "500", "250"].includes(data.speed))
@@ -612,9 +653,11 @@ async function initializePresets() {
               const result: ResultData = JSON.parse(
                 apply_moves(SOLVED, algorithm),
               );
-              scene?.resetCenterRotations();
-              replace(result.state);
-              result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+              replace(
+                result.state,
+                true,
+                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+              );
               $("scramble-text").textContent = algorithm;
               refresh();
             } catch (scrambleError) {
@@ -633,9 +676,11 @@ async function initializePresets() {
               const result: ResultData = JSON.parse(
                 apply_moves(SOLVED, cleanedScramble),
               );
-              scene?.resetCenterRotations();
-              replace(result.state);
-              result.moves.forEach((m) => scene?.applyMoveToCenters(m));
+              replace(
+                result.state,
+                true,
+                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+              );
               $("scramble-text").textContent = cleanedScramble;
               refresh();
             } catch (scrambleError) {
@@ -647,8 +692,11 @@ async function initializePresets() {
           // state 文字列がある場合
           else if (typeof data.state === "string" && data.state.trim()) {
             validate(data.state);
-            scene?.resetCenterRotations();
-            replace(data.state);
+            replace(
+              data.state,
+              true,
+              centersFromInput(data.state, data.centerTurns),
+            );
             refresh();
           } else {
             throw new Error(

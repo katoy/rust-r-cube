@@ -77,11 +77,37 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
+    await expect(page.locator("#camera-status-a")).toContainText("読込完了");
+    await expect(page.locator("#camera-drop-a")).toHaveClass(/has-file/);
+
     const viewBPath = getTestImagePath("solved", "B");
     await page.locator("#camera-file-b").setInputFiles(viewBPath);
     await page.waitForTimeout(300);
 
+    await expect(page.locator("#camera-status-b")).toContainText("読込完了");
+    await expect(page.locator("#camera-drop-b")).toHaveClass(/has-file/);
     await expect(page.locator("#camera-canvas")).toBeVisible();
+
+    // ビュー切り替えボタンの検証
+    await page.locator("#camera-view-a").click();
+    await expect(page.locator("#camera-view-a")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.locator("#camera-view-b")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+
+    await page.locator("#camera-view-b").click();
+    await expect(page.locator("#camera-view-b")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.locator("#camera-view-a")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
 
     await page.locator("#camera-close").click();
   });

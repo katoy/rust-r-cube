@@ -513,7 +513,10 @@ fn solves_known_states() {
     }
 }
 #[test]
+#[ignore = "long-running solver regression; run explicitly before releases or after search changes"]
 fn solves_one_thousand_scrambles() {
+    let start = std::time::Instant::now();
+    eprintln!("Starting 1000 scramble regression checks (5s search budget per seed)");
     for seed in 1..=1000 {
         let cube = apply(&RawCube::default(), &scramble(seed));
         let state = facelets(&cube);
@@ -521,6 +524,12 @@ fn solves_one_thousand_scrambles() {
         let solution =
             solve_state(&state, 5000, true).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
         assert_eq!(solution.state, SOLVED, "seed {seed}");
+        if seed % 10 == 0 {
+            eprintln!(
+                "{seed}/1000 scrambles passed ({:.1}s)",
+                start.elapsed().as_secs_f64()
+            );
+        }
     }
 }
 #[test]

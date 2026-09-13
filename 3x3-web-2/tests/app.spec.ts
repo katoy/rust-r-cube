@@ -449,12 +449,13 @@ test("speed setting affects playback duration", async ({ page }) => {
 
   // 高速設定
   await page.locator("#speed").selectOption("250");
+  const movesCount1 = await page.locator(".solution-move").count();
   const start1 = Date.now();
   await page.locator("#play").click();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 10000,
   });
-  const time1 = Date.now() - start1;
+  const timePerMove1 = (Date.now() - start1) / Math.max(1, movesCount1);
 
   // リセット
   await page.locator("#reset").click();
@@ -464,15 +465,16 @@ test("speed setting affects playback duration", async ({ page }) => {
 
   // 低速設定
   await page.locator("#speed").selectOption("1000");
+  const movesCount2 = await page.locator(".solution-move").count();
   const start2 = Date.now();
   await page.locator("#play").click();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 30000,
   });
-  const time2 = Date.now() - start2;
+  const timePerMove2 = (Date.now() - start2) / Math.max(1, movesCount2);
 
-  // 低速の方が時間がかかる
-  expect(time2).toBeGreaterThan(time1 * 0.5);
+  // 低速（1000ms）の方が1手あたり高速（250ms）より時間がかかる
+  expect(timePerMove2).toBeGreaterThan(timePerMove1);
 });
 
 test("arrows are displayed on initial solved state", async ({ page }) => {

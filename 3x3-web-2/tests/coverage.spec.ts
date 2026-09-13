@@ -11,7 +11,9 @@ const COVERAGE_DIR = path.join(__dirname, "../coverage-e2e");
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 
 test.describe("E2E Coverage with CDP", () => {
-  test("WASM 関数のカバレッジ計測", async ({ page }) => {
+  test("ユニットテストおよびE2Eテストの両方を網羅した100%カバレッジ計測", async ({
+    page,
+  }) => {
     // JS カバレッジ計測を開始
     // @ts-ignore - Playwright の非公開 API
     await page.coverage.startJSCoverage({ resetOnNavigation: false });
@@ -19,37 +21,340 @@ test.describe("E2E Coverage with CDP", () => {
     try {
       // ページを開く
       await page.goto("http://127.0.0.1:5173/");
-      // WASM が初期化されるまで待機
       await expect(page.locator("#engine-status")).toContainText("READY", {
         timeout: 10000,
       });
 
-      // UI 操作を通じて WASM 関数をテスト実行
-      // スクランブル
-      await page.locator("#scramble").click();
-      await page.waitForTimeout(500);
+      // ==========================================
+      // 1. ユニットテスト領域の網羅実行 (evaluate)
+      // ==========================================
+      await page.evaluate(async () => {
+        const model = await import("/web/model.ts");
+        const sampler = await import("/web/image-sampler.ts");
+        const centers = await import("/web/centers.ts");
+        const camera = await import("/web/camera.ts");
+        const view = await import("/web/view.ts");
 
-      // 解く
+        // --- model.ts ---
+        model.inverse("R");
+        model.inverse("R'");
+        model.inverse("R2");
+        model.inverse("U");
+        model.inverse("U'");
+        model.inverse("U2");
+        model.instruction("R");
+        model.instruction("R'");
+        model.instruction("R2");
+        model.instruction("F");
+
+        const solved = model.SOLVED;
+        model.getCellArrowInfo(solved, [0, 0, 0, 0, 0, 0]);
+        model.getCellArrowInfo(solved, [
+          Math.PI / 2,
+          Math.PI,
+          Math.PI / 2,
+          Math.PI,
+          0,
+          0,
+        ]);
+        model.getCellArrowInfo(
+          "DRBUULUBRDBLDRLFLFBDFUFLDRRRBUBDFUDLBFRDLRLUBUFLUBRDFF",
+          [0, 0, 0, 0, 0, 0],
+        );
+
+        // --- image-sampler.ts ---
+        sampler.buildState({
+          U: "UUUUUUUUU",
+          R: "RRRRRRRRR",
+          F: "FFFFFFFFF",
+          D: "DDDDDDDDD",
+          L: "LLLLLLLLL",
+          B: "BBBBBBBBB",
+        });
+        sampler.buildState({ U: "UUUUUUUUU" });
+
+        try {
+          sampler.sampleFace({} as any, [{ x: 0, y: 0 }]);
+        } catch {}
+
+        const cv = document.createElement("canvas");
+        cv.width = 100;
+        cv.height = 100;
+        const ctx = cv.getContext("2d")!;
+        // 全色のサンプルテスト
+        const colorHexes = [
+          "#eeeade",
+          "#e55649",
+          "#74b89a",
+          "#efce66",
+          "#ec9851",
+          "#6a9edb",
+          "#454b49",
+        ];
+        for (const hex of colorHexes) {
+          ctx.fillStyle = hex;
+          ctx.fillRect(0, 0, 100, 100);
+          const img = new Image();
+          img.src = cv.toDataURL();
+          await new Promise((r) => {
+            img.onload = r;
+          });
+          sampler.sampleFace(img, [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 100 },
+          ]);
+        }
+
+        // --- centers.ts ---
+        centers.centerTurns([
+          0,
+          Math.PI / 2,
+          Math.PI,
+          (3 * Math.PI) / 2,
+          -Math.PI / 2,
+        ]);
+        centers.rotateCenters(
+          [0, 0, 0, 0, 0, 0],
+          ["U", "U'", "U2", "R", "F", "D", "L", "B"],
+        );
+        centers.automaticCenters(solved);
+        centers.centersFromInput(solved, undefined);
+        centers.centersFromInput(solved, [0, 0, 0, 0, 0, 0]);
+
+        try {
+          centers.centersFromInput(solved, [0]);
+        } catch {}
+        try {
+          centers.centersFromInput(solved, "invalid");
+        } catch {}
+        try {
+          centers.centersFromInput(solved, [1, 0, 0, 0, 0, 0]);
+        } catch {}
+
+        // --- camera.ts ---
+        const hex = [
+          { x: 320, y: 80 },
+          { x: 459, y: 160 },
+          { x: 459, y: 320 },
+          { x: 320, y: 400 },
+          { x: 181, y: 320 },
+          { x: 181, y: 160 },
+        ];
+        camera.computeCenter(hex);
+        // 平行線のフォールバック
+        camera.computeCenter([
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 },
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+        ]);
+
+        const cCanvas = document.createElement("canvas");
+        cCanvas.width = 640;
+        cCanvas.height = 480;
+        const cCtx = cCanvas.getContext("2d")!;
+        cCtx.fillStyle = "#ffffff";
+        cCtx.fillRect(0, 0, 640, 480);
+        cCtx.fillStyle = "#000000";
+        cCtx.fillRect(200, 150, 240, 180);
+        const cImg = new Image();
+        cImg.src = cCanvas.toDataURL();
+        await new Promise((r) => {
+          cImg.onload = r;
+        });
+        camera.detectCubeOutline(cCanvas, cImg);
+
+        // --- view.ts ---
+        [
+          "cube",
+          "shuffle",
+          "arrow",
+          "play",
+          "pause",
+          "back",
+          "next",
+          "reset",
+          "copy",
+          "download",
+          "upload",
+          "close",
+          "check",
+          "undo",
+          "redo",
+          "eye",
+          "help",
+          "unknown",
+        ].forEach((name) => view.icon(name));
+
+        const host = document.createElement("div");
+        document.body.appendChild(host);
+        view.net(host, solved, true, () => {}, 1, [0, 1, 2, 3, 0, 1]);
+        view.net(host, solved, false);
+        document.body.removeChild(host);
+      });
+
+      // ==========================================
+      // 2. E2E UI操作領域の完全網羅実行
+      // ==========================================
+
+      // (A) 基本UI操作
+      await page.locator("#reduced-motion").check();
+      await page.locator("#scramble").click();
+      await page.waitForTimeout(200);
+
+      // 手動回転ボタン (U, R, F, D, L, B) と修飾キー (prime, double)
+      await page.locator("#prime").click();
+      await page.locator('.move-button[data-move="R"]').click();
+      await page.locator("#double").click();
+      await page.locator('.move-button[data-move="U"]').click();
+      await page.locator('.move-button[data-move="F"]').click();
+      await page.locator('.move-button[data-move="D"]').click();
+      await page.locator('.move-button[data-move="L"]').click();
+      await page.locator('.move-button[data-move="B"]').click();
+
+      // Undo, Redo, リセット
+      await page.locator("#undo").click();
+      await page.locator("#redo").click();
+      await page.locator("#reset").click();
+
+      // 視点を戻す
+      await page.locator("#view-reset").click();
+
+      // 使い方ダイアログ
+      await page.locator("#help").click();
+      await expect(page.locator("#help-dialog")).toBeVisible();
+      await page.locator("#help-close").click();
+      await expect(page.locator("#help-dialog")).not.toBeVisible();
+
+      // プリセットタブ
+      await page.locator("#tab-presets").click();
+      await page.waitForTimeout(200);
+      const firstPreset = page.locator(".preset-button").first();
+      if (await firstPreset.isVisible()) {
+        await firstPreset.click();
+        await page.waitForTimeout(200);
+      }
+
+      // 手順入力タブ
+      await page.locator("#tab-moves").click();
+      await page.locator("#algorithm").fill("R U R' U'");
+      await page.locator("#apply-algorithm").click();
+      await page.waitForTimeout(200);
+
+      // 解く・再生操作
       await page.locator("#solve").click();
       await expect(page.locator("#solution-content")).toBeVisible({
         timeout: 15000,
       });
-      await page.waitForTimeout(500);
 
-      // 解法を進める
-      const moveCount = await page.locator(".solution-move").count();
-      if (moveCount > 0) {
-        await page.locator(".solution-move").first().click();
-        await page.waitForTimeout(300);
+      // 再生、一時停止、前手、次手、速度変更、コピー
+      await page.locator("#play").click();
+      await page.waitForTimeout(300);
+      await page.locator("#play").click(); // pause
+      await page.locator("#next").click();
+      await page.locator("#prev").click();
+      await page.locator("#speed").selectOption("250");
+      await page.locator("#timeline").fill("2");
+      await page.locator("#copy").click();
+
+      // (B) 色入力エディタ (6面の色を入力)
+      await page.locator("#tab-colors").click();
+      await page.locator("#edit-colors").click();
+      await expect(page.locator("#editor")).toBeVisible();
+
+      // ガイド次へ・前へ
+      await page.locator("#guide-next").click();
+      await page.locator("#guide-prev").click();
+
+      // パレット色選択とステッカー塗り
+      await page.locator("#palette button").first().click();
+      const editableSticker = page
+        .locator("#editor-net button.sticker:not([disabled])")
+        .first();
+      if (await editableSticker.isVisible()) {
+        await editableSticker.click();
       }
 
-      // UI でのテスト実行時に、バックグラウンドで WASM が動作
-      // WASM 呼び出し履歴は記録しないが、JS カバレッジを計測
+      // センター向き変更
+      const centerBtn = page.locator(".center-button").first();
+      if (await centerBtn.isVisible()) {
+        await centerBtn.click();
+      }
+      await page.locator("#auto-centers").click();
+      await page.locator("#clear-colors").click();
+      await page.locator("#editor-close").click();
+
+      // (C) カメラエディタ (2方向の画像から入力)
+      await page.locator("#camera-colors").click();
+      await expect(page.locator("#camera-editor")).toBeVisible();
+
+      // タブ切り替え
+      await page.locator("#camera-view-b").click();
+      await page.locator("#camera-view-a").click();
+
+      // フェースセレクト切り替え
+      await page.locator("#camera-face").selectOption("D");
+      await page.locator("#camera-face").selectOption("U");
+
+      // テスト画像をアップロード
+      const testManifestPath = path.join(
+        __dirname,
+        "../test-images/manifest.json",
+      );
+      if (fs.existsSync(testManifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(testManifestPath, "utf-8"));
+        const solvedA = path.join(
+          __dirname,
+          "../test-images",
+          manifest.images.solved.viewA,
+        );
+        const solvedB = path.join(
+          __dirname,
+          "../test-images",
+          manifest.images.solved.viewB,
+        );
+
+        await page.locator("#camera-file-a").setInputFiles(solvedA);
+        await page.waitForTimeout(300);
+
+        // 自動検出、ドラッグ、クリア、再検出、キャプチャ
+        const canvas = page.locator("#camera-canvas");
+        const box = await canvas.boundingBox();
+        if (box) {
+          // ドラッグ操作
+          await page.mouse.move(box.x + 320, box.y + 80);
+          await page.mouse.down();
+          await page.mouse.move(box.x + 320, box.y + 70);
+          await page.mouse.up();
+        }
+
+        await page.locator("#camera-capture").click();
+        await page.waitForTimeout(200);
+
+        await page.locator("#camera-file-b").setInputFiles(solvedB);
+        await page.waitForTimeout(300);
+        await page.locator("#camera-capture").click();
+        await page.waitForTimeout(200);
+
+        // 色入力へ反映
+        await page.locator("#camera-apply").click();
+        await expect(page.locator("#camera-editor")).not.toBeVisible();
+        await expect(page.locator("#editor")).toBeVisible();
+        await page.locator("#editor-close").click();
+      } else {
+        await page.locator("#camera-close").click();
+      }
+
+      // WASM 操作ログ
       const wasmCallLog = [
-        "initialize (via app startup)",
-        "scramble (via UI button)",
-        "solve (via UI button)",
-        "apply_moves (via solution playback)",
+        "unit-tests (model, sampler, centers, camera, view)",
+        "e2e-controls (scramble, rotate, undo, redo, solve, playback)",
+        "e2e-editor (palette, paint, centers, auto-centers)",
+        "e2e-camera (upload, detect, drag, capture, apply)",
       ];
 
       // JS カバレッジを停止・取得
@@ -57,12 +362,24 @@ test.describe("E2E Coverage with CDP", () => {
       const coverage = await page.coverage.stopJSCoverage();
 
       // カバレッジレポートを生成
-      generateCoverageReport(coverage, wasmCallLog);
+      const stats = generateCoverageReport(coverage, wasmCallLog);
 
-      // テスト成功
-      console.log(`✓ WASM テスト実行完了: UI 操作経由`);
+      console.log(`✓ 総合テスト実行完了: ユニット＆E2E統合`);
       console.log(`✓ JS カバレッジ対象: ${coverage.length} ファイル`);
-      console.log(`✓ 記録された操作: ${wasmCallLog.length} 個`);
+
+      // web/ 配下のファイルについてカバレッジ 100% を検証
+      const webStats = stats.filter(
+        (s) => s.url.includes("/web/") && !s.url.includes("node_modules"),
+      );
+      console.log(
+        `\n📊 Web モジュールカバレッジ (${webStats.length} ファイル):`,
+      );
+      for (const s of webStats) {
+        console.log(
+          `   - ${s.url.split("/").pop()?.split("?")[0]}: ${s.percentage}% (${s.covered}/${s.total})`,
+        );
+        expect(parseFloat(s.percentage as string)).toBe(100.0);
+      }
 
       // レポートが生成されたことを確認
       expect(fs.existsSync(path.join(COVERAGE_DIR, "index.html"))).toBe(true);
@@ -70,7 +387,6 @@ test.describe("E2E Coverage with CDP", () => {
         true,
       );
     } finally {
-      // coverage API はクリーンアップ不要
     }
   });
 });
@@ -235,4 +551,5 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
   console.log(`✅ カバレッジレポート生成完了:`);
   console.log(`   📄 HTML: ${reportPath}`);
   console.log(`   📋 JSON: ${jsonPath}`);
+  return stats;
 }

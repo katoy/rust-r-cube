@@ -24,10 +24,12 @@ export interface ImageManifestData {
     A: {
       faces: string[];
       corners: Record<string, Point[]>;
+      outline?: Point[];
     };
     B: {
       faces: string[];
       corners: Record<string, Point[]>;
+      outline?: Point[];
     };
   };
   images: Record<
@@ -86,6 +88,25 @@ export function getFaceCorners(faceLabel: string): Point[] {
 }
 
 /**
+ * ビュー（A, B）の外周6点（てっぺんから時計回り）を取得
+ */
+export function getOutlineCorners(view: "A" | "B"): Point[] {
+  const manifest = loadFullManifest();
+  if (manifest.views[view]?.outline) {
+    return manifest.views[view].outline!;
+  }
+  // フォールバック（計算値）
+  return [
+    { x: 320, y: 80 },
+    { x: 459, y: 160 },
+    { x: 459, y: 320 },
+    { x: 320, y: 400 },
+    { x: 181, y: 320 },
+    { x: 181, y: 160 },
+  ];
+}
+
+/**
  * 期待する54文字のキューブ状態文字列を取得
  */
 export function getExpectedState(imageName: string): string {
@@ -122,35 +143,56 @@ export async function uploadTestImage(
 }
 
 /**
- * 面の四隅をクリックしてキャプチャ（対角立体画像の面ごとの4隅を正確にクリック）
+ * ビュー（AまたはB）の外周6点をキャプチャ（自動検出された6点または指定座標）
  */
-export async function captureFaceOnTestImage(page: Page, faceLabel: string) {
-  // フェース選択
-  await page.locator("#camera-face").selectOption(faceLabel);
-  await page.waitForTimeout(100);
+export async function captureViewOnTestImage(
+  page: Page,
+  view: "A" | "B",
+  manualPoints?: Point[],
+) {
+  // ビューの切り替え
+  const tabSelector = view === "A" ? "#camera-view-a" : "#camera-view-b";
+  await page.locator(tabSelector).click();
+  await page.waitForTimeout(150);
 
-  // Canvas の位置を取得
-  const canvas = page.locator("#camera-canvas");
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error("Canvas が見つかりません");
+  if (manualPoints && manualPoints.length > 0) {
+    // 手動指定テストの場合: クリアボタンを押して指定座標をクリック
+    await page.locator("#camera-clear-points").click();
+    await page.waitForTimeout(50);
 
-  const manifest = loadFullManifest();
-  const corners = getFaceCorners(faceLabel);
+    const canvas = page.locator("#camera-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas が見つかりません");
 
-  // Canvas の実際の表示サイズに合わせて座標をスケール
-  const scaleX = box.width / manifest.imageWidth;
-  const scaleY = box.height / manifest.imageHeight;
+    const manifest = loadFullManifest();
+    const scaleX = box.width / manifest.imageWidth;
+    const scaleY = box.height / manifest.imageHeight;
 
-  for (const corner of corners) {
-    const clickX = box.x + corner.x * scaleX;
-    const clickY = box.y + corner.y * scaleY;
-    await page.mouse.click(clickX, clickY);
+    for (const pt of manualPoints) {
+      const clickX = box.x + pt.x * scaleX;
+      const clickY = box.y + pt.y * scaleY;
+      await page.mouse.click(clickX, clickY);
+      await page.waitForTimeout(30);
+    }
   }
 
   // キャプチャボタンをクリック
   await expect(page.locator("#camera-capture")).not.toBeDisabled();
   await page.locator("#camera-capture").click();
   await page.waitForTimeout(100);
+}
+
+/**
+ * 面単位のテスト用ラッパー（外周6点キャプチャを呼び出し）
+ */
+export async function captureFaceOnTestImage(page: Page, faceLabel: string) {
+  const view = ["U", "R", "F"].includes(faceLabel) ? "A" : "B";
+  const progressText = await page.locator("#camera-progress").textContent();
+  const count = parseInt(progressText?.split("/")[0] || "0", 10);
+  // まだ該当ビューが読み取られていなければ読み取る
+  if ((view === "A" && count < 3) || (view === "B" && count < 6)) {
+    await captureViewOnTestImage(page, view);
+  }
 }
 
 /**

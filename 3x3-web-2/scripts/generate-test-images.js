@@ -55,6 +55,16 @@ const CORNERS_VIEW_A = {
   ],
 };
 
+// 外周6点（上面のてっぺんから時計回り）
+const OUTLINE_HEXAGON = [
+  { x: Math.round(O.x + vL.x + vR.x), y: Math.round(O.y + vL.y + vR.y) }, // 1: てっぺん
+  { x: Math.round(O.x + vR.x), y: Math.round(O.y + vR.y) }, // 2: 右上
+  { x: Math.round(O.x + vR.x + vD.x), y: Math.round(O.y + vR.y + vD.y) }, // 3: 右下
+  { x: Math.round(O.x + vD.x), y: Math.round(O.y + vD.y) }, // 4: 底（真下）
+  { x: Math.round(O.x + vL.x + vD.x), y: Math.round(O.y + vL.y + vD.y) }, // 5: 左下
+  { x: Math.round(O.x + vL.x), y: Math.round(O.y + vL.y) }, // 6: 左上
+];
+
 // ビューB: 上面=D, 前面左=L, 前面右=B
 const CORNERS_VIEW_B = {
   D: [
@@ -361,10 +371,12 @@ async function generateTestImages() {
           A: {
             faces: ["U", "R", "F"],
             corners: CORNERS_VIEW_A,
+            outline: OUTLINE_HEXAGON,
           },
           B: {
             faces: ["D", "L", "B"],
             corners: CORNERS_VIEW_B,
+            outline: OUTLINE_HEXAGON,
           },
         },
         images: imageManifest,

@@ -1226,10 +1226,24 @@ dialog > p {
   color: var(--text);
   font-weight: 600;
 }
-#camera-editor > label {
+.camera-point-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.camera-point-controls label {
+  flex: 1;
+  min-width: 200px;
   display: grid;
   gap: 6px;
   font-size: 12px;
+}
+.camera-point-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 #camera-editor select {
   width: 100%;

@@ -4,10 +4,12 @@ import {
   loadFullManifest,
   getTestImagePath,
   getFaceCorners,
+  getOutlineCorners,
   getExpectedState,
   getEditorState,
   openCameraEditor,
   uploadTestImage,
+  captureViewOnTestImage,
   captureFaceOnTestImage,
 } from "./test-utils";
 
@@ -24,6 +26,8 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     expect(fullManifest).toBeDefined();
     expect(fullManifest.views.A.faces).toEqual(["U", "R", "F"]);
     expect(fullManifest.views.B.faces).toEqual(["D", "L", "B"]);
+    expect(fullManifest.views.A.outline).toHaveLength(6);
+    expect(fullManifest.views.B.outline).toHaveLength(6);
 
     for (const face of ["U", "R", "F"]) {
       const corners = fullManifest.views.A.corners[face];
@@ -112,23 +116,33 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-close").click();
   });
 
-  test("フェース選択が正常に動作する", async ({ page }) => {
+  test("フェース・ビュー選択セレクトが正常に動作する", async ({ page }) => {
     await ready(page);
     await openCameraEditor(page);
 
     const faceSelect = page.locator("#camera-face");
     await expect(faceSelect).toBeVisible();
 
-    const faces = ["U", "R", "F", "D", "L", "B"];
-    for (const face of faces) {
-      await faceSelect.selectOption(face);
-      await expect(faceSelect).toHaveValue(face);
-    }
+    await faceSelect.selectOption("U");
+    await expect(faceSelect).toHaveValue("U");
+    await expect(page.locator("#camera-view-a")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    await faceSelect.selectOption("D");
+    await expect(faceSelect).toHaveValue("D");
+    await expect(page.locator("#camera-view-b")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     await page.locator("#camera-close").click();
   });
 
-  test("四隅をクリックしてキャプチャボタンを有効にできる", async ({ page }) => {
+  test("画像をアップロードすると外周6角が自動検出されキャプチャボタンが有効になる", async ({
+    page,
+  }) => {
     await ready(page);
     await openCameraEditor(page);
 
@@ -136,19 +150,89 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // キャプチャボタンは最初は無効
-    await expect(page.locator("#camera-capture")).toBeDisabled();
+    // アップロード直後に自動検出されるため、キャプチャボタンが有効
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
+    await expect(page.locator("#camera-help")).toContainText("自動検出");
 
-    // U面の正確な4隅をクリック
-    await captureFaceOnTestImage(page, "U");
+    // 画像Aの3面をそのままキャプチャ
+    await page.locator("#camera-capture").click();
+    await page.waitForTimeout(100);
 
-    // 読み取り完了後、入力済み進捗が 1/6 面になる
-    await expect(page.locator("#camera-progress")).toContainText("1 / 6");
+    // 読み取り完了後、入力済み進捗が 3/6 面になる
+    await expect(page.locator("#camera-progress")).toContainText("3 / 6");
 
     await page.locator("#camera-close").click();
   });
 
-  test("全 6 面を正確な四隅指定でキャプチャしてから apply が有効になる", async ({
+  test("クリアボタンで角をリセットし手動クリックで再指定できる", async ({
+    page,
+  }) => {
+    await ready(page);
+    await openCameraEditor(page);
+
+    const viewAPath = getTestImagePath("solved", "A");
+    await page.locator("#camera-file-a").setInputFiles(viewAPath);
+    await page.waitForTimeout(300);
+
+    // クリアボタンを押してリセット
+    await page.locator("#camera-clear-points").click();
+    await expect(page.locator("#camera-capture")).toBeDisabled();
+    await expect(page.locator("#camera-help")).toContainText("0/6点");
+
+    // 外周6点を手動クリックして再指定
+    const outline = getOutlineCorners("A");
+    const canvas = page.locator("#camera-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas が見つかりません");
+
+    const manifest = loadFullManifest();
+    const scaleX = box.width / manifest.imageWidth;
+    const scaleY = box.height / manifest.imageHeight;
+
+    for (const pt of outline) {
+      await page.mouse.click(box.x + pt.x * scaleX, box.y + pt.y * scaleY);
+      await page.waitForTimeout(30);
+    }
+
+    // 6点指定後にキャプチャボタンが有効化
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
+
+    await page.locator("#camera-close").click();
+  });
+
+  test("自動検出された頂点をドラッグして微調整できる", async ({ page }) => {
+    await ready(page);
+    await openCameraEditor(page);
+
+    const viewAPath = getTestImagePath("solved", "A");
+    await page.locator("#camera-file-a").setInputFiles(viewAPath);
+    await page.waitForTimeout(300);
+
+    const canvas = page.locator("#camera-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas が見つかりません");
+
+    // P1 (てっぺん: x=320, y=80) 付近をつかんで少し上へドラッグ
+    const startX = box.x + box.width * (320 / 640);
+    const startY = box.y + box.height * (80 / 480);
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY - 15);
+    await page.mouse.up();
+
+    // キャプチャボタンは依然として有効
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
+
+    // 「角を自動検出」ボタンを押すと初期位置に再検出される
+    await page.locator("#camera-detect").click();
+    await page.waitForTimeout(100);
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
+
+    await page.locator("#camera-close").click();
+  });
+
+  test("外周6点指定で画像A・画像Bをキャプチャしてから apply が有効になる", async ({
     page,
   }) => {
     await ready(page);
@@ -164,9 +248,7 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
     await expect(page.locator("#camera-progress")).toContainText("3 / 6");
     await expect(page.locator("#camera-apply")).toBeDisabled();
@@ -175,9 +257,7 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-b").setInputFiles(viewBPath);
     await page.waitForTimeout(300);
 
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await expect(page.locator("#camera-apply")).not.toBeDisabled();
@@ -185,9 +265,7 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-close").click();
   });
 
-  test("キャプチャをキャンセルして別の面に切り替えるとポイントがリセットされる", async ({
-    page,
-  }) => {
+  test("ビューを切り替えると自動検出が再実行される", async ({ page }) => {
     await ready(page);
     await openCameraEditor(page);
 
@@ -195,18 +273,13 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     await page.locator("#camera-file-a").setInputFiles(viewAPath);
     await page.waitForTimeout(300);
 
-    // U 面で 1 点だけクリック
-    await page.locator("#camera-face").selectOption("U");
-    const canvas = page.locator("#camera-canvas");
-    const box = await canvas.boundingBox();
-
-    if (box) {
-      await page.mouse.click(box.x + 50, box.y + 50);
-    }
-
-    // R 面に切り替えるとポイント入力がリセットされる
-    await page.locator("#camera-face").selectOption("R");
+    // クリアして未指定状態にする
+    await page.locator("#camera-clear-points").click();
     await expect(page.locator("#camera-capture")).toBeDisabled();
+
+    // ビューAを再表示すると再検出されてキャプチャ可能になる
+    await page.locator("#camera-detect").click();
+    await expect(page.locator("#camera-capture")).not.toBeDisabled();
 
     await page.locator("#camera-close").click();
   });
@@ -237,17 +310,13 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
 
     const expectedState = getExpectedState("solved");
 
-    // ビューA のアップロードと U, R, F 面キャプチャ
+    // ビューA のアップロードと 3面キャプチャ
     await uploadTestImage(page, "solved", "A");
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
-    // ビューB のアップロードと D, L, B 面キャプチャ
+    // ビューB のアップロードと 3面キャプチャ
     await uploadTestImage(page, "solved", "B");
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await page.locator("#camera-apply").click();
@@ -278,14 +347,10 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
     const expectedState = getExpectedState("scrambled-1");
 
     await uploadTestImage(page, "scrambled-1", "A");
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
     await uploadTestImage(page, "scrambled-1", "B");
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await page.locator("#camera-apply").click();
@@ -313,14 +378,10 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
     const expectedState = getExpectedState("superflip");
 
     await uploadTestImage(page, "superflip", "A");
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
     await uploadTestImage(page, "superflip", "B");
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await expect(page.locator("#camera-progress")).toContainText("6 / 6");
     await page.locator("#camera-apply").click();
@@ -339,14 +400,10 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
     const expectedState = getExpectedState("mixed-colors");
 
     await uploadTestImage(page, "mixed-colors", "A");
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
     await uploadTestImage(page, "mixed-colors", "B");
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await page.locator("#camera-apply").click();
 
@@ -366,14 +423,10 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
     const expectedState = getExpectedState("partial");
 
     await uploadTestImage(page, "partial", "A");
-    for (const face of ["U", "R", "F"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "A");
 
     await uploadTestImage(page, "partial", "B");
-    for (const face of ["D", "L", "B"]) {
-      await captureFaceOnTestImage(page, face);
-    }
+    await captureViewOnTestImage(page, "B");
 
     await page.locator("#camera-apply").click();
 

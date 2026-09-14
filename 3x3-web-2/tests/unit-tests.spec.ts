@@ -107,6 +107,45 @@ test.describe("Web Modules Unit Tests", () => {
     expect(arrowInfo.scrambledLength).toBe(54);
   });
 
+  test("model.ts - getErrorIndices extraction", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const errorIndices = await page.evaluate(async () => {
+      const model = await import("/web/model.ts");
+
+      // 1. エッジ 1 のエラー（スロット0: [5, 10]）
+      const edge1 = model.getErrorIndices("エッジ 1 の色の組み合わせが不正です。");
+      // 2. コーナー 2 のエラー（スロット1: [6, 18, 38]）
+      const corner2 = model.getErrorIndices(
+        "コーナー 2 の色の組み合わせが不正です。隣接する面の向きも確認してください。",
+      );
+      // 3. 該当なし（他のエラーメッセージ）
+      const centerErr = model.getErrorIndices("センターの色は変更できません。");
+      // 4. 空文字列または未定義
+      const empty = model.getErrorIndices("");
+      const undefinedMsg = model.getErrorIndices(undefined);
+      // 5. 範囲外スロット
+      const outOfRange = model.getErrorIndices("エッジ 99 のエラー");
+
+      return {
+        edge1,
+        corner2,
+        centerErr,
+        empty,
+        undefinedMsg,
+        outOfRange,
+      };
+    });
+
+    expect(errorIndices.edge1).toEqual([5, 10]);
+    expect(errorIndices.corner2).toEqual([6, 18, 38]);
+    expect(errorIndices.centerErr).toEqual([]);
+    expect(errorIndices.empty).toEqual([]);
+    expect(errorIndices.undefinedMsg).toEqual([]);
+    expect(errorIndices.outOfRange).toEqual([]);
+  });
+
   test("image-sampler.ts - buildState and sampleFace", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#engine-status")).toContainText("READY");
@@ -374,13 +413,18 @@ test.describe("Web Modules Unit Tests", () => {
 
       const clicked = clickedIndex;
 
-      // 非エディタブルモードでnet再描画
+      // 非エディタブルモードでnet再描画（エラーインデックス付き）
       view.net(
         host,
         "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
         false,
+        undefined,
+        -1,
+        undefined,
+        [5, 10], // エラー対象
       );
       const spanStickers = host.querySelectorAll("span.sticker").length;
+      const errorStickers = host.querySelectorAll("span.sticker.is-error").length;
 
       document.body.removeChild(host);
 
@@ -391,6 +435,7 @@ test.describe("Web Modules Unit Tests", () => {
         totalButtons,
         clicked,
         spanStickers,
+        errorStickers,
       };
     });
 
@@ -400,5 +445,6 @@ test.describe("Web Modules Unit Tests", () => {
     expect(viewResults.totalButtons).toBe(54); // 54 buttons total (6 disabled centers)
     expect(viewResults.clicked).toBeGreaterThanOrEqual(0);
     expect(viewResults.spanStickers).toBe(54);
+    expect(viewResults.errorStickers).toBe(2);
   });
 });

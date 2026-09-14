@@ -63,8 +63,10 @@ export function net(
   onPaint?: (index: number) => void,
   active = -1,
   centers?: number[],
+  errorIndices?: number[],
 ) {
   host.replaceChildren();
+  const errorSet = new Set(errorIndices || []);
   [...FACES].forEach((face, f) => {
     const container = document.createElement("div");
     container.className = `net-face face-${face}`;
@@ -75,20 +77,24 @@ export function net(
     const grid = document.createElement("div");
     grid.className = "face-grid";
     for (let i = 0; i < 9; i++) {
+      const cellIndex = f * 9 + i;
       const cell = document.createElement(editable ? "button" : "span");
       cell.className = "sticker";
-      cell.dataset.index = String(f * 9 + i);
-      cell.dataset.color = state[f * 9 + i];
+      if (errorSet.has(cellIndex)) {
+        cell.classList.add("is-error");
+      }
+      cell.dataset.index = String(cellIndex);
+      cell.dataset.color = state[cellIndex];
       cell.textContent =
         i === 4 ? (centers ? ["↑", "→", "↓", "←"][centers[f]] : face) : "";
       if (active === f) cell.classList.add("active-face");
       cell.setAttribute(
         "aria-label",
-        `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[state[f * 9 + i]]}`,
+        `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[state[cellIndex]]}`,
       );
       if (editable) {
         (cell as HTMLButtonElement).disabled = i === 4;
-        cell.onclick = () => onPaint?.(f * 9 + i);
+        cell.onclick = () => onPaint?.(cellIndex);
       }
       grid.append(cell);
     }

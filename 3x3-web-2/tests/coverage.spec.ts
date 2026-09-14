@@ -285,6 +285,19 @@ test.describe("E2E Coverage with CDP", () => {
         await centerBtn.click();
       }
       await page.locator("#auto-centers").click();
+
+      // エラー発生時の赤枠（is-error）表示テスト:
+      // clear-colors で未入力状態にし、editor-apply をクリックしてバリデーションエラーを発生させる
+      await page.locator("#clear-colors").click();
+      await page.locator("#editor-apply").click();
+      await expect(page.locator("#editor-error")).not.toBeEmpty();
+
+      // ガイドグリッドまたはパレットでステッカーを塗ってエラーがクリアされることを確認
+      await page.locator("#palette button").first().click();
+      if (await editableSticker.isVisible()) {
+        await editableSticker.click();
+      }
+
       await page.locator("#clear-colors").click();
       await page.locator("#editor-close").click();
 

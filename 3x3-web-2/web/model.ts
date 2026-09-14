@@ -86,6 +86,25 @@ export const EDGES = [
   [48, 14],
 ];
 
+export function getErrorIndices(message?: string): number[] {
+  if (!message) return [];
+  const edgeMatch = message.match(/エッジ\s*(\d+)/);
+  if (edgeMatch) {
+    const slot = parseInt(edgeMatch[1], 10) - 1;
+    if (slot >= 0 && slot < EDGES.length) {
+      return [...EDGES[slot]];
+    }
+  }
+  const cornerMatch = message.match(/コーナー\s*(\d+)/);
+  if (cornerMatch) {
+    const slot = parseInt(cornerMatch[1], 10) - 1;
+    if (slot >= 0 && slot < CORNERS.length) {
+      return [...CORNERS[slot]];
+    }
+  }
+  return [];
+}
+
 export const ARROW_COLORS = {
   NORMAL: 0x10b981, // エメラルドグリーン
   CORNER_TWIST: 0xf43f5e, // ローズピンク（赤・橙ステッカーと被らず高コントラスト）

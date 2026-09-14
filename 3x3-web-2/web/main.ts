@@ -362,7 +362,7 @@ async function solve(budget = 5000) {
   }
 }
 
-const editor = new ColorEditor(validate, (s, centers) =>
+const editor = new ColorEditor((s) => validate(s), (s, centers) =>
   replace(s, true, centers),
 );
 const camera = new TwoViewCamera((s) => {

@@ -765,6 +765,9 @@ dialog > p {
 .sticker:disabled {
   opacity: 1;
   cursor: default;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
 }
 .sticker[data-color="U"] {
   background: #eeeade;
@@ -854,6 +857,22 @@ dialog > p {
 }
 .active-face {
   box-shadow: inset 0 0 0 1px #fff7;
+}
+.sticker.is-error {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4), inset 0 0 6px rgba(239, 68, 68, 0.6);
+  animation: pulse-error 1.5s ease-in-out infinite alternate;
+  z-index: 2;
+}
+@keyframes pulse-error {
+  from {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3), inset 0 0 4px rgba(239, 68, 68, 0.5);
+  }
+  to {
+    border-color: #f87171;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.6), inset 0 0 8px rgba(239, 68, 68, 0.8);
+  }
 }
 #clear-colors {
   margin-top: 16px;
@@ -1099,6 +1118,9 @@ dialog > p {
   }
   .net-label {
     font-size: 8px;
+  }
+  .sticker:disabled {
+    font-size: 13px;
   }
   .tabs {
     gap: 12px;

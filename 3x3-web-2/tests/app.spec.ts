@@ -450,8 +450,8 @@ test("speed setting affects playback duration", async ({ page }) => {
   // 高速設定
   await page.locator("#speed").selectOption("250");
   const movesCount1 = await page.locator(".solution-move").count();
-  const start1 = Date.now();
   await page.locator("#play").click();
+  const start1 = Date.now();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 10000,
   });
@@ -466,8 +466,8 @@ test("speed setting affects playback duration", async ({ page }) => {
   // 低速設定
   await page.locator("#speed").selectOption("1000");
   const movesCount2 = await page.locator(".solution-move").count();
-  const start2 = Date.now();
   await page.locator("#play").click();
+  const start2 = Date.now();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 30000,
   });

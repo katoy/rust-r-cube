@@ -1,34 +1,34 @@
 {
-  "timestamp": "2026-09-13T22:59:11.075Z",
+  "timestamp": "2026-09-16T21:11:28.476Z",
   "url": "http://127.0.0.1:5173/",
-  "totalTime": 5844,
-  "averageTime": 1168.8,
+  "totalTime": 5866,
+  "averageTime": 1173.2,
   "operationCount": 5,
   "operations": [
     {
-      "timestamp": 1789340345182,
+      "timestamp": 1789593082571,
       "operation": "page_load",
-      "duration": 1322
+      "duration": 1318
     },
     {
-      "timestamp": 1789340346505,
+      "timestamp": 1789593083889,
       "operation": "scramble",
-      "duration": 360
+      "duration": 338
     },
     {
-      "timestamp": 1789340346865,
+      "timestamp": 1789593084227,
       "operation": "solve",
-      "duration": 2931
+      "duration": 3013
     },
     {
-      "timestamp": 1789340349796,
+      "timestamp": 1789593087240,
       "operation": "playback",
-      "duration": 878
+      "duration": 846
     },
     {
-      "timestamp": 1789340350674,
+      "timestamp": 1789593088086,
       "operation": "reset",
-      "duration": 353
+      "duration": 351
     }
   ],
   "consoleLogs": [

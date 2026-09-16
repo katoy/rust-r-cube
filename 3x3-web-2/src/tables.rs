@@ -65,15 +65,20 @@ impl MoveTable {
             if let Some(bytes) = crate::TABLE_BYTES {
                 return decode_moves(bytes);
             }
-            MoveTable {
-                twist: generate_twist_move_table(),
-                flip: generate_flip_move_table(),
-                ud_slice: generate_ud_slice_move_table(),
-                cp: generate_cp_move_table(),
-                ep8: generate_ep8_move_table(),
-                slice_p: generate_slice_p_move_table(),
-            }
+            build_move_table()
         })
+    }
+}
+
+/// 移動テーブルをゼロから生成します（事前計算バイナリなし）。
+pub(crate) fn build_move_table() -> MoveTable {
+    MoveTable {
+        twist: generate_twist_move_table(),
+        flip: generate_flip_move_table(),
+        ud_slice: generate_ud_slice_move_table(),
+        cp: generate_cp_move_table(),
+        ep8: generate_ep8_move_table(),
+        slice_p: generate_slice_p_move_table(),
     }
 }
 
@@ -86,43 +91,50 @@ impl PruningTable {
             if let Some(bytes) = crate::TABLE_BYTES {
                 return decode_pruning(bytes);
             }
-            let (
-                twist_class,
-                twist_sym,
-                twist_self_sym,
-                flip_class,
-                flip_sym,
-                flip_self_sym,
-                ud_slice_x2,
-            ) = generate_x2_maps();
-            PruningTable {
-                twist_slice: generate_twist_slice_pruning_table(
-                    move_table,
-                    &twist_class,
-                    &twist_sym,
-                    &twist_self_sym,
-                    &ud_slice_x2,
-                ),
-                flip_slice: generate_flip_slice_pruning_table(
-                    move_table,
-                    &flip_class,
-                    &flip_sym,
-                    &flip_self_sym,
-                    &ud_slice_x2,
-                ),
-                cp_slice: generate_cp_slice_pruning_table(move_table),
-                ep8_slice: generate_ep8_slice_pruning_table(move_table),
-                twist_class,
-                twist_sym,
-                twist_self_sym,
-                flip_class,
-                flip_sym,
-                flip_self_sym,
-                ud_slice_x2,
-            }
+            build_pruning_table(move_table)
         })
     }
+}
 
+/// 枝刈りテーブルをゼロから生成します（事前計算バイナリなし）。
+pub(crate) fn build_pruning_table(move_table: &MoveTable) -> PruningTable {
+    let (
+        twist_class,
+        twist_sym,
+        twist_self_sym,
+        flip_class,
+        flip_sym,
+        flip_self_sym,
+        ud_slice_x2,
+    ) = generate_x2_maps();
+    PruningTable {
+        twist_slice: generate_twist_slice_pruning_table(
+            move_table,
+            &twist_class,
+            &twist_sym,
+            &twist_self_sym,
+            &ud_slice_x2,
+        ),
+        flip_slice: generate_flip_slice_pruning_table(
+            move_table,
+            &flip_class,
+            &flip_sym,
+            &flip_self_sym,
+            &ud_slice_x2,
+        ),
+        cp_slice: generate_cp_slice_pruning_table(move_table),
+        ep8_slice: generate_ep8_slice_pruning_table(move_table),
+        twist_class,
+        twist_sym,
+        twist_self_sym,
+        flip_class,
+        flip_sym,
+        flip_self_sym,
+        ud_slice_x2,
+    }
+}
+
+impl PruningTable {
     pub fn get_twist_slice(&self, twist: usize, slice: usize) -> u8 {
         let c = self.twist_class[twist] as usize;
         let s = if self.twist_self_sym[twist] {

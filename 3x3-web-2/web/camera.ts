@@ -1,5 +1,5 @@
 import { buildState, sampleFace } from "./image-sampler";
-import { FACES } from "./model";
+import { COLORS, FACES, FACE_NAMES, NAMES } from "./model";
 
 type Point = { x: number; y: number };
 type Apply = (state: string) => void;
@@ -119,6 +119,8 @@ export class TwoViewCamera {
   private points: Point[] = [];
   private centerPoint?: Point;
   private faces: Partial<Record<(typeof FACES)[number], string>> = {};
+  private detectedLabels: { A?: string; B?: string } = {};
+  private selectedColor = "U";
   private draggingIndex = -1; // 0..5: points, 6: centerPoint
   private hoverIndex = -1; // 0..5: points, 6: centerPoint
   private dragMoved = false;
@@ -128,24 +130,50 @@ export class TwoViewCamera {
 
     const toCanvasCoords = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
+      if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+
+      const elemRatio = rect.width / rect.height;
+      const canvasRatio = canvas.width / canvas.height;
+
+      let drawWidth = rect.width;
+      let drawHeight = rect.height;
+      let drawLeft = rect.left;
+      let drawTop = rect.top;
+
+      if (elemRatio > canvasRatio) {
+        // 横長：左右にレターボックス余白がある場合
+        drawWidth = rect.height * canvasRatio;
+        drawLeft = rect.left + (rect.width - drawWidth) / 2;
+      } else {
+        // 縦長：上下にレターボックス余白がある場合
+        drawHeight = rect.width / canvasRatio;
+        drawTop = rect.top + (rect.height - drawHeight) / 2;
+      }
+
+      const scaleX = canvas.width / drawWidth;
+      const scaleY = canvas.height / drawHeight;
+
       return {
-        x: Math.max(0, Math.min(canvas.width, (clientX - rect.left) * scaleX)),
-        y: Math.max(0, Math.min(canvas.height, (clientY - rect.top) * scaleY)),
+        x: Math.max(0, Math.min(canvas.width, (clientX - drawLeft) * scaleX)),
+        y: Math.max(0, Math.min(canvas.height, (clientY - drawTop) * scaleY)),
       };
     };
 
     const findHitTarget = (x: number, y: number) => {
-      // 外周6点または中心点（pointsが6点ある場合）から判定
-      // 中心点を優先または判定対象に含める
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / Math.max(1, rect.width);
+      // 画面上で最低30px相当の当たり判定領域を確保
+      const hitRadius = Math.max(30, 30 * scaleX);
+
       if (this.points.length === 6) {
         const center = this.centerPoint ?? computeCenter(this.points);
-        if (Math.hypot(center.x - x, center.y - y) <= 22) {
+        if (Math.hypot(center.x - x, center.y - y) <= hitRadius) {
           return 6;
         }
       }
-      return this.points.findIndex((p) => Math.hypot(p.x - x, p.y - y) <= 22);
+      return this.points.findIndex(
+        (p) => Math.hypot(p.x - x, p.y - y) <= hitRadius,
+      );
     };
 
     const handlePointerDown = (clientX: number, clientY: number) => {
@@ -191,43 +219,71 @@ export class TwoViewCamera {
         this.draggingIndex = -1;
         canvas.style.cursor = this.hoverIndex !== -1 ? "grab" : "crosshair";
         this.draw();
+        if (this.points.length === 6) this.updateDetectedLabels();
+        this.update();
         return;
       }
 
       // ドラッグせずにクリックした場合
       if (!this.dragMoved && this.activeImage) {
         const { x, y } = toCanvasCoords(clientX, clientY);
-        if (this.points.length < 6) {
+        // 既存の頂点の近くをクリックした場合は新規追加しない
+        if (findHitTarget(x, y) === -1 && this.points.length < 6) {
           this.points.push({ x, y });
           this.draw();
+          if (this.points.length === 6) this.updateDetectedLabels();
           this.update();
         }
       }
     };
 
-    // マウスイベント
-    canvas.addEventListener("mousedown", (e) =>
-      handlePointerDown(e.clientX, e.clientY),
-    );
-    window.addEventListener("mousemove", (e) => {
+    // ポインターイベント（マウス・トラックパッド・タッチ対応）
+    canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {}
+      handlePointerDown(e.clientX, e.clientY);
+    });
+    window.addEventListener("pointermove", (e) => {
       if (this.draggingIndex !== -1) {
         handlePointerMove(e.clientX, e.clientY);
       }
     });
-    canvas.addEventListener("mousemove", (e) => {
+    canvas.addEventListener("pointermove", (e) => {
       if (this.draggingIndex === -1) {
         handlePointerMove(e.clientX, e.clientY);
       }
     });
-    window.addEventListener("mouseup", (e) => {
+    window.addEventListener("pointerup", (e) => {
       if (this.draggingIndex !== -1) {
+        try {
+          if (canvas.hasPointerCapture(e.pointerId)) {
+            canvas.releasePointerCapture(e.pointerId);
+          }
+        } catch {}
         handlePointerUp(e.clientX, e.clientY);
       }
     });
-    canvas.addEventListener("mouseup", (e) => {
+    canvas.addEventListener("pointerup", (e) => {
       if (this.draggingIndex === -1) {
+        try {
+          if (canvas.hasPointerCapture(e.pointerId)) {
+            canvas.releasePointerCapture(e.pointerId);
+          }
+        } catch {}
         handlePointerUp(e.clientX, e.clientY);
       }
+    });
+    canvas.addEventListener("pointercancel", (e) => {
+      try {
+        if (canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch {}
+      this.draggingIndex = -1;
+      this.hoverIndex = -1;
+      this.draw();
     });
     canvas.addEventListener("mouseleave", () => {
       if (this.draggingIndex === -1) {
@@ -236,31 +292,17 @@ export class TwoViewCamera {
       }
     });
 
-    // タッチイベント
-    canvas.addEventListener(
-      "touchstart",
-      (e) => {
-        if (e.touches.length > 0) {
-          e.preventDefault();
-          handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-        }
-      },
-      { passive: false },
-    );
-    canvas.addEventListener(
-      "touchmove",
-      (e) => {
-        if (e.touches.length > 0) {
-          e.preventDefault();
-          handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-        }
-      },
-      { passive: false },
-    );
-    canvas.addEventListener("touchend", (e) => {
-      const touch = e.changedTouches[0];
-      if (touch) {
-        handlePointerUp(touch.clientX, touch.clientY);
+    // 右クリックで頂点を削除
+    canvas.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const { x, y } = toCanvasCoords(e.clientX, e.clientY);
+      const hit = findHitTarget(x, y);
+      if (hit >= 0 && hit < this.points.length) {
+        this.points.splice(hit, 1);
+        this.centerPoint = undefined;
+        this.hoverIndex = -1;
+        this.draw();
+        this.update();
       }
     });
 
@@ -280,15 +322,31 @@ export class TwoViewCamera {
       detectButton.onclick = () => this.autoDetectOutline();
     }
 
+    const rotateButton = $("camera-rotate-points");
+    if (rotateButton) {
+      rotateButton.onclick = () => this.rotatePoints();
+    }
+
     const clearButton = $("camera-clear-points");
     if (clearButton) {
       clearButton.onclick = () => {
         this.points = [];
         this.centerPoint = undefined;
+        this.detectedLabels[this.currentView] = undefined;
         this.draw();
         this.update();
       };
     }
+
+    // キーボードショートカット 'r' で枠を回転
+    window.addEventListener("keydown", (e) => {
+      const dialog = $("camera-editor") as HTMLDialogElement | null;
+      if (!dialog?.open) return;
+      if ((e.key === "r" || e.key === "R") && this.points.length === 6) {
+        e.preventDefault();
+        this.rotatePoints();
+      }
+    });
 
     const viewAButton = $("camera-view-a");
     const viewBButton = $("camera-view-b");
@@ -312,6 +370,9 @@ export class TwoViewCamera {
       this.close();
       this.apply(state);
     };
+
+    this.initPalette();
+    this.renderResults();
   }
 
   private setupDropZone(
@@ -357,9 +418,11 @@ export class TwoViewCamera {
 
   open() {
     this.faces = {};
+    this.detectedLabels = {};
     this.points = [];
     this.centerPoint = undefined;
     this.currentView = "A";
+    this.selectedColor = "U";
     this.imageA = undefined;
     this.imageB = undefined;
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
@@ -373,6 +436,8 @@ export class TwoViewCamera {
     if (inputB) inputB.value = "";
 
     this.renderImage();
+    this.initPalette();
+    this.renderResults();
     this.update();
     ($("camera-editor") as HTMLDialogElement).showModal();
   }
@@ -383,6 +448,7 @@ export class TwoViewCamera {
     this.points = [];
     this.centerPoint = undefined;
     this.renderImage();
+    this.renderResults();
     this.autoDetectOutline();
   }
 
@@ -436,6 +502,20 @@ export class TwoViewCamera {
     this.draw();
     this.points = detectCubeOutline(this.canvas, activeImage);
     this.centerPoint = undefined;
+    if (this.points.length === 6) this.updateDetectedLabels();
+    this.draw();
+    this.update();
+  }
+
+  rotatePoints(step = 1) {
+    if (this.points.length !== 6) return;
+    const s = ((step % 6) + 6) % 6;
+    this.points = [
+      ...this.points.slice(6 - s),
+      ...this.points.slice(0, 6 - s),
+    ];
+    this.centerPoint = undefined;
+    this.updateDetectedLabels();
     this.draw();
     this.update();
   }
@@ -457,31 +537,86 @@ export class TwoViewCamera {
       };
       const [p1, p2, p3, p4, p5, p6] = pts;
 
-      if (this.currentView === "A") {
-        // 画像A: 上面=U, 前面左=F, 前面右=R
-        // U面: 左上=P1, 右上=P2, 右下=center, 左下=P6
-        this.faces["U"] = sampleFace(activeImage, [p1, p2, center, p6]);
-        // F面: 左上=P6, 右上=center, 右下=P4, 左下=P5
-        this.faces["F"] = sampleFace(activeImage, [p6, center, p4, p5]);
-        // R面: 左上=center, 右上=P2, 右下=P3, 左下=P4
-        this.faces["R"] = sampleFace(activeImage, [center, p2, p3, p4]);
-      } else {
-        // 画像B: 上面=D, 前面左=L, 前面右=B
-        // D面: 左上=P6, 右上=P1, 右下=P2, 左下=center
-        this.faces["D"] = sampleFace(activeImage, [p6, p1, p2, center]);
-        // L面: 左上=P4, 右上=P5, 右下=P6, 左下=center
-        this.faces["L"] = sampleFace(activeImage, [p4, p5, p6, center]);
-        // B面: 左上=P3, 右上=P4, 右下=center, 左下=P2
-        this.faces["B"] = sampleFace(activeImage, [p3, p4, center, p2]);
+      const rawQuads =
+        this.currentView === "A"
+          ? [
+              { defaultFace: "U", quad: [p1, p2, center, p6] },
+              { defaultFace: "F", quad: [p6, center, p4, p5] },
+              { defaultFace: "R", quad: [center, p2, p3, p4] },
+            ]
+          : [
+              { defaultFace: "D", quad: [p6, p1, p2, center] },
+              { defaultFace: "L", quad: [p4, p5, p6, center] },
+              { defaultFace: "B", quad: [p3, p4, center, p2] },
+            ];
+
+      // 3面の各面をサンプリング
+      const sampledItems = rawQuads.map(({ defaultFace, quad }) => {
+        const sampled = sampleFace(activeImage, quad);
+        const centerChar = sampled[4];
+        return { defaultFace, quad, sampled, centerChar };
+      });
+
+      // 3面の画像の各面のセンターを認識して、該当する面の色を設定する
+      const usedFaces = new Set<string>();
+      const faceAssignments: {
+        targetFace: (typeof FACES)[number];
+        sampled: string;
+      }[] = [];
+
+      // 1. 有効なセンター色で、まだこのキャプチャ内で重複していないものを優先割り当て
+      const assignedIndices = new Set<number>();
+      for (let i = 0; i < sampledItems.length; i++) {
+        const item = sampledItems[i];
+        if (
+          FACES.includes(item.centerChar) &&
+          !usedFaces.has(item.centerChar)
+        ) {
+          usedFaces.add(item.centerChar);
+          faceAssignments.push({
+            targetFace: item.centerChar as (typeof FACES)[number],
+            sampled: item.sampled,
+          });
+          assignedIndices.add(i);
+        }
       }
 
+      // 2. センター色が '?' または重複している場合は、defaultFace または未割り当ての面から補填
+      for (let i = 0; i < sampledItems.length; i++) {
+        if (assignedIndices.has(i)) continue;
+        const item = sampledItems[i];
+        let targetFace = item.defaultFace;
+        if (usedFaces.has(targetFace)) {
+          const fallback = rawQuads
+            .map((q) => q.defaultFace)
+            .find((f) => !usedFaces.has(f));
+          targetFace = fallback ?? item.defaultFace;
+        }
+        usedFaces.add(targetFace);
+        faceAssignments.push({
+          targetFace: targetFace as (typeof FACES)[number],
+          sampled: item.sampled,
+        });
+        assignedIndices.add(i);
+      }
+
+      for (const { targetFace, sampled } of faceAssignments) {
+        this.faces[targetFace] = sampled;
+      }
+
+      this.updateDetectedLabels();
       this.points = [];
       this.centerPoint = undefined;
       this.draw();
+      this.renderResults();
       this.update();
 
-      // 自動で画像Bに切り替える（画像A読取完了時かつ画像Bが未読取の場合）
-      if (this.currentView === "A" && !this.faces["D"]) {
+      // 自動で画像Bに切り替える（画像A読取完了時かつ画像Bがロード済みで未読取の面がある場合）
+      if (
+        this.currentView === "A" &&
+        this.imageB &&
+        Object.keys(this.faces).length < 6
+      ) {
         this.switchView("B");
       }
     } catch (error) {
@@ -545,8 +680,7 @@ export class TwoViewCamera {
     // 6点揃ったら、中央点と各面の境界線を描画
     if (this.points.length === 6) {
       const center = this.centerPoint ?? computeCenter(this.points);
-      const isCenterHovered =
-        this.hoverIndex === 6 || this.draggingIndex === 6;
+      const isCenterHovered = this.hoverIndex === 6 || this.draggingIndex === 6;
 
       // 境界Y字線 (center -> P2, center -> P4, center -> P6)
       context.strokeStyle = "#facc15";
@@ -608,6 +742,188 @@ export class TwoViewCamera {
     });
   }
 
+  private updateDetectedLabels() {
+    const view = this.currentView;
+    const keys =
+      view === "A" ? (["U", "R", "F"] as const) : (["D", "L", "B"] as const);
+
+    // 1. キャプチャ済みのデータがある場合はそのセンター色を使用
+    const capturedNames = keys.map((key) => {
+      const colorChar = this.faces[key]?.[4];
+      return colorChar && colorChar !== "?" ? NAMES[colorChar] : undefined;
+    });
+    if (capturedNames.some((c) => c !== undefined)) {
+      this.detectedLabels[view] = keys
+        .map((key, i) =>
+          capturedNames[i] ? `${capturedNames[i]}面` : FACE_NAMES[key],
+        )
+        .join("・");
+      return;
+    }
+
+    // 2. 現在アクティブな画像と6点が揃っていればサンプリング
+    const img = this.activeImage;
+    if (img && this.points.length === 6) {
+      try {
+        const scaleX = img.naturalWidth / this.canvas.width;
+        const scaleY = img.naturalHeight / this.canvas.height;
+        const pts = this.points.map((point) => ({
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+        }));
+        const rawCenter = this.centerPoint ?? computeCenter(this.points);
+        const center = {
+          x: rawCenter.x * scaleX,
+          y: rawCenter.y * scaleY,
+        };
+        const [p1, p2, p3, p4, p5, p6] = pts;
+
+        const quads =
+          view === "A"
+            ? [
+                [p1, p2, center, p6],
+                [center, p2, p3, p4],
+                [p6, center, p4, p5],
+              ]
+            : [
+                [p6, p1, p2, center],
+                [p4, p5, p6, center],
+                [p3, p4, center, p2],
+              ];
+
+        const sampledNames = quads.map((quad) => {
+          const sampled = sampleFace(img, quad);
+          const c = sampled[4];
+          return c && c !== "?" ? NAMES[c] : undefined;
+        });
+
+        if (sampledNames.some((c) => c !== undefined)) {
+          this.detectedLabels[view] = keys
+            .map((key, i) =>
+              sampledNames[i] ? `${sampledNames[i]}面` : FACE_NAMES[key],
+            )
+            .join("・");
+          return;
+        }
+      } catch {
+        // サンプリング失敗時はフォールバック
+      }
+    }
+
+    this.detectedLabels[view] = undefined;
+  }
+
+  private getViewFacesLabel(view: "A" | "B"): string {
+    if (this.detectedLabels[view]) {
+      return this.detectedLabels[view]!;
+    }
+    const defaultKeys = view === "A" ? ["U", "R", "F"] : ["D", "L", "B"];
+    return defaultKeys.map((k) => FACE_NAMES[k]).join("・");
+  }
+
+  private initPalette() {
+    const palette = $("camera-palette");
+    if (!palette) return;
+    palette.replaceChildren();
+
+    const colors = [...FACES, "?"];
+    colors.forEach((c) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "color-choice";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(this.selectedColor === c));
+      if (this.selectedColor === c) {
+        button.setAttribute("aria-pressed", "true");
+      }
+      button.setAttribute("aria-label", `${NAMES[c]}を選択`);
+
+      const swatch = document.createElement("i");
+      swatch.style.background = COLORS[c];
+
+      const text = document.createElement("span");
+      text.textContent = NAMES[c];
+
+      button.append(swatch, text);
+      button.onclick = () => {
+        this.selectedColor = c;
+        this.initPalette();
+      };
+      palette.append(button);
+    });
+  }
+
+  private renderResults() {
+    const host = $("camera-result-faces");
+    if (!host) return;
+    host.replaceChildren();
+
+    // 展開図（cube-net）と同じ URFDLB 順（CSS Gridにより U: (2,1), L: (1,2), F: (2,2), R: (3,2), B: (4,2), D: (2,3) に配置）
+    const faces = ["U", "R", "F", "D", "L", "B"] as const;
+
+    faces.forEach((face) => {
+      const card = document.createElement("div");
+      card.className = `net-face face-${face} camera-face-card`;
+      card.id = `camera-face-card-${face}`;
+      const viewOfFace = ["U", "R", "F"].includes(face) ? "A" : "B";
+      if (this.currentView === viewOfFace) {
+        card.classList.add("is-active-view");
+      }
+
+      const faceState = this.faces[face] ?? "?????????";
+      const centerColor = faceState[4];
+      const centerName =
+        centerColor && centerColor !== "?"
+          ? `${NAMES[centerColor]}面`
+          : FACE_NAMES[face];
+
+      const title = document.createElement("span");
+      title.className = "net-label camera-face-title";
+      title.textContent = `${face} · ${centerName}`;
+      card.append(title);
+
+      const grid = document.createElement("div");
+      grid.className = "face-grid";
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "sticker";
+        cell.dataset.color = faceState[i];
+        cell.dataset.index = String(i);
+        cell.dataset.face = face;
+        if (i === 4) {
+          cell.dataset.center = "true";
+          cell.disabled = true;
+          cell.textContent = face;
+        }
+        cell.setAttribute(
+          "aria-label",
+            `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[faceState[i]]}${i === 4 ? "（センター）" : ""}`,
+          );
+
+          if (i !== 4) {
+            cell.onclick = () => {
+              const current = this.faces[face] ?? "?????????";
+              const updated =
+                current.substring(0, i) +
+                this.selectedColor +
+                current.substring(i + 1);
+              this.faces[face] = updated;
+
+              this.renderResults();
+              this.update();
+            };
+          }
+
+          grid.append(cell);
+        }
+
+        card.append(grid);
+        host.append(card);
+      });
+  }
+
   private update() {
     $("camera-progress").textContent =
       `${Object.keys(this.faces).length} / 6 面`;
@@ -633,6 +949,15 @@ export class TwoViewCamera {
       ) {
         faceSelect.value = "D";
       }
+
+      const optU = faceSelect.querySelector('option[value="U"]');
+      if (optU) {
+        optU.textContent = `画像A（${this.getViewFacesLabel("A")}）`;
+      }
+      const optD = faceSelect.querySelector('option[value="D"]');
+      if (optD) {
+        optD.textContent = `画像B（${this.getViewFacesLabel("B")}）`;
+      }
     }
 
     const tabA = $("camera-view-a");
@@ -657,8 +982,25 @@ export class TwoViewCamera {
 
     const cardA = $("camera-drop-a");
     const cardB = $("camera-drop-b");
-    if (cardA) cardA.classList.toggle("has-file", !!this.imageA);
-    if (cardB) cardB.classList.toggle("has-file", !!this.imageB);
+    if (cardA) {
+      cardA.classList.toggle("has-file", !!this.imageA);
+      const titleA = cardA.querySelector(".file-card-title");
+      if (titleA) {
+        titleA.textContent = `画像A（${this.getViewFacesLabel("A")}）`;
+      }
+    }
+    if (cardB) {
+      cardB.classList.toggle("has-file", !!this.imageB);
+      const titleB = cardB.querySelector(".file-card-title");
+      if (titleB) {
+        titleB.textContent = `画像B（${this.getViewFacesLabel("B")}）`;
+      }
+    }
+
+    const rotateBtn = $("camera-rotate-points") as HTMLButtonElement | null;
+    if (rotateBtn) {
+      rotateBtn.disabled = this.points.length !== 6;
+    }
 
     if (!this.activeImage) {
       $("camera-help").textContent =
@@ -667,10 +1009,9 @@ export class TwoViewCamera {
       $("camera-help").textContent =
         `画像${this.currentView}：上面のてっぺんから時計回りにキューブ外周の6角をクリックしてください (${this.points.length}/6点)。`;
     } else {
-      const facesText =
-        this.currentView === "A" ? "上面・右面・前面" : "下面・左面・背面";
+      const facesText = this.getViewFacesLabel(this.currentView);
       $("camera-help").textContent =
-        `画像${this.currentView}の6角と中心点を自動検出しました（外周6角・中心点をドラッグして微調整可能）。「この3面を読み取る」を押すと3面（${facesText}）を一括認識します。`;
+        `画像${this.currentView}の6角と中心点を検出しました（枠の向きが合わない場合は「🔄 枠を回転」で60°調整可能。頂点・中心ドラッグで微調整）。「この3面を読み取る」で一括認識します。`;
     }
     $("camera-error").textContent = "";
   }

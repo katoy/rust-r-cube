@@ -253,8 +253,10 @@ test.describe("E2E Coverage with CDP", () => {
 
       // 再生、一時停止、前手、次手、速度変更、コピー
       await page.locator("#play").click();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(100);
       await page.locator("#play").click(); // pause
+      await page.locator("#timeline").fill("1");
+      await page.locator("#timeline").dispatchEvent("input");
       await page.locator("#next").click();
       await page.locator("#prev").click();
       await page.locator("#speed").selectOption("250");

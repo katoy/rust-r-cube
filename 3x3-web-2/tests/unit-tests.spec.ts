@@ -115,7 +115,9 @@ test.describe("Web Modules Unit Tests", () => {
       const model = await import("/web/model.ts");
 
       // 1. エッジ 1 のエラー（スロット0: [5, 10]）
-      const edge1 = model.getErrorIndices("エッジ 1 の色の組み合わせが不正です。");
+      const edge1 = model.getErrorIndices(
+        "エッジ 1 の色の組み合わせが不正です。",
+      );
       // 2. コーナー 2 のエラー（スロット1: [6, 18, 38]）
       const corner2 = model.getErrorIndices(
         "コーナー 2 の色の組み合わせが不正です。隣接する面の向きも確認してください。",
@@ -200,11 +202,60 @@ test.describe("Web Modules Unit Tests", () => {
         { x: 0, y: 100 },
       ]);
 
+      // 5. rgbToHsv & classifyColor: 各種分岐のテスト
+      const hsvBlack = sampler.rgbToHsv(0, 0, 0); // max === 0
+      const hsvGray = sampler.rgbToHsv(128, 128, 128); // max === min
+      const hsvRed = sampler.rgbToHsv(255, 0, 0); // case r
+      const hsvMagenta = sampler.rgbToHsv(255, 0, 50); // case r, g < b
+      const hsvGreen = sampler.rgbToHsv(0, 255, 0); // case g
+      const hsvBlue = sampler.rgbToHsv(0, 0, 255); // case b
+
+      const colorBlack = sampler.classifyColor(0, 0, 0); // v < 0.2 -> '?'
+      const colorDarkGrey = sampler.classifyColor(80, 80, 80); // s < 0.3, v < 0.45 -> '?'
+      const colorWhite = sampler.classifyColor(240, 240, 240); // U
+      const colorGreen = sampler.classifyColor(50, 200, 50); // F
+      const colorBlue = sampler.classifyColor(30, 80, 220); // B
+      const colorYellow = sampler.classifyColor(230, 220, 30); // D
+      const colorOrange = sampler.classifyColor(240, 140, 30); // L
+      const colorRed = sampler.classifyColor(220, 40, 40); // R
+      const colorMagentaRed = sampler.classifyColor(240, 30, 80); // R (h >= 340)
+
+      // 6. sampleFace with dark image (all '?')
+      ctx.fillStyle = "#101010";
+      ctx.fillRect(0, 0, 100, 100);
+      const darkImg = new Image();
+      darkImg.src = canvas.toDataURL();
+      await new Promise((resolve) => {
+        darkImg.onload = resolve;
+      });
+      const darkSampled = sampler.sampleFace(darkImg, [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+      ]);
+
       return {
         fullState,
         partialState,
         error4Points,
         sampled,
+        hsvBlack,
+        hsvGray,
+        hsvRed,
+        hsvMagenta,
+        hsvGreen,
+        hsvBlue,
+        colorBlack,
+        colorDarkGrey,
+        colorWhite,
+        colorGreen,
+        colorBlue,
+        colorYellow,
+        colorOrange,
+        colorRed,
+        colorMagentaRed,
+        darkSampled,
       };
     });
 
@@ -214,6 +265,16 @@ test.describe("Web Modules Unit Tests", () => {
     expect(samplerResults.partialState).toBe("UUUUUUUUU" + "?".repeat(45));
     expect(samplerResults.error4Points).toBe("面の四隅を4点指定してください。");
     expect(samplerResults.sampled).toBe("UUUUUUUUU");
+    expect(samplerResults.colorBlack).toBe("?");
+    expect(samplerResults.colorDarkGrey).toBe("?");
+    expect(samplerResults.colorWhite).toBe("U");
+    expect(samplerResults.colorGreen).toBe("F");
+    expect(samplerResults.colorBlue).toBe("B");
+    expect(samplerResults.colorYellow).toBe("D");
+    expect(samplerResults.colorOrange).toBe("L");
+    expect(samplerResults.colorRed).toBe("R");
+    expect(samplerResults.colorMagentaRed).toBe("R");
+    expect(samplerResults.darkSampled).toBe("?????????");
   });
 
   test("centers.ts - centerTurns, rotateCenters, automaticCenters, centersFromInput", async ({
@@ -424,7 +485,9 @@ test.describe("Web Modules Unit Tests", () => {
         [5, 10], // エラー対象
       );
       const spanStickers = host.querySelectorAll("span.sticker").length;
-      const errorStickers = host.querySelectorAll("span.sticker.is-error").length;
+      const errorStickers = host.querySelectorAll(
+        "span.sticker.is-error",
+      ).length;
 
       document.body.removeChild(host);
 

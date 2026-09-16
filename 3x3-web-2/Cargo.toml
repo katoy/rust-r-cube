@@ -28,3 +28,7 @@ opt-level = 3
 [[bin]]
 name = "benchmark"
 path = "src/bin/benchmark.rs"
+
+[[bin]]
+name = "superflip_bench"
+path = "src/bin/superflip_bench.rs"

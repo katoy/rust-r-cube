@@ -92,7 +92,7 @@ pub fn solve_state_with_centers(
                     0 => 1,
                     1 => 2,
                     2 => -1,
-                    _ => 0,
+                    _ => unreachable!("m % 3 は 0, 1, 2 のみ"),
                 };
                 centers[f] = (centers[f] + t).rem_euclid(4);
             }

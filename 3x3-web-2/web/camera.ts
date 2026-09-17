@@ -3,8 +3,15 @@ import {
   computeCenter,
   detectCubeOutline,
 } from "./camera-geometry";
+import {
+  toCanvasCoords,
+  findHitTarget,
+  rotatePointsArray,
+} from "./camera-ui-helper";
+import { renderCanvasOverlay } from "./camera-canvas-renderer";
+import { renderPalette, renderResultFaces } from "./camera-results-ui";
 import { buildState, sampleFace } from "./image-sampler";
-import { COLORS, FACES, FACE_NAMES, NAMES } from "./model";
+import { FACES, FACE_NAMES, NAMES } from "./model";
 
 export { computeCenter, detectCubeOutline, type Point };
 type Apply = (state: string) => void;
@@ -27,61 +34,19 @@ export class TwoViewCamera {
   constructor(private apply: Apply) {
     const canvas = this.canvas;
 
-    const toCanvasCoords = (clientX: number, clientY: number) => {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+    const getCanvasCoords = (clientX: number, clientY: number) =>
+      toCanvasCoords(canvas, clientX, clientY);
 
-      const elemRatio = rect.width / rect.height;
-      const canvasRatio = canvas.width / canvas.height;
-
-      let drawWidth = rect.width;
-      let drawHeight = rect.height;
-      let drawLeft = rect.left;
-      let drawTop = rect.top;
-
-      if (elemRatio > canvasRatio) {
-        // 横長：左右にレターボックス余白がある場合
-        drawWidth = rect.height * canvasRatio;
-        drawLeft = rect.left + (rect.width - drawWidth) / 2;
-      } else {
-        // 縦長：上下にレターボックス余白がある場合
-        drawHeight = rect.width / canvasRatio;
-        drawTop = rect.top + (rect.height - drawHeight) / 2;
-      }
-
-      const scaleX = canvas.width / drawWidth;
-      const scaleY = canvas.height / drawHeight;
-
-      return {
-        x: Math.max(0, Math.min(canvas.width, (clientX - drawLeft) * scaleX)),
-        y: Math.max(0, Math.min(canvas.height, (clientY - drawTop) * scaleY)),
-      };
-    };
-
-    const findHitTarget = (x: number, y: number) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / Math.max(1, rect.width);
-      // 画面上で最低30px相当の当たり判定領域を確保
-      const hitRadius = Math.max(30, 30 * scaleX);
-
-      if (this.points.length === 6) {
-        const center = this.centerPoint ?? computeCenter(this.points);
-        if (Math.hypot(center.x - x, center.y - y) <= hitRadius) {
-          return 6;
-        }
-      }
-      return this.points.findIndex(
-        (p) => Math.hypot(p.x - x, p.y - y) <= hitRadius,
-      );
-    };
+    const checkHit = (x: number, y: number) =>
+      findHitTarget(canvas, this.points, this.centerPoint, x, y, computeCenter);
 
     const handlePointerDown = (clientX: number, clientY: number) => {
       const activeImage = this.activeImage;
       if (!activeImage) return;
-      const { x, y } = toCanvasCoords(clientX, clientY);
+      const { x, y } = getCanvasCoords(clientX, clientY);
       this.dragMoved = false;
 
-      const hit = findHitTarget(x, y);
+      const hit = checkHit(x, y);
       if (hit !== -1) {
         this.draggingIndex = hit;
         canvas.style.cursor = "grabbing";
@@ -94,7 +59,7 @@ export class TwoViewCamera {
     const handlePointerMove = (clientX: number, clientY: number) => {
       const activeImage = this.activeImage;
       if (!activeImage) return;
-      const { x, y } = toCanvasCoords(clientX, clientY);
+      const { x, y } = getCanvasCoords(clientX, clientY);
 
       if (this.draggingIndex !== -1) {
         this.dragMoved = true;
@@ -106,7 +71,7 @@ export class TwoViewCamera {
         this.draw();
         this.update();
       } else {
-        const hit = findHitTarget(x, y);
+        const hit = checkHit(x, y);
         this.hoverIndex = hit;
         canvas.style.cursor = hit !== -1 ? "grab" : "crosshair";
         this.draw();
@@ -125,9 +90,9 @@ export class TwoViewCamera {
 
       // ドラッグせずにクリックした場合
       if (!this.dragMoved && this.activeImage) {
-        const { x, y } = toCanvasCoords(clientX, clientY);
+        const { x, y } = getCanvasCoords(clientX, clientY);
         // 既存の頂点の近くをクリックした場合は新規追加しない
-        if (findHitTarget(x, y) === -1 && this.points.length < 6) {
+        if (checkHit(x, y) === -1 && this.points.length < 6) {
           this.points.push({ x, y });
           this.draw();
           if (this.points.length === 6) this.updateDetectedLabels();
@@ -194,8 +159,8 @@ export class TwoViewCamera {
     // 右クリックで頂点を削除
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      const { x, y } = toCanvasCoords(e.clientX, e.clientY);
-      const hit = findHitTarget(x, y);
+      const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+      const hit = checkHit(x, y);
       if (hit >= 0 && hit < this.points.length) {
         this.points.splice(hit, 1);
         this.centerPoint = undefined;
@@ -408,8 +373,7 @@ export class TwoViewCamera {
 
   rotatePoints(step = 1) {
     if (this.points.length !== 6) return;
-    const s = ((step % 6) + 6) % 6;
-    this.points = [...this.points.slice(6 - s), ...this.points.slice(0, 6 - s)];
+    this.points = rotatePointsArray(this.points, step);
     this.centerPoint = undefined;
     this.updateDetectedLabels();
     this.draw();
@@ -543,98 +507,13 @@ export class TwoViewCamera {
   }
 
   private draw() {
-    const context = this.canvas.getContext("2d");
-    if (!context) return;
-    context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const activeImage = this.activeImage;
-    if (activeImage) {
-      context.drawImage(
-        activeImage,
-        0,
-        0,
-        this.canvas.width,
-        this.canvas.height,
-      );
-    }
-    context.lineWidth = 3;
-    context.font = "bold 16px sans-serif";
-
-    // 2点以上の場合は外周線を引く
-    if (this.points.length > 1) {
-      context.strokeStyle = "#c4ed94";
-      context.beginPath();
-      context.moveTo(this.points[0].x, this.points[0].y);
-      for (let i = 1; i < this.points.length; i++) {
-        context.lineTo(this.points[i].x, this.points[i].y);
-      }
-      if (this.points.length === 6) {
-        context.closePath();
-      }
-      context.stroke();
-    }
-
-    // 6点揃ったら、中央点と各面の境界線を描画
-    if (this.points.length === 6) {
-      const center = this.centerPoint ?? computeCenter(this.points);
-      const isCenterHovered = this.hoverIndex === 6 || this.draggingIndex === 6;
-
-      // 境界Y字線 (center -> P2, center -> P4, center -> P6)
-      context.strokeStyle = "#facc15";
-      context.lineWidth = 2;
-      context.beginPath();
-      context.moveTo(center.x, center.y);
-      context.lineTo(this.points[1].x, this.points[1].y); // P2 (右上)
-      context.moveTo(center.x, center.y);
-      context.lineTo(this.points[3].x, this.points[3].y); // P4 (底)
-      context.moveTo(center.x, center.y);
-      context.lineTo(this.points[5].x, this.points[5].y); // P6 (左上)
-      context.stroke();
-
-      // 中央点ハンドル
-      context.beginPath();
-      context.arc(center.x, center.y, isCenterHovered ? 12 : 9, 0, Math.PI * 2);
-      context.fillStyle = isCenterHovered
-        ? "rgba(250, 204, 21, 0.4)"
-        : "rgba(250, 204, 21, 0.25)";
-      context.fill();
-
-      context.beginPath();
-      context.arc(center.x, center.y, isCenterHovered ? 7 : 5, 0, Math.PI * 2);
-      context.fillStyle = "#facc15";
-      context.fill();
-      context.strokeStyle = "#1e261e";
-      context.lineWidth = 2;
-      context.stroke();
-
-      context.fillStyle = "#ffffff";
-      context.fillText("中心", center.x + 10, center.y + 5);
-    }
-
-    // 各頂点の描画（ドラッグハンドル）
-    this.points.forEach((point, index) => {
-      const isHovered =
-        this.hoverIndex === index || this.draggingIndex === index;
-
-      // 外側リング
-      context.beginPath();
-      context.arc(point.x, point.y, isHovered ? 12 : 9, 0, Math.PI * 2);
-      context.fillStyle = isHovered
-        ? "rgba(250, 204, 21, 0.4)"
-        : "rgba(196, 237, 148, 0.3)";
-      context.fill();
-
-      // 内側サークル
-      context.beginPath();
-      context.arc(point.x, point.y, isHovered ? 7 : 5, 0, Math.PI * 2);
-      context.fillStyle = isHovered ? "#facc15" : "#c4ed94";
-      context.fill();
-      context.strokeStyle = "#1e261e";
-      context.lineWidth = 2;
-      context.stroke();
-
-      // 番号
-      context.fillStyle = "#ffffff";
-      context.fillText(String(index + 1), point.x + 12, point.y - 8);
+    renderCanvasOverlay(this.canvas, {
+      activeImage: this.activeImage,
+      points: this.points,
+      centerPoint: this.centerPoint,
+      hoverIndex: this.hoverIndex,
+      draggingIndex: this.draggingIndex,
+      computeCenterFn: computeCenter,
     });
   }
 
@@ -718,105 +597,33 @@ export class TwoViewCamera {
   }
 
   private initPalette() {
-    const palette = $("camera-palette");
-    if (!palette) return;
-    palette.replaceChildren();
-
-    const colors = [...FACES, "?"];
-    colors.forEach((c) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "color-choice";
-      button.setAttribute("role", "radio");
-      button.setAttribute("aria-checked", String(this.selectedColor === c));
-      if (this.selectedColor === c) {
-        button.setAttribute("aria-pressed", "true");
-      }
-      button.setAttribute("aria-label", `${NAMES[c]}を選択`);
-
-      const swatch = document.createElement("i");
-      swatch.style.background = COLORS[c];
-
-      const text = document.createElement("span");
-      text.textContent = NAMES[c];
-
-      button.append(swatch, text);
-      button.onclick = () => {
+    renderPalette({
+      container: $("camera-palette"),
+      selectedColor: this.selectedColor,
+      onSelectColor: (c) => {
         this.selectedColor = c;
         this.initPalette();
-      };
-      palette.append(button);
+      },
     });
   }
 
   private renderResults() {
-    const host = $("camera-result-faces");
-    if (!host) return;
-    host.replaceChildren();
+    renderResultFaces({
+      host: $("camera-result-faces"),
+      faces: this.faces,
+      currentView: this.currentView,
+      selectedColor: this.selectedColor,
+      onUpdateSticker: (face, i) => {
+        const current = this.faces[face] ?? "?????????";
+        const updated =
+          current.substring(0, i) +
+          this.selectedColor +
+          current.substring(i + 1);
+        this.faces[face] = updated;
 
-    // 展開図（cube-net）と同じ URFDLB 順（CSS Gridにより U: (2,1), L: (1,2), F: (2,2), R: (3,2), B: (4,2), D: (2,3) に配置）
-    const faces = ["U", "R", "F", "D", "L", "B"] as const;
-
-    faces.forEach((face) => {
-      const card = document.createElement("div");
-      card.className = `net-face face-${face} camera-face-card`;
-      card.id = `camera-face-card-${face}`;
-      const viewOfFace = ["U", "R", "F"].includes(face) ? "A" : "B";
-      if (this.currentView === viewOfFace) {
-        card.classList.add("is-active-view");
-      }
-
-      const faceState = this.faces[face] ?? "?????????";
-      const centerColor = faceState[4];
-      const centerName =
-        centerColor && centerColor !== "?"
-          ? `${NAMES[centerColor]}面`
-          : FACE_NAMES[face];
-
-      const title = document.createElement("span");
-      title.className = "net-label camera-face-title";
-      title.textContent = `${face} · ${centerName}`;
-      card.append(title);
-
-      const grid = document.createElement("div");
-      grid.className = "face-grid";
-
-      for (let i = 0; i < 9; i++) {
-        const cell = document.createElement("button");
-        cell.type = "button";
-        cell.className = "sticker";
-        cell.dataset.color = faceState[i];
-        cell.dataset.index = String(i);
-        cell.dataset.face = face;
-        if (i === 4) {
-          cell.dataset.center = "true";
-          cell.disabled = true;
-          cell.textContent = face;
-        }
-        cell.setAttribute(
-          "aria-label",
-          `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[faceState[i]]}${i === 4 ? "（センター）" : ""}`,
-        );
-
-        if (i !== 4) {
-          cell.onclick = () => {
-            const current = this.faces[face] ?? "?????????";
-            const updated =
-              current.substring(0, i) +
-              this.selectedColor +
-              current.substring(i + 1);
-            this.faces[face] = updated;
-
-            this.renderResults();
-            this.update();
-          };
-        }
-
-        grid.append(cell);
-      }
-
-      card.append(grid);
-      host.append(card);
+        this.renderResults();
+        this.update();
+      },
     });
   }
 

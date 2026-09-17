@@ -5,9 +5,7 @@ import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
 import { SOLVED, FACES, inverse, instruction, type ResultData } from "./model";
 import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
-import { ColorEditor } from "./editor";
 import { SolverClient } from "./solver-client";
-import { TwoViewCamera } from "./camera";
 import { CubeStore } from "./cube-store";
 import {
   automaticCenters,
@@ -348,23 +346,44 @@ async function solve(budget = 5000) {
   }
 }
 
-const editor = new ColorEditor(
-  (s) => validate(s),
-  (s, centers) => replace(s, true, centers),
-);
-const camera = new TwoViewCamera((s) => {
-  let centers = [0, 0, 0, 0, 0, 0];
-  try {
-    centers = automaticCenters(s);
-  } catch {}
-  editor.open(s, centers);
-});
-$("edit-colors").onclick = () => {
+let editorInstance: import("./editor").ColorEditor | undefined;
+async function getEditor() {
+  if (!editorInstance) {
+    const { ColorEditor } = await import("./editor");
+    editorInstance = new ColorEditor(
+      (s) => validate(s),
+      (s, centers) => replace(s, true, centers),
+    );
+  }
+  return editorInstance;
+}
+
+let cameraInstance: import("./camera").TwoViewCamera | undefined;
+async function getCamera() {
+  if (!cameraInstance) {
+    const { TwoViewCamera } = await import("./camera");
+    cameraInstance = new TwoViewCamera(async (s) => {
+      let centers = [0, 0, 0, 0, 0, 0];
+      try {
+        centers = automaticCenters(s);
+      } catch {}
+      const ed = await getEditor();
+      ed.open(s, centers);
+    });
+  }
+  return cameraInstance;
+}
+
+$("edit-colors").onclick = async () => {
   stop();
   refresh();
-  editor.open(store.getState(), store.getCenterRotations());
+  const ed = await getEditor();
+  ed.open(store.getState(), store.getCenterRotations());
 };
-$("camera-colors").onclick = () => camera.open();
+$("camera-colors").onclick = async () => {
+  const cam = await getCamera();
+  cam.open();
+};
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);
 $("cancel").onclick = () => {

@@ -317,6 +317,14 @@ h1 {
   border-color: var(--accent);
   color: var(--ink);
 }
+.move-button.active-press,
+.modifier.active-press {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--ink) !important;
+  transform: translateY(1px) scale(0.96);
+  box-shadow: 0 0 12px rgba(181, 230, 29, 0.45);
+}
 .history-buttons {
   display: flex;
   align-items: center;

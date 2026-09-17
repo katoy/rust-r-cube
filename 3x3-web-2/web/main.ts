@@ -15,6 +15,7 @@ import {
 } from "./centers";
 
 import { registerServiceWorker } from "./pwa";
+import { sound } from "./sound";
 
 const store = new CubeStore();
 (window as any).cube_store = store;
@@ -38,6 +39,23 @@ const reduced = $<HTMLInputElement>("reduced-motion");
 reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const includeOrientation = $<HTMLInputElement>("include-orientation");
 includeOrientation.checked = true;
+
+const soundToggleBtn = $("sound-toggle");
+function updateSoundButton() {
+  const enabled = sound.isEnabled();
+  soundToggleBtn.setAttribute("aria-pressed", String(enabled));
+  soundToggleBtn.setAttribute(
+    "aria-label",
+    enabled ? "効果音をミュート" : "効果音を有効化",
+  );
+  soundToggleBtn.innerHTML = icon(enabled ? "volume" : "mute");
+}
+updateSoundButton();
+soundToggleBtn.onclick = () => {
+  sound.toggle();
+  updateSoundButton();
+};
+
 function message(text = "") {
   $("message").textContent = text;
 }
@@ -225,9 +243,13 @@ async function seek(target: number, animate = true) {
     await new Promise((resolve) =>
       setTimeout(resolve, Number($<HTMLSelectElement>("speed").value)),
     );
+  if (move) sound.playMove();
   if (token === motion) {
     inMotion = false;
     refresh();
+    if (target === data.moves.length) {
+      sound.playSuccess();
+    }
   }
 }
 async function play() {
@@ -285,6 +307,7 @@ async function applyAlgorithm(algorithm: string, animate = true) {
       !reduced.checked
     );
     store.applyAlgorithmResult(result.state, nextCenters);
+    sound.playMove();
     if (inMotion) {
       await scene!.turn(
         result.moves[0],
@@ -295,6 +318,9 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     if (token === motion) {
       inMotion = false;
       refresh();
+      if (result.state === SOLVED) {
+        sound.playSuccess();
+      }
     }
   } catch (error) {
     message(String(error));
@@ -557,8 +583,16 @@ document.addEventListener("keydown", (event) => {
     event.target instanceof HTMLSelectElement
   )
     return;
-  if (!mainReady) return;
+
   const face = event.key.toUpperCase();
+  if (FACES.includes(face) && face.length === 1) {
+    const btn = document.querySelector(`button[data-move="${face}"]`);
+    btn?.classList.add("active-press");
+  } else if (event.key === "Shift") {
+    $("prime")?.classList.add("active-press");
+  }
+
+  if (!mainReady) return;
   if (FACES.includes(face) && face.length === 1) {
     event.preventDefault();
     if (!event.repeat)
@@ -591,6 +625,15 @@ document.addEventListener("keydown", (event) => {
       stop();
       void seek(solution.moves.length, false);
     }
+  }
+});
+document.addEventListener("keyup", (event) => {
+  const face = event.key.toUpperCase();
+  if (FACES.includes(face) && face.length === 1) {
+    const btn = document.querySelector(`button[data-move="${face}"]`);
+    btn?.classList.remove("active-press");
+  } else if (event.key === "Shift") {
+    $("prime")?.classList.remove("active-press");
   }
 });
 document.addEventListener("visibilitychange", () => {

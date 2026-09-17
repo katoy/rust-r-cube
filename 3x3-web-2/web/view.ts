@@ -20,12 +20,15 @@ const paths: Record<string, string> = {
   redo: "m15 4 6 6-6 6m6-6H11a7 7 0 0 0-7 7",
   eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
   help: "M9 8a3 3 0 1 1 4 3c-1 1-1 1-1 3m0 3v1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  volume:
+    "M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14",
+  mute: "M11 5L6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6",
 };
 export const icon = (name: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || paths.cube}"/></svg>`;
 export function mount() {
   document.querySelector("#app")!.innerHTML = `
-  <header class="topbar"><a class="brand" href="./" aria-label="Cube Studio ホーム">${icon("cube")}<span>CUBE<span class="brand-light"> STUDIO</span><small>ひと回し先が、見えてくる。</small></span></a><div class="top-actions"><span class="local-badge"><i></i> すべて、このブラウザで。</span><button id="help" class="icon-button" aria-label="使い方">${icon("help")}</button></div></header>
+  <header class="topbar"><a class="brand" href="./" aria-label="Cube Studio ホーム">${icon("cube")}<span>CUBE<span class="brand-light"> STUDIO</span><small>ひと回し先が、見えてくる。</small></span></a><div class="top-actions"><span class="local-badge"><i></i> すべて、このブラウザで。</span><button id="sound-toggle" class="icon-button" aria-pressed="true" aria-label="効果音の切り替え">${icon("volume")}</button><button id="help" class="icon-button" aria-label="使い方">${icon("help")}</button></div></header>
   <main>
     <div class="page-heading"><div><p class="eyebrow">YOUR CUBE. YOUR NEXT MOVE.</p><h1>揃うまで、ひと回しずつ。</h1><p class="lead">混ざったキューブに、見える道筋を。</p></div><span class="edition">01 — SOLVER <span>3 × 3 × 3</span></span></div>
     <div class="workspace">

@@ -1398,10 +1398,19 @@ fn test_superflip_orientation_solve_length() {
     for mv_str in &sol.moves {
         let m = parse_moves(mv_str).unwrap()[0];
         let f = m / 3;
-        let t: i32 = match m % 3 { 0 => 1, 1 => 2, 2 => -1, _ => 0 };
+        let t: i32 = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
         final_centers[f] = (final_centers[f] + t).rem_euclid(4);
     }
-    assert_eq!(final_centers, [0, 0, 0, 0, 0, 0], "All centers must reach 0 rotation");
+    assert_eq!(
+        final_centers,
+        [0, 0, 0, 0, 0, 0],
+        "All centers must reach 0 rotation"
+    );
 
     // 検証3: 手数は合理的な範囲（同時最適化19手 or 逐次55手 + 余裕）
     assert!(
@@ -1410,7 +1419,6 @@ fn test_superflip_orientation_solve_length() {
         sol.moves.len()
     );
 }
-
 
 #[test]
 fn test_easy_5_moves_length() {

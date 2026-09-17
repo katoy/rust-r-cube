@@ -98,15 +98,8 @@ impl PruningTable {
 
 /// 枝刈りテーブルをゼロから生成します（事前計算バイナリなし）。
 pub(crate) fn build_pruning_table(move_table: &MoveTable) -> PruningTable {
-    let (
-        twist_class,
-        twist_sym,
-        twist_self_sym,
-        flip_class,
-        flip_sym,
-        flip_self_sym,
-        ud_slice_x2,
-    ) = generate_x2_maps();
+    let (twist_class, twist_sym, twist_self_sym, flip_class, flip_sym, flip_self_sym, ud_slice_x2) =
+        generate_x2_maps();
     PruningTable {
         twist_slice: generate_twist_slice_pruning_table(
             move_table,

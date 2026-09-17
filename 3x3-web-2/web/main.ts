@@ -8,6 +8,7 @@ import { CubeScene } from "./scene";
 import { ColorEditor } from "./editor";
 import { SolverClient } from "./solver-client";
 import { TwoViewCamera } from "./camera";
+import { CubeStore } from "./cube-store";
 import {
   automaticCenters,
   centerTurns,
@@ -15,32 +16,21 @@ import {
   rotateCenters,
 } from "./centers";
 
-type CubeSnapshot = { state: string; centerTurns: number[] };
-let centerRotations = [0, 0, 0, 0, 0, 0];
-const snapshot = (): CubeSnapshot => ({
-  state,
-  centerTurns: centerTurns(centerRotations),
-});
+const store = new CubeStore();
+(window as any).cube_store = store;
 
 mount();
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const storageKey = "cube-studio-v1";
-let state = SOLVED,
-  revision = 0,
-  mainReady = false,
+let mainReady = false,
   engineError = false,
   solving = false;
-let solution: ResultData | undefined,
-  step = 0,
-  playing = false,
+let playing = false,
   motion = 0,
   inMotion = false,
   playbackRun = 0;
-let scene: CubeScene | undefined,
-  modifier = "",
-  history: CubeSnapshot[] = [],
-  future: CubeSnapshot[] = [];
+let scene: CubeScene | undefined;
 let solver: SolverClient | undefined,
   interval = 0;
 const reduced = $<HTMLInputElement>("reduced-motion");
@@ -70,7 +60,7 @@ function persist() {
       storageKey,
       JSON.stringify({
         version: 1,
-        ...snapshot(),
+        ...store.getSnapshot(),
         reducedMotion: reduced.checked,
         speed: $<HTMLSelectElement>("speed").value,
       }),
@@ -88,42 +78,25 @@ function replace(
 ) {
   stop();
   cancelSearch();
-  const nextTurns = centerTurns(centers);
-  if (
-    record &&
-    (state !== next ||
-      centerTurns(centerRotations).some((t, i) => t !== nextTurns[i]))
-  ) {
-    history.push(snapshot());
-    if (history.length > 200) history.shift();
-    future = [];
-  }
-  state = next;
-  centerRotations = [...centers];
-  revision++;
-  solution = undefined;
-  step = 0;
+  store.replace(next, record, centers);
   message();
   persist();
   refresh();
 }
 function refresh() {
+  const state = store.getState();
+  const solution = store.getSolution();
+  const step = store.getStep();
+  const centerRotations = store.getCenterRotations();
   const next = solution?.moves[step] || "";
   if (scene) {
     scene.centerRotations = [...centerRotations];
     if (!inMotion) scene.show(state, next);
   }
-  net(
-    $("fallback-net"),
-    state,
-    false,
-    undefined,
-    -1,
-    centerTurns(centerRotations),
-  );
+  net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
   $("cube-status").textContent =
     state === SOLVED
-      ? centerTurns(centerRotations).some((t) => t !== 0)
+      ? store.getCenterTurns().some((t) => t !== 0)
         ? "色は完成・センターの向きあり"
         : "完成状態"
       : solution
@@ -136,8 +109,8 @@ function refresh() {
   $("cancel").hidden = !solving;
   $("solve").innerHTML =
     `<span>${engineError ? "エンジンを再試行" : state === SOLVED ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
-  $<HTMLButtonElement>("undo").disabled = !mainReady || history.length === 0;
-  $<HTMLButtonElement>("redo").disabled = !mainReady || future.length === 0;
+  $<HTMLButtonElement>("undo").disabled = !mainReady || !store.canUndo();
+  $<HTMLButtonElement>("redo").disabled = !mainReady || !store.canRedo();
   document
     .querySelectorAll<HTMLButtonElement>(
       "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load",
@@ -194,9 +167,10 @@ try {
   fallback();
 }
 async function seek(target: number, animate = true) {
+  const solution = store.getSolution();
   if (!solution) return;
   target = Math.max(0, Math.min(solution.moves.length, target));
-  const old = step;
+  const old = store.getStep();
   const data = solution;
   const token = ++motion;
   scene?.finish();
@@ -207,14 +181,12 @@ async function seek(target: number, animate = true) {
       : target === old - 1
         ? inverse(data.moves[target])
         : undefined;
-  step = target;
-  state = nextState;
-  revision++;
   const traversed =
     target > old
       ? data.moves.slice(old, target)
       : data.moves.slice(target, old).reverse().map(inverse);
-  centerRotations = rotateCenters(centerRotations, traversed);
+  const nextCenters = rotateCenters(store.getCenterRotations(), traversed);
+  store.updateAfterSeek(nextState, nextCenters, target);
   persist();
   inMotion = !!(animate && move && scene && !reduced.checked);
   refresh();
@@ -234,6 +206,7 @@ async function seek(target: number, animate = true) {
   }
 }
 async function play() {
+  const solution = store.getSolution();
   if (!solution) return;
   if (playing) {
     stop();
@@ -241,7 +214,7 @@ async function play() {
     return;
   }
   stop();
-  if (step === solution.moves.length) await seek(0, false);
+  if (store.getStep() === solution.moves.length) await seek(0, false);
   playing = true;
   refresh();
   const data = solution;
@@ -249,10 +222,10 @@ async function play() {
   while (
     playing &&
     run === playbackRun &&
-    solution === data &&
-    step < data.moves.length
+    store.getSolution() === data &&
+    store.getStep() < data.moves.length
   ) {
-    await seek(step + 1);
+    await seek(store.getStep() + 1);
     if (reduced.checked)
       await new Promise((resolve) =>
         setTimeout(
@@ -264,7 +237,7 @@ async function play() {
         ),
       );
   }
-  if (solution === data && run === playbackRun) {
+  if (store.getSolution() === data && run === playbackRun) {
     playing = false;
     refresh();
   }
@@ -272,23 +245,13 @@ async function play() {
 async function applyAlgorithm(algorithm: string, animate = true) {
   if (!mainReady) return;
   try {
-    const result: ResultData = JSON.parse(apply_moves(state, algorithm));
+    const result: ResultData = JSON.parse(
+      apply_moves(store.getState(), algorithm),
+    );
     stop();
     cancelSearch();
-    const nextCenters = rotateCenters(centerRotations, result.moves);
-    if (
-      state !== result.state ||
-      nextCenters.some((angle, i) => angle !== centerRotations[i])
-    ) {
-      history.push(snapshot());
-      if (history.length > 200) history.shift();
-      future = [];
-    }
-    state = result.state;
-    centerRotations = nextCenters;
-    revision++;
-    solution = undefined;
-    step = 0;
+    const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
+    store.applyAlgorithmResult(result.state, nextCenters);
     message();
     persist();
     const token = ++motion;
@@ -302,7 +265,7 @@ async function applyAlgorithm(algorithm: string, animate = true) {
       refresh();
       await scene!.turn(
         result.moves[0],
-        state,
+        store.getState(),
         Number($<HTMLSelectElement>("speed").value),
       );
     } else {
@@ -328,9 +291,10 @@ async function solve(budget = 5000) {
   message();
   $("extended").hidden = true;
   try {
-    validate(state);
+    const currentState = store.getState();
+    validate(currentState);
     solving = true;
-    const at = revision;
+    const at = store.getRevision();
     const start = performance.now();
     refresh();
     interval = window.setInterval(() => {
@@ -338,16 +302,15 @@ async function solve(budget = 5000) {
         `探索中 · ${((performance.now() - start) / 1000).toFixed(1)} 秒 / ${budget / 1000} 秒`;
     }, 100);
     const result = await solver.solve(
-      state,
+      currentState,
       at,
       budget,
       includeOrientation.checked,
-      [...centerRotations],
+      store.getCenterRotations(),
     );
 
-    if (revision !== at) return;
-    solution = result;
-    step = 0;
+    if (store.getRevision() !== at) return;
+    store.setSolution(result);
     $("solver-note").textContent =
       `${result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
     if (result.moves.length === 0) message("すでに6面が揃っています。");
@@ -376,7 +339,7 @@ const camera = new TwoViewCamera((s) => {
 $("edit-colors").onclick = () => {
   stop();
   refresh();
-  editor.open(state, centerRotations);
+  editor.open(store.getState(), store.getCenterRotations());
 };
 $("camera-colors").onclick = () => camera.open();
 $("solve").onclick = () => void solve();
@@ -404,39 +367,40 @@ document
       (button.onclick = (event) =>
         void applyAlgorithm(
           button.dataset.move! +
-            ((event as MouseEvent).shiftKey ? "'" : modifier),
+            ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
         )),
   );
-function setModifier(value: string) {
-  modifier = modifier === value ? "" : value;
-  $("prime").setAttribute("aria-pressed", String(modifier === "'"));
-  $("double").setAttribute("aria-pressed", String(modifier === "2"));
+function setModifier(value: "'" | "2") {
+  store.toggleModifier(value);
+  const mod = store.getModifier();
+  $("prime").setAttribute("aria-pressed", String(mod === "'"));
+  $("double").setAttribute("aria-pressed", String(mod === "2"));
 }
 $("prime").onclick = () => setModifier("'");
 $("double").onclick = () => setModifier("2");
 $("undo").onclick = () => {
-  const prev = history.pop();
-  if (prev) {
-    future.push(snapshot());
-    replace(prev.state, false, centersFromInput(prev.state, prev.centerTurns));
+  if (store.undo()) {
+    message();
+    persist();
+    refresh();
   }
 };
 $("redo").onclick = () => {
-  const next = future.pop();
-  if (next) {
-    history.push(snapshot());
-    replace(next.state, false, centersFromInput(next.state, next.centerTurns));
+  if (store.redo()) {
+    message();
+    persist();
+    refresh();
   }
 };
 $("reset").onclick = () => replace(SOLVED);
 $("view-reset").onclick = () => scene?.resetView();
 $("prev").onclick = () => {
   stop();
-  void seek(step - 1);
+  void seek(store.getStep() - 1);
 };
 $("next").onclick = () => {
   stop();
-  void seek(step + 1);
+  void seek(store.getStep() + 1);
 };
 $("play").onclick = () => void play();
 $<HTMLInputElement>("timeline").oninput = () => {
@@ -450,6 +414,7 @@ reduced.onchange = () => {
 };
 $<HTMLSelectElement>("speed").onchange = persist;
 $("copy").onclick = async () => {
+  const solution = store.getSolution();
   if (solution)
     try {
       await navigator.clipboard.writeText(solution.moves.join(" "));
@@ -490,7 +455,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
 });
 $("save").onclick = () => {
   const blob = new Blob(
-    [JSON.stringify({ version: 1, ...snapshot() }, null, 2)],
+    [JSON.stringify({ version: 1, ...store.getSnapshot() }, null, 2)],
     {
       type: "application/json",
     },
@@ -506,7 +471,7 @@ $("load").onclick = () => $<HTMLInputElement>("file").click();
 $<HTMLInputElement>("file").onchange = async () => {
   const file = $<HTMLInputElement>("file").files?.[0];
   if (!file) return;
-  const at = revision;
+  const at = store.getRevision();
   try {
     if (file.size > 65536)
       throw new Error("ファイルは64KB以内にしてください。");
@@ -521,7 +486,7 @@ $<HTMLInputElement>("file").onchange = async () => {
     )
       throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
     validate(data.state);
-    if (at !== revision)
+    if (at !== store.getRevision())
       throw new Error(
         "読込中にキューブが変更されました。もう一度読み込んでください。",
       );
@@ -555,7 +520,7 @@ document.addEventListener("keydown", (event) => {
   if (FACES.includes(face) && face.length === 1) {
     event.preventDefault();
     if (!event.repeat)
-      void applyAlgorithm(face + (event.shiftKey ? "'" : modifier));
+      void applyAlgorithm(face + (event.shiftKey ? "'" : store.getModifier()));
   } else if (
     event.code === "Space" &&
     !(event.target instanceof HTMLButtonElement)
@@ -565,11 +530,11 @@ document.addEventListener("keydown", (event) => {
   } else if (event.key === "ArrowLeft") {
     event.preventDefault();
     stop();
-    void seek(step - 1);
+    void seek(store.getStep() - 1);
   } else if (event.key === "ArrowRight") {
     event.preventDefault();
     stop();
-    void seek(step + 1);
+    void seek(store.getStep() + 1);
   }
 });
 document.addEventListener("visibilitychange", () => {
@@ -592,8 +557,7 @@ async function start() {
           throw new Error("format");
         validate(data.state);
         const restoredCenters = centersFromInput(data.state, data.centerTurns);
-        state = data.state;
-        centerRotations = restoredCenters;
+        store.replace(data.state, false, restoredCenters);
         if (typeof data.reducedMotion === "boolean")
           reduced.checked = data.reducedMotion;
         if (["1000", "500", "250"].includes(data.speed))

@@ -27,8 +27,8 @@ fn main() {
     {
         let budget_ms: u32 = 30_000;
         let start = std::time::Instant::now();
-        let mut search = cube_studio::search::Search::new(budget_ms)
-            .with_target_centers(initial_centers);
+        let mut search =
+            cube_studio::search::Search::new(budget_ms).with_target_centers(initial_centers);
         let result = search.solve(&cube);
         let elapsed = start.elapsed();
 
@@ -51,10 +51,18 @@ fn main() {
                 let mut centers = initial_centers;
                 for &m in &sol {
                     let f = m / 3;
-                    let t: i32 = match m % 3 { 0 => 1, 1 => 2, 2 => -1, _ => 0 };
+                    let t: i32 = match m % 3 {
+                        0 => 1,
+                        1 => 2,
+                        2 => -1,
+                        _ => 0,
+                    };
                     centers[f] = (centers[f] + t).rem_euclid(4);
                 }
-                println!("  最終センター: {centers:?} (全て0 = {})", centers.iter().all(|&c| c == 0));
+                println!(
+                    "  最終センター: {centers:?} (全て0 = {})",
+                    centers.iter().all(|&c| c == 0)
+                );
 
                 let final_cube = cube_studio::cube::apply(&cube, &sol);
                 println!(
@@ -76,7 +84,8 @@ fn main() {
     {
         let budget_ms: u32 = 30_000;
         let start = std::time::Instant::now();
-        let sol = cube_studio::solve_state_with_centers(&state, budget_ms, true, Some(initial_centers));
+        let sol =
+            cube_studio::solve_state_with_centers(&state, budget_ms, true, Some(initial_centers));
         let elapsed = start.elapsed();
 
         print!("[逐次方式 30s] ");

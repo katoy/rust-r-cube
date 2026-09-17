@@ -44,6 +44,18 @@ export class CubeScene {
   >[] = [];
   private pieces: THREE.Object3D[] = [];
   private arrowGroup = new THREE.Group(); // 矢印グループ
+  private arrowGeometry: THREE.ShapeGeometry;
+  private outlineGeometry: THREE.ShapeGeometry;
+  private outlineMaterial: THREE.MeshBasicMaterial;
+  private colorMaterials = new Map<number, THREE.MeshBasicMaterial>();
+  private outlineMeshes: THREE.Mesh<
+    THREE.ShapeGeometry,
+    THREE.MeshBasicMaterial
+  >[] = [];
+  private arrowMeshes: THREE.Mesh<
+    THREE.ShapeGeometry,
+    THREE.MeshBasicMaterial
+  >[] = [];
   centerRotations: number[] = [0, 0, 0, 0, 0, 0];
   private centerLabels: THREE.Mesh[] = [];
   private active?: {
@@ -159,6 +171,63 @@ export class CubeScene {
           this.add(label);
         }
       }
+
+    // 矢印用ジオメトリとアウトラインマテリアルを事前生成（再利用でGPUメモリリーク防止）
+    const stemW = 0.05;
+    const stemH = 0.16;
+    const headW = 0.15;
+    const headH = 0.22;
+    const notch = 0.03;
+
+    const arrowShape = new THREE.Shape();
+    arrowShape.moveTo(-stemW, -stemH);
+    arrowShape.lineTo(stemW, -stemH);
+    arrowShape.lineTo(stemW, notch);
+    arrowShape.lineTo(headW, notch);
+    arrowShape.lineTo(0, headH);
+    arrowShape.lineTo(-headW, notch);
+    arrowShape.lineTo(-stemW, notch);
+    arrowShape.closePath();
+    this.arrowGeometry = new THREE.ShapeGeometry(arrowShape);
+
+    const o = 0.022;
+    const outlineShape = new THREE.Shape();
+    outlineShape.moveTo(-(stemW + o), -(stemH + o));
+    outlineShape.lineTo(stemW + o, -(stemH + o));
+    outlineShape.lineTo(stemW + o, notch - o * 0.4);
+    outlineShape.lineTo(headW + o * 1.3, notch - o * 0.4);
+    outlineShape.lineTo(0, headH + o * 1.3);
+    outlineShape.lineTo(-(headW + o * 1.3), notch - o * 0.4);
+    outlineShape.lineTo(-(stemW + o), notch - o * 0.4);
+    outlineShape.closePath();
+    this.outlineGeometry = new THREE.ShapeGeometry(outlineShape);
+
+    this.outlineMaterial = new THREE.MeshBasicMaterial({
+      color: ARROW_COLORS.OUTLINE,
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+
+    const defaultColorMat = this.getColorMaterial(ARROW_COLORS.NORMAL);
+    for (let i = 0; i < 54; i++) {
+      const outlineMesh = new THREE.Mesh(
+        this.outlineGeometry,
+        this.outlineMaterial,
+      );
+      outlineMesh.userData = { isOutline: true, stickerIdx: i };
+      outlineMesh.renderOrder = 10;
+      this.outlineMeshes.push(outlineMesh);
+      this.arrowGroup.add(outlineMesh);
+
+      const arrowMesh = new THREE.Mesh(this.arrowGeometry, defaultColorMat);
+      arrowMesh.userData = { stickerIdx: i };
+      arrowMesh.renderOrder = 11;
+      this.arrowMeshes.push(arrowMesh);
+      this.arrowGroup.add(arrowMesh);
+    }
+
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.addEventListener("change", () => {
       this.dirty = true;
@@ -199,6 +268,21 @@ export class CubeScene {
     this.controls.target.set(0, 0, 0);
     this.controls.update();
   }
+  private getColorMaterial(color: number): THREE.MeshBasicMaterial {
+    let mat = this.colorMaterials.get(color);
+    if (!mat) {
+      mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.colorMaterials.set(color, mat);
+    }
+    return mat;
+  }
+
   dispose() {
     this.finish();
     this.renderer.setAnimationLoop(null);
@@ -216,6 +300,11 @@ export class CubeScene {
         }
       }
     });
+    this.arrowGeometry?.dispose();
+    this.outlineGeometry?.dispose();
+    this.outlineMaterial?.dispose();
+    this.colorMaterials.forEach((mat) => mat.dispose());
+    this.colorMaterials.clear();
     this.renderer.dispose();
   }
   show(state: string, next = "") {
@@ -232,13 +321,11 @@ export class CubeScene {
   }
 
   getArrowCount(): number {
-    return this.getArrows().length;
+    return this.arrowMeshes.length;
   }
 
   getArrows(): THREE.Mesh[] {
-    return (this.arrowGroup.children as THREE.Mesh[]).filter(
-      (m) => m.userData?.stickerIdx !== undefined && !m.userData?.isOutline,
-    );
+    return this.arrowMeshes;
   }
 
   private updateCenterLabels() {
@@ -257,53 +344,15 @@ export class CubeScene {
   }
 
   private updateArrows(state?: string) {
-    // 既存の矢印を削除
-    this.arrowGroup.clear();
-    if (!state || state.length < 54) return;
+    if (!state || state.length < 54) {
+      this.arrowGroup.visible = false;
+      return;
+    }
+    this.arrowGroup.visible = true;
 
     this.updateCenterLabels();
 
     const arrowInfo = getCellArrowInfo(state, this.centerRotations);
-
-    // セル表面に貼り付ける矢印の共通ジオメトリ
-    const stemW = 0.05;
-    const stemH = 0.16;
-    const headW = 0.15;
-    const headH = 0.22;
-    const notch = 0.03;
-
-    // 内側のカラー矢印
-    const arrowShape = new THREE.Shape();
-    arrowShape.moveTo(-stemW, -stemH);
-    arrowShape.lineTo(stemW, -stemH);
-    arrowShape.lineTo(stemW, notch);
-    arrowShape.lineTo(headW, notch);
-    arrowShape.lineTo(0, headH);
-    arrowShape.lineTo(-headW, notch);
-    arrowShape.lineTo(-stemW, notch);
-    arrowShape.closePath();
-    const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
-
-    // 外側の暗色アウトライン（あらゆるステッカー地色から矢印をくっきり際立たせる）
-    const o = 0.022;
-    const outlineShape = new THREE.Shape();
-    outlineShape.moveTo(-(stemW + o), -(stemH + o));
-    outlineShape.lineTo(stemW + o, -(stemH + o));
-    outlineShape.lineTo(stemW + o, notch - o * 0.4);
-    outlineShape.lineTo(headW + o * 1.3, notch - o * 0.4);
-    outlineShape.lineTo(0, headH + o * 1.3);
-    outlineShape.lineTo(-(headW + o * 1.3), notch - o * 0.4);
-    outlineShape.lineTo(-(stemW + o), notch - o * 0.4);
-    outlineShape.closePath();
-    const outlineGeometry = new THREE.ShapeGeometry(outlineShape);
-
-    const outlineMaterial = new THREE.MeshBasicMaterial({
-      color: ARROW_COLORS.OUTLINE,
-      transparent: true,
-      opacity: 0.96,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
 
     // 全54セルの矢印を配置（各セルの表面に印刷された向き・角度）
     for (let i = 0; i < 54; i++) {
@@ -323,38 +372,27 @@ export class CubeScene {
       const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
       const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
 
-      // 1. 暗色アウトラインメッシュ（背景ステッカーとの境界を明確化）
-      const outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
-      outlineMesh.userData = { isOutline: true, stickerIdx: i };
+      // 1. 暗色アウトラインメッシュ
+      const outlineMesh = this.outlineMeshes[i];
       outlineMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.015);
       outlineMesh.quaternion.setFromRotationMatrix(rotMatrix);
-      outlineMesh.renderOrder = 10;
-      this.arrowGroup.add(outlineMesh);
+      outlineMesh.userData.origin = outlineMesh.position.clone();
+      outlineMesh.userData.rotation = outlineMesh.quaternion.clone();
 
-      // 2. 内側のカラー矢印メッシュ
-      const mat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-
-      const arrowMesh = new THREE.Mesh(arrowGeometry, mat);
+      // 2. 内側のカラー矢印メッシュ（マテリアルはキャッシュを再利用）
+      const arrowMesh = this.arrowMeshes[i];
+      arrowMesh.material = this.getColorMaterial(color);
+      arrowMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.017);
+      arrowMesh.quaternion.setFromRotationMatrix(rotMatrix);
       arrowMesh.userData = {
         stickerIdx: i,
         color,
         rotAngle: angle,
         kind,
         pieceIdx,
+        origin: arrowMesh.position.clone(),
+        rotation: arrowMesh.quaternion.clone(),
       };
-
-      // セル表面から 0.017 浮かせ、アウトラインの前面に密着して表示
-      arrowMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.017);
-      arrowMesh.quaternion.setFromRotationMatrix(rotMatrix);
-      arrowMesh.renderOrder = 11;
-
-      this.arrowGroup.add(arrowMesh);
     }
   }
 
@@ -413,6 +451,20 @@ export class CubeScene {
       this.root.add(mesh);
       mesh.position.copy(mesh.userData.origin);
       mesh.quaternion.copy(mesh.userData.rotation);
+    }
+    for (const mesh of this.outlineMeshes) {
+      this.arrowGroup.add(mesh);
+      if (mesh.userData.origin) {
+        mesh.position.copy(mesh.userData.origin);
+        mesh.quaternion.copy(mesh.userData.rotation);
+      }
+    }
+    for (const mesh of this.arrowMeshes) {
+      this.arrowGroup.add(mesh);
+      if (mesh.userData.origin) {
+        mesh.position.copy(mesh.userData.origin);
+        mesh.quaternion.copy(mesh.userData.rotation);
+      }
     }
     this.root.remove(active.layer);
     active.finish();

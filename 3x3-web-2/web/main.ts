@@ -78,10 +78,8 @@ function replace(
 ) {
   stop();
   cancelSearch();
-  store.replace(next, record, centers);
   message();
-  persist();
-  refresh();
+  store.replace(next, record, centers);
 }
 function refresh() {
   const state = store.getState();
@@ -151,6 +149,18 @@ function refresh() {
     $<HTMLInputElement>("timeline").value = String(step);
   }
 }
+store.subscribe((_s, { type }) => {
+  if (type === "modifier") {
+    const mod = store.getModifier();
+    $("prime").setAttribute("aria-pressed", String(mod === "'"));
+    $("double").setAttribute("aria-pressed", String(mod === "2"));
+    return;
+  }
+  if (type !== "solution") {
+    persist();
+  }
+  refresh();
+});
 function fallback() {
   scene?.dispose();
   scene = undefined;
@@ -186,10 +196,8 @@ async function seek(target: number, animate = true) {
       ? data.moves.slice(old, target)
       : data.moves.slice(target, old).reverse().map(inverse);
   const nextCenters = rotateCenters(store.getCenterRotations(), traversed);
-  store.updateAfterSeek(nextState, nextCenters, target);
-  persist();
   inMotion = !!(animate && move && scene && !reduced.checked);
-  refresh();
+  store.updateAfterSeek(nextState, nextCenters, target);
   if (inMotion && move)
     await scene!.turn(
       move,
@@ -250,10 +258,8 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     );
     stop();
     cancelSearch();
-    const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
-    store.applyAlgorithmResult(result.state, nextCenters);
     message();
-    persist();
+    const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
     const token = ++motion;
     inMotion = !!(
       animate &&
@@ -261,15 +267,13 @@ async function applyAlgorithm(algorithm: string, animate = true) {
       scene &&
       !reduced.checked
     );
+    store.applyAlgorithmResult(result.state, nextCenters);
     if (inMotion) {
-      refresh();
       await scene!.turn(
         result.moves[0],
         store.getState(),
         Number($<HTMLSelectElement>("speed").value),
       );
-    } else {
-      refresh();
     }
     if (token === motion) {
       inMotion = false;
@@ -372,25 +376,14 @@ document
   );
 function setModifier(value: "'" | "2") {
   store.toggleModifier(value);
-  const mod = store.getModifier();
-  $("prime").setAttribute("aria-pressed", String(mod === "'"));
-  $("double").setAttribute("aria-pressed", String(mod === "2"));
 }
 $("prime").onclick = () => setModifier("'");
 $("double").onclick = () => setModifier("2");
 $("undo").onclick = () => {
-  if (store.undo()) {
-    message();
-    persist();
-    refresh();
-  }
+  if (store.undo()) message();
 };
 $("redo").onclick = () => {
-  if (store.redo()) {
-    message();
-    persist();
-    refresh();
-  }
+  if (store.redo()) message();
 };
 $("reset").onclick = () => replace(SOLVED);
 $("view-reset").onclick = () => scene?.resetView();
@@ -633,7 +626,6 @@ async function initializePresets() {
                 rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
               );
               $("scramble-text").textContent = algorithm;
-              refresh();
             } catch (scrambleError) {
               throw new Error(
                 `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
@@ -656,7 +648,6 @@ async function initializePresets() {
                 rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
               );
               $("scramble-text").textContent = cleanedScramble;
-              refresh();
             } catch (scrambleError) {
               throw new Error(
                 `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
@@ -671,7 +662,6 @@ async function initializePresets() {
               true,
               centersFromInput(data.state, data.centerTurns),
             );
-            refresh();
           } else {
             throw new Error(
               `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,

@@ -6,7 +6,21 @@ export interface CubeSnapshot {
   centerTurns: number[];
 }
 
-export type StoreListener = (store: CubeStore) => void;
+export type StoreEventType =
+  | "replace"
+  | "undo"
+  | "redo"
+  | "modifier"
+  | "solution"
+  | "step"
+  | "seek"
+  | "algorithm";
+
+export interface StoreEventDetail {
+  type: StoreEventType;
+}
+
+export type StoreListener = (store: CubeStore, event: StoreEventDetail) => void;
 
 export class CubeStore {
   private state: string = SOLVED;
@@ -78,7 +92,7 @@ export class CubeStore {
     this.revision++;
     this.solution = undefined;
     this.step = 0;
-    this.notify();
+    this.notify("replace");
   }
 
   undo(): boolean {
@@ -90,7 +104,7 @@ export class CubeStore {
     this.revision++;
     this.solution = undefined;
     this.step = 0;
-    this.notify();
+    this.notify("undo");
     return true;
   }
 
@@ -103,30 +117,30 @@ export class CubeStore {
     this.revision++;
     this.solution = undefined;
     this.step = 0;
-    this.notify();
+    this.notify("redo");
     return true;
   }
 
   setModifier(value: string): void {
     if (this.modifier === value) return;
     this.modifier = value;
-    this.notify();
+    this.notify("modifier");
   }
 
   toggleModifier(value: "'" | "2"): void {
     this.modifier = this.modifier === value ? "" : value;
-    this.notify();
+    this.notify("modifier");
   }
 
   setSolution(solution: ResultData | undefined): void {
     this.solution = solution;
     this.step = 0;
-    this.notify();
+    this.notify("solution");
   }
 
   setStep(target: number): void {
     this.step = target;
-    this.notify();
+    this.notify("step");
   }
 
   updateAfterSeek(
@@ -138,7 +152,7 @@ export class CubeStore {
     this.centerRotations = [...nextCenterRotations];
     this.step = step;
     this.revision++;
-    this.notify();
+    this.notify("seek");
   }
 
   applyAlgorithmResult(
@@ -160,7 +174,7 @@ export class CubeStore {
     this.revision++;
     this.solution = undefined;
     this.step = 0;
-    this.notify();
+    this.notify("algorithm");
   }
 
   subscribe(listener: StoreListener): () => void {
@@ -170,9 +184,10 @@ export class CubeStore {
     };
   }
 
-  private notify(): void {
+  private notify(type: StoreEventType): void {
+    const event: StoreEventDetail = { type };
     for (const listener of this.listeners) {
-      listener(this);
+      listener(this, event);
     }
   }
 }

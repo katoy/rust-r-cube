@@ -57,6 +57,10 @@ test("scramble, solve, step, backwards, jump and complete playback", async ({
   await page.locator(".solution-move").last().click();
   expect(await state(page)).toBe(SOLVED);
   await page.locator("#play").click();
+  await expect(page.locator("#scene")).not.toHaveAttribute(
+    "data-state",
+    SOLVED,
+  );
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 20000,
   });

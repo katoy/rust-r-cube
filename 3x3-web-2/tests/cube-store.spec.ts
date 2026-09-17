@@ -195,4 +195,52 @@ test.describe("CubeStore Unit Tests", () => {
     // replace (1) + toggleModifier (2) + undo (3) = 3 (unsubscribe後はカウントされない)
     expect(result.callCount).toBe(3);
   });
+
+  test("subscribe passes event type for distinct store mutations", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const { apply_moves } = (window as any).cube_studio;
+      const store = new CubeStore();
+
+      const events: string[] = [];
+      store.subscribe((_s, event) => {
+        events.push(event?.type);
+      });
+
+      const rState = JSON.parse(apply_moves(SOLVED, "R")).state;
+      store.replace(rState);
+      store.toggleModifier("'");
+      store.undo();
+      store.redo();
+      store.setSolution({
+        state: SOLVED,
+        moves: ["R"],
+        states: [SOLVED, rState],
+        elapsed_ms: 5,
+        nodes: 10,
+      });
+      store.setStep(1);
+      store.updateAfterSeek(SOLVED, [0, 0, 0, 0, 0, 0], 0);
+      store.applyAlgorithmResult(rState, [0, 0, 0, 0, 0, 0]);
+
+      return { events };
+    });
+
+    expect(result.events).toEqual([
+      "replace",
+      "modifier",
+      "undo",
+      "redo",
+      "solution",
+      "step",
+      "seek",
+      "algorithm",
+    ]);
+  });
 });

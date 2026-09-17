@@ -1421,6 +1421,41 @@ fn test_superflip_orientation_solve_length() {
 }
 
 #[test]
+fn test_superflip_5s_budget_solves_under_24_moves() {
+    let scramble = "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U";
+    let moves = parse_moves(scramble).unwrap();
+    let cube = apply(&RawCube::default(), &moves);
+    let state = facelets(&cube);
+
+    let mut initial_centers = [0i32; 6];
+    for &m in &moves {
+        let f = m / 3;
+        let t: i32 = match m % 3 {
+            0 => 1,
+            1 => 2,
+            2 => -1,
+            _ => 0,
+        };
+        initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
+    }
+
+    // UIデフォルト予算 5000ms（リリースモード）で、同時最適化により 24手以内で解けることを検証
+    // デバッグビルド（cargo test のデフォルト）は最適化なしで約5倍遅いため予算を自動調整
+    let budget = if cfg!(debug_assertions) {
+        30_000
+    } else {
+        5_000
+    };
+    let sol = crate::solve_state_with_centers(&state, budget, true, Some(initial_centers)).unwrap();
+    assert_eq!(sol.state, SOLVED, "Cube must be fully solved");
+    assert!(
+        sol.moves.len() <= 24,
+        "Superflip should solve in <= 24 moves, but took {} moves",
+        sol.moves.len()
+    );
+}
+
+#[test]
 fn test_easy_5_moves_length() {
     let seq = "R U F";
     let moves = parse_moves(seq).unwrap();

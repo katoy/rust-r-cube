@@ -446,39 +446,45 @@ test("large number of moves is handled correctly", async ({ page }) => {
 
 test("speed setting affects playback duration", async ({ page }) => {
   await ready(page);
-  await page.locator("#reduced-motion").check();
-  await page.locator("#scramble").click();
+
+  // 固定の短手番プリセット（簡単5手、実質3手）で再生速度の差異を確実に検証
+  await page.locator("#tab-presets").click();
+  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await expect(page.locator("#preset-status")).toContainText(
+    "簡単（5手） を読み込みました",
+  );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
 
-  // 高速設定
+  // 高速設定 (250ms)
   await page.locator("#speed").selectOption("250");
-  const movesCount1 = await page.locator(".solution-move").count();
-  await page.locator("#play").click();
   const start1 = Date.now();
+  await page.locator("#play").click();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
     timeout: 10000,
   });
-  const timePerMove1 = (Date.now() - start1) / Math.max(1, movesCount1);
+  const durationFast = Date.now() - start1;
 
-  // リセット
-  await page.locator("#reset").click();
-  await page.locator("#scramble").click();
+  // 再び同じプリセットを読み込む
+  await page.locator("#tab-presets").click();
+  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await expect(page.locator("#preset-status")).toContainText(
+    "簡単（5手） を読み込みました",
+  );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
 
-  // 低速設定
+  // 低速設定 (1000ms)
   await page.locator("#speed").selectOption("1000");
-  const movesCount2 = await page.locator(".solution-move").count();
-  await page.locator("#play").click();
   const start2 = Date.now();
+  await page.locator("#play").click();
   await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED, {
-    timeout: 30000,
+    timeout: 10000,
   });
-  const timePerMove2 = (Date.now() - start2) / Math.max(1, movesCount2);
+  const durationSlow = Date.now() - start2;
 
-  // 低速（1000ms）の方が1手あたり高速（250ms）より時間がかかる
-  expect(timePerMove2).toBeGreaterThan(timePerMove1);
+  // 低速（1000ms）は高速（250ms）に比べ明らかに長い時間を要する
+  expect(durationSlow).toBeGreaterThan(durationFast * 1.5);
 });
 
 test("arrows are displayed on initial solved state", async ({ page }) => {

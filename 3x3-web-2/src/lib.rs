@@ -60,8 +60,11 @@ pub fn solve_state_with_centers(
     let start = web_time::Instant::now();
     let mut total_nodes = 0u64;
     let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
-        let mut search_oriented =
-            search::Search::new((budget_ms / 2).min(15000)).with_target_centers(centers);
+        let oriented_budget = budget_ms
+            .saturating_sub(1000)
+            .max(budget_ms * 4 / 5)
+            .min(25000);
+        let mut search_oriented = search::Search::new(oriented_budget).with_target_centers(centers);
         let res = search_oriented.solve(&cube);
         total_nodes += search_oriented.nodes;
         res

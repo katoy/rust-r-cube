@@ -16,10 +16,13 @@ import {
   rotateCenters,
 } from "./centers";
 
+import { registerServiceWorker } from "./pwa";
+
 const store = new CubeStore();
 (window as any).cube_store = store;
 
 mount();
+registerServiceWorker();
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const storageKey = "cube-studio-v1";

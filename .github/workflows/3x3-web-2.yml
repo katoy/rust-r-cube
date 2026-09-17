@@ -1,0 +1,77 @@
+name: 3x3-web-2 CI
+
+on:
+  push:
+    branches: ["main", "master", "feature/**"]
+    paths:
+      - "3x3-web-2/**"
+      - ".github/workflows/3x3-web-2.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "3x3-web-2/**"
+      - ".github/workflows/3x3-web-2.yml"
+  workflow_dispatch:
+
+jobs:
+  check-and-test:
+    name: Check, Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 3x3-web-2
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "latest"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: 3x3-web-2/package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Rust formatting & clippy check
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --release
+
+      - name: Web format & typecheck
+        run: |
+          npm run format:check
+          npm run typecheck
+
+      - name: Build WASM & Web bundle
+        run: npm run build
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: 3x3-web-2/playwright-report/
+          retention-days: 7

@@ -79,6 +79,7 @@ jobs:
           cd 2x2 && cargo fetch --locked || true
           cd ../2x2-web && cargo fetch --locked || true
           cd ../3x3-web && cargo fetch --locked || true
+          cd ../3x3-web-2 && cargo fetch --locked || true
 
       - name: Build
         shell: bash
@@ -93,6 +94,7 @@ jobs:
           cd 2x2 && cargo build --verbose
           cd ../2x2-web && cargo build --verbose
           cd ../3x3-web && cargo build --verbose
+          cd ../3x3-web-2 && cargo build --verbose
 
       - name: Test
         shell: bash
@@ -107,3 +109,4 @@ jobs:
           cd 2x2 && cargo test --verbose
           cd ../2x2-web && cargo test --verbose
           cd ../3x3-web && cargo test --verbose
+          cd ../3x3-web-2 && cargo test --verbose

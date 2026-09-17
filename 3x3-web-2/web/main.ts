@@ -146,10 +146,26 @@ function refresh() {
     $("play").innerHTML = icon(playing ? "pause" : "play");
     $("play").setAttribute("aria-label", playing ? "一時停止" : "自動再生");
     $<HTMLButtonElement>("play").disabled = solution.moves.length === 0;
+    $<HTMLButtonElement>("first").disabled = step === 0;
     $<HTMLButtonElement>("prev").disabled = step === 0;
     $<HTMLButtonElement>("next").disabled = step === solution.moves.length;
+    $<HTMLButtonElement>("last").disabled = step === solution.moves.length;
     $<HTMLInputElement>("timeline").max = String(solution.moves.length);
     $<HTMLInputElement>("timeline").value = String(step);
+
+    if (step === 0) {
+      list.scrollTop = 0;
+    } else {
+      const currentButton = list.children[step] as HTMLElement | undefined;
+      if (currentButton) {
+        currentButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } else if (step === solution.moves.length && list.lastElementChild) {
+        (list.lastElementChild as HTMLElement).scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+        });
+      }
+    }
   }
 }
 store.subscribe((_s, { type }) => {
@@ -390,6 +406,10 @@ $("redo").onclick = () => {
 };
 $("reset").onclick = () => replace(SOLVED);
 $("view-reset").onclick = () => scene?.resetView();
+$("first").onclick = () => {
+  stop();
+  void seek(0, false);
+};
 $("prev").onclick = () => {
   stop();
   void seek(store.getStep() - 1);
@@ -397,6 +417,13 @@ $("prev").onclick = () => {
 $("next").onclick = () => {
   stop();
   void seek(store.getStep() + 1);
+};
+$("last").onclick = () => {
+  const solution = store.getSolution();
+  if (solution) {
+    stop();
+    void seek(solution.moves.length, false);
+  }
 };
 $("play").onclick = () => void play();
 $<HTMLInputElement>("timeline").oninput = () => {
@@ -531,6 +558,20 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     stop();
     void seek(store.getStep() + 1);
+  } else if (event.key === "Home") {
+    const solution = store.getSolution();
+    if (solution) {
+      event.preventDefault();
+      stop();
+      void seek(0, false);
+    }
+  } else if (event.key === "End") {
+    const solution = store.getSolution();
+    if (solution) {
+      event.preventDefault();
+      stop();
+      void seek(solution.moves.length, false);
+    }
   }
 });
 document.addEventListener("visibilitychange", () => {

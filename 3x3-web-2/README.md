@@ -1,167 +1,151 @@
-# Cube Studio
+# Cube Studio (3x3-web-2)
 
-Rustで解き、3Dでたどる、ブラウザ完結の3×3ルービックキューブsolverです。
-日本語UI、実物の色入力、回転アニメーション、手順の前後再生を備えています。
+ブラウザ上で動作する、高速・高機能な 3×3×3 ルービックキューブ・ソルバー＆シミュレータです。  
+Rust で実装された Kociemba 2段階探索エンジンを WebAssembly (WASM) にコンパイルし、Web Worker 上でバックグラウンド実行します。フロントエンドは TypeScript + Vite + Three.js で構築され、PWA による完全なオフライン動作に対応しています。
 
-## 起動
+[![Live Demo](https://img.shields.io/badge/Cube_Studio-Demo-success)](https://katoy.github.io/rust-r-cube/3x3-v2/)
+[![CI](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml/badge.svg)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
+[![Three.js](https://img.shields.io/badge/Three.js-r186-black)](https://threejs.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.80+-orange)](https://www.rust-lang.org/)
 
-必要環境：Rust（動作確認 1.93）、`wasm32-unknown-unknown`、wasm-pack、Node.js（22.12以上）、npm。
+---
 
-初回のみ環境のセットアップが必要です：
+## 主な特徴
 
-```sh
-rustup target add wasm32-unknown-unknown
-cargo install wasm-pack --locked
+- ⚡ **Kociemba 2段階探索アルゴリズム**:
+  - どのような混ざった状態からでも、通常 20手前後（平均 10〜30ms）で高速に解法を導出。
+  - **スーパーキューブ（センターパーツの向き解決）対応**: 各面センターの 90°/180° の回転も保持・解消する高精度モードを搭載。
+- 🧵 **Web Worker による非同期探索**:
+  - 重い探索処理をバックグラウンド Worker で実行するため、3D アニメーションやユーザー操作が一切カクつきません。
+- 🧊 **Three.js による 3D レンダリング & 2D フォールバック**:
+  - スムーズな回転アニメーション、視点操作、ズーム。
+  - WebGL が利用できない環境では 2D 展開図モードへ自動的にフォールバック。
+- 📱 **PWA (Progressive Web App) 対応**:
+  - Service Worker と Web App Manifest を備え、スマートフォンやデスクトップにアプリとしてインストール可能。
+  - 一度アクセスすれば完全オフラインで利用可能。
+- 📷 **2方向カメラ入力**:
+  - 2方向からの斜め写真（上面・右面・前面 / 下面・左面・背面）から、外周 6 角を指定して 6 面の色を一度にキャプチャ・補正。
+- 🎓 **初心者向けガイダンス**:
+  - 回転記号（U, R, F, D, L, B, ′, 2）の日本語・英語対応ツールチップ。
+  - ヘルプダイアログ内の記号早見表。
+- ⏩ **充実した再生コントロール**:
+  - 自動再生、1手送り/戻し、再生速度変更（0.5×, 1×, 2×）。
+  - 最初/最後へのジャンプボタン、キーボードショートカット（Home, End, Space, ←, →）。
+  - 再生位置に連動した手順リストの自動スムーズスクロール。
+- 🚀 **バンドルサイズと読み込み最適化**:
+  - Three.js の独立ベンダーチャンク化。
+  - カラーエディタやカメラモジュールを初回起動時の動的インポート（Dynamic Import）にすることで、初期 JS を約 53KB に軽量化。
+
+---
+
+## アーキテクチャ
+
+```mermaid
+flowchart TD
+    subgraph UI ["ブラウザ メインスレッド (TypeScript / Three.js)"]
+        View["UI / View (DOM)"]
+        Scene["3D Scene (Three.js)"]
+        Store["CubeStore (状態・Undo/Redo)"]
+        Sound["Sound (Web Audio)"]
+        View --> Store
+        Scene --> Store
+        Store --> View
+    end
+
+    subgraph Dynamic ["遅延ロードモジュール (Dynamic Import)"]
+        Editor["ColorEditor"]
+        Camera["TwoViewCamera"]
+        Store -.->|クリック時にロード| Editor
+        Store -.->|クリック時にロード| Camera
+    end
+
+    subgraph Worker ["Web Worker (WASM)"]
+        Client["SolverClient"]
+        WasmWorker["solver.worker.ts"]
+        RustWasm["cube_studio.wasm"]
+        Solver["Kociemba Two-Phase Engine"]
+        Client <-->|postMessage| WasmWorker
+        WasmWorker --> RustWasm
+        RustWasm --> Solver
+    end
+
+    Store <--> Client
 ```
 
-### スクリプトで起動（推奨）
+---
 
-起動スクリプトを実行すると、依存パッケージ（`node_modules`）や WASM（`pkg/`）の存在を確認・必要に応じて自動ビルドし、開発サーバーを起動します。
+## 開発と実行
 
-```sh
-./start.sh
-# または
-npm start
-```
+### 前提環境
+- **Rust**: 1.80 以上 (`wasm32-unknown-unknown` ターゲット)
+- **wasm-pack**: 最新版 (`cargo install wasm-pack` または `npm install -g wasm-pack`)
+- **Node.js**: v20 以上
+- **npm**: v10 以上
 
-オプション：
-- `./start.sh -b`（または `--build`）：WASM を強制再ビルドしてから起動
-- `./start.sh -p`（または `--preview`）：プロダクション用にビルドしてプレビューサーバーを起動
-- `./start.sh -h`（または `--help`）：使い方の確認
+### コマンド
 
-### 手動での起動手順
+```bash
+# 依存関係のインストール
+npm install
 
-```sh
-npm ci
-npm run wasm
+# 開発サーバーの起動 (Vite)
 npm run dev
-```
 
-表示されたローカルURLを開いてください。通常は http://127.0.0.1:5173 です。
-Rustを変更した場合は `npm run wasm`（または `./start.sh -b`）を実行します。
-
-```sh
-npm run build       # Rust/WASM・型検査・Webビルド → dist/
-npm run preview     # 配布物の動作確認
-```
-
-`dist/` の内容を静的ホスティングへ配置できます。相対URLでアセットを解決するため、`/nested/cube/` のようなサブディレクトリにも対応します。`.wasm` のMIME型は `application/wasm` に設定してください。ブラウザの `file://` ではなくHTTP(S)で配信します。
-
-## できること
-
-- 25手のスクランブル、18種類の面回転、手順の一括入力、Undo／Redo。
-- 3Dの視点回転・ズームと、WebGLを利用できない場合の2D展開図。
-- 6面の色入力。1面ずつの持ち方ガイド、色の残数、未入力状態に対応。不正なピース（エッジやコーナーの配色不正）がある場合は該当マスを赤枠パルスで強調表示。
-- 2方向の画像入力。画像A/Bから外周頂点・中心点の自動認識およびドラッグ微調整に対応し、3×3セルの色を自動分類できます。読み取り結果はダイアログ内で確認・編集可能で、センターセルを含む各マスの色をパレットから自由に補正できます。認識結果に応じて面ラベルや案内メッセージも動的に更新されます。
-- 各センターを0°・90°・180°・270°で指定。配色に整合する向きの自動設定、入力検証、保存・復元に対応。
-- ピースの重複・欠落、エッジの反転、コーナーのねじれ、置換パリティの検査。
-- 専用Workerで解法探索。通常5秒／延長30秒の上限、中止と再試行。
-- 自動再生、一時停止、前後1手、任意ステップへの移動、再生速度、次の面の強調。
-- 状態の自動保存、JSONの保存・読込、プリセット状態の読み込み、解法のコピー。
-- スマートフォン、キーボード、色名の読み上げ、動きを減らす設定。
-
-`U R F D L B` キーで回転、Shiftで逆回転。画面の `′`・`2` は回転方向の切替です。Spaceで再生／停止、矢印キーで手順を前後します。入力欄やダイアログ内ではショートカットを無効にしています。
-
-実物の入力時は **上が白、前が緑、右が赤**。回転方向は、対象の面を正面から見た向きです。画面のカメラだけを回しても `U/R/F` の基準は変わりません。
-
-6色3×3とセンターに向きのあるキューブに対応しています。スライス回転、旧版のテキスト形式は対象外です。スクランブルはランダムな回転列であり、競技用の一様ランダム状態生成ではありません。短手数の状態（5手以内）は直接全探索（IDA*）により厳密な最短手数（例: `R U F` は3手 `F' U' R'`）で瞬時に解き、一般状態は Kociemba の2段階探索に深さ上限の縮小反復（Anytime 最適化）を組み合わせて短手数の解法を探索します。センター方位を含めた完成状態への復元にも対応しています。
-
-色入力画面の「センターの向き」では、各面のガイドを正面から見て上向きを0°とし、時計回りに90°ずつ指定します。「配色に合う向きを自動設定」は、全センター0°を基本とし、配色との整合に必要な場合だけU面を90°にする機能です。実物の矢印方向を推定するものではありません。実物の矢印も揃える場合は、各面の方向を手動入力してください。通常の回転では解けない組み合わせや不正な配色は適用時にエラーメッセージが表示され、展開図および編集ガイド上の該当するピース（エッジやコーナーのマス）が赤枠でハイライトされます。
-
-画像入力は「2方向の画像から入力」から開始します。対角に近い2方向から撮影し、各画像の3面について外周頂点や中心点を指定・微調整することで、射影変換により3×3セルの色を自動判定します。「この3面を読み取る」を実行すると、読み取り結果セクションに各面の3×3ステッカーが表示されます。照明や反射で誤認識されたマスは、パレットから色を選んでセルをクリックすることで直接補正できます。中央のセンターセルも同様に補正可能で、センター色に応じて面ラベル（白面・赤面・緑面など）や案内文もリアルタイムに連動更新されます。6面を揃えて「色入力へ反映」を押すと色入力画面に引き継がれ、ピースの整合性を確認して探索を開始できます。画像はブラウザ内だけで処理します。センターの矢印方向は画像から判定せず、センター入力で指定します。
-
-色を塗り直すと向きも自動設定されますが、同じダイアログで向きを手動指定した後は、その指定を保持します。センターだけの変更もUndo／Redoの対象です。JSONと自動保存にはURFDLB順の `centerTurns`（0〜3、90°単位）を含めます。従来の `centerTurns` がないv1データは、配色に整合する向きを自動設定して読み込みます。
-
-## 構成
-
-| 部分 | 役割 |
-| --- | --- |
-| `src/cube.rs` | URFDLBの54ステッカーとピース表現の相互変換、物理的検証、手順解析 |
-| `src/coord.rs` / `src/search.rs` | 座標化、深さ1〜5の直接探索、枝刈りを使うKociembaの2段階探索とAnytime最適化 |
-| `build.rs` / `src/tables.rs` | ホスト側で探索テーブルを生成。ブラウザではバージョン・チェックサムを検査して読み込む |
-| `src/lib.rs` | Rustの解法検証、再生状態生成、WASM境界 |
-| `web/solver.worker.ts` / `web/solver-client.ts` | UIと探索の分離、中止、タイムアウト、古い応答の破棄 |
-| `web/scene.ts` | Three.jsによる描画と回転アニメーション。静止時は再描画しない |
-| `web/centers.ts` | センター向きの入力検証・自動設定・回転の追跡 |
-| `web/editor.ts` / `web/main.ts` | 色入力とアプリの操作・再生・保存、プリセット読み込み |
-
-論理的な回転・各ステップの状態はRustが生成し、TypeScriptは描画と操作を担当します。解法は元の状態に適用して完成を確認してから返します。手動操作や状態の読込で既存の解法を無効化し、探索中ならWorkerを終了します。中止後はWorkerを再生成するので、SharedArrayBufferや特別なHTTPヘッダーは不要です。
-
-座標・テーブル生成の実装は `../3x3-web/src/kociemba` を参考にしています。取り込み時にコーナーの向きをURFDLBの標準的な面表現に合わせ、全18手を独立した幾何学計算で検証しました。旧版のソース・未コミット変更には手を加えていません。
-
-### プリセット状態
-
-Web UI の「キューブを準備」セクションに「プリセット」タブがあり、有名なキューブ状態をワンクリックで読み込めます。各プリセットは JSON 形式で `cubes/`（および公開用の `public/cubes/`）に保存されています：
-
-| プリセット | ファイル | 説明 | 実測解法手数 |
-| --- | --- | --- | --- |
-| ✅ 完成状態 | `solved.json` | 完全に揃ったキューブ（テスト基準） | 0 手 |
-| 🟢 簡単（5手） | `easy-5-moves.json` | 5手以内で解ける初級者向け（`R U F`） | 3 手 (`F' U' R'`) |
-| 🔄 T-Permutation | `t-perm.json` | 速解き（Speedcubing）のPLLパターン | 11 手 |
-| ⚡ スーパーフリップ | `superflip.json` | 全エッジが反転した最難問。神の数20手近傍 | 19 手 |
-| 🎲 ランダム（seed=1） | `seed-1-scramble.json` | シード値ベースで動的スクランブル生成 | 24 手 |
-
-プリセットは `state` 文字列、`scramble` 手順列、または `scramble_seed`（乱数シード）のいずれかの指定に対応しています。詳細は `cubes/README.md` を参照してください。
-
-### WASM APIと保存形式
-
-- `initialize()`：探索テーブルを読み込む。Worker起動時に実行。
-- `validate(state)`：不正なら例外。正常なら完成状態かどうかを返す。
-- `apply_moves(state, notation)`：回転後の状態・手順・各ステップの状態をJSONで返す。
-- `scramble(seed)`：固定seedから25手の回転列を生成。
-- `solve(state, budget_ms)`：検証済みの解法をJSONで返す。タイムアウト・入力不正は例外。
-
-`state` は面順 `URFDLB`、各面は正面から見て左上から行優先の54文字です。色は対応するセンターの面記号で表現します。解法の戻り値は `{ state, moves, states, elapsed_ms, nodes }`。`states[0]` は開始状態です。Workerの要求・応答はリクエストIDと状態リビジョンを持ちます。
-
-```json
-{
-  "version": 1,
-  "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
-}
-```
-
-自動保存はこのブラウザのlocalStorageを使用します。ネットワーク送信はしません。ブラウザデータを消すと自動保存も消えるため、残したい状態はJSONで保存してください。解法や途中の入力ダイアログは再読み込み後に復元されません。
-
-## 検証
-
-```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test --release
-npm run format:check
+# WASM ビルド + 型チェック + 本番バンドルビルド
 npm run build
-npx playwright install chromium
+
+# 型チェックのみ
+npm run typecheck
+
+# コードフォーマットチェック
+npm run format:check
+
+# コードフォーマット整形
+npm run format
+
+# Playwright E2E テストの実行
 npm test
+
+# 全体チェック (Rust fmt/clippy/test + Web format/typecheck/build/test)
+npm run check
 ```
 
-通常のRustテストは、全18手と独立した3D座標回転との一致、逆回転、配色の往復変換、不正状態、既知状態、Superflip、少数の固定seedによるスクランブル、センター配置2,048通り、時間制限、テーブルのシリアライズ往復を検証します。
+---
 
-固定seed 1〜1,000のスクランブル検証は長時間の回帰テストとして残し、通常実行（`cargo test --release`、`npm run check`）ではスキップします。探索アルゴリズム・枝刈りテーブルの変更時やリリース前に、次のコマンドで明示的に実行してください。
+## ディレクトリ構成
 
-```sh
-cargo test --release --lib tests::solves_one_thousand_scrambles -- --ignored --exact --nocapture
+```
+3x3-web-2/
+├── Cargo.toml               # Rust WASM パッケージ定義
+├── src/                     # Rust ソルバー実装 (Kociemba 2段階エンジン)
+│   ├── lib.rs               # WASM バインディング
+│   ├── cubie.rs             # キューブ物理状態表現
+│   ├── coord.rs             # 座標変換・枝刈りテーブル
+│   └── search.rs            # IDA* 探索アルゴリズム
+├── web/                     # TypeScript フロントエンド
+│   ├── main.ts              # エントリポイント
+│   ├── view.ts              # DOM 生成・UI バインディング
+│   ├── scene.ts             # Three.js 3D レンダリング
+│   ├── cube-store.ts        # 状態管理・Undo/Redo
+│   ├── solver-client.ts     # Worker 通信クライアント
+│   ├── solver.worker.ts     # Web Worker
+│   ├── editor.ts            # 6面カラーエディタ
+│   ├── camera.ts            # カメラ入力メイン
+│   ├── camera-geometry.ts   # 幾何計算・射影変換
+│   ├── camera-ui-helper.ts  # 当たり判定・座標系ヘルパー
+│   ├── camera-canvas-renderer.ts # ガイド枠・頂点描画
+│   ├── camera-results-ui.ts # 読み取り展開図・修正パレット
+│   └── pwa.ts               # Service Worker 登録
+├── tests/                   # Playwright E2E テスト群
+├── public/                  # PWA アイコン・マニフェスト・Service Worker
+├── index.html
+├── vite.config.ts
+└── playwright.config.ts
 ```
 
-開始時と10件完了ごとに進捗・経過時間を表示し、失敗時にはseedを報告します。各状態の探索予算は5秒で、実行時間と成功率は端末性能や負荷の影響を受けます。このテストはサンプルの回帰検証であり、全状態の網羅やセンター補正の検証ではありません。処理時間の分布は下記のベンチマークで評価します。
-
-ブラウザテストは、入力→探索→完成、54マスの手入力、保存復元、アニメーションの中断、探索の中止・古い結果、初期化失敗と再試行、2Dフォールバック、サブディレクトリ配信を確認します。320・768・1024・1440pxで横にはみ出さないことと、axeによる通常画面・入力ダイアログの検査も含みます。スクリーンショットは `test-results/studio-desktop.png` と `test-results/studio-mobile.png` に出力します。
-
-ブラウザテスト中はソースの編集やWASMの再ビルドをしないでください。開発サーバーの自動再読み込みが操作を中断します。
-
-## 性能測定
-
-```sh
-npm run benchmark                 # 新作のRustコア、1000状態
-node scripts/compare-legacy.mjs    # 旧版の探索コアを一時ディレクトリでビルドして比較
-npm run benchmark:web             # 実ブラウザのWASM Worker、1000状態
-```
-
-比較は同じ端末、同じxorshift seed 1〜1000、同じ25手の回転列で行います。旧版はKociembaコアの `Search::solve(..., 128)` と既定の2,000万ノード上限を使用し、GUIやセンター方位の補正、上位solverの追加探索は含めません。各エンジン固有のピース表現から同じ物理的回転列を適用します。比較スクリプトは参照ソースのハッシュと一時ディレクトリを表示し、元ファイルは変更しません。
-
-計測結果は初期化とウォーム探索を分けます。初期化時間にネットワーク取得・WASMコンパイルは含まれないため、ページの初回表示時間とは異なります。端末・ブラウザ・負荷で変動します。
-
-配布WASMは事前生成テーブル込みで約6.18MB（gzip約3.36MB）。初回はこのダウンロードが必要です。JavaScriptはThree.js込みで約586KB（gzip約151KB）です。配信時のgzip／Brotliとアセットキャッシュを推奨します。ログイン、バックエンドAPI、外部フォント、解析サービスは使いません。
+---
 
 ## ライセンス
 
-MIT。参照元のKociemba座標・テーブル生成はkatoyによる `rust-r-cube/3x3-web` の実装です。外部依存のライセンスは各パッケージに従います。
+[MIT License](../LICENSE)

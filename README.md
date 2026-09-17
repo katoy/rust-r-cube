@@ -4,7 +4,9 @@ Rustで実装された、高性能ソルバー搭載の2x2および3x3ルービ�
 
 [![2x2 Web Demo](https://img.shields.io/badge/2x2_demo-live-success)](https://katoy.github.io/rust-r-cube/)
 [![3x3 Web Demo](https://img.shields.io/badge/3x3_demo-live-success)](https://katoy.github.io/rust-r-cube/3x3/)
+[![Cube Studio (3x3 v2)](https://img.shields.io/badge/Cube_Studio_(3x3_v2)-live-success)](https://katoy.github.io/rust-r-cube/3x3-v2/)
 [![CI](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml/badge.svg)](#)
+[![3x3-web-2 CI](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml/badge.svg)](#)
 [![License](https://img.shields.io/badge/license-MIT-green)](#)
 
 ---
@@ -27,6 +29,16 @@ Rustで実装された、高性能ソルバー搭載の2x2および3x3ルービ�
 ブラウザ上（WebAssembly）およびデスクトップ環境で動作する3x3ルービックキューブのアプリケーションです。
 - **特徴**: Kociembaの2段階アルゴリズム（Two-Phase Algorithm）を搭載し、どのような状態からでも瞬時（数ミリ秒〜200ミリ秒）に20手前後の解法を提示。さらに、スーパーキューブ（センター方位）の解決にも完全対応。
 - **技術詳細**: `eframe` (egui) によるGUI、WASM/`trunk` によるWebサポート。
+
+### 4. [3x3-web-2 (Cube Studio - 次世代Web/PWA版)](./3x3-web-2/)
+Three.js + TypeScript + Rust (WASM WebWorker) によるモダンでリッチな 3×3×3 ルービックキューブ アプリケーションです。
+- **特徴**:
+  - Web Worker による完全非同期の Kociemba 2段階ソルバー（UIフリーズなし）。
+  - Three.js による高品質3Dアニメーションと、WebGL非対応時の2D展開図自動フォールバック。
+  - PWA による完全なオフライン起動＆ホーム画面インストール対応。
+  - 2方向写真からのカラー一括スキャン＆補正パレット。
+  - 初心者向けガイダンス（回転記号早見表・ツールチップ）、自動スクロール付き再生コントロール。
+- **技術詳細**: Vite 8, Three.js, wasm-bindgen, Playwright E2E。
 
 ---
 

@@ -26,6 +26,14 @@ export const FACE_NAMES: Record<string, string> = {
   L: "左面",
   B: "背面",
 };
+export const FACE_NAMES_EN: Record<string, string> = {
+  U: "上面 (Up)",
+  R: "右面 (Right)",
+  F: "前面 (Front)",
+  D: "下面 (Down)",
+  L: "左面 (Left)",
+  B: "背面 (Back)",
+};
 export interface ResultData {
   state: string;
   moves: string[];

@@ -929,6 +929,39 @@ dialog > p {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+.help-notation-table {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.help-notation-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.help-notation-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.help-notation-table th,
+.help-notation-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.help-notation-table th {
+  color: var(--text-secondary, #a0a0a0);
+  font-weight: 500;
+}
+.help-notation-table td strong {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-primary, #ffffff);
+}
 #fallback {
   padding: 90px 28px 30px;
   min-height: 450px;

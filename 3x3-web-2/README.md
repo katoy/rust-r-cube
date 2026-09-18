@@ -90,7 +90,7 @@ flowchart TD
 - **Node.js**: v20 以上
 - **npm**: v10 以上
 
-### コマンド
+### 起動・開発コマンド
 
 ```bash
 # 依存関係のインストール
@@ -99,16 +99,22 @@ npm install
 # 開発サーバーの起動 (Vite)
 npm run dev
 
-# WASM ビルド + 型チェック + 本番バンドルビルド
+# またはヘルパースクリプトでの起動（WASM自動チェック/再ビルド付き）
+./start.sh
+./start.sh --preview   # 本番ビルドを作成しローカルプレビュー起動
+./start.sh --build     # WASM を再コンパイルしてから起動
+
+# WASM ビルド + 型チェック + 本番バンドルビルド (dist/ を生成)
 npm run build
+
+# 本番ビルドのローカルプレビュー
+npm run preview
 
 # 型チェックのみ
 npm run typecheck
 
-# コードフォーマットチェック
+# コードフォーマットチェック / 整形
 npm run format:check
-
-# コードフォーマット整形
 npm run format
 
 # Playwright E2E テストの実行
@@ -116,6 +122,27 @@ npm test
 
 # 全体チェック (Rust fmt/clippy/test + Web format/typecheck/build/test)
 npm run check
+```
+
+---
+
+## デプロイ (GitHub Pages / 静的ホスティング)
+
+### 1. GitHub Actions による自動デプロイ
+リポジトリの `main` ブランチに push またはマージされると、GitHub Actions ワークフロー（`.github/workflows/deploy-pages.yml`）が起動します。
+本モジュールは `npm run build` により `dist/` が生成され、GitHub Pages の `/3x3-v2/` パスに自動配置されます。
+
+- **公開 URL**: `https://<user>.github.io/rust-r-cube/3x3-v2/`
+
+### 2. 手動・他の静的ホスティングへのデプロイ
+Vite の設定で相対パスベース（`base: "./"`）にビルドされるため、生成された `dist/` フォルダをそのまま任意の静的ウェブサーバー（GitHub Pages, Cloudflare Pages, Vercel, Netlify, Nginx, S3 等）に配置するだけで動作します。
+
+```bash
+# 本番向け成果物の生成 (dist/ ディレクトリ)
+npm run build
+
+# 生成された dist/ をプレビュー確認
+npm run preview
 ```
 
 ---

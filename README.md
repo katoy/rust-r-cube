@@ -86,6 +86,25 @@ trunk serve --open
 ```
 ※ Web版の起動には `trunk` のインストールが必要です: `cargo install trunk`
 
+### 4. 3x3-web-2 (Cube Studio) Web版の起動 (開発サーバー)
+```bash
+cd 3x3-web-2
+npm install
+npm run dev
+```
+
+---
+
+## デプロイ (GitHub Pages)
+
+本リポジトリの `main` ブランチにプッシュされると、GitHub Actions ワークフロー（[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)）が自動実行され、GitHub Pages に一括デプロイされます。
+
+- **ルート (`/`)**: 2x2 Web版
+- **`/3x3/`**: 3x3 Web版 (Trunk / egui)
+- **`/3x3-v2/`**: 3x3-web-2 (Cube Studio / Three.js + Vite)
+
+各Webアプリは静的ファイル（HTML, JS, CSS, WASM）として生成されるため、GitHub Pages のほか、Cloudflare Pages、Vercel、Netlify 等の任意の静的ホスティング環境にもデプロイ可能です。
+
 ---
 
 ## 技術スタック

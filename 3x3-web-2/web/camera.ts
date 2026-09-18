@@ -32,6 +32,7 @@ export class TwoViewCamera {
   private dragMoved = false;
   private mediaStream?: MediaStream;
   private isStreaming = false;
+  private streamRafId?: number;
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -777,7 +778,7 @@ export class TwoViewCamera {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       }
     }
-    requestAnimationFrame(() => this.renderLiveStream());
+    this.streamRafId = requestAnimationFrame(() => this.renderLiveStream());
   }
 
   public captureLiveFrame() {
@@ -806,6 +807,10 @@ export class TwoViewCamera {
 
   public stopLiveStream() {
     this.isStreaming = false;
+    if (this.streamRafId !== undefined) {
+      cancelAnimationFrame(this.streamRafId);
+      this.streamRafId = undefined;
+    }
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = undefined;

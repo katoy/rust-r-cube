@@ -111,7 +111,7 @@ pub(crate) fn parity(p: &[u8]) -> usize {
         % 2
 }
 pub fn facelets(cube: &RawCube) -> String {
-    let mut f = *SOLVED.as_bytes().first_chunk::<54>().unwrap();
+    let mut f = <[u8; 54]>::try_from(SOLVED.as_bytes()).unwrap();
     for (slot, indices) in CORNERS.iter().enumerate() {
         for n in 0..3 {
             f[indices[(n + cube.co[slot] as usize) % 3]] =

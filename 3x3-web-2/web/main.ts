@@ -18,8 +18,16 @@ import { registerServiceWorker } from "./pwa";
 import { sound } from "./sound";
 import { analyzeMoves } from "./triggers";
 
+declare global {
+  interface Window {
+    cube_store?: CubeStore;
+    cube_scene?: CubeScene;
+    cube_studio?: typeof cubeStudio;
+  }
+}
+
 const store = new CubeStore();
-(window as any).cube_store = store;
+window.cube_store = store;
 
 mount();
 registerServiceWorker();
@@ -230,7 +238,7 @@ function fallback() {
 }
 try {
   scene = new CubeScene($("scene"));
-  (window as any).cube_scene = scene;
+  window.cube_scene = scene;
   $("scene").addEventListener("render-failed", fallback);
 } catch {
   fallback();
@@ -696,7 +704,7 @@ refresh();
 async function start() {
   try {
     await init({ module_or_path: wasmUrl });
-    (window as any).cube_studio = cubeStudio;
+    window.cube_studio = cubeStudio;
     mainReady = true;
     try {
       const raw = localStorage.getItem(storageKey);

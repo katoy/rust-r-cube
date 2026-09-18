@@ -412,14 +412,6 @@ export class CubeScene {
     }
   }
 
-  private getCenter(indices: number[]): THREE.Vector3 {
-    const center = new THREE.Vector3();
-    indices.forEach((idx) => {
-      center.add(this.stickers[idx].position);
-    });
-    center.divideScalar(indices.length);
-    return center;
-  }
   async turn(move: string, state: string, duration: number) {
     this.finish();
     if (duration <= 0) {

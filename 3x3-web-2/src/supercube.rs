@@ -65,7 +65,8 @@ pub fn rotate_center_180(face: usize) -> Vec<usize> {
         2 => ("U", "D"),
         3 => ("R", "L"),
         4 => ("U", "D"),
-        _ => ("U", "D"),
+        5 => ("U", "D"),
+        _ => unreachable!("face index must be 0..5, got {face}"),
     };
     let x = names[face];
     let alg = format!("{x} {a} {b} {x}2 {a}' {b}' {x} {a} {b} {x}2 {a}' {b}'");

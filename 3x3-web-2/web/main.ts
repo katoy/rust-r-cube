@@ -16,6 +16,7 @@ import {
 
 import { registerServiceWorker } from "./pwa";
 import { sound } from "./sound";
+import { analyzeMoves } from "./triggers";
 
 const store = new CubeStore();
 (window as any).cube_store = store;
@@ -142,11 +143,25 @@ function refresh() {
       `${solution.elapsed_ms < 1000 ? `${Math.round(solution.elapsed_ms)} ms` : `${(solution.elapsed_ms / 1000).toFixed(2)} 秒`} · 検証済み`;
     const list = $("move-list");
     list.replaceChildren();
-    solution.moves.forEach((move, i) => {
+    const analyzed = analyzeMoves(solution.moves);
+    analyzed.forEach((meta, i) => {
+      if (i === 0 || meta.phase !== analyzed[i - 1].phase) {
+        const phaseBadge = document.createElement("span");
+        phaseBadge.className = `phase-badge phase-${meta.phase}`;
+        phaseBadge.textContent = meta.phaseLabel;
+        list.append(phaseBadge);
+      }
       const button = document.createElement("button");
       button.className = `solution-move ${i < step ? "done" : ""} ${i === step ? "current" : ""}`;
-      button.textContent = move;
-      button.setAttribute("aria-label", `${i + 1}手目 ${move} の直後へ移動`);
+      button.dataset.step = String(i);
+      button.textContent = meta.move;
+      const titleParts = [meta.phaseLabel];
+      if (meta.trigger) titleParts.push(`[${meta.trigger}]`);
+      button.title = titleParts.join(" ");
+      button.setAttribute(
+        "aria-label",
+        `${i + 1}手目 ${meta.move} (${meta.phaseLabel}${meta.trigger ? `, ${meta.trigger}` : ""}) の直後へ移動`,
+      );
       if (i === step) button.setAttribute("aria-current", "step");
       button.onclick = () => {
         stop();
@@ -155,8 +170,12 @@ function refresh() {
       list.append(button);
     });
     $("next-symbol").textContent = next || "✓";
+    const currentMeta = analyzed[step];
+    const phasePrefix = currentMeta
+      ? `【${currentMeta.phaseLabel}${currentMeta.trigger ? ` · ${currentMeta.trigger}` : ""}】 `
+      : "";
     $("next-instruction").textContent = next
-      ? instruction(next)
+      ? `${phasePrefix}${instruction(next)}`
       : "6面が揃いました。おつかれさまでした。";
     $("step-count").textContent = `${step} / ${solution.moves.length}`;
     $("play").innerHTML = icon(playing ? "pause" : "play");
@@ -172,7 +191,9 @@ function refresh() {
     if (step === 0) {
       list.scrollTop = 0;
     } else {
-      const currentButton = list.children[step] as HTMLElement | undefined;
+      const currentButton = list.querySelector(
+        `[data-step="${step}"]`,
+      ) as HTMLElement | null;
       if (currentButton) {
         currentButton.scrollIntoView({ block: "nearest", inline: "nearest" });
       } else if (step === solution.moves.length && list.lastElementChild) {

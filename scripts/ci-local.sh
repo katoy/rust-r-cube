@@ -19,7 +19,7 @@ else
   echo "sccache not found: proceeding without compiler cache"
 fi
 
-PROJECTS=("2x2" "2x2-web" "3x3-web")
+PROJECTS=("2x2" "2x2-web" "3x3-web" "3x3-web-2")
 
 for proj in "${PROJECTS[@]}"; do
   echo "========================================"
@@ -43,6 +43,13 @@ for proj in "${PROJECTS[@]}"; do
     
     echo "-- cargo test --"
     cargo test --verbose
+
+    if [ "${proj}" = "3x3-web-2" ] && command -v npm >/dev/null 2>&1; then
+      echo "-- 3x3-web-2 web checks: format, typecheck, build --"
+      npm run format:check
+      npm run typecheck
+      npm run build
+    fi
   )
 done
 

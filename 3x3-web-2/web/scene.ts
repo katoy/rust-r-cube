@@ -264,7 +264,23 @@ export class CubeScene {
     this.renderer.setSize(w, h);
   }
   resetView() {
-    this.camera.position.set(7, 5.5, 8.5);
+    this.setViewPreset("iso");
+  }
+  setViewPreset(preset: "iso" | "front" | "top" | "right") {
+    switch (preset) {
+      case "iso":
+        this.camera.position.set(7, 5.5, 8.5);
+        break;
+      case "front":
+        this.camera.position.set(0, 0, 11.5);
+        break;
+      case "top":
+        this.camera.position.set(0, 11.5, 0.001);
+        break;
+      case "right":
+        this.camera.position.set(11.5, 0, 0);
+        break;
+    }
     this.controls.target.set(0, 0, 0);
     this.controls.update();
   }

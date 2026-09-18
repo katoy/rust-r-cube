@@ -275,6 +275,35 @@ h1 {
   width: 15px;
   height: 15px;
 }
+.view-presets {
+  display: inline-flex;
+  align-items: center;
+  background: #182017;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.view-preset-btn {
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.view-preset-btn:hover {
+  color: var(--text);
+}
+.view-preset-btn.active {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
 .manual-controls {
   border-top: 1px solid #3a4437;
   padding: 20px 28px 16px;

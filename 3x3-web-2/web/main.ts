@@ -223,6 +223,9 @@ function fallback() {
   $("scene").hidden = true;
   $("fallback").hidden = false;
   $("view-reset").hidden = true;
+  document
+    .querySelector<HTMLElement>(".view-presets")
+    ?.setAttribute("hidden", "");
   document.querySelector<HTMLElement>(".gesture")!.hidden = true;
 }
 try {
@@ -471,7 +474,22 @@ $("redo").onclick = () => {
   if (store.redo()) message();
 };
 $("reset").onclick = () => replace(SOLVED);
-$("view-reset").onclick = () => scene?.resetView();
+const viewPresets = ["iso", "front", "top", "right"] as const;
+function updateActivePreset(presetName: (typeof viewPresets)[number]) {
+  viewPresets.forEach((name) => {
+    $(`view-preset-${name}`).classList.toggle("active", name === presetName);
+  });
+}
+viewPresets.forEach((preset) => {
+  $(`view-preset-${preset}`).onclick = () => {
+    scene?.setViewPreset(preset);
+    updateActivePreset(preset);
+  };
+});
+$("view-reset").onclick = () => {
+  scene?.resetView();
+  updateActivePreset("iso");
+};
 $("first").onclick = () => {
   stop();
   void seek(0, false);

@@ -21,9 +21,6 @@ export function renderPalette(options: PaletteOptions): void {
     button.className = "color-choice";
     button.setAttribute("role", "radio");
     button.setAttribute("aria-checked", String(selectedColor === c));
-    if (selectedColor === c) {
-      button.setAttribute("aria-pressed", "true");
-    }
     button.setAttribute("aria-label", `${NAMES[c]}を選択`);
 
     const swatch = document.createElement("i");

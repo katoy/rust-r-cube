@@ -542,6 +542,17 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
     }
   };
 });
+$("share-link").onclick = async () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("alg");
+  url.searchParams.set("state", store.getState());
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    message("共有リンクをクリップボードにコピーしました。");
+  } catch {
+    message(`共有リンク: ${url.toString()}`);
+  }
+};
 $("save").onclick = () => {
   const blob = new Blob(
     [JSON.stringify({ version: 1, ...store.getSnapshot() }, null, 2)],
@@ -686,6 +697,27 @@ async function start() {
     } catch {
       message("保存状態を復元できなかったため、完成状態から開始しました。");
     }
+
+    const params = new URLSearchParams(window.location.search);
+    const stateParam = params.get("state");
+    const algParam = params.get("alg");
+    if (stateParam && stateParam.length === 54) {
+      try {
+        validate(stateParam);
+        const restoredCenters = automaticCenters(stateParam);
+        store.replace(stateParam, false, restoredCenters);
+      } catch {
+        // 不正な state は無視
+      }
+    } else if (algParam) {
+      try {
+        const cleanAlg = algParam.replace(/\+/g, " ");
+        await applyAlgorithm(cleanAlg, false);
+      } catch {
+        // 不正な alg は無視
+      }
+    }
+
     solver = new SolverClient((status, text) => {
       engineError = status === "error";
       $("engine-status").textContent =

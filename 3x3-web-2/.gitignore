@@ -9,6 +9,8 @@
 /playwright-report/
 /benchmark-results/
 /test-images/
+/coverage-e2e/
+/coverage-e2e-advanced/
 
 # OS and editor artifacts
 .DS_Store

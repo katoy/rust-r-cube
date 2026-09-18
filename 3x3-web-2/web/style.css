@@ -1249,6 +1249,12 @@ dialog > p {
   border-color: var(--accent);
   box-shadow: 0 0 12px rgba(196, 237, 148, 0.3);
 }
+.camera-live-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
 .camera-files {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

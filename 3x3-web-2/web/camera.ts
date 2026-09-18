@@ -30,6 +30,8 @@ export class TwoViewCamera {
   private draggingIndex = -1; // 0..5: points, 6: centerPoint
   private hoverIndex = -1; // 0..5: points, 6: centerPoint
   private dragMoved = false;
+  private mediaStream?: MediaStream;
+  private isStreaming = false;
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -227,6 +229,14 @@ export class TwoViewCamera {
     this.setupDropZone($("camera-drop-a"), inputA, "A");
     this.setupDropZone($("camera-drop-b"), inputB, "B");
     this.setupCanvasDrop(canvas);
+
+    const liveBtn = $("camera-live-stream");
+    const takePhotoBtn = $("camera-take-photo");
+    const stopStreamBtn = $("camera-stop-stream");
+
+    if (liveBtn) liveBtn.onclick = () => void this.startLiveStream();
+    if (takePhotoBtn) takePhotoBtn.onclick = () => this.captureLiveFrame();
+    if (stopStreamBtn) stopStreamBtn.onclick = () => this.stopLiveStream();
 
     $("camera-capture").onclick = () => this.capture();
     $("camera-apply").onclick = () => {
@@ -723,7 +733,96 @@ export class TwoViewCamera {
     $("camera-error").textContent = message;
   }
 
+  public async startLiveStream() {
+    this.error("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.error(
+        "お使いの環境ではライブカメラ（getUserMedia）をご利用いただけません。画像ファイルを選択してください。",
+      );
+      return;
+    }
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
+      });
+      const video = $("camera-video") as HTMLVideoElement;
+      video.srcObject = this.mediaStream;
+      await video.play();
+      this.isStreaming = true;
+      $("camera-live-stream").hidden = true;
+      $("camera-take-photo").hidden = false;
+      $("camera-stop-stream").hidden = false;
+      $("camera-help").textContent =
+        "キューブをカメラに向けて「📸 この映像で取り込む」をクリックしてください。";
+      this.renderLiveStream();
+    } catch {
+      this.error(
+        "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
+      );
+    }
+  }
+
+  private renderLiveStream() {
+    if (!this.isStreaming) return;
+    const video = $("camera-video") as HTMLVideoElement | null;
+    if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      const canvas = this.canvas;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+    }
+    requestAnimationFrame(() => this.renderLiveStream());
+  }
+
+  public captureLiveFrame() {
+    const video = $("camera-video") as HTMLVideoElement | null;
+    if (!this.isStreaming || !video) return;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = video.videoWidth || 640;
+    offscreen.height = video.videoHeight || 480;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+
+    offscreen.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `camera-${this.currentView}.jpg`, {
+          type: "image/jpeg",
+        });
+        this.stopLiveStream();
+        void this.processFile(file, this.currentView);
+      },
+      "image/jpeg",
+      0.92,
+    );
+  }
+
+  public stopLiveStream() {
+    this.isStreaming = false;
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream = undefined;
+    }
+    const video = $("camera-video") as HTMLVideoElement | null;
+    if (video) video.srcObject = null;
+    const liveBtn = $("camera-live-stream");
+    const takeBtn = $("camera-take-photo");
+    const stopBtn = $("camera-stop-stream");
+    if (liveBtn) liveBtn.hidden = false;
+    if (takeBtn) takeBtn.hidden = true;
+    if (stopBtn) stopBtn.hidden = true;
+    this.draw();
+  }
+
   private close() {
+    this.stopLiveStream();
     ($("camera-editor") as HTMLDialogElement).close();
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);

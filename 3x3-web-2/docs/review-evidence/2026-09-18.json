@@ -1,0 +1,253 @@
+{
+  "reviewedCommit": "c3930bc014378701fd9f7a85b0568fd3551f453d",
+  "environment": {
+    "browser": "Chromium (Playwright 1.63.0)",
+    "camera": "fake device; real camera not used"
+  },
+  "records": [
+    {
+      "name": "algorithm-reload",
+      "result": {
+        "first": {
+          "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+          "centerTurns": [0, 1, 0, 0, 0, 0]
+        },
+        "second": {
+          "state": "UUDUUDUUDRRRRRRRRRFFBFFBFFBDDUDDUDDULLLLLLLLLFBBFBBFBB",
+          "centerTurns": [0, 2, 0, 0, 0, 0]
+        },
+        "r2": "UUDUUDUUDRRRRRRRRRFFBFFBFFBDDUDDUDDULLLLLLLLLFBBFBBFBB"
+      }
+    },
+    {
+      "name": "nested-preset",
+      "result": {
+        "status": "❌ 読み込み失敗 (HTTP 404: ファイルが見つかりません (http://127.0.0.1:4173/cubes/easy-5-moves.json))",
+        "responses": [
+          {
+            "url": "http://127.0.0.1:4173/cubes/easy-5-moves.json",
+            "status": 404
+          }
+        ]
+      }
+    },
+    {
+      "name": "camera-escape",
+      "result": {
+        "dialogOpen": false,
+        "trackState": "live",
+        "videoStillAttached": true
+      }
+    },
+    {
+      "name": "storage-blocked-startup",
+      "result": {
+        "appChildren": 0,
+        "errors": ["SecurityError: Storage blocked"]
+      }
+    },
+    {
+      "name": "share-centers",
+      "result": {
+        "before": {
+          "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+          "centerTurns": [2, 0, 0, 0, 0, 0]
+        },
+        "url": "http://127.0.0.1:5173/?state=UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+        "after": {
+          "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+          "centerTurns": [0, 0, 0, 0, 0, 0]
+        }
+      }
+    },
+    {
+      "name": "first-visit-offline",
+      "result": {
+        "cached": [
+          "http://127.0.0.1:4173/nested/cube/",
+          "http://127.0.0.1:4173/nested/cube/index.html",
+          "http://127.0.0.1:4173/nested/cube/manifest.webmanifest",
+          "http://127.0.0.1:4173/nested/cube/icon.svg",
+          "http://127.0.0.1:4173/nested/cube/icon-192.png",
+          "http://127.0.0.1:4173/nested/cube/icon-512.png",
+          "http://127.0.0.1:4173/nested/cube/assets/solver.worker-CG9h_1ED.js",
+          "http://127.0.0.1:4173/nested/cube/assets/cube_studio_bg-CWHtzO1x.wasm"
+        ],
+        "engineCount": 0,
+        "bodyText": ""
+      }
+    },
+    {
+      "name": "foreign-cache-deletion",
+      "result": {
+        "before": ["another-app-v1"],
+        "after": ["cube-studio-v1"]
+      }
+    },
+    {
+      "name": "preferences-reload",
+      "result": {
+        "before": {
+          "speed": "250",
+          "reduced": true,
+          "saved": {
+            "version": 1,
+            "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+            "centerTurns": [0, 1, 0, 0, 0, 0],
+            "reducedMotion": true,
+            "speed": "250"
+          }
+        },
+        "first": {
+          "speed": "250",
+          "reduced": true,
+          "saved": {
+            "version": 1,
+            "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+            "centerTurns": [0, 1, 0, 0, 0, 0],
+            "reducedMotion": false,
+            "speed": "500"
+          }
+        },
+        "second": {
+          "speed": "500",
+          "reduced": false,
+          "saved": {
+            "version": 1,
+            "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+            "centerTurns": [0, 1, 0, 0, 0, 0],
+            "reducedMotion": false,
+            "speed": "500"
+          }
+        }
+      }
+    },
+    {
+      "name": "arrow-physical-direction",
+      "result": {
+        "storedTurns": [1, 0, 0, 0, 0, 0],
+        "metadataAngle": 1.5707963267948966,
+        "actualArrowDirection": [
+          -1, -2.220446049250313e-16, -1.1102230246251565e-16
+        ],
+        "expectedClockwiseUDirection": [1, 0, 0],
+        "netLabel": "→"
+      }
+    },
+    {
+      "name": "tabs-arrow-navigation",
+      "result": {
+        "focused": ["tab-presets", "tab-colors", "tab-scramble", "tab-presets"],
+        "tabCount": 4
+      }
+    },
+    {
+      "name": "camera-unknown-centers",
+      "result": {
+        "camera": [
+          {
+            "face": "U",
+            "color": "?",
+            "disabled": true
+          },
+          {
+            "face": "R",
+            "color": "?",
+            "disabled": true
+          },
+          {
+            "face": "F",
+            "color": "?",
+            "disabled": true
+          },
+          {
+            "face": "D",
+            "color": "?",
+            "disabled": true
+          },
+          {
+            "face": "L",
+            "color": "?",
+            "disabled": true
+          },
+          {
+            "face": "B",
+            "color": "?",
+            "disabled": true
+          }
+        ],
+        "editor": ["?", "?", "?", "?", "?", "?"]
+      }
+    },
+    {
+      "name": "coverage-never-called",
+      "entry": {
+        "url": "review-probe.js",
+        "scriptId": "12",
+        "source": "window.reviewUsed = 1;\nfunction reviewNeverCalled() {\n  window.reviewNeverRan = 42;\n  window.reviewNeverRanAgain = 43;\n}\n//# sourceURL=review-probe.js",
+        "functions": [
+          {
+            "functionName": "",
+            "isBlockCoverage": true,
+            "ranges": [
+              {
+                "startOffset": 0,
+                "endOffset": 150,
+                "count": 1
+              }
+            ]
+          },
+          {
+            "functionName": "reviewNeverCalled",
+            "isBlockCoverage": false,
+            "ranges": [
+              {
+                "startOffset": 23,
+                "endOffset": 120,
+                "count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "reportedLines": [0, 1, 2, 3, 4, 5],
+      "reportedPercentage": 100,
+      "neverRan": "undefined"
+    },
+    {
+      "name": "clean-fixtures",
+      "result": {
+        "test": "tests/camera-input.spec.ts:23",
+        "setup": "Copied camera-input.spec.ts, test-utils.ts and package.json into a temporary directory, reused node_modules; no test-images directory.",
+        "passed": 0,
+        "failed": 1,
+        "error": "ENOENT: no such file or directory, open 'test-images/manifest.json'"
+      }
+    }
+  ],
+  "checks": {
+    "rust": {
+      "passed": 83,
+      "failed": 0,
+      "ignored": 1
+    },
+    "playwrightFull": {
+      "passed": 100,
+      "failed": 1,
+      "skipped": 1,
+      "failure": "coverage.spec.ts: browserContext.close trace file ENOENT"
+    },
+    "coverageRerun": {
+      "passed": 1,
+      "failed": 0
+    },
+    "npmAudit": {
+      "vulnerabilities": 0
+    },
+    "typecheck": "passed",
+    "prettier": "passed",
+    "rustfmt": "passed",
+    "clippy": "passed",
+    "build": "passed with Three.js chunk size warning"
+  }
+}

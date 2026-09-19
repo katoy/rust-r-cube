@@ -529,12 +529,12 @@ fn fail_solution(start_cube: &Cube, progress: &ProgressReporter) -> Solution {
     }
     progress.report(1.0);
     let mut msg = "解が見つかりませんでした。".to_string();
-    if !is_orientation_solvable(start_cube) {
-        let oris = get_orientations_vec(start_cube);
-        let sum: u32 = oris.iter().map(|&o| o as u32).sum();
+    let oris = get_orientations_vec(start_cube);
+    let total_ori: u32 = oris.iter().map(|&o| o as u32).sum();
+    if !total_ori.is_multiple_of(2) {
         msg += &format!(
             "方位パリティが異常(sum={})なため、現在の色配置のままでは解決不可能です。",
-            sum
+            total_ori
         );
     } else {
         msg += "物理的に不可能な状態か、探索深度（最大128手）を超えている可能性があります。";

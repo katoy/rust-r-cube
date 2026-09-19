@@ -1,0 +1,18 @@
+# Build and dependency artifacts
+/target/
+/node_modules/
+/dist/
+/pkg/
+
+# Test artifacts and reports
+/test-results/
+/playwright-report/
+/benchmark-results/
+/test-images/
+/coverage-e2e/
+/coverage-e2e-advanced/
+
+# OS and editor artifacts
+.DS_Store
+*.swp
+*~

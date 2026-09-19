@@ -40,7 +40,30 @@
   - リリースバイナリのビルド
   - アーティファクトのアップロード
 
-### 2. Release (リリース自動化)
+### 2. 3x3-web-2 CI (Cube Studio CI)
+**ファイル**: `.github/workflows/3x3-web-2.yml`
+
+- **トリガー**: `3x3-web-2/**` の push, PR
+- **実行内容**:
+  - Rust ツールチェーン & WASM ターゲット (`wasm32-unknown-unknown`) のセットアップ
+  - `wasm-pack` インストール
+  - Node.js 20 & npm 依存関係のインストール
+  - Playwright (Chromium) のセットアップ
+  - Rust チェック (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --release`)
+  - Web チェック (`npm run format:check`, `npm run typecheck`, `npm run build`)
+  - Playwright E2E テストの実行 (`npx playwright test`)
+  - テスト失敗時のレポート保存
+
+### 3. GitHub Pages デプロイ (deploy-pages)
+**ファイル**: `.github/workflows/deploy-pages.yml`
+
+- **トリガー**: `main` ブランチへの push, workflow_dispatch
+- **デプロイ先**:
+  - `/`: 2x2 Web (Trunk)
+  - `/3x3/`: 3x3 Web (Trunk)
+  - `/3x3-v2/`: 3x3 Cube Studio (wasm-pack + Vite)
+
+### 4. Release (リリース自動化)
 **ファイル**: `.github/workflows/release.yml`
 
 - **トリガー**: `v*` タグのプッシュ (例: `v1.0.0`)

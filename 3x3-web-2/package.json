@@ -1,0 +1,37 @@
+{
+  "name": "cube-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "./start.sh",
+    "wasm": "wasm-pack build --target web --release --out-dir pkg --no-pack",
+    "dev": "vite --host 127.0.0.1",
+    "build": "npm run wasm && npm run typecheck && vite build && node scripts/generate-sw-precache.js",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1",
+    "offline": "node scripts/launch-offline.js",
+    "start:offline": "node scripts/launch-offline.js",
+    "test": "playwright test",
+    "test:coverage": "playwright test tests/coverage.spec.ts",
+    "test:camera": "node scripts/generate-test-images.js && playwright test tests/camera-input.spec.ts tests/center-input.spec.ts",
+    "generate-test-images": "node scripts/generate-test-images.js",
+    "format": "prettier --write web tests scripts *.json *.ts",
+    "format:check": "prettier --check web tests scripts *.json *.ts",
+    "benchmark": "cargo run --release --bin benchmark",
+    "benchmark:web": "CUBE_BENCH=1 playwright test tests/performance.spec.ts --output=benchmark-results",
+    "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --release && npm run format:check && npm run build && npm test"
+  },
+  "dependencies": {
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/three": "0.185.4",
+    "canvas": "^3.2.3",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}

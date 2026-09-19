@@ -4,7 +4,9 @@ Rustで実装された、高性能ソルバー搭載の2x2および3x3ルービ�
 
 [![2x2 Web Demo](https://img.shields.io/badge/2x2_demo-live-success)](https://katoy.github.io/rust-r-cube/)
 [![3x3 Web Demo](https://img.shields.io/badge/3x3_demo-live-success)](https://katoy.github.io/rust-r-cube/3x3/)
+[![Cube Studio (3x3 v2)](https://img.shields.io/badge/Cube_Studio_(3x3_v2)-live-success)](https://katoy.github.io/rust-r-cube/3x3-v2/)
 [![CI](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml/badge.svg)](#)
+[![3x3-web-2 CI](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml/badge.svg)](#)
 [![License](https://img.shields.io/badge/license-MIT-green)](#)
 
 ---
@@ -27,6 +29,20 @@ Rustで実装された、高性能ソルバー搭載の2x2および3x3ルービ�
 ブラウザ上（WebAssembly）およびデスクトップ環境で動作する3x3ルービックキューブのアプリケーションです。
 - **特徴**: Kociembaの2段階アルゴリズム（Two-Phase Algorithm）を搭載し、どのような状態からでも瞬時（数ミリ秒〜200ミリ秒）に20手前後の解法を提示。さらに、スーパーキューブ（センター方位）の解決にも完全対応。
 - **技術詳細**: `eframe` (egui) によるGUI、WASM/`trunk` によるWebサポート。
+
+### 4. [3x3-web-2 (Cube Studio - 次世代Web/PWA版)](./3x3-web-2/)
+Three.js + TypeScript + Rust (WASM WebWorker) によるモダンでリッチな 3×3×3 ルービックキューブ アプリケーションです。
+- **特徴**:
+  - Web Worker による完全非同期の Kociemba 2段階ソルバー（UIフリーズなし）。
+  - Three.js による高品質3Dアニメーション、視点プリセット切替（標準・前・上・右）、WebGL非対応時の2D展開図自動フォールバック。
+  - PWA による完全なオフライン起動＆ホーム画面インストール対応（動的プリキャッシュ生成）。
+  - 解法フェーズ分解（Phase 1 / Phase 2）およびトリガームーブ（Sexy Move 等）の自動注釈。
+  - Web Audio API による効果音 & キーボード入力時の視覚的キーフィードバック。
+  - 状態・解法・センター方位の URL 共有リンク機能（ワンクリックコピー）。
+  - WCAG 2.1 AA 準拠のアクセシビリティ対応 & 自動監査テスト（axe-core）。
+  - WebRTC ライブカメラ映像 & 2方向写真からのカラー一括スキャン＆補正パレット。
+  - 初心者向けガイダンス（回転記号早見表・ツールチップ）、自動スクロール付き再生コントロール。
+- **技術詳細**: Vite 8, Three.js, wasm-bindgen, Web Audio API, Playwright E2E。
 
 ---
 
@@ -71,6 +87,25 @@ cd 3x3-web
 trunk serve --open
 ```
 ※ Web版の起動には `trunk` のインストールが必要です: `cargo install trunk`
+
+### 4. 3x3-web-2 (Cube Studio) Web版の起動 (開発サーバー)
+```bash
+cd 3x3-web-2
+npm install
+npm run dev
+```
+
+---
+
+## デプロイ (GitHub Pages)
+
+本リポジトリの `main` ブランチにプッシュされると、GitHub Actions ワークフロー（[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)）が自動実行され、GitHub Pages に一括デプロイされます。
+
+- **ルート (`/`)**: 2x2 Web版
+- **`/3x3/`**: 3x3 Web版 (Trunk / egui)
+- **`/3x3-v2/`**: 3x3-web-2 (Cube Studio / Three.js + Vite)
+
+各Webアプリは静的ファイル（HTML, JS, CSS, WASM）として生成されるため、GitHub Pages のほか、Cloudflare Pages、Vercel、Netlify 等の任意の静的ホスティング環境にもデプロイ可能です。
 
 ---
 

@@ -1,0 +1,897 @@
+import "./style.css";
+import init, * as cubeStudio from "../pkg/cube_studio";
+const { apply_moves, validate, scramble } = cubeStudio;
+import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
+import { SOLVED, FACES, inverse, instruction, type ResultData } from "./model";
+import { mount, icon, net } from "./view";
+import { CubeScene } from "./scene";
+import { SolverClient } from "./solver-client";
+import { CubeStore } from "./cube-store";
+import {
+  automaticCenters,
+  centerTurns,
+  centersFromInput,
+  rotateCenters,
+} from "./centers";
+
+import { registerServiceWorker } from "./pwa";
+import { sound } from "./sound";
+import { analyzeMoves } from "./triggers";
+
+declare global {
+  interface Window {
+    cube_store?: CubeStore;
+    cube_scene?: CubeScene;
+    cube_studio?: typeof cubeStudio;
+  }
+}
+
+const store = new CubeStore();
+window.cube_store = store;
+
+mount();
+registerServiceWorker();
+const $ = <T extends HTMLElement>(id: string) =>
+  document.getElementById(id) as T;
+const storageKey = "cube-studio-v1";
+let mainReady = false,
+  engineError = false,
+  solving = false;
+let playing = false,
+  motion = 0,
+  inMotion = false,
+  playbackRun = 0;
+let scene: CubeScene | undefined;
+let solver: SolverClient | undefined,
+  interval = 0;
+let restoring = true;
+const reduced = $<HTMLInputElement>("reduced-motion");
+reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const includeOrientation = $<HTMLInputElement>("include-orientation");
+includeOrientation.checked = true;
+
+const soundToggleBtn = $("sound-toggle");
+function updateSoundButton() {
+  const enabled = sound.isEnabled();
+  soundToggleBtn.setAttribute("aria-pressed", String(enabled));
+  soundToggleBtn.setAttribute(
+    "aria-label",
+    enabled ? "効果音をミュート" : "効果音を有効化",
+  );
+  soundToggleBtn.innerHTML = icon(enabled ? "volume" : "mute");
+}
+updateSoundButton();
+soundToggleBtn.onclick = () => {
+  sound.toggle();
+  updateSoundButton();
+};
+
+function message(text = "") {
+  $("message").textContent = text;
+}
+function stop() {
+  playing = false;
+  playbackRun++;
+  motion++;
+  scene?.finish();
+  inMotion = false;
+}
+function cancelSearch() {
+  if (solving) {
+    solving = false;
+    clearInterval(interval);
+    solver?.cancel();
+  }
+}
+function persist() {
+  if (restoring) return;
+  try {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        version: 1,
+        ...store.getSnapshot(),
+        reducedMotion: reduced.checked,
+        speed: $<HTMLSelectElement>("speed").value,
+      }),
+    );
+  } catch {
+    message(
+      "ブラウザの保存領域を利用できません。必要な状態は「保存」でダウンロードしてください。",
+    );
+  }
+}
+function replace(
+  next: string,
+  record = true,
+  centers = automaticCenters(next),
+) {
+  stop();
+  cancelSearch();
+  message();
+  store.replace(next, record, centers);
+}
+function refresh() {
+  const state = store.getState();
+  const solution = store.getSolution();
+  const step = store.getStep();
+  const centerRotations = store.getCenterRotations();
+  const next = solution?.moves[step] || "";
+  if (scene) {
+    scene.centerRotations = [...centerRotations];
+    if (!inMotion) scene.show(state, next);
+  }
+  net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
+  $("cube-status").textContent =
+    state === SOLVED
+      ? store.getCenterTurns().some((t) => t !== 0)
+        ? "色は完成・センターの向きあり"
+        : "完成状態"
+      : solution
+        ? `${step} / ${solution.moves.length} 手`
+        : "スクランブル状態";
+  $("scene").dataset.state = state;
+  $<HTMLButtonElement>("solve").disabled =
+    !mainReady || (!solver?.ready && !engineError) || solving;
+  $("solve").hidden = solving;
+  $("cancel").hidden = !solving;
+  $("solve").innerHTML =
+    `<span>${engineError ? "エンジンを再試行" : state === SOLVED ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
+  $<HTMLButtonElement>("undo").disabled = !mainReady || !store.canUndo();
+  $<HTMLButtonElement>("redo").disabled = !mainReady || !store.canRedo();
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load",
+    )
+    .forEach((b) => (b.disabled = !mainReady));
+  $("solution-empty").hidden = !!solution;
+  $("solution-content").hidden = !solution;
+  $<HTMLButtonElement>("copy").disabled = !solution;
+  if (solution) {
+    $("move-count").textContent = `${solution.moves.length} 手`;
+    $("solve-time").textContent =
+      `${solution.elapsed_ms < 1000 ? `${Math.round(solution.elapsed_ms)} ms` : `${(solution.elapsed_ms / 1000).toFixed(2)} 秒`} · 検証済み`;
+    const list = $("move-list");
+    list.replaceChildren();
+    const analyzed = analyzeMoves(solution.moves);
+    analyzed.forEach((meta, i) => {
+      if (i === 0 || meta.phase !== analyzed[i - 1].phase) {
+        const phaseBadge = document.createElement("span");
+        phaseBadge.className = `phase-badge phase-${meta.phase}`;
+        phaseBadge.textContent = meta.phaseLabel;
+        list.append(phaseBadge);
+      }
+      const button = document.createElement("button");
+      button.className = `solution-move ${i < step ? "done" : ""} ${i === step ? "current" : ""}`;
+      button.dataset.step = String(i);
+      button.textContent = meta.move;
+      const titleParts = [meta.phaseLabel];
+      if (meta.trigger) titleParts.push(`[${meta.trigger}]`);
+      button.title = titleParts.join(" ");
+      button.setAttribute(
+        "aria-label",
+        `${i + 1}手目 ${meta.move} (${meta.phaseLabel}${meta.trigger ? `, ${meta.trigger}` : ""}) の直後へ移動`,
+      );
+      if (i === step) button.setAttribute("aria-current", "step");
+      button.onclick = () => {
+        stop();
+        void seek(i + 1, false);
+      };
+      list.append(button);
+    });
+    $("next-symbol").textContent = next || "✓";
+    const currentMeta = analyzed[step];
+    const phasePrefix = currentMeta
+      ? `【${currentMeta.phaseLabel}${currentMeta.trigger ? ` · ${currentMeta.trigger}` : ""}】 `
+      : "";
+    $("next-instruction").textContent = next
+      ? `${phasePrefix}${instruction(next)}`
+      : "6面が揃いました。おつかれさまでした。";
+    $("step-count").textContent = `${step} / ${solution.moves.length}`;
+    $("play").innerHTML = icon(playing ? "pause" : "play");
+    $("play").setAttribute("aria-label", playing ? "一時停止" : "自動再生");
+    $<HTMLButtonElement>("play").disabled = solution.moves.length === 0;
+    $<HTMLButtonElement>("first").disabled = step === 0;
+    $<HTMLButtonElement>("prev").disabled = step === 0;
+    $<HTMLButtonElement>("next").disabled = step === solution.moves.length;
+    $<HTMLButtonElement>("last").disabled = step === solution.moves.length;
+    $<HTMLInputElement>("timeline").max = String(solution.moves.length);
+    $<HTMLInputElement>("timeline").value = String(step);
+
+    if (step === 0) {
+      list.scrollTop = 0;
+    } else {
+      const currentButton = list.querySelector(
+        `[data-step="${step}"]`,
+      ) as HTMLElement | null;
+      if (currentButton) {
+        currentButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } else if (step === solution.moves.length && list.lastElementChild) {
+        (list.lastElementChild as HTMLElement).scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+        });
+      }
+    }
+  }
+}
+store.subscribe((_s, { type }) => {
+  if (type === "modifier") {
+    const mod = store.getModifier();
+    $("prime").setAttribute("aria-pressed", String(mod === "'"));
+    $("double").setAttribute("aria-pressed", String(mod === "2"));
+    return;
+  }
+  if (type !== "solution") {
+    persist();
+  }
+  refresh();
+});
+function fallback() {
+  scene?.dispose();
+  scene = undefined;
+  $("scene").hidden = true;
+  $("fallback").hidden = false;
+  $("view-reset").hidden = true;
+  document
+    .querySelector<HTMLElement>(".view-presets")
+    ?.setAttribute("hidden", "");
+  document.querySelector<HTMLElement>(".gesture")!.hidden = true;
+}
+try {
+  scene = new CubeScene($("scene"));
+  window.cube_scene = scene;
+  $("scene").addEventListener("render-failed", fallback);
+} catch {
+  fallback();
+}
+async function seek(target: number, animate = true) {
+  const solution = store.getSolution();
+  if (!solution) return;
+  target = Math.max(0, Math.min(solution.moves.length, target));
+  const old = store.getStep();
+  const data = solution;
+  const token = ++motion;
+  scene?.finish();
+  const nextState = data.states[target];
+  const move =
+    target === old + 1
+      ? data.moves[old]
+      : target === old - 1
+        ? inverse(data.moves[target])
+        : undefined;
+  const traversed =
+    target > old
+      ? data.moves.slice(old, target)
+      : data.moves.slice(target, old).reverse().map(inverse);
+  const nextCenters = rotateCenters(store.getCenterRotations(), traversed);
+  inMotion = !!(animate && move && scene && !reduced.checked);
+  store.updateAfterSeek(nextState, nextCenters, target);
+  if (inMotion && move)
+    await scene!.turn(
+      move,
+      nextState,
+      Number($<HTMLSelectElement>("speed").value),
+    );
+  else if (animate && move && !scene && !reduced.checked)
+    await new Promise((resolve) =>
+      setTimeout(resolve, Number($<HTMLSelectElement>("speed").value)),
+    );
+  if (move) sound.playMove();
+  if (token === motion) {
+    inMotion = false;
+    refresh();
+    if (target === data.moves.length) {
+      sound.playSuccess();
+    }
+  }
+}
+async function play() {
+  const solution = store.getSolution();
+  if (!solution) return;
+  if (playing) {
+    stop();
+    refresh();
+    return;
+  }
+  stop();
+  if (store.getStep() === solution.moves.length) await seek(0, false);
+  playing = true;
+  refresh();
+  const data = solution;
+  const run = playbackRun;
+  while (
+    playing &&
+    run === playbackRun &&
+    store.getSolution() === data &&
+    store.getStep() < data.moves.length
+  ) {
+    await seek(store.getStep() + 1);
+    if (reduced.checked)
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          Math.max(
+            30,
+            Math.round(Number($<HTMLSelectElement>("speed").value) / 10),
+          ),
+        ),
+      );
+  }
+  if (store.getSolution() === data && run === playbackRun) {
+    playing = false;
+    refresh();
+  }
+}
+async function applyAlgorithm(algorithm: string, animate = true) {
+  if (!mainReady) return;
+  try {
+    const result: ResultData = JSON.parse(
+      apply_moves(store.getState(), algorithm),
+    );
+    stop();
+    cancelSearch();
+    message();
+    const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
+    const token = ++motion;
+    inMotion = !!(
+      animate &&
+      result.moves.length === 1 &&
+      scene &&
+      !reduced.checked
+    );
+    store.applyAlgorithmResult(result.state, nextCenters);
+    sound.playMove();
+    if (inMotion) {
+      await scene!.turn(
+        result.moves[0],
+        store.getState(),
+        Number($<HTMLSelectElement>("speed").value),
+      );
+    }
+    if (token === motion) {
+      inMotion = false;
+      refresh();
+      if (result.state === SOLVED) {
+        sound.playSuccess();
+      }
+    }
+  } catch (error) {
+    message(String(error));
+  }
+}
+async function solve(budget = 5000) {
+  if (engineError) {
+    engineError = false;
+    solver?.restart();
+    refresh();
+    return;
+  }
+  if (!solver?.ready || solving) return;
+  stop();
+  message();
+  $("extended").hidden = true;
+  try {
+    const currentState = store.getState();
+    validate(currentState);
+    solving = true;
+    const at = store.getRevision();
+    const start = performance.now();
+    refresh();
+    interval = window.setInterval(() => {
+      $("solver-note").textContent =
+        `探索中 · ${((performance.now() - start) / 1000).toFixed(1)} 秒 / ${budget / 1000} 秒`;
+    }, 100);
+    const result = await solver.solve(
+      currentState,
+      at,
+      budget,
+      includeOrientation.checked,
+      store.getCenterRotations(),
+    );
+
+    if (store.getRevision() !== at) return;
+    store.setSolution(result);
+    $("solver-note").textContent =
+      `${result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
+    if (result.moves.length === 0) message("すでに6面が揃っています。");
+  } catch (error) {
+    if (String(error).includes("cancelled")) return;
+    message(error instanceof Error ? error.message : String(error));
+    $("extended").hidden = false;
+  } finally {
+    solving = false;
+    clearInterval(interval);
+    refresh();
+  }
+}
+
+let editorInstance: import("./editor").ColorEditor | undefined;
+async function getEditor() {
+  if (!editorInstance) {
+    const { ColorEditor } = await import("./editor");
+    editorInstance = new ColorEditor(
+      (s) => validate(s),
+      (s, centers) => replace(s, true, centers),
+    );
+  }
+  return editorInstance;
+}
+
+let cameraInstance: import("./camera").TwoViewCamera | undefined;
+async function getCamera() {
+  if (!cameraInstance) {
+    const { TwoViewCamera } = await import("./camera");
+    cameraInstance = new TwoViewCamera(async (s) => {
+      let centers = [0, 0, 0, 0, 0, 0];
+      try {
+        centers = automaticCenters(s);
+      } catch {}
+      const ed = await getEditor();
+      ed.open(s, centers);
+    });
+  }
+  return cameraInstance;
+}
+
+$("edit-colors").onclick = async () => {
+  stop();
+  refresh();
+  const ed = await getEditor();
+  ed.open(store.getState(), store.getCenterRotations());
+};
+$("camera-colors").onclick = async () => {
+  const cam = await getCamera();
+  cam.open();
+};
+$("solve").onclick = () => void solve();
+$("extended").onclick = () => void solve(30000);
+$("cancel").onclick = () => {
+  cancelSearch();
+  message("探索を中止しました。");
+  $("solver-note").textContent = "エンジンを再準備しています";
+  refresh();
+};
+$("scramble").onclick = () => {
+  if (!mainReady) return;
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const algorithm = scramble(seed);
+  const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
+  replace(result.state, true, rotateCenters([0, 0, 0, 0, 0, 0], result.moves));
+  $("scramble-text").textContent = algorithm;
+};
+$("apply-algorithm").onclick = () =>
+  void applyAlgorithm($<HTMLTextAreaElement>("algorithm").value);
+document
+  .querySelectorAll<HTMLButtonElement>("[data-move]")
+  .forEach(
+    (button) =>
+      (button.onclick = (event) =>
+        void applyAlgorithm(
+          button.dataset.move! +
+            ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
+        )),
+  );
+function setModifier(value: "'" | "2") {
+  store.toggleModifier(value);
+}
+$("prime").onclick = () => setModifier("'");
+$("double").onclick = () => setModifier("2");
+$("undo").onclick = () => {
+  if (store.undo()) message();
+};
+$("redo").onclick = () => {
+  if (store.redo()) message();
+};
+$("reset").onclick = () => replace(SOLVED);
+const viewPresets = ["iso", "front", "top", "right"] as const;
+function updateActivePreset(presetName: (typeof viewPresets)[number]) {
+  viewPresets.forEach((name) => {
+    $(`view-preset-${name}`).classList.toggle("active", name === presetName);
+  });
+}
+viewPresets.forEach((preset) => {
+  $(`view-preset-${preset}`).onclick = () => {
+    scene?.setViewPreset(preset);
+    updateActivePreset(preset);
+  };
+});
+$("view-reset").onclick = () => {
+  scene?.resetView();
+  updateActivePreset("iso");
+};
+$("first").onclick = () => {
+  stop();
+  void seek(0, false);
+};
+$("prev").onclick = () => {
+  stop();
+  void seek(store.getStep() - 1);
+};
+$("next").onclick = () => {
+  stop();
+  void seek(store.getStep() + 1);
+};
+$("last").onclick = () => {
+  const solution = store.getSolution();
+  if (solution) {
+    stop();
+    void seek(solution.moves.length, false);
+  }
+};
+$("play").onclick = () => void play();
+$<HTMLInputElement>("timeline").oninput = () => {
+  stop();
+  void seek(Number($<HTMLInputElement>("timeline").value), false);
+};
+reduced.onchange = () => {
+  stop();
+  persist();
+  refresh();
+};
+$<HTMLSelectElement>("speed").onchange = persist;
+$("copy").onclick = async () => {
+  const solution = store.getSolution();
+  if (solution)
+    try {
+      await navigator.clipboard.writeText(solution.moves.join(" "));
+      message("解法をコピーしました。");
+    } catch {
+      message("コピーできませんでした。解法を選択してコピーしてください。");
+    }
+};
+$("help").onclick = () => {
+  stop();
+  refresh();
+  $<HTMLDialogElement>("help-dialog").showModal();
+};
+$("help-close").onclick = () => $<HTMLDialogElement>("help-dialog").close();
+document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
+  button.onclick = () => {
+    document
+      .querySelectorAll<HTMLButtonElement>("[data-tab]")
+      .forEach((tab) => {
+        const active = button === tab;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        $(`${tab.dataset.tab}-panel`).hidden = !active;
+      });
+  };
+  button.onkeydown = (event) => {
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      const tabs = Array.from(
+        document.querySelectorAll<HTMLButtonElement>("[data-tab]"),
+      );
+      const step = event.key === "ArrowRight" ? 1 : tabs.length - 1;
+      const target = tabs[(tabs.indexOf(button) + step) % tabs.length];
+      target.click();
+      target.focus();
+    }
+  };
+});
+$("share-link").onclick = async () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("alg");
+  url.searchParams.set("state", store.getState());
+  const snapshot = store.getSnapshot();
+  if (snapshot.centerTurns && snapshot.centerTurns.some((t) => t !== 0)) {
+    url.searchParams.set("centers", snapshot.centerTurns.join(","));
+  } else {
+    url.searchParams.delete("centers");
+  }
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    message("共有リンクをクリップボードにコピーしました。");
+  } catch {
+    message(`共有リンク: ${url.toString()}`);
+  }
+};
+$("save").onclick = () => {
+  const blob = new Blob(
+    [JSON.stringify({ version: 1, ...store.getSnapshot() }, null, 2)],
+    {
+      type: "application/json",
+    },
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "cube-studio.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+$("load").onclick = () => $<HTMLInputElement>("file").click();
+$<HTMLInputElement>("file").onchange = async () => {
+  const file = $<HTMLInputElement>("file").files?.[0];
+  if (!file) return;
+  const at = store.getRevision();
+  try {
+    if (file.size > 65536)
+      throw new Error("ファイルは64KB以内にしてください。");
+    const data: unknown = JSON.parse(await file.text());
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !("version" in data) ||
+      data.version !== 1 ||
+      !("state" in data) ||
+      typeof data.state !== "string"
+    )
+      throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
+    validate(data.state);
+    if (at !== store.getRevision())
+      throw new Error(
+        "読込中にキューブが変更されました。もう一度読み込んでください。",
+      );
+    replace(
+      data.state,
+      true,
+      centersFromInput(
+        data.state,
+        "centerTurns" in data ? data.centerTurns : undefined,
+      ),
+    );
+  } catch (error) {
+    message(String(error));
+  } finally {
+    $<HTMLInputElement>("file").value = "";
+  }
+};
+document.addEventListener("keydown", (event) => {
+  if (
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    document.querySelector("dialog[open]") ||
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement ||
+    event.target instanceof HTMLSelectElement
+  )
+    return;
+
+  const face = event.key.toUpperCase();
+  if (FACES.includes(face) && face.length === 1) {
+    const btn = document.querySelector(`button[data-move="${face}"]`);
+    btn?.classList.add("active-press");
+  } else if (event.key === "Shift") {
+    $("prime")?.classList.add("active-press");
+  }
+
+  if (!mainReady) return;
+  if (FACES.includes(face) && face.length === 1) {
+    event.preventDefault();
+    if (!event.repeat)
+      void applyAlgorithm(face + (event.shiftKey ? "'" : store.getModifier()));
+  } else if (
+    event.code === "Space" &&
+    !(event.target instanceof HTMLButtonElement)
+  ) {
+    event.preventDefault();
+    void play();
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    stop();
+    void seek(store.getStep() - 1);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    stop();
+    void seek(store.getStep() + 1);
+  } else if (event.key === "Home") {
+    const solution = store.getSolution();
+    if (solution) {
+      event.preventDefault();
+      stop();
+      void seek(0, false);
+    }
+  } else if (event.key === "End") {
+    const solution = store.getSolution();
+    if (solution) {
+      event.preventDefault();
+      stop();
+      void seek(solution.moves.length, false);
+    }
+  }
+});
+document.addEventListener("keyup", (event) => {
+  const face = event.key.toUpperCase();
+  if (FACES.includes(face) && face.length === 1) {
+    const btn = document.querySelector(`button[data-move="${face}"]`);
+    btn?.classList.remove("active-press");
+  } else if (event.key === "Shift") {
+    $("prime")?.classList.remove("active-press");
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stop();
+    refresh();
+  }
+});
+refresh();
+async function start() {
+  try {
+    await init({ module_or_path: wasmUrl });
+    window.cube_studio = cubeStudio;
+    mainReady = true;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.version !== 1 || typeof data.state !== "string")
+          throw new Error("format");
+        validate(data.state);
+        if (typeof data.reducedMotion === "boolean")
+          reduced.checked = data.reducedMotion;
+        if (["1000", "500", "250"].includes(data.speed))
+          $<HTMLSelectElement>("speed").value = data.speed;
+        const restoredCenters = centersFromInput(data.state, data.centerTurns);
+        store.replace(data.state, false, restoredCenters);
+      }
+    } catch {
+      message("保存状態を復元できなかったため、完成状態から開始しました。");
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const stateParam = params.get("state");
+    const centersParam = params.get("centers");
+    const algParam = params.get("alg");
+    if (stateParam && stateParam.length === 54) {
+      try {
+        validate(stateParam);
+        let restoredCenters: number[];
+        if (centersParam) {
+          const parsed = centersParam.split(",").map((v) => Number(v));
+          restoredCenters = centersFromInput(stateParam, parsed);
+        } else {
+          restoredCenters = automaticCenters(stateParam);
+        }
+        store.replace(stateParam, false, restoredCenters);
+      } catch {
+        // 不正な state は無視
+      }
+    } else if (algParam) {
+      try {
+        const cleanAlg = algParam.replace(/\+/g, " ");
+        const result: ResultData = JSON.parse(apply_moves(SOLVED, cleanAlg));
+        validate(result.state);
+        const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);
+        store.replace(result.state, false, nextCenters);
+      } catch {
+        // 不正な alg は無視（保存状態の局面を維持）
+      }
+    }
+    restoring = false;
+
+    solver = new SolverClient((status, text) => {
+      engineError = status === "error";
+      $("engine-status").textContent =
+        status === "ready"
+          ? "● READY"
+          : status === "error"
+            ? "読み込み失敗"
+            : "準備中";
+      $("engine-status").classList.toggle("ready", status === "ready");
+      if (!solving)
+        $("solver-note").textContent =
+          status === "ready" ? "ブラウザ内で計算 · 通常5秒以内" : text;
+      if (engineError) message(text);
+      queueMicrotask(refresh);
+    });
+    refresh();
+  } catch {
+    message(
+      "アプリを読み込めませんでした。接続を確認し、ページを再読み込みしてください。",
+    );
+    $("engine-status").textContent = "読み込み失敗";
+  }
+}
+
+// プリセット状態の定義
+const presets = [
+  { id: "solved", label: "完成状態", emoji: "✅" },
+  { id: "superflip", label: "スーパーフリップ", emoji: "⚡" },
+  { id: "easy-5-moves", label: "簡単（5手）", emoji: "🟢" },
+  { id: "t-perm", label: "T-Permutation", emoji: "🔄" },
+  { id: "seed-1-scramble", label: "ランダム（seed=1）", emoji: "🎲" },
+];
+
+// プリセットボタンを生成
+async function initializePresets() {
+  const presetButtons = $("preset-buttons");
+  const presetStatus = $("preset-status");
+
+  try {
+    for (const preset of presets) {
+      const button = document.createElement("button");
+      button.className = "secondary";
+      button.textContent = `${preset.emoji} ${preset.label}`;
+      button.onclick = async () => {
+        try {
+          presetStatus.textContent = "読み込み中…";
+          const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+            ? import.meta.env.BASE_URL
+            : `${import.meta.env.BASE_URL}/`;
+          const response = await fetch(`${baseUrl}cubes/${preset.id}.json`);
+          if (!response.ok) {
+            throw new Error(
+              `HTTP ${response.status}: ファイルが見つかりません (${response.url})`,
+            );
+          }
+          const data = await response.json();
+
+          // scramble_seed がある場合は WASM の scramble() で生成
+          if (typeof data.scramble_seed === "number") {
+            try {
+              const algorithm = scramble(data.scramble_seed);
+              const result: ResultData = JSON.parse(
+                apply_moves(SOLVED, algorithm),
+              );
+              replace(
+                result.state,
+                true,
+                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+              );
+              $("scramble-text").textContent = algorithm;
+            } catch (scrambleError) {
+              throw new Error(
+                `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+              );
+            }
+          }
+          // scramble 文字列がある場合
+          else if (typeof data.scramble === "string" && data.scramble.trim()) {
+            try {
+              const cleanedScramble = data.scramble.replace(
+                /(\b[URFDLB])\s+(\d|')/g,
+                "$1$2",
+              );
+              const result: ResultData = JSON.parse(
+                apply_moves(SOLVED, cleanedScramble),
+              );
+              replace(
+                result.state,
+                true,
+                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+              );
+              $("scramble-text").textContent = cleanedScramble;
+            } catch (scrambleError) {
+              throw new Error(
+                `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+              );
+            }
+          }
+          // state 文字列がある場合
+          else if (typeof data.state === "string" && data.state.trim()) {
+            validate(data.state);
+            replace(
+              data.state,
+              true,
+              centersFromInput(data.state, data.centerTurns),
+            );
+          } else {
+            throw new Error(
+              `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
+            );
+          }
+
+          presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
+        } catch (error) {
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
+          presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
+        }
+      };
+      presetButtons.append(button);
+    }
+    presetStatus.textContent =
+      "プリセットから選択してください（下のタブから 📌 プリセット）";
+  } catch (error) {
+    presetStatus.textContent = `初期化エラー: ${String(error)}`;
+  }
+}
+
+// プリセット初期化を開始
+initializePresets();
+
+void start();

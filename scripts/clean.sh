@@ -22,7 +22,12 @@ if [ -d "3x3-web" ]; then
   (cd 3x3-web && cargo clean && rm -rf dist coverage_detailed.txt)
 fi
 
+echo "== Cleaning 3x3-web-2 =="
+if [ -d "3x3-web-2" ]; then
+  (cd 3x3-web-2 && cargo clean && rm -rf dist pkg test-results playwright-report)
+fi
+
 echo "== Cleaning other temporary files =="
-rm -f .DS_Store 2x2/.DS_Store 2x2-web/.DS_Store 3x3-web/.DS_Store
+rm -f .DS_Store 2x2/.DS_Store 2x2-web/.DS_Store 3x3-web/.DS_Store 3x3-web-2/.DS_Store
 
 echo "== Clean completed successfully =="

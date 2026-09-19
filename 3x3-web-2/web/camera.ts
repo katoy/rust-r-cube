@@ -33,9 +33,13 @@ export class TwoViewCamera {
   private mediaStream?: MediaStream;
   private isStreaming = false;
   private streamRafId?: number;
+  private streamRequestId = 0;
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
+    const dialog = $("camera-editor") as HTMLDialogElement;
+    dialog.addEventListener("close", () => this.handleDialogClose());
+    dialog.addEventListener("cancel", () => this.handleDialogClose());
 
     const getCanvasCoords = (clientX: number, clientY: number) =>
       toCanvasCoords(canvas, clientX, clientY);
@@ -248,6 +252,7 @@ export class TwoViewCamera {
 
     this.initPalette();
     this.renderResults();
+    (window as any).__lastCamera = this;
   }
 
   private setupDropZone(
@@ -472,7 +477,8 @@ export class TwoViewCamera {
       }
 
       for (const { targetFace, sampled } of faceAssignments) {
-        this.faces[targetFace] = sampled;
+        const normalized = sampled.slice(0, 4) + targetFace + sampled.slice(5);
+        this.faces[targetFace] = normalized;
       }
 
       this.updateDetectedLabels();
@@ -742,8 +748,10 @@ export class TwoViewCamera {
       );
       return;
     }
+    const requestId = ++this.streamRequestId;
+    const dialog = $("camera-editor") as HTMLDialogElement;
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
           width: { ideal: 1280 },
@@ -751,9 +759,18 @@ export class TwoViewCamera {
         },
         audio: false,
       });
+      if (requestId !== this.streamRequestId || !dialog.open) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      this.mediaStream = stream;
       const video = $("camera-video") as HTMLVideoElement;
       video.srcObject = this.mediaStream;
       await video.play();
+      if (requestId !== this.streamRequestId || !dialog.open) {
+        this.stopLiveStream();
+        return;
+      }
       this.isStreaming = true;
       $("camera-live-stream").hidden = true;
       $("camera-take-photo").hidden = false;
@@ -762,9 +779,11 @@ export class TwoViewCamera {
         "キューブをカメラに向けて「📸 この映像で取り込む」をクリックしてください。";
       this.renderLiveStream();
     } catch {
-      this.error(
-        "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
-      );
+      if (requestId === this.streamRequestId && dialog.open) {
+        this.error(
+          "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
+        );
+      }
     }
   }
 
@@ -806,6 +825,7 @@ export class TwoViewCamera {
   }
 
   public stopLiveStream() {
+    this.streamRequestId++;
     this.isStreaming = false;
     if (this.streamRafId !== undefined) {
       cancelAnimationFrame(this.streamRafId);
@@ -826,13 +846,20 @@ export class TwoViewCamera {
     this.draw();
   }
 
-  private close() {
+  private handleDialogClose() {
     this.stopLiveStream();
-    ($("camera-editor") as HTMLDialogElement).close();
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
     this.sourceUrlA = undefined;
     this.sourceUrlB = undefined;
+  }
+
+  private close() {
+    const dialog = $("camera-editor") as HTMLDialogElement;
+    if (dialog.open) {
+      dialog.close();
+    }
+    this.handleDialogClose();
   }
 
   private get canvas() {

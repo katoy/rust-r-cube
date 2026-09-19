@@ -5,9 +5,13 @@ class SoundManager {
   private enabled: boolean = true;
 
   constructor() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    // デフォルトは有効
-    this.enabled = saved === null ? true : saved === "true";
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      // デフォルトは有効
+      this.enabled = saved === null ? true : saved === "true";
+    } catch {
+      this.enabled = true;
+    }
   }
 
   private initContext() {
@@ -31,7 +35,9 @@ class SoundManager {
 
   public toggle(): boolean {
     this.enabled = !this.enabled;
-    localStorage.setItem(STORAGE_KEY, String(this.enabled));
+    try {
+      localStorage.setItem(STORAGE_KEY, String(this.enabled));
+    } catch {}
     return this.enabled;
   }
 

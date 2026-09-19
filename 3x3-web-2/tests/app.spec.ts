@@ -206,6 +206,23 @@ test("production assets and worker load under a subdirectory", async ({
   expect(await state(page)).toBe(SOLVED);
   expect(errors).toEqual([]);
 });
+
+test("R04: presets load correctly under a subdirectory", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("http://127.0.0.1:4173/nested/cube/");
+  await expect(page.locator("#engine-status")).toContainText("READY");
+
+  await page.locator('button[data-tab="presets"]').click();
+  const firstPreset = page.locator("#preset-buttons button").first();
+  await firstPreset.click();
+
+  await expect(page.locator("#preset-status")).not.toContainText("エラー");
+  await expect(page.locator("#preset-status")).toContainText(
+    "を読み込みました",
+  );
+  expect(errors).toEqual([]);
+});
 test("worker loading failure offers retry", async ({ page }) => {
   await page.route("**/web/solver.worker.ts*", (route) => route.abort());
   await page.goto("/");

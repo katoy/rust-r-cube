@@ -44,6 +44,7 @@ let playing = false,
 let scene: CubeScene | undefined;
 let solver: SolverClient | undefined,
   interval = 0;
+let restoring = true;
 const reduced = $<HTMLInputElement>("reduced-motion");
 reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const includeOrientation = $<HTMLInputElement>("include-orientation");
@@ -83,6 +84,7 @@ function cancelSearch() {
   }
 }
 function persist() {
+  if (restoring) return;
   try {
     localStorage.setItem(
       storageKey,
@@ -561,8 +563,8 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
       const tabs = Array.from(
         document.querySelectorAll<HTMLButtonElement>("[data-tab]"),
       );
-      const target =
-        tabs[(tabs.indexOf(button) + (event.key === "ArrowRight" ? 1 : 2)) % 3];
+      const step = event.key === "ArrowRight" ? 1 : tabs.length - 1;
+      const target = tabs[(tabs.indexOf(button) + step) % tabs.length];
       target.click();
       target.focus();
     }
@@ -572,6 +574,12 @@ $("share-link").onclick = async () => {
   const url = new URL(window.location.href);
   url.searchParams.delete("alg");
   url.searchParams.set("state", store.getState());
+  const snapshot = store.getSnapshot();
+  if (snapshot.centerTurns && snapshot.centerTurns.some((t) => t !== 0)) {
+    url.searchParams.set("centers", snapshot.centerTurns.join(","));
+  } else {
+    url.searchParams.delete("centers");
+  }
   try {
     await navigator.clipboard.writeText(url.toString());
     message("共有リンクをクリップボードにコピーしました。");
@@ -713,12 +721,12 @@ async function start() {
         if (data.version !== 1 || typeof data.state !== "string")
           throw new Error("format");
         validate(data.state);
-        const restoredCenters = centersFromInput(data.state, data.centerTurns);
-        store.replace(data.state, false, restoredCenters);
         if (typeof data.reducedMotion === "boolean")
           reduced.checked = data.reducedMotion;
         if (["1000", "500", "250"].includes(data.speed))
           $<HTMLSelectElement>("speed").value = data.speed;
+        const restoredCenters = centersFromInput(data.state, data.centerTurns);
+        store.replace(data.state, false, restoredCenters);
       }
     } catch {
       message("保存状態を復元できなかったため、完成状態から開始しました。");
@@ -726,11 +734,18 @@ async function start() {
 
     const params = new URLSearchParams(window.location.search);
     const stateParam = params.get("state");
+    const centersParam = params.get("centers");
     const algParam = params.get("alg");
     if (stateParam && stateParam.length === 54) {
       try {
         validate(stateParam);
-        const restoredCenters = automaticCenters(stateParam);
+        let restoredCenters: number[];
+        if (centersParam) {
+          const parsed = centersParam.split(",").map((v) => Number(v));
+          restoredCenters = centersFromInput(stateParam, parsed);
+        } else {
+          restoredCenters = automaticCenters(stateParam);
+        }
         store.replace(stateParam, false, restoredCenters);
       } catch {
         // 不正な state は無視
@@ -738,11 +753,13 @@ async function start() {
     } else if (algParam) {
       try {
         const cleanAlg = algParam.replace(/\+/g, " ");
+        store.replace(SOLVED, false, [0, 0, 0, 0, 0, 0]);
         await applyAlgorithm(cleanAlg, false);
       } catch {
         // 不正な alg は無視
       }
     }
+    restoring = false;
 
     solver = new SolverClient((status, text) => {
       engineError = status === "error";
@@ -790,7 +807,10 @@ async function initializePresets() {
       button.onclick = async () => {
         try {
           presetStatus.textContent = "読み込み中…";
-          const response = await fetch(`/cubes/${preset.id}.json`);
+          const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+            ? import.meta.env.BASE_URL
+            : `${import.meta.env.BASE_URL}/`;
+          const response = await fetch(`${baseUrl}cubes/${preset.id}.json`);
           if (!response.ok) {
             throw new Error(
               `HTTP ${response.status}: ファイルが見つかりません (${response.url})`,

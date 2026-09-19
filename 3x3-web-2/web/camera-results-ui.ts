@@ -84,7 +84,8 @@ export function renderResultFaces(options: ResultsOptions): void {
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "sticker";
-      cell.dataset.color = faceState[i];
+      const color = i === 4 ? face : faceState[i];
+      cell.dataset.color = color;
       cell.dataset.index = String(i);
       cell.dataset.face = face;
       if (i === 4) {
@@ -94,7 +95,7 @@ export function renderResultFaces(options: ResultsOptions): void {
       }
       cell.setAttribute(
         "aria-label",
-        `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[faceState[i]]}${i === 4 ? "（センター）" : ""}`,
+        `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[color]}${i === 4 ? "（センター）" : ""}`,
       );
 
       if (i !== 4) {

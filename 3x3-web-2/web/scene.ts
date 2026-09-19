@@ -32,6 +32,20 @@ function position(face: number, row: number, col: number) {
     ][face] as [number, number, number]),
   );
 }
+
+function rotationMatrixForFaceAngle(
+  faceIdx: number,
+  clockwiseAngle: number,
+): THREE.Matrix4 {
+  const n = normal[faceIdx];
+  // 外向き法線に対する右手系回転では時計回り回転角は -clockwiseAngle
+  const targetDir = faceUp[faceIdx].clone().applyAxisAngle(n, -clockwiseAngle);
+  const zAxis = n.clone().normalize();
+  const yAxis = targetDir.clone().normalize();
+  const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+  return new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+}
+
 export class CubeScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -157,14 +171,7 @@ export class CubeScene {
             }),
           );
           label.position.copy(mesh.position).addScaledVector(normal[f], 0.017);
-          const n = normal[f];
-          const baseUp = faceUp[f].clone();
-          const zAxis = n.clone().normalize();
-          const yAxis = baseUp.clone().normalize();
-          const xAxis = new THREE.Vector3()
-            .crossVectors(yAxis, zAxis)
-            .normalize();
-          const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+          const rotMatrix = rotationMatrixForFaceAngle(f, 0);
           label.quaternion.setFromRotationMatrix(rotMatrix);
           label.renderOrder = 9;
           this.centerLabels[f] = label;
@@ -349,12 +356,7 @@ export class CubeScene {
       const label = this.centerLabels[f];
       if (!label) continue;
       const angle = this.centerRotations[f] ?? 0;
-      const n = normal[f];
-      const baseUp = faceUp[f].clone().applyAxisAngle(n, angle);
-      const zAxis = n.clone().normalize();
-      const yAxis = baseUp.clone().normalize();
-      const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
-      const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+      const rotMatrix = rotationMatrixForFaceAngle(f, angle);
       label.quaternion.setFromRotationMatrix(rotMatrix);
     }
   }
@@ -381,12 +383,7 @@ export class CubeScene {
       const pieceIdx = arrowInfo.pieceIndices[i];
 
       // 共通の回転姿勢（面の基準上方向から angle 回転）
-      const baseUp = faceUp[faceIdx].clone();
-      const targetDir = baseUp.applyAxisAngle(n, angle);
-      const zAxis = n.clone().normalize();
-      const yAxis = targetDir.clone().normalize();
-      const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
-      const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+      const rotMatrix = rotationMatrixForFaceAngle(faceIdx, angle);
 
       // 1. 暗色アウトラインメッシュ
       const outlineMesh = this.outlineMeshes[i];

@@ -1,4 +1,5 @@
-const CACHE_NAME = "cube-studio-v1";
+const CACHE_PREFIX = "cube-studio-";
+const CACHE_NAME = `${CACHE_PREFIX}v1`;
 
 const PRECACHE_ASSETS = [
   "./",
@@ -25,7 +26,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_NAME)
+            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
             .map((key) => caches.delete(key)),
         ),
       )
@@ -58,10 +59,14 @@ self.addEventListener("fetch", (event) => {
         .catch(async () => {
           const cached = await caches.match(request);
           if (cached) return cached;
-          const rootCached = await caches.match("./index.html");
+          const scope = self.registration.scope;
+          const indexUrl = new URL("./index.html", scope).toString();
+          const rootCached =
+            (await caches.match(indexUrl)) ||
+            (await caches.match(scope)) ||
+            (await caches.match("./index.html")) ||
+            (await caches.match("./"));
           if (rootCached) return rootCached;
-          const fallback = await caches.match("./");
-          if (fallback) return fallback;
           return caches.match("/");
         }),
     );
@@ -70,23 +75,23 @@ self.addEventListener("fetch", (event) => {
 
   // 静的アセット（JS, WASM, CSS, 画像, プリセット JSON 等）
   event.respondWith(
-    caches.match(request).then((cached) => {
-      // キャッシュ優先（Cache First）。バックグラウンドで更新し、キャッシュがない場合はネットワークへ
-      const fetchPromise = fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse.ok) {
-            const clone = networkResponse.clone();
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(request, clone));
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          return cached;
-        });
+    (async () => {
+      const cached =
+        (await caches.match(request)) ||
+        (await caches.match(request.url)) ||
+        (await caches.match(url.pathname));
+      if (cached) return cached;
 
-      return cached || fetchPromise;
-    }),
+      try {
+        const networkResponse = await fetch(request);
+        if (networkResponse.ok) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return networkResponse;
+      } catch (err) {
+        return cached;
+      }
+    })(),
   );
 });

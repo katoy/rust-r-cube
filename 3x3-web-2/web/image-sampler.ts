@@ -153,5 +153,14 @@ export function sampleFace(image: HTMLImageElement, points: Point[]): string {
 export function buildState(
   faces: Partial<Record<(typeof FACES)[number], string>>,
 ) {
-  return [...FACES].map((face) => faces[face] ?? "?????????").join("");
+  return [...FACES]
+    .map((face) => {
+      const raw = faces[face];
+      if (!raw) return "?????????";
+      if (raw[4] === "?") {
+        return raw.slice(0, 4) + face + raw.slice(5);
+      }
+      return raw;
+    })
+    .join("");
 }

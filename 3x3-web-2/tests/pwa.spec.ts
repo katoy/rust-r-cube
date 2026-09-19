@@ -104,4 +104,40 @@ test.describe("PWA and Offline Support", () => {
       await context.setOffline(false);
     }
   });
+
+  test("R02: does not delete caches belonging to other apps on the same origin", async ({
+    page,
+    context,
+  }) => {
+    // 既存の SW とキャッシュをクリーンアップ
+    await page.goto("/");
+    await page.evaluate(async () => {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+      const keys = await caches.keys();
+      for (const k of keys) await caches.delete(k);
+    });
+
+    // 他アプリのキャッシュを作成
+    await page.evaluate(async () => {
+      const otherCache = await caches.open("another-app-v1");
+      await otherCache.put("/dummy", new Response("dummy content"));
+    });
+
+    // ページを再読み込みして Service Worker を登録・有効化させる
+    await page.reload();
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      // activate が完了するのを少し待つ
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+
+    // 他アプリのキャッシュが残っていることを検証
+    const hasOtherAppCache = await page.evaluate(async () => {
+      return await caches.has("another-app-v1");
+    });
+    expect(hasOtherAppCache).toBe(true);
+  });
 });

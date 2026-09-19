@@ -65,6 +65,9 @@ jobs:
       - name: Build WASM & Web bundle
         run: npm run build
 
+      - name: Generate camera test images
+        run: npm run generate-test-images
+
       - name: Run Playwright tests
         run: npx playwright test
 

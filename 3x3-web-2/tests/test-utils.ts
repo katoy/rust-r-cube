@@ -7,6 +7,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
+import { execSync } from "child_process";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const TEST_IMAGES_DIR = path.join(__dirname, "../test-images");
 
@@ -47,6 +49,13 @@ export interface ImageManifestData {
  */
 export function loadFullManifest(): ImageManifestData {
   const manifestPath = path.join(TEST_IMAGES_DIR, "manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    const scriptPath = path.resolve(
+      __dirname,
+      "../scripts/generate-test-images.js",
+    );
+    execSync(`node "${scriptPath}"`, { stdio: "pipe" });
+  }
   return JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
 }
 

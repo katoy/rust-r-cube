@@ -110,6 +110,8 @@ const CUBE_STATES = [
   {
     name: "partial",
     state: "UUUU?UUUURRRR?RRRR????F????????D????LLLL?LLLL????B????",
+    // 固定センターモデルのため、エディタ反映時の期待値は未認識センターが面の色に補正される
+    expectedState: "UUUUUUUUURRRRRRRRR????F????????D????LLLLLLLLL????B????",
   },
 ];
 
@@ -352,7 +354,7 @@ async function generateTestImages() {
     imageManifest[cubeState.name] = {
       viewA: `${cubeState.name}-view-a.png`,
       viewB: `${cubeState.name}-view-b.png`,
-      expectedState: cubeState.state,
+      expectedState: cubeState.expectedState ?? cubeState.state,
     };
 
     console.log(`   ✅ ${cubeState.name} 生成完了`);

@@ -60,7 +60,17 @@ export class ColorEditor {
     };
   }
   open(state: string, centers: number[]) {
-    this.draft = state;
+    let fixedDraft = state;
+    for (let f = 0; f < 6; f++) {
+      const centerIdx = f * 9 + 4;
+      if (centerIdx < fixedDraft.length && fixedDraft[centerIdx] === "?") {
+        fixedDraft =
+          fixedDraft.slice(0, centerIdx) +
+          FACES[f] +
+          fixedDraft.slice(centerIdx + 1);
+      }
+    }
+    this.draft = fixedDraft;
     this.turns = centerTurns(centers);
     this.manualCenters = false;
     this.face = 0;

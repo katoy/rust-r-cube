@@ -13,6 +13,9 @@ for arg in "$@"; do
     --preview|-p)
       MODE="preview"
       ;;
+    --offline|-o)
+      MODE="offline"
+      ;;
     --build|-b)
       REBUILD_WASM=true
       ;;
@@ -20,8 +23,9 @@ for arg in "$@"; do
       echo "使い方: $0 [オプション]"
       echo ""
       echo "オプション:"
-      echo "  -b, --build     起動前に WebAssembly (wasm) を再ビルドする"
+      echo "  -o, --offline   PWAキャッシュ構築後、オフラインモード（ネットワーク切断）でブラウザを起動する"
       echo "  -p, --preview   プロダクション用にビルドしてプレビューサーバーを起動する"
+      echo "  -b, --build     起動前に WebAssembly (wasm) を再ビルドする"
       echo "  -h, --help      このヘルプを表示する"
       exit 0
       ;;
@@ -45,7 +49,10 @@ if [ "$REBUILD_WASM" = true ] || [ ! -f "pkg/cube_studio_bg.wasm" ]; then
   npm run wasm
 fi
 
-if [ "$MODE" = "preview" ]; then
+if [ "$MODE" = "offline" ]; then
+  echo "⚡ オフライン動作検証モードを起動します..."
+  node scripts/launch-offline.js
+elif [ "$MODE" = "preview" ]; then
   echo "🚀 プロダクションビルドを実行しています..."
   npm run build
   echo "🌐 プレビューサーバーを起動します..."

@@ -753,10 +753,12 @@ async function start() {
     } else if (algParam) {
       try {
         const cleanAlg = algParam.replace(/\+/g, " ");
-        store.replace(SOLVED, false, [0, 0, 0, 0, 0, 0]);
-        await applyAlgorithm(cleanAlg, false);
+        const result: ResultData = JSON.parse(apply_moves(SOLVED, cleanAlg));
+        validate(result.state);
+        const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);
+        store.replace(result.state, false, nextCenters);
       } catch {
-        // 不正な alg は無視
+        // 不正な alg は無視（保存状態の局面を維持）
       }
     }
     restoring = false;

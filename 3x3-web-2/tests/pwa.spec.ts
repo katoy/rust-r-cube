@@ -105,7 +105,7 @@ test.describe("PWA and Offline Support", () => {
     }
   });
 
-  test("R02: does not delete caches belonging to other apps on the same origin", async ({
+  test("R02: isolates cache per deployment path and preserves other apps and other paths", async ({
     page,
     context,
   }) => {
@@ -118,10 +118,19 @@ test.describe("PWA and Offline Support", () => {
       for (const k of keys) await caches.delete(k);
     });
 
-    // 他アプリのキャッシュを作成
+    // 他アプリのキャッシュおよび別配置パスのキャッシュ、同一パスの旧キャッシュを作成
     await page.evaluate(async () => {
-      const otherCache = await caches.open("another-app-v1");
-      await otherCache.put("/dummy", new Response("dummy content"));
+      const otherApp = await caches.open("another-app-v1");
+      await otherApp.put("/dummy1", new Response("dummy1"));
+
+      const otherPathV2 = await caches.open("cube-studio-v2");
+      await otherPathV2.put("/dummy2", new Response("dummy2"));
+
+      const otherPathNested = await caches.open("cube-studio-nested-cube-v1");
+      await otherPathNested.put("/dummy3", new Response("dummy3"));
+
+      const samePathOld = await caches.open("cube-studio-root-old-v0");
+      await samePathOld.put("/dummy4", new Response("dummy4"));
     });
 
     // ページを再読み込みして Service Worker を登録・有効化させる
@@ -134,10 +143,17 @@ test.describe("PWA and Offline Support", () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
-    // 他アプリのキャッシュが残っていることを検証
-    const hasOtherAppCache = await page.evaluate(async () => {
-      return await caches.has("another-app-v1");
+    // 検証
+    const cacheKeys = await page.evaluate(async () => {
+      return await caches.keys();
     });
-    expect(hasOtherAppCache).toBe(true);
+
+    // 1. 他アプリのキャッシュが残っていること
+    expect(cacheKeys).toContain("another-app-v1");
+    // 2. 別配置パス（v2, nested-cube）のキャッシュが保護されて残っていること
+    expect(cacheKeys).toContain("cube-studio-v2");
+    expect(cacheKeys).toContain("cube-studio-nested-cube-v1");
+    // 3. 同一スコープ（root）の旧バージョンキャッシュは削除されていること
+    expect(cacheKeys).not.toContain("cube-studio-root-old-v0");
   });
 });

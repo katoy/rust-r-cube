@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,14 +32,31 @@ if (fs.existsSync(swPath)) {
     allFiles.unshift("./");
   }
 
+  // ファイル内容のハッシュを計算（同名資産の更新を検知して SW を更新させる）
+  const hash = crypto.createHash("sha256");
+  const sortedFiles = [...allFiles].sort();
+  for (const file of sortedFiles) {
+    if (file === "./") continue;
+    const absPath = path.join(distDir, file.replace(/^\.\//, ""));
+    if (fs.existsSync(absPath)) {
+      hash.update(file);
+      hash.update(fs.readFileSync(absPath));
+    }
+  }
+  const contentHash = hash.digest("hex").slice(0, 10);
+
   let swContent = fs.readFileSync(swPath, "utf-8");
   const precacheStr = JSON.stringify(allFiles, null, 2);
   swContent = swContent.replace(
     /const PRECACHE_ASSETS = \[[^\]]*\];/s,
     `const PRECACHE_ASSETS = ${precacheStr};`,
   );
+  swContent = swContent.replace(
+    /const CACHE_VERSION = "[^"]*";/,
+    `const CACHE_VERSION = "${contentHash}";`,
+  );
   fs.writeFileSync(swPath, swContent, "utf-8");
   console.log(
-    `[generate-sw-precache] Injected ${allFiles.length} assets into dist/sw.js`,
+    `[generate-sw-precache] Injected ${allFiles.length} assets and version ${contentHash} into dist/sw.js`,
   );
 }

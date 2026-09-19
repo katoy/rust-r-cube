@@ -1,0 +1,208 @@
+{
+  "verificationDate": "2026-09-20",
+  "baselineCommit": "c3930bc014378701fd9f7a85b0568fd3551f453d",
+  "reviewedCommit": "1b95636",
+  "note": "Results from the preceding verification of the implementation; tests were not rerun for the documentation update.",
+  "checks": {
+    "cargoFmt": "passed",
+    "cargoClippy": "passed",
+    "cargoTestRelease": {
+      "passed": 83,
+      "failed": 0,
+      "ignored": 1
+    },
+    "npmFormatCheck": "passed",
+    "npmBuild": {
+      "result": "passed",
+      "includesTypecheck": true,
+      "precacheAssets": 19,
+      "warning": "Three.js chunk exceeds 500 kB"
+    },
+    "playwright": {
+      "passed": 114,
+      "failed": 0,
+      "skipped": 1,
+      "durationMinutes": 5.8,
+      "browser": "Chromium"
+    }
+  },
+  "browserProbes": [
+    {
+      "id": "R01_live_and_pending_close",
+      "result": {
+        "live": {
+          "tracks": [
+            "ended"
+          ],
+          "raf": null,
+          "streaming": false,
+          "src": null
+        },
+        "pending": {
+          "tracks": [
+            "ended"
+          ],
+          "raf": null,
+          "streaming": false,
+          "src": null
+        }
+      }
+    },
+    {
+      "id": "R02_other_deployment_cache",
+      "result": [
+        "cube-studio-v1",
+        "another-app-v1"
+      ]
+    },
+    {
+      "id": "new_invalid_alg_resets_restored_state",
+      "result": {
+        "before": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+        "after": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+        "resetToSolved": true,
+        "saved": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB"
+      }
+    },
+    {
+      "id": "R05_all_six_faces_arrow_and_label",
+      "result": {
+        "results": [
+          {
+            "face": "U",
+            "arrow": [
+              1,
+              -2.220446049250313e-16,
+              -1.1102230246251565e-16
+            ],
+            "label": [
+              1,
+              -2.220446049250313e-16,
+              -1.1102230246251565e-16
+            ]
+          },
+          {
+            "face": "R",
+            "arrow": [
+              -1.1102230246251565e-16,
+              0,
+              -1
+            ],
+            "label": [
+              -1.1102230246251565e-16,
+              0,
+              -1
+            ]
+          },
+          {
+            "face": "F",
+            "arrow": [
+              1,
+              2.220446049250313e-16,
+              0
+            ],
+            "label": [
+              1,
+              2.220446049250313e-16,
+              0
+            ]
+          },
+          {
+            "face": "D",
+            "arrow": [
+              1,
+              -2.220446049250313e-16,
+              1.1102230246251565e-16
+            ],
+            "label": [
+              1,
+              -2.220446049250313e-16,
+              1.1102230246251565e-16
+            ]
+          },
+          {
+            "face": "L",
+            "arrow": [
+              -1.1102230246251565e-16,
+              0,
+              1
+            ],
+            "label": [
+              -1.1102230246251565e-16,
+              0,
+              1
+            ]
+          },
+          {
+            "face": "B",
+            "arrow": [
+              -1,
+              2.220446049250313e-16,
+              0
+            ],
+            "label": [
+              -1,
+              2.220446049250313e-16,
+              0
+            ]
+          }
+        ],
+        "allCorrect": true
+      }
+    },
+    {
+      "id": "R10_first_visit_offline_lazy_and_presets",
+      "result": {
+        "camera": true,
+        "editor": true,
+        "statuses": [
+          "✓ 完成状態 を読み込みました",
+          "✓ スーパーフリップ を読み込みました",
+          "✓ 簡単（5手） を読み込みました",
+          "✓ T-Permutation を読み込みました",
+          "✓ ランダム（seed=1） を読み込みました"
+        ]
+      }
+    },
+    {
+      "id": "R13_real_v8_unused_function_and_branch",
+      "result": {
+        "calc": {
+          "covered": 3,
+          "total": 8,
+          "percentage": "37.50",
+          "uncoveredLines": [
+            2,
+            3,
+            4,
+            6,
+            7
+          ]
+        },
+        "never": {
+          "functionRan": false,
+          "branchRan": false
+        }
+      }
+    }
+  ],
+  "R14_serviceWorkerUpdate": {
+    "sameNameAssetChanged": true,
+    "generatedServiceWorkerByteIdentical": true,
+    "firstServiceWorkerSha256": "077f787f685f8a5fe8c981638517ddc1f8852e72675f82b0fd9f7c21c0943c54",
+    "secondServiceWorkerSha256": "077f787f685f8a5fe8c981638517ddc1f8852e72675f82b0fd9f7c21c0943c54",
+    "baseline": {
+      "firstResponse": "old",
+      "secondResponse": "new",
+      "networkCalls": 2,
+      "cachedVersion": "new"
+    },
+    "current": {
+      "firstResponse": "old",
+      "secondResponse": "old",
+      "networkCalls": 0,
+      "cachedVersion": "old"
+    },
+    "assertionsPassed": true
+  }
+}

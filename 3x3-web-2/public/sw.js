@@ -1,5 +1,23 @@
-const CACHE_PREFIX = "cube-studio-";
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+function getScopeSlug() {
+  try {
+    let pathname = "/";
+    if (self.registration && self.registration.scope) {
+      pathname = new URL(self.registration.scope).pathname;
+    } else if (self.location && self.location.href) {
+      const u = new URL(self.location.href);
+      pathname = u.pathname.substring(0, u.pathname.lastIndexOf("/") + 1);
+    }
+    const clean = pathname.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9_-]/g, "-");
+    return clean || "root";
+  } catch {
+    return "root";
+  }
+}
+
+const SCOPE_SLUG = getScopeSlug();
+const CACHE_PREFIX = `cube-studio-${SCOPE_SLUG}-`;
+const CACHE_VERSION = "v1";
+const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const PRECACHE_ASSETS = [
   "./",
@@ -80,18 +98,19 @@ self.addEventListener("fetch", (event) => {
         (await caches.match(request)) ||
         (await caches.match(request.url)) ||
         (await caches.match(url.pathname));
-      if (cached) return cached;
 
-      try {
-        const networkResponse = await fetch(request);
-        if (networkResponse.ok) {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return networkResponse;
-      } catch (err) {
-        return cached;
-      }
+      const fetchPromise = fetch(request)
+        .then(async (networkResponse) => {
+          if (networkResponse.ok) {
+            const clone = networkResponse.clone();
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, clone);
+          }
+          return networkResponse;
+        })
+        .catch(() => cached);
+
+      return cached || fetchPromise;
     })(),
   );
 });

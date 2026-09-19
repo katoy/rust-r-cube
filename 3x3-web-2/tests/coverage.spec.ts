@@ -15,7 +15,7 @@ const COVERAGE_DIR = path.join(__dirname, "../coverage-e2e");
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 
 test.describe("E2E Coverage with CDP", () => {
-  test("ユニットテストおよびE2Eテストの両方を網羅した100%カバレッジ計測", async ({
+  test("ユニットテストおよびE2Eテストによるブラウザ配信JavaScriptの行カバレッジ計測", async ({
     page,
   }) => {
     // JS カバレッジ計測を開始
@@ -846,7 +846,7 @@ test.describe("E2E Coverage with CDP", () => {
       console.log(`✓ 総合テスト実行完了: ユニット＆E2E統合`);
       console.log(`✓ JS カバレッジ対象: ${coverage.length} ファイル`);
 
-      // web/ 配下のファイルについてカバレッジ 100% を検証
+      // web/ 配下のファイルについて各目標カバレッジ閾値を検証
       const webStats = stats.filter(
         (s) => s.url.includes("/web/") && !s.url.includes("node_modules"),
       );
@@ -983,9 +983,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
   <div class="summary" style="margin-top: 30px;">
     <h2>📝 注釈</h2>
     <ul>
-      <li><strong>測定対象:</strong> ブラウザで実行される JavaScript/TypeScript コード</li>
-      <li><strong>WASM コード:</strong> JIT コンパイルされるため、行単位の詳細カバレッジは不完全</li>
-      <li><strong>完全なカバレッジ:</strong> Rust コンパイルレベルは <code>cargo llvm-cov</code> で計測</li>
+      <li><strong>測定対象:</strong> ブラウザに配信された変換後JavaScriptの行カバレッジ（ソースマップ逆変換なしの実測行ベース）</li>
+      <li><strong>WASM コード:</strong> JIT コンパイルされるため、行単位の詳細カバレッジはブラウザ側では不完全（Rust側の完全なカバレッジは <code>cargo llvm-cov</code> で計測）</li>
     </ul>
   </div>
 </body>

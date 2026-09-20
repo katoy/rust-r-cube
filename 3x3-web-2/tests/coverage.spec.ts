@@ -186,13 +186,16 @@ test.describe("E2E Coverage with CDP", () => {
         triggers.analyzeMoves(["R", "U", "R'"]);
         triggers.analyzeMoves(["L'", "U'", "L"]);
         triggers.analyzeMoves(["F", "B", "U", "D", "R2", "L2"]);
-        triggers.analyzeMoves(["R", "U", "R'", "U'"], [
-          { name: "Cross", start: 0, end: 1 },
-          { name: "First Layer", start: 1, end: 2 },
-          { name: "Second Layer", start: 2, end: 3 },
-          { name: "OLL", start: 3, end: 4 },
-          { name: "Unknown Phase", start: 4, end: 4 },
-        ]);
+        triggers.analyzeMoves(
+          ["R", "U", "R'", "U'"],
+          [
+            { name: "Cross", start: 0, end: 1 },
+            { name: "First Layer", start: 1, end: 2 },
+            { name: "Second Layer", start: 2, end: 3 },
+            { name: "OLL", start: 3, end: 4 },
+            { name: "Unknown Phase", start: 4, end: 4 },
+          ],
+        );
 
         // --- cube-store.ts ---
         const { CubeStore } = await import("/web/cube-store.ts");

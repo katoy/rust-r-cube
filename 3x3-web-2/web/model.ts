@@ -34,11 +34,7 @@ export const FACE_NAMES_EN: Record<string, string> = {
   L: "左面 (Left)",
   B: "背面 (Back)",
 };
-export type SolverAlgorithm =
-  | "kociemba"
-  | "cfop"
-  | "thistlethwaite"
-  | "korf";
+export type SolverAlgorithm = "kociemba" | "cfop" | "thistlethwaite" | "korf";
 
 export interface PhaseInfo {
   name: string;

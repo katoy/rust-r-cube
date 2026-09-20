@@ -45,7 +45,10 @@ const PHASE_LABEL_MAP: Record<string, string> = {
   "Korf IDA*": "IDA* 最短手順探索",
 };
 
-export function analyzeMoves(moves: string[], phases?: PhaseInfo[]): MoveMeta[] {
+export function analyzeMoves(
+  moves: string[],
+  phases?: PhaseInfo[],
+): MoveMeta[] {
   if (moves.length === 0) return [];
 
   // トリガーの検出
@@ -116,4 +119,3 @@ export function analyzeMoves(moves: string[], phases?: PhaseInfo[]): MoveMeta[] 
     };
   });
 }
-

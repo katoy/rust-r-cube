@@ -1039,7 +1039,9 @@ test("solver algorithm selection, persistence, and phase badges", async ({
   // 1. CFOP を選択して解く
   await algoSelect.selectOption("cfop");
   await page.locator("#solve").click();
-  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
 
   // フェーズバッジが表示されることを確認
   const cfopBadges = await page.locator(".phase-badge").allTextContents();
@@ -1057,7 +1059,9 @@ test("solver algorithm selection, persistence, and phase badges", async ({
 
   await algoSelect.selectOption("thistlethwaite");
   await page.locator("#solve").click();
-  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
 
   const thBadges = await page.locator(".phase-badge").allTextContents();
   expect(thBadges.length).toBeGreaterThan(0);
@@ -1073,7 +1077,9 @@ test("solver algorithm selection, persistence, and phase badges", async ({
 
   await algoSelect.selectOption("korf");
   await page.locator("#solve").click();
-  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
 
   // R U R' U' の逆手順（U R U' R'）など4手以内で最短解決
   const korfMoves = await page.locator(".solution-move").allTextContents();
@@ -1092,4 +1098,3 @@ test("solver algorithm selection, persistence, and phase badges", async ({
   await page.waitForSelector("#engine-status.ready");
   expect(await page.locator("#solver-algorithm").inputValue()).toBe("cfop");
 });
-

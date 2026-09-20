@@ -462,7 +462,9 @@ test("preserves legacy un-scoped cache (e.g. cube-studio-v1) as foreign deployme
   // 別配置とみなされる un-scoped cube-studio キャッシュも勝手に削除されない（R02原則）
   expect(remainingKeys).toContain("cube-studio-v1");
   // 自身のキャッシュが作成されていること
-  expect(remainingKeys.some((k) => k.startsWith("cube-studio-nested-cube-"))).toBe(true);
+  expect(
+    remainingKeys.some((k) => k.startsWith("cube-studio-nested-cube-")),
+  ).toBe(true);
 });
 
 test("offline navigation does not leak root scope's index.html into nested subscope", async ({

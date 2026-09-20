@@ -1,7 +1,9 @@
 /// スーパーフリップ状態を、同時最適化 vs 逐次方式 で解いたときの手数を比較するベンチマーク
 fn main() {
-    // テストと同じシーケンス
-    let superflip_seq = "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U";
+    // UI と同じプリセットを使用する
+    let preset: serde_json::Value =
+        serde_json::from_str(include_str!("../../cubes/superflip.json")).unwrap();
+    let superflip_seq = preset["scramble"].as_str().unwrap();
 
     let moves: Vec<usize> = cube_studio::cube::parse_moves(superflip_seq).unwrap();
     let cube = cube_studio::cube::apply(&cube_studio::coord::RawCube::default(), &moves);

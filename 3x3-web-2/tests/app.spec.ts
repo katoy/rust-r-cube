@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { ARROW_COLORS, inverse, FACES } from "../web/model";
+import { ARROW_COLORS, inverse, FACES, EDGES } from "../web/model";
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 async function ready(page: Page) {
   await page.goto("/");
@@ -891,10 +891,13 @@ test("orientation mode solves cube so that all centers are also oriented correct
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
-test("superflip preset solves with orientation in 24 moves or less", async ({
+test("superflip preset loads all twelve flipped edges and solves orientation within 24 moves", async ({
   page,
 }) => {
   await ready(page);
+  const presetResponse = await page.request.get("/cubes/superflip.json");
+  expect(presetResponse.ok()).toBe(true);
+  const superflipPreset = await presetResponse.json();
 
   // 1. 向きモードをONにし、reduced-motionを有効にする
   await page.locator("#reduced-motion").check();
@@ -907,14 +910,32 @@ test("superflip preset solves with orientation in 24 moves or less", async ({
     "スーパーフリップ を読み込みました",
   );
 
+  // 全エッジの2枚だけを交換した状態が、実際のプリセット読み込みで表示される。
+  const expected = [...SOLVED];
+  for (const [a, b] of EDGES) {
+    [expected[a], expected[b]] = [expected[b], expected[a]];
+  }
+  expect(await state(page)).toBe(expected.join(""));
+  expect(superflipPreset.state).toBe(expected.join(""));
+  await expect(page.locator("#scramble-text")).toHaveText(
+    superflipPreset.scramble,
+  );
+  const initialCenterTurns = await page.evaluate(() =>
+    (window as any).cube_scene.centerRotations.map((angle: number) =>
+      Math.round(angle / (Math.PI / 2)),
+    ),
+  );
+  expect(initialCenterTurns).toEqual([0, 2, 0, 3, 2, 3]);
+
   // 3. 解法探索を実行
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible({
     timeout: 10000,
   });
 
-  // 4. 手数が24手以内であることを検証
+  // 4. Superflip は色だけでも20手必要。向き補正の手数は探索結果による。
   const moves = await page.locator(".solution-move").allTextContents();
+  expect(moves.length).toBeGreaterThanOrEqual(20);
   expect(moves.length).toBeLessThanOrEqual(24);
 
   // 5. 解法の最後まで進む
@@ -946,7 +967,7 @@ test("superflip preset solves with orientation in 24 moves or less", async ({
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
-test("all presets can be loaded and solved within optimal move bounds", async ({
+test("all presets can be loaded and solved within configured move bounds", async ({
   page,
 }) => {
   await ready(page);
@@ -971,7 +992,7 @@ test("all presets can be loaded and solved within optimal move bounds", async ({
     {
       label: "スーパーフリップ",
       expectedMovesMax: 24,
-      description: "at most 24 moves (God's number 20)",
+      description: "at most 24 moves (color-only optimum is 20)",
     },
     {
       label: "ランダム（seed=1）",

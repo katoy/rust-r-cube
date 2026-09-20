@@ -423,15 +423,44 @@ fn complete_end_to_end_multiple_seeds() {
     }
 }
 
-#[test]
-fn superflip_solvable_in_20_moves() {
-    // スーパーフリップ：すべてのエッジが反転している特殊な状態
-    // 最小手数は正確に 20手（God's Number の一つ）
+fn superflip_preset_moves() -> Vec<usize> {
+    let preset: serde_json::Value =
+        serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
+    parse_moves(preset["scramble"].as_str().unwrap()).unwrap()
+}
 
-    // スーパーフリップを作成：R U' R U R U R U' R' U' R2 の相当シーケンス
-    // サポートされている記法で作成
-    let superflip_sequence = "R U R U R U R U R U R U R U R U R U R U";
-    let moves = parse_moves(superflip_sequence).unwrap();
+#[test]
+fn superflip_preset_flips_all_edges_without_moving_pieces() {
+    let preset: serde_json::Value =
+        serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
+    let public_preset: serde_json::Value =
+        serde_json::from_str(include_str!("../public/cubes/superflip.json")).unwrap();
+    assert_eq!(
+        preset, public_preset,
+        "Published preset must match the source"
+    );
+
+    let moves = parse_moves(preset["scramble"].as_str().unwrap()).unwrap();
+    let cube = apply(&RawCube::default(), &moves);
+    let expected = RawCube {
+        eo: [1; 12],
+        ..RawCube::default()
+    };
+    assert_eq!(
+        cube, expected,
+        "Only the twelve edge orientations may change"
+    );
+    assert_eq!(preset["state"].as_str().unwrap(), facelets(&expected));
+    assert_eq!(moves.len(), 20);
+    assert_eq!(preset["solution_length"], 20);
+
+    let inverse: Vec<_> = moves.iter().rev().map(|&m| m / 3 * 3 + 2 - m % 3).collect();
+    assert_eq!(apply(&cube, &inverse), RawCube::default());
+}
+
+#[test]
+fn superflip_solver_returns_valid_solution() {
+    let moves = superflip_preset_moves();
     let superflip_cube = apply(&RawCube::default(), &moves);
     let superflip_state = facelets(&superflip_cube);
 
@@ -452,10 +481,10 @@ fn superflip_solvable_in_20_moves() {
             "Solution should result in solved state"
         );
 
-        // 解法が 25手以内であることを確認（20手前後が目安）
+        // 既存の25手以内という回帰基準に加え、20手未満にならないことを確認。
         assert!(
-            solution.moves.len() <= 25,
-            "Complex state should be solvable in 25 moves or less, got {} moves",
+            (20..=25).contains(&solution.moves.len()),
+            "Superflip solution must have 20 to 25 moves, got {}",
             solution.moves.len()
         );
 
@@ -465,21 +494,16 @@ fn superflip_solvable_in_20_moves() {
 }
 
 #[test]
-fn superflip_variations() {
-    // スーパーフリップの異なるバリエーションをテスト
-    let superflip_sequences = [
-        "M' U M' U M' U2 M U M U2 M U M U2", // クラシック
-        "R U' R U R U R U' R' U' R2",        // バリエーション 1
-        "M U M U2 M U M",                    // バリエーション 2
+fn sample_face_turn_sequences_are_solvable() {
+    // R/U の手順は一般のスクランブルであり、Superflip ではない。
+    let sequences = [
+        "R U R U R U R U R U R U R U R U R U R U",
+        "R U' R U R U R U' R' U' R2",
     ];
 
-    for (idx, sequence) in superflip_sequences.iter().enumerate() {
-        let moves = parse_moves(sequence);
-        if moves.is_err() {
-            continue; // 無効なシーケンスはスキップ
-        }
-
-        let cube = apply(&RawCube::default(), &moves.unwrap());
+    for (idx, sequence) in sequences.iter().enumerate() {
+        let moves = parse_moves(sequence).unwrap();
+        let cube = apply(&RawCube::default(), &moves);
         let state = facelets(&cube);
 
         // スクランブルされた状態であることを確認
@@ -1364,8 +1388,7 @@ fn test_supercube_centers() {
 
 #[test]
 fn test_superflip_orientation_solve_length() {
-    let superflip_seq = "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U";
-    let moves = parse_moves(superflip_seq).unwrap();
+    let moves = superflip_preset_moves();
     let cube = apply(&RawCube::default(), &moves);
     let state = facelets(&cube);
 
@@ -1382,9 +1405,7 @@ fn test_superflip_orientation_solve_length() {
         initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
     }
 
-    // solve_state_with_centers は内部で同時最適化を試みる（上限15秒）。
-    // 通常環境では 19手（同時最適化成功）、計測環境では55手（逐次フォールバック）になる。
-    // どちらの場合でも「正しく解けているか」を検証する。
+    // 同時探索とセンター後付け補正のいずれでも、色・向きの完成を検証する。
     let sol = crate::solve_state_with_centers(&state, 60000, true, Some(initial_centers)).unwrap();
     println!(
         "Superflip solved with orientation in {} moves: {:?}",
@@ -1414,18 +1435,14 @@ fn test_superflip_orientation_solve_length() {
         "All centers must reach 0 rotation"
     );
 
-    // 検証3: 手数は合理的な範囲（同時最適化19手 or 逐次55手 + 余裕）
-    assert!(
-        sol.moves.len() <= 60,
-        "Expected at most 60 moves, got {}",
-        sol.moves.len()
-    );
+    assert!((20..=60).contains(&sol.moves.len()));
+    let solution_moves = parse_moves(&sol.moves.join(" ")).unwrap();
+    assert_eq!(apply(&cube, &solution_moves), RawCube::default());
 }
 
 #[test]
-fn test_superflip_5s_budget_solves_under_24_moves() {
-    let scramble = "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U";
-    let moves = parse_moves(scramble).unwrap();
+fn test_superflip_5s_budget_solves_colors_and_centers() {
+    let moves = superflip_preset_moves();
     let cube = apply(&RawCube::default(), &moves);
     let state = facelets(&cube);
 
@@ -1441,7 +1458,7 @@ fn test_superflip_5s_budget_solves_under_24_moves() {
         initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
     }
 
-    // UIデフォルト予算 5000ms（リリースモード）で、同時最適化により 24手以内で解けることを検証
+    // UIデフォルト予算 5000ms（リリースモード）で、色とセンター向きを解けることを検証
     // デバッグビルドやカバレッジ計測時はオーバーヘッドで約5倍遅いため予算を自動調整
     let budget = if cfg!(debug_assertions) {
         60_000
@@ -1451,10 +1468,16 @@ fn test_superflip_5s_budget_solves_under_24_moves() {
     let sol = crate::solve_state_with_centers(&state, budget, true, Some(initial_centers)).unwrap();
     assert_eq!(sol.state, SOLVED, "Cube must be fully solved");
     assert!(
-        sol.moves.len() <= 24,
-        "Superflip should solve in <= 24 moves, but took {} moves",
+        (20..=24).contains(&sol.moves.len()),
+        "Expected 20 to 24 moves within the UI budget, got {}",
         sol.moves.len()
     );
+    let solution_moves = parse_moves(&sol.moves.join(" ")).unwrap();
+    assert_eq!(apply(&cube, &solution_moves), RawCube::default());
+    for m in solution_moves {
+        initial_centers[m / 3] = (initial_centers[m / 3] + (m % 3 + 1) as i32) % 4;
+    }
+    assert_eq!(initial_centers, [0; 6]);
 }
 
 #[test]

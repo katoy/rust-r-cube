@@ -97,7 +97,7 @@ const CUBE_STATES = [
   },
   {
     name: "superflip",
-    state: "RFUUUUDDFUBBRRFFLFRRRFFBFFDDDRDDUDDUURBLLLLLLLRBUBBLBB",
+    state: "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
   },
   {
     name: "scrambled-1",

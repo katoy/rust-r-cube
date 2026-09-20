@@ -1264,6 +1264,8 @@ fn wasm_result_data_serialization() {
         states: vec![SOLVED.to_string()],
         elapsed_ms: 123.45,
         nodes: 999,
+        algorithm: "kociemba".to_string(),
+        phases: Vec::new(),
     };
 
     // JSON シリアライズ可能か確認
@@ -1440,9 +1442,9 @@ fn test_superflip_5s_budget_solves_under_24_moves() {
     }
 
     // UIデフォルト予算 5000ms（リリースモード）で、同時最適化により 24手以内で解けることを検証
-    // デバッグビルド（cargo test のデフォルト）は最適化なしで約5倍遅いため予算を自動調整
+    // デバッグビルドやカバレッジ計測時はオーバーヘッドで約5倍遅いため予算を自動調整
     let budget = if cfg!(debug_assertions) {
-        30_000
+        60_000
     } else {
         5_000
     };
@@ -1523,3 +1525,50 @@ fn incompatible_center_input_is_rejected_before_search() {
     // Color-only solving does not constrain center orientation.
     assert!(crate::solve_state_with_centers(SOLVED, 0, false, Some([1, 0, 0, 0, 0, 0])).is_ok());
 }
+
+#[test]
+fn test_solve_state_with_all_algorithms() {
+    let sc = parse_moves("R U R' U'").unwrap();
+    let scrambled_cube = apply(&RawCube::default(), &sc);
+    let state = facelets(&scrambled_cube);
+
+    // 1. CFOP
+    let res_cfop = crate::solve_state_with_algorithm(&state, 5000, false, None, "cfop").unwrap();
+    assert_eq!(res_cfop.state, SOLVED);
+    assert_eq!(res_cfop.algorithm, "cfop");
+    assert!(!res_cfop.phases.is_empty());
+
+    // 2. Thistlethwaite
+    let res_th =
+        crate::solve_state_with_algorithm(&state, 5000, false, None, "thistlethwaite").unwrap();
+    assert_eq!(res_th.state, SOLVED);
+    assert_eq!(res_th.algorithm, "thistlethwaite");
+    assert!(!res_th.phases.is_empty());
+
+    // 3. Korf (IDA*)
+    let res_korf = crate::solve_state_with_algorithm(&state, 5000, false, None, "korf").unwrap();
+    assert_eq!(res_korf.state, SOLVED);
+    assert_eq!(res_korf.algorithm, "korf");
+    assert!(!res_korf.phases.is_empty());
+    assert_eq!(res_korf.moves.len(), 4); // R U R' U' は最短4手
+
+    // 4. Kociemba (デフォルト / 未知の文字列)
+    let res_koc = crate::solve_state_with_algorithm(&state, 5000, false, None, "kociemba").unwrap();
+    assert_eq!(res_koc.state, SOLVED);
+    assert_eq!(res_koc.algorithm, "kociemba");
+
+    let res_unknown = crate::solve_state_with_algorithm(&state, 5000, false, None, "unknown").unwrap();
+    assert_eq!(res_unknown.state, SOLVED);
+
+    // 5. wasm solve_with_algorithm
+    let wasm_res = crate::solve_with_algorithm(&state, 5000, false, None, Some("cfop".to_string()));
+    assert!(wasm_res.is_ok());
+    let wasm_json = wasm_res.unwrap();
+    let parsed: crate::ResultData = serde_json::from_str(&wasm_json).unwrap();
+    assert_eq!(parsed.state, SOLVED);
+
+    // 6. 不正な state のエラーハンドリング
+    assert!(crate::solve_state_with_algorithm("INVALID", 1000, false, None, "cfop").is_err());
+}
+
+

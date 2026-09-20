@@ -3,12 +3,22 @@ pub mod coord;
 pub mod cube;
 pub mod search;
 pub mod supercube;
+pub mod cfop;
+pub mod korf;
+pub mod thistlethwaite;
 mod tables;
 
 const TABLE_BYTES: Option<&[u8]> = Some(include_bytes!(concat!(env!("OUT_DIR"), "/tables.bin")));
 
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct PhaseInfo {
+    pub name: String,
+    pub start: usize,
+    pub end: usize,
+}
 
 #[derive(Debug, Serialize, serde::Deserialize)]
 pub struct ResultData {
@@ -17,8 +27,19 @@ pub struct ResultData {
     pub states: Vec<String>,
     pub elapsed_ms: f64,
     pub nodes: u64,
+    #[serde(default)]
+    pub algorithm: String,
+    #[serde(default)]
+    pub phases: Vec<PhaseInfo>,
 }
-fn result(state: &str, moves: &[usize], elapsed_ms: f64, nodes: u64) -> Result<ResultData, String> {
+fn result(
+    state: &str,
+    moves: &[usize],
+    elapsed_ms: f64,
+    nodes: u64,
+    algorithm: &str,
+    phases: Vec<PhaseInfo>,
+) -> Result<ResultData, String> {
     let mut cube = cube::parse_state(state)?;
     let mut states = vec![state.to_owned()];
     for m in moves {
@@ -31,6 +52,8 @@ fn result(state: &str, moves: &[usize], elapsed_ms: f64, nodes: u64) -> Result<R
         states,
         elapsed_ms,
         nodes,
+        algorithm: algorithm.to_string(),
+        phases,
     })
 }
 pub fn solve_state(
@@ -47,6 +70,16 @@ pub fn solve_state_with_centers(
     include_orientation: bool,
     initial_centers: Option<[i32; 6]>,
 ) -> Result<ResultData, String> {
+    solve_state_with_algorithm(state, budget_ms, include_orientation, initial_centers, "kociemba")
+}
+
+pub fn solve_state_with_algorithm(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+    initial_centers: Option<[i32; 6]>,
+    algorithm: &str,
+) -> Result<ResultData, String> {
     let cube = cube::parse_state(state)?;
     if let (true, Some(centers)) = (include_orientation, initial_centers) {
         let center_parity = centers.iter().map(|c| c.rem_euclid(4)).sum::<i32>() % 2;
@@ -59,35 +92,85 @@ pub fn solve_state_with_centers(
     }
     let start = web_time::Instant::now();
     let mut total_nodes = 0u64;
-    let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
-        let oriented_budget = budget_ms
-            .saturating_sub(1000)
-            .max(budget_ms * 4 / 5)
-            .min(25000);
-        let mut search_oriented = search::Search::new(oriented_budget).with_target_centers(centers);
-        let res = search_oriented.solve(&cube);
-        total_nodes += search_oriented.nodes;
-        res
-    } else {
-        None
-    };
+    let mut phase_infos = Vec::new();
 
-    let mut moves = if let Some(m) = moves_opt {
-        m
-    } else {
-        let elapsed_ms = start.elapsed().as_millis() as u32;
-        let remaining_budget = budget_ms.saturating_sub(elapsed_ms).min(30000);
-        let mut search = search::Search::new(remaining_budget);
-        let m = search.solve(&cube).ok_or_else(|| {
-            "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
-        })?;
-        total_nodes += search.nodes;
-        m
+    let mut moves = match algorithm {
+        "cfop" => {
+            let res = cfop::solve(&cube)?;
+            let mut offset = 0;
+            for p in res.phases {
+                let len = p.moves.len();
+                phase_infos.push(PhaseInfo {
+                    name: p.name.to_string(),
+                    start: offset,
+                    end: offset + len,
+                });
+                offset += len;
+            }
+            res.moves
+        }
+        "thistlethwaite" => {
+            let mut th = thistlethwaite::ThistlethwaiteSearch::new(budget_ms);
+            let res = th.solve(&cube)?;
+            total_nodes += th.nodes;
+            let mut offset = 0;
+            for p in res.phases {
+                let len = p.moves.len();
+                phase_infos.push(PhaseInfo {
+                    name: p.name.to_string(),
+                    start: offset,
+                    end: offset + len,
+                });
+                offset += len;
+            }
+            res.moves
+        }
+        "korf" => {
+            let mut korf = korf::KorfSearch::new(budget_ms);
+            let m = korf.solve(&cube).ok_or_else(|| {
+                "探索時間の上限に達しました。".to_owned()
+            })?;
+            total_nodes += korf.nodes;
+            phase_infos.push(PhaseInfo {
+                name: "IDA* 最短探索".to_string(),
+                start: 0,
+                end: m.len(),
+            });
+            m
+        }
+        _ => {
+            // Kociemba (Two-Phase)
+            let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
+                let oriented_budget = budget_ms
+                    .saturating_sub(1000)
+                    .max(budget_ms * 4 / 5)
+                    .min(25000);
+                let mut search_oriented = search::Search::new(oriented_budget).with_target_centers(centers);
+                let res = search_oriented.solve(&cube);
+                total_nodes += search_oriented.nodes;
+                res
+            } else {
+                None
+            };
+
+            let m = if let Some(m) = moves_opt {
+                m
+            } else {
+                let elapsed_ms = start.elapsed().as_millis() as u32;
+                let remaining_budget = budget_ms.saturating_sub(elapsed_ms).min(30000);
+                let mut search = search::Search::new(remaining_budget);
+                let m = search.solve(&cube).ok_or_else(|| {
+                    "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
+                })?;
+                total_nodes += search.nodes;
+                m
+            };
+            m
+        }
     };
 
     if include_orientation {
         if let Some(initial) = initial_centers {
-            // センターの向き（Supercube仕様）を解く
             let mut centers = initial;
             for &m in &moves {
                 let f = m / 3;
@@ -100,17 +183,23 @@ pub fn solve_state_with_centers(
                 centers[f] = (centers[f] + t).rem_euclid(4);
             }
             let center_fixes = supercube::solve_center_orientations(centers);
-            moves.extend(center_fixes);
+            if !center_fixes.is_empty() {
+                let start_idx = moves.len();
+                moves.extend(center_fixes);
+                phase_infos.push(PhaseInfo {
+                    name: "センター向き解決".to_string(),
+                    start: start_idx,
+                    end: moves.len(),
+                });
+            }
         }
     }
 
     // 完成状態を確認
     let result_cube = cube::apply(&cube, &moves);
     let is_solved = if include_orientation {
-        // 向き情報を含める: 完全に解けているか確認
         result_cube == coord::RawCube::default()
     } else {
-        // 色だけを確認: 向き情報を無視して色だけが揃っているか確認
         cube::facelets(&result_cube) == cube::SOLVED
     };
 
@@ -123,6 +212,8 @@ pub fn solve_state_with_centers(
         &moves,
         start.elapsed().as_secs_f64() * 1000.0,
         total_nodes,
+        algorithm,
+        phase_infos,
     )
 }
 fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
@@ -151,7 +242,7 @@ pub fn center_parity(state: &str) -> Result<u8, JsValue> {
 }
 #[wasm_bindgen]
 pub fn apply_moves(state: &str, moves: &str) -> Result<String, JsValue> {
-    json(cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0)))
+    json(cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0, "apply", Vec::new())))
 }
 #[wasm_bindgen]
 pub fn scramble(seed: u32) -> String {
@@ -173,6 +264,17 @@ pub fn solve_with_orientation(
     include_orientation: bool,
     centers_str: Option<String>,
 ) -> Result<String, JsValue> {
+    solve_with_algorithm(state, budget_ms, include_orientation, centers_str, None)
+}
+
+#[wasm_bindgen]
+pub fn solve_with_algorithm(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+    centers_str: Option<String>,
+    algorithm: Option<String>,
+) -> Result<String, JsValue> {
     let initial_centers = centers_str.and_then(|s| {
         let nums: Vec<i32> = s.split(',').filter_map(|p| p.trim().parse().ok()).collect();
         if nums.len() == 6 {
@@ -181,11 +283,13 @@ pub fn solve_with_orientation(
             None
         }
     });
-    json(solve_state_with_centers(
+    let alg = algorithm.as_deref().unwrap_or("kociemba");
+    json(solve_state_with_algorithm(
         state,
         budget_ms,
         include_orientation,
         initial_centers,
+        alg,
     ))
 }
 

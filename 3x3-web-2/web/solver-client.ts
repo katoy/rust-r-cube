@@ -64,6 +64,7 @@ export class SolverClient {
     budget: number,
     includeOrientation = true,
     centerRotations?: number[],
+    algorithm?: import("./model").SolverAlgorithm,
   ) {
     if (!this.ready)
       return Promise.reject(new Error("エンジンの準備完了をお待ちください。"));
@@ -86,6 +87,7 @@ export class SolverClient {
         budget,
         includeOrientation,
         centerRotations,
+        algorithm,
       });
     });
   }

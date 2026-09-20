@@ -1,7 +1,7 @@
 import init, {
   initialize,
   solve,
-  solve_with_orientation,
+  solve_with_algorithm,
 } from "../pkg/cube_studio";
 import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
 import type { Request, Reply } from "./model";
@@ -20,11 +20,12 @@ async function start() {
                 .map((r) => Math.round(r / (Math.PI / 2)).toString())
                 .join(",")
             : undefined;
-        const result = solve_with_orientation(
+        const result = solve_with_algorithm(
           data.state,
           data.budget,
           includeOrientation,
           centersStr,
+          data.algorithm || "kociemba",
         );
 
         send({

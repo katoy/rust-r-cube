@@ -54,6 +54,10 @@ const reduced = $<HTMLInputElement>("reduced-motion");
 reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const includeOrientation = $<HTMLInputElement>("include-orientation");
 includeOrientation.checked = true;
+const solverAlgo = $<HTMLSelectElement>("solver-algorithm");
+solverAlgo.onchange = () => {
+  persist();
+};
 
 const soundToggleBtn = $("sound-toggle");
 function updateSoundButton() {
@@ -98,6 +102,7 @@ function persist() {
         ...store.getSnapshot(),
         reducedMotion: reduced.checked,
         speed: $<HTMLSelectElement>("speed").value,
+        solverAlgorithm: solverAlgo.value,
       }),
     );
   } catch {
@@ -160,7 +165,7 @@ function refresh() {
       `${solution.elapsed_ms < 1000 ? `${Math.round(solution.elapsed_ms)} ms` : `${(solution.elapsed_ms / 1000).toFixed(2)} 秒`} · 検証済み`;
     const list = $("move-list");
     list.replaceChildren();
-    const analyzed = analyzeMoves(solution.moves);
+    const analyzed = analyzeMoves(solution.moves, solution.phases);
     analyzed.forEach((meta, i) => {
       if (i === 0 || meta.phase !== analyzed[i - 1].phase) {
         const phaseBadge = document.createElement("span");
@@ -395,6 +400,7 @@ async function solve(budget = 5000) {
       budget,
       includeOrientation.checked,
       store.getCenterRotations(),
+      solverAlgo.value as import("./model").SolverAlgorithm,
     );
 
     if (store.getRevision() !== at) return;
@@ -740,6 +746,12 @@ async function start() {
           reduced.checked = data.reducedMotion;
         if (["1000", "500", "250"].includes(data.speed))
           $<HTMLSelectElement>("speed").value = data.speed;
+        if (
+          ["kociemba", "cfop", "thistlethwaite", "korf"].includes(
+            data.solverAlgorithm,
+          )
+        )
+          solverAlgo.value = data.solverAlgorithm;
         const restoredCenters = centersFromInput(data.state, data.centerTurns);
         store.replace(data.state, false, restoredCenters);
       }
@@ -748,6 +760,13 @@ async function start() {
     }
 
     const params = new URLSearchParams(window.location.search);
+    const solverParam = params.get("solver") || params.get("algorithm");
+    if (
+      solverParam &&
+      ["kociemba", "cfop", "thistlethwaite", "korf"].includes(solverParam)
+    ) {
+      solverAlgo.value = solverParam;
+    }
     const stateParam = params.get("state");
     const centersParam = params.get("centers");
     const algParam = params.get("alg");

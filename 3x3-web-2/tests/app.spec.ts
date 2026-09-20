@@ -1016,3 +1016,80 @@ test("all presets can be loaded and solved within optimal move bounds", async ({
     }
   }
 });
+
+test("solver algorithm selection, persistence, and phase badges", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.waitForSelector("#engine-status.ready");
+
+  const algoSelect = page.locator("#solver-algorithm");
+  await expect(algoSelect).toBeVisible();
+
+  // 4つの選択肢が存在することを確認
+  const options = await algoSelect.locator("option").all();
+  expect(options.length).toBe(4);
+  expect(await algoSelect.inputValue()).toBe("kociemba");
+
+  // 手順を入力して簡単なスクランブル状態にする
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  // 1. CFOP を選択して解く
+  await algoSelect.selectOption("cfop");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+
+  // フェーズバッジが表示されることを確認
+  const cfopBadges = await page.locator(".phase-badge").allTextContents();
+  expect(cfopBadges.length).toBeGreaterThan(0);
+  console.log("CFOP Phase Badges:", cfopBadges);
+
+  // 解法の最後まで進んで完成状態を検証
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 2. Thistlethwaite を選択して解く
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  await algoSelect.selectOption("thistlethwaite");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+
+  const thBadges = await page.locator(".phase-badge").allTextContents();
+  expect(thBadges.length).toBeGreaterThan(0);
+  console.log("Thistlethwaite Phase Badges:", thBadges);
+
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 3. Korf (IDA*) を選択して解く
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  await algoSelect.selectOption("korf");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({ timeout: 10000 });
+
+  // R U R' U' の逆手順（U R U' R'）など4手以内で最短解決
+  const korfMoves = await page.locator(".solution-move").allTextContents();
+  expect(korfMoves.length).toBeLessThanOrEqual(4);
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 4. localStorage への永続化を確認
+  // 現在は "korf" が選択されているのでリロード後も "korf" が復元される
+  await page.reload();
+  await page.waitForSelector("#engine-status.ready");
+  expect(await page.locator("#solver-algorithm").inputValue()).toBe("korf");
+
+  // 5. URLパラメータ ?solver=cfop による指定
+  await page.goto("/?solver=cfop");
+  await page.waitForSelector("#engine-status.ready");
+  expect(await page.locator("#solver-algorithm").inputValue()).toBe("cfop");
+});
+

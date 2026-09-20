@@ -591,6 +591,47 @@ h2 {
   border: 1px solid rgba(181, 230, 29, 0.35);
   color: var(--accent);
 }
+.phase-badge.phase-3 {
+  background: rgba(106, 158, 219, 0.15);
+  border: 1px solid rgba(106, 158, 219, 0.35);
+  color: #6a9edb;
+}
+.phase-badge.phase-4 {
+  background: rgba(236, 152, 81, 0.15);
+  border: 1px solid rgba(236, 152, 81, 0.35);
+  color: #ec9851;
+}
+.phase-badge.phase-5 {
+  background: rgba(229, 86, 73, 0.15);
+  border: 1px solid rgba(229, 86, 73, 0.35);
+  color: #e55649;
+}
+.solver-algo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+.solver-algo-row label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.solver-algo-row select {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.solver-algo-row select:focus {
+  border-color: var(--accent);
+}
+
 .solution-move {
   font:
     12px ui-monospace,

@@ -7,8 +7,20 @@ function getScopeSlug() {
       const u = new URL(self.location.href);
       pathname = u.pathname.substring(0, u.pathname.lastIndexOf("/") + 1);
     }
-    const clean = pathname.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9_-]/g, "-");
-    return clean || "root";
+    const segments = pathname
+      .replace(/^\/+|\/+$/g, "")
+      .split("/")
+      .filter(Boolean)
+      .map((seg) => seg.replace(/-/g, "_").replace(/[^a-zA-Z0-9_]/g, "_"));
+
+    if (segments.length === 0) {
+      return "root";
+    }
+    const slug = segments.join("-");
+    if (slug === "root") {
+      return "path-root";
+    }
+    return slug;
   } catch {
     return "root";
   }
@@ -75,15 +87,18 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(async () => {
-          const cached = await caches.match(request);
+          const ownCache = await caches.open(CACHE_NAME);
+          const cached =
+            (await ownCache.match(request)) ||
+            (await ownCache.match(request, { ignoreSearch: true }));
           if (cached) return cached;
-          const scope = self.registration.scope;
+          const scope = self.registration ? self.registration.scope : "./";
           const indexUrl = new URL("./index.html", scope).toString();
           const rootCached =
-            (await caches.match(indexUrl)) ||
-            (await caches.match(scope)) ||
-            (await caches.match("./index.html")) ||
-            (await caches.match("./"));
+            (await ownCache.match(indexUrl)) ||
+            (await ownCache.match(scope)) ||
+            (await ownCache.match("./index.html")) ||
+            (await ownCache.match("./"));
           if (rootCached) return rootCached;
           return caches.match("/");
         }),
@@ -94,17 +109,17 @@ self.addEventListener("fetch", (event) => {
   // 静的アセット（JS, WASM, CSS, 画像, プリセット JSON 等）
   event.respondWith(
     (async () => {
+      const ownCache = await caches.open(CACHE_NAME);
       const cached =
-        (await caches.match(request)) ||
-        (await caches.match(request.url)) ||
-        (await caches.match(url.pathname));
+        (await ownCache.match(request)) ||
+        (await ownCache.match(request.url)) ||
+        (await ownCache.match(url.pathname));
 
       const fetchPromise = fetch(request)
         .then(async (networkResponse) => {
           if (networkResponse.ok) {
             const clone = networkResponse.clone();
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put(request, clone);
+            await ownCache.put(request, clone);
           }
           return networkResponse;
         })

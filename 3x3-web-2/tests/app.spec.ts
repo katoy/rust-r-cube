@@ -192,6 +192,41 @@ test("responsive layout and accessibility", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(page.locator("#editor")).not.toBeVisible();
 });
+test("mobile layout keeps 3D scene and solution controls visible simultaneously", async ({
+  page,
+}) => {
+  for (const { width, height } of [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await ready(page);
+    await page.locator("#scramble").click();
+    await page.locator("#solve").click();
+    await expect(page.locator("#solution-content")).toBeVisible();
+
+    const sceneBox = await page.locator("#scene").boundingBox();
+    const playBox = await page.locator("#play").boundingBox();
+    const nextSymbolBox = await page.locator("#next-symbol").boundingBox();
+
+    expect(sceneBox).not.toBeNull();
+    expect(playBox).not.toBeNull();
+    expect(nextSymbolBox).not.toBeNull();
+
+    expect(sceneBox!.y).toBeGreaterThanOrEqual(0);
+    expect(sceneBox!.y + sceneBox!.height).toBeLessThan(400);
+    expect(playBox!.y + playBox!.height).toBeLessThanOrEqual(height);
+    expect(nextSymbolBox!.y + nextSymbolBox!.height).toBeLessThanOrEqual(
+      height,
+    );
+
+    await page.locator("#next").click();
+    await expect(page.locator("#step-count")).toContainText("1 /");
+    await page.locator("#solution-close").click();
+    await expect(page.locator("#solution-content")).not.toBeVisible();
+    await page.locator("#reset").click();
+  }
+});
 test("production assets and worker load under a subdirectory", async ({
   page,
 }) => {

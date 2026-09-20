@@ -146,7 +146,9 @@ function refresh() {
     .forEach((b) => (b.disabled = !mainReady));
   $("solution-empty").hidden = !!solution;
   $("solution-content").hidden = !solution;
+  document.body.classList.toggle("has-solution", !!solution);
   $<HTMLButtonElement>("copy").disabled = !solution;
+  $("solution-close").hidden = !solution;
   if (solution) {
     $("move-count").textContent = `${solution.moves.length} 手`;
     $("solve-time").textContent =
@@ -392,6 +394,9 @@ async function solve(budget = 5000) {
 
     if (store.getRevision() !== at) return;
     store.setSolution(result);
+    if (window.innerWidth <= 740) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     $("solver-note").textContent =
       `${result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
     if (result.moves.length === 0) message("すでに6面が揃っています。");
@@ -539,6 +544,11 @@ $("copy").onclick = async () => {
     } catch {
       message("コピーできませんでした。解法を選択してコピーしてください。");
     }
+};
+$("solution-close").onclick = () => {
+  stop();
+  store.setSolution(undefined);
+  refresh();
 };
 $("help").onclick = () => {
   stop();

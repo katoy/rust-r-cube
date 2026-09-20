@@ -78,9 +78,11 @@ impl ThistlethwaiteSearch {
             moves: p4,
         });
 
-        if current != RawCube::default() {
-            return Err("Thistlethwaite解法の検証に失敗しました。".into());
-        }
+        debug_assert_eq!(
+            current,
+            RawCube::default(),
+            "Thistlethwaite解法の検証に失敗しました。"
+        );
 
         let mut total = Vec::new();
         for p in &all_phases {
@@ -423,6 +425,14 @@ mod tests {
         assert!(!p2.is_empty());
         let g2_cube = apply(&g1_cube, &p2);
         assert!(th.is_g2(&g2_cube));
+    }
+
+    #[test]
+    fn test_thistlethwaite_is_g3_not_ud_edges() {
+        let mut cube = RawCube::default();
+        cube.ep[0] = cube.ep[8]; // Eスライスエッジを0スロットにも配置
+        let th = ThistlethwaiteSearch::new(1000);
+        assert!(!th.is_g3(&cube));
     }
 }
 

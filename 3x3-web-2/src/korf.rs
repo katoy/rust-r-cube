@@ -139,6 +139,16 @@ mod tests {
     }
 
     #[test]
+    fn test_korf_timeout_in_search() {
+        let cube = RawCube::default();
+        let mut korf = KorfSearch::new(1);
+        korf.nodes = 4094;
+        korf.start = Instant::now() - std::time::Duration::from_secs(1);
+        assert!(!korf.search(&cube, 2, 99));
+        assert!(korf.timed_out);
+    }
+
+    #[test]
     fn test_korf_fallback_on_deep_scramble() {
         // 深さ12を超えるスクランブルではKociembaにフォールバックして解く
         let cube = RawCube::default();

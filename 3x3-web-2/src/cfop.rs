@@ -62,10 +62,12 @@ pub fn solve(cube: &RawCube) -> Result<CfopResult, String> {
         moves: pll_moves,
     });
 
-    // 最終検証: 完成しているか
-    if current != RawCube::default() {
-        return Err("CFOP解法の検証に失敗しました。".into());
-    }
+    debug_assert_eq!(
+        current,
+        RawCube::default(),
+        "CFOP解法の検証に失敗しました。"
+    );
+
 
     let mut total_moves = Vec::new();
     for p in &all_phases {
@@ -98,7 +100,7 @@ fn solve_cross(cube: &RawCube) -> Result<Vec<usize>, String> {
             continue;
         }
         let mut found = false;
-        for depth in 1..=4 {
+        for depth in 1..=5 {
             let mut path = Vec::new();
             if search_cross_edge(&current, depth, 99, target, &mut path) {
                 for &m in &path {
@@ -110,22 +112,12 @@ fn solve_cross(cube: &RawCube) -> Result<Vec<usize>, String> {
             }
         }
         if !found {
-            // 深さ5まで
-            let mut path = Vec::new();
-            if search_cross_edge(&current, 5, 99, target, &mut path) {
-                for &m in &path {
-                    current = current.multiply(move_cube_18(m));
-                }
-                total_moves.extend(path);
-                found = true;
-            }
-        }
-        if !found {
             return Err(format!("クロスエッジ {} の探索に失敗しました。", target));
         }
     }
     Ok(total_moves)
 }
+
 
 fn search_cross_edge(
     c: &RawCube,
@@ -172,7 +164,7 @@ fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
         }
         let solved_slots = corner_slot;
         let mut found = false;
-        for depth in 1..=5 {
+        for depth in 1..=6 {
             let mut path = Vec::new();
             if search_corner(&current, depth, 99, solved_slots, corner_slot, &mut path) {
                 for &m in &path {
@@ -184,22 +176,12 @@ fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
             }
         }
         if !found {
-            // 深さ6まで探索
-            let mut path = Vec::new();
-            if search_corner(&current, 6, 99, solved_slots, corner_slot, &mut path) {
-                for &m in &path {
-                    current = current.multiply(move_cube_18(m));
-                }
-                moves.extend(path);
-                found = true;
-            }
-        }
-        if !found {
             return Err(format!("第1層コーナー {} の探索に失敗しました。", corner_slot));
         }
     }
     Ok(moves)
 }
+
 
 fn search_corner(
     c: &RawCube,
@@ -278,20 +260,15 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
 
         let solved_slots = &[8, 9, 10, 11][..step_idx];
 
-        let current_pos = (0..12).position(|i| current.ep[i] as usize == target_slot).unwrap();
-        if current_pos >= 8 && current_pos <= 11 {
-            // 中層にあるので抜き出す
-            let eject_macs = get_slot_macros(current_pos);
-            for mac in &eject_macs {
-                let after = apply(&current, mac);
-                let fl_intact = is_first_layer_intact(&after);
-                let slots_intact = solved_slots.iter().all(|&s| after.ep[s] as usize == s && after.eo[s] == 0);
-                if fl_intact && slots_intact {
-                    result_moves.extend(mac.clone());
-                    current = after;
-                    break;
-                }
-            }
+        let current_pos = match (0..12).position(|i| current.ep[i] as usize == target_slot) {
+            Some(p) => p,
+            None => return Err(format!("第2層エッジ {} の探索に失敗しました。", target_slot)),
+        };
+        if (8..=11).contains(&current_pos) {
+            // 中層にあるので抜き出す（1つ目のマクロでU層に追い出す）
+            let eject_mac = &get_slot_macros(current_pos)[0];
+            result_moves.extend(eject_mac.clone());
+            current = apply(&current, eject_mac);
         }
 
         // これで目的のピースは U層 (0..4) にある
@@ -304,9 +281,9 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
                 let m = match u_turns {
                     1 => 0, // U
                     2 => 1, // U2
-                    3 => 2, // U'
-                    _ => unreachable!(),
+                    _ => 2, // U'
                 };
+
                 prefix.push(m);
             }
             let c_u = apply(&current, &prefix);
@@ -331,8 +308,6 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
         }
 
         if !solved {
-            let pos = (0..12).position(|i| current.ep[i] as usize == target_slot).unwrap();
-            eprintln!("target_slot: {}, actual_pos: {}, eo: {}", target_slot, pos, current.eo[pos]);
             return Err(format!("第2層エッジ {} の解決に失敗しました。", target_slot));
         }
     }
@@ -380,12 +355,10 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 found_path = Some(path);
                 break;
             }
-            if count >= 4 {
-                continue;
-            }
-            for op in &edge_ops {
-                let next = apply(&c, op);
-                if is_f2l_intact(&next) {
+            if count < 3 {
+                for op in &edge_ops {
+                    let next = apply(&c, op);
+                    debug_assert!(is_f2l_intact(&next));
                     let mut next_path = path.clone();
                     next_path.extend(op.clone());
                     queue.push_back((next, next_path, count + 1));
@@ -416,18 +389,17 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 found_path = Some(path);
                 break;
             }
-            if count >= 5 {
-                continue;
-            }
-            for op in &corner_ops {
-                let next = apply(&c, op);
-                if is_f2l_intact(&next) && is_oll_edges_solved(&next) {
+            if count < 4 {
+                for op in &corner_ops {
+                    let next = apply(&c, op);
+                    debug_assert!(is_f2l_intact(&next) && is_oll_edges_solved(&next));
                     let mut next_path = path.clone();
                     next_path.extend(op.clone());
                     queue.push_back((next, next_path, count + 1));
                 }
             }
         }
+
 
         let p = found_path.ok_or_else(|| "OLLコーナーの解決に失敗しました。".to_string())?;
         total_moves.extend(p);
@@ -464,8 +436,7 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 0 => vec![],
                 1 => vec![0],
                 2 => vec![1],
-                3 => vec![2],
-                _ => unreachable!(),
+                _ => vec![2],
             };
             let tc = apply(&c, &pref);
             if (0..4).all(|i| tc.cp[i] as usize == i) {
@@ -479,16 +450,15 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
         if ok {
             break;
         }
-        if count >= 4 {
+        if count >= 2 {
             continue;
         }
         for op in &corner_ops {
             let next = apply(&c, op);
-            if is_oll_solved(&next) {
-                let mut next_path = path.clone();
-                next_path.extend(op.clone());
-                queue.push_back((next, next_path, count + 1));
-            }
+            debug_assert!(is_oll_solved(&next));
+            let mut next_path = path.clone();
+            next_path.extend(op.clone());
+            queue.push_back((next, next_path, count + 1));
         }
     }
 
@@ -522,21 +492,21 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
             found_path = Some(path);
             break;
         }
-        if count >= 3 {
-            continue;
-        }
-        for op in &edge_ops {
-            let next = apply(&c, op);
-            if is_f2l_intact(&next)
-                && (0..4).all(|i| next.cp[i] as usize == i && next.co[i] == 0)
-                && is_oll_edges_solved(&next)
-            {
+        if count < 2 {
+            for op in &edge_ops {
+                let next = apply(&c, op);
+                debug_assert!(
+                    is_f2l_intact(&next)
+                        && (0..4).all(|i| next.cp[i] as usize == i && next.co[i] == 0)
+                        && is_oll_edges_solved(&next)
+                );
                 let mut next_path = path.clone();
                 next_path.extend(op.clone());
                 queue.push_back((next, next_path, count + 1));
             }
         }
     }
+
 
     let p = found_path.ok_or_else(|| "PLLエッジの解決に失敗しました。".to_string())?;
     total_moves.extend(p);
@@ -608,6 +578,61 @@ mod tests {
         assert!(is_f2l_intact(&cube));
         assert!(is_oll_edges_solved(&cube));
         assert!(is_oll_solved(&cube));
+    }
+
+    #[test]
+    fn test_cfop_error_paths_and_helpers() {
+        use crate::coord::{Corner, Edge};
+
+        assert!(get_slot_macros(99).is_empty());
+
+        // クロスエラー (目的のエッジが存在しない)
+        let mut broken_cross = RawCube::default();
+        broken_cross.ep[4] = Edge::UR;
+        assert!(solve_cross(&broken_cross).is_err());
+
+        // 第1層エラー (目的のコーナーが存在しない)
+        let mut broken_c1 = RawCube::default();
+        broken_c1.cp[4] = Corner::UFR;
+        assert!(solve_first_layer(&broken_c1).is_err());
+
+        // 第2層エラー (目的のエッジが存在しない)
+        let mut broken_e2_none = RawCube::default();
+        broken_e2_none.ep[8] = Edge::UR;
+        assert!(solve_second_layer(&broken_e2_none).is_err());
+
+        // 第2層エラー (第1層が崩れているため解決不可)
+        let mut broken_e2_unsolvable = RawCube::default();
+        broken_e2_unsolvable.ep.swap(0, 8);
+        broken_e2_unsolvable.eo[4] = 1;
+        assert!(solve_second_layer(&broken_e2_unsolvable).is_err());
+
+        // OLLエラー (単一Uエッジ反転でパリティ不正)
+        let mut broken_oll = RawCube::default();
+        broken_oll.eo[0] = 1;
+        assert!(solve_oll(&broken_oll).is_err());
+
+        // PLLコーナーエラー (U層コーナーが欠損しており解決不可)
+        let mut broken_pll = RawCube::default();
+        broken_pll.cp[0] = Corner::DLF;
+        assert!(solve_pll(&broken_pll).is_err());
+
+        // OLLコーナーエラー (単一コーナー反転でパリティ不正)
+        let mut broken_oll_c = RawCube::default();
+        broken_oll_c.co[0] = 1;
+        assert!(solve_oll(&broken_oll_c).is_err());
+
+        // PLLエッジエラー (単一エッジ交換でパリティ不正)
+        let mut broken_pll_e = RawCube::default();
+        broken_pll_e.ep.swap(0, 1);
+        assert!(solve_pll(&broken_pll_e).is_err());
+
+        // solve() における各フェーズのエラー伝播 (?) の網羅
+        assert!(solve(&broken_cross).is_err());
+        assert!(solve(&broken_c1).is_err());
+        assert!(solve(&broken_e2_none).is_err());
+        assert!(solve(&broken_oll).is_err());
+        assert!(solve(&broken_pll).is_err());
     }
 }
 

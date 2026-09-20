@@ -7,20 +7,43 @@ function getScopeSlug() {
       const u = new URL(self.location.href);
       pathname = u.pathname.substring(0, u.pathname.lastIndexOf("/") + 1);
     }
-    const segments = pathname
+    const rawSegments = pathname
       .replace(/^\/+|\/+$/g, "")
       .split("/")
-      .filter(Boolean)
-      .map((seg) => seg.replace(/-/g, "_").replace(/[^a-zA-Z0-9_]/g, "_"));
+      .filter(Boolean);
 
-    if (segments.length === 0) {
+    if (rawSegments.length === 0) {
       return "root";
     }
-    const slug = segments.join("-");
-    if (slug === "root") {
-      return "path-root";
+
+    // 記号を一意にエスケープ（ハイフン、アンダースコア、ドット等の衝突防止）
+    const escapeSegment = (seg) =>
+      seg.replace(/[^a-zA-Z0-9]/g, (ch) => {
+        if (ch === "_") return "__";
+        if (ch === "-") return "_h_";
+        if (ch === ".") return "_d_";
+        return `_x${ch.charCodeAt(0).toString(16)}_`;
+      });
+
+    // /root/ は "root_" とし、ルートスコープ "/" ("root") との衝突・前方一致を防止
+    if (rawSegments.length === 1 && rawSegments[0] === "root") {
+      return "root_";
     }
-    return slug;
+
+    const segments = rawSegments.map(escapeSegment);
+
+    // /root/... 配下は "root_" で開始してルートスコープ "root-" との前方一致巻き込みを防止
+    if (segments[0] === "root") {
+      return "root_" + segments.slice(1).join("_");
+    }
+
+    // 2階層までは "-" 結合（/nested/cube/ -> "nested-cube" で既存互換）
+    if (segments.length <= 2) {
+      return segments.join("-");
+    }
+
+    // 3階層目以降は "_" 結合（/nested/cube/child/ -> "nested-cube_child" で親スコープ "nested-cube-" との前方一致巻き込みを防止）
+    return segments.slice(0, 2).join("-") + "_" + segments.slice(2).join("_");
   } catch {
     return "root";
   }
@@ -94,13 +117,15 @@ self.addEventListener("fetch", (event) => {
           if (cached) return cached;
           const scope = self.registration ? self.registration.scope : "./";
           const indexUrl = new URL("./index.html", scope).toString();
+          const scopeUrl = new URL("./", scope).toString();
           const rootCached =
             (await ownCache.match(indexUrl)) ||
+            (await ownCache.match(scopeUrl)) ||
             (await ownCache.match(scope)) ||
             (await ownCache.match("./index.html")) ||
             (await ownCache.match("./"));
           if (rootCached) return rootCached;
-          return caches.match("/");
+          return ownCache.match("/");
         }),
     );
     return;

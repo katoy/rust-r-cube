@@ -1,4 +1,7 @@
-const STORAGE_KEY = "cube_studio_sound_enabled";
+const STORAGE_KEY =
+  typeof window !== "undefined" && window.location.pathname.length > 1
+    ? `cube_studio_sound_enabled:${window.location.pathname}`
+    : "cube_studio_sound_enabled";
 
 class SoundManager {
   private ctx: AudioContext | null = null;

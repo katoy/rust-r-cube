@@ -31,9 +31,14 @@ window.cube_store = store;
 
 mount();
 registerServiceWorker();
+export function getScopedStorageKey(baseKey: string): string {
+  const p = typeof window !== "undefined" ? window.location.pathname : "/";
+  return p.length > 1 ? `${baseKey}:${p}` : baseKey;
+}
+
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
-const storageKey = "cube-studio-v1";
+const storageKey = getScopedStorageKey("cube-studio-v1");
 let mainReady = false,
   engineError = false,
   solving = false;
@@ -762,7 +767,7 @@ async function start() {
       }
     } else if (algParam) {
       try {
-        const cleanAlg = algParam.replace(/\+/g, " ");
+        const cleanAlg = algParam.replace(/[_+]/g, " ").trim();
         const result: ResultData = JSON.parse(apply_moves(SOLVED, cleanAlg));
         validate(result.state);
         const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);

@@ -53,4 +53,26 @@ test.describe("R06: URL ?alg= parameter idempotency", () => {
       "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
     );
   });
+
+  test("R16: ?alg= parameter with underscores (e.g. R_U_R'_U') applies moves to cube state", async ({
+    page,
+  }) => {
+    // 共有リンクやショートハンド等で使われるアンダースコア区切り ?alg=R_U_R'_U'
+    await page.goto("/?alg=R_U_R'_U'");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    // キューブが完成状態ではなく、アルゴリズム適用状態になっていること
+    await expect(page.locator("#cube-status")).not.toContainText("完成状態");
+
+    // 適用された局面が、空白区切り ?alg=R+U+R'+U' と完全に一致すること
+    const stateUnderScore = await page
+      .locator("#scene")
+      .getAttribute("data-state");
+
+    await page.goto("/?alg=R+U+R'+U'");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    const stateSpace = await page.locator("#scene").getAttribute("data-state");
+
+    expect(stateUnderScore).toBe(stateSpace);
+  });
 });

@@ -10,11 +10,18 @@ const projectDir = fileURLToPath(new URL("..", import.meta.url));
 const presetFile = "cubes/easy-5-moves.json";
 const firstPreset = { name: "version-1" };
 const secondPreset = { name: "version-2" };
+// 親子スコープが重なる場合は、子スコープを先に判定する。
 const deploymentScopes = [
+  "/nested/cube/child/",
   "/nested/cube/",
   "/nested/cube-alt/",
+  "/nested/cube_alt/",
   "/nested-cube/",
+  "/path/root/",
+  "/root/child/",
   "/root/",
+  "/version.1/",
+  "/version_1/",
   "/",
 ];
 
@@ -303,6 +310,16 @@ for (const { scope, otherScope } of [
   { scope: "/nested/cube/", otherScope: "/nested/cube-alt/" },
   { scope: "/nested/cube/", otherScope: "/nested-cube/" },
   { scope: "/", otherScope: "/root/" },
+  // ハイフンとアンダースコアを同じスラグへ変換してはいけない。
+  { scope: "/nested/cube-alt/", otherScope: "/nested/cube_alt/" },
+  // 親スコープの旧版削除で、子スコープのキャッシュを巻き込まない。
+  { scope: "/nested/cube/", otherScope: "/nested/cube/child/" },
+  // /root/ の特別扱いで、実在する /path/root/ と衝突してはいけない。
+  { scope: "/root/", otherScope: "/path/root/" },
+  // ルート配置のプレフィックスで /root/ 配下の別配置を削除しない。
+  { scope: "/", otherScope: "/root/child/" },
+  // ドットなどの記号をアンダースコアへ変換して同一スラグにしてはいけない。
+  { scope: "/version.1/", otherScope: "/version_1/" },
 ]) {
   test(`R02: ${scope} preserves the real deployment at ${otherScope} through activation and update`, async ({
     page,
@@ -446,4 +463,56 @@ test("preserves legacy un-scoped cache (e.g. cube-studio-v1) as foreign deployme
   expect(remainingKeys).toContain("cube-studio-v1");
   // 自身のキャッシュが作成されていること
   expect(remainingKeys.some((k) => k.startsWith("cube-studio-nested-cube-"))).toBe(true);
+});
+
+test("offline navigation does not leak root scope's index.html into nested subscope", async ({
+  page,
+  context,
+  build,
+  deployment,
+}) => {
+  build.generate();
+  const subScope = "/nested/cube/";
+
+  // ルートスコープ（または別アプリ）のキャッシュ "/" に外部HTMLを仕込む
+  await page.goto(deployment.origin + subScope);
+  await page.evaluate(async () => {
+    const foreignCache = await caches.open("foreign-root-cache");
+    await foreignCache.put(
+      new Request(location.origin + "/"),
+      new Response("<!doctype html><title>FOREIGN_ROOT_APP</title>", {
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+  });
+
+  await registerWorker(page);
+
+  // 自スコープのHTMLキャッシュを意図的に削除し、フォールバック挙動を誘発する
+  const ownCaches = (await page.evaluate(() => caches.keys())).filter((k) =>
+    k.startsWith("cube-studio-nested-cube-"),
+  );
+  expect(ownCaches.length).toBeGreaterThan(0);
+  await page.evaluate(async (cName) => {
+    const cache = await caches.open(cName);
+    const keys = await cache.keys();
+    for (const req of keys) {
+      if (req.url.endsWith("/index.html") || req.url.endsWith("/")) {
+        await cache.delete(req);
+      }
+    }
+  }, ownCaches[0]);
+
+  // 自スコープのHTMLキャッシュを意図的に削除した極限状態でも、他スコープのキャッシュを拾わないこと
+  try {
+    const response = await page.goto(deployment.origin + subScope + "subroute");
+    if (response) {
+      const text = await response.text();
+      // ルートに存在する別アプリのキャッシュ (FOREIGN_ROOT_APP) を勝手に拾って返してはならない
+      expect(text).not.toContain("FOREIGN_ROOT_APP");
+    }
+  } catch (err: any) {
+    // 他スコープのキャッシュを越境取得せず、自スコープ内でフォールバック不能としてエラーとなるのは正常な隔離動作
+    expect(err.message).toContain("ERR_FAILED");
+  }
 });

@@ -1387,6 +1387,32 @@ fn test_supercube_centers() {
 }
 
 #[test]
+fn test_cancel_redundant_moves_opposite_faces() {
+    use crate::supercube::cancel_redundant_moves;
+
+    // 1. 同一面の直接相殺: R R' -> 空
+    let r_rprime = parse_moves("R R'").unwrap();
+    assert_eq!(cancel_redundant_moves(&r_rprime), Vec::<usize>::new());
+
+    // 2. 対向面を跨いだ相殺: U D U' -> D
+    let u_d_uprime = parse_moves("U D U'").unwrap();
+    let expected_d = parse_moves("D").unwrap();
+    assert_eq!(cancel_redundant_moves(&u_d_uprime), expected_d);
+
+    // 3. 対向面を跨いだ合成: R L R2 -> L R' (または R' L)
+    let r_l_r2 = parse_moves("R L R2").unwrap();
+    let res = cancel_redundant_moves(&r_l_r2);
+    let c1 = apply(&RawCube::default(), &r_l_r2);
+    let c2 = apply(&RawCube::default(), &res);
+    assert_eq!(c1, c2);
+    assert_eq!(res.len(), 2);
+
+    // 4. 複数対向面の完全相殺: U D U2 D' U -> 空
+    let complex = parse_moves("U D U2 D' U").unwrap();
+    assert_eq!(cancel_redundant_moves(&complex), Vec::<usize>::new());
+}
+
+#[test]
 fn test_superflip_orientation_solve_length() {
     let moves = superflip_preset_moves();
     let cube = apply(&RawCube::default(), &moves);
@@ -1638,15 +1664,15 @@ fn test_superflip_cfop_move_counts_match_theoretical_values() {
     assert_eq!(facelets(&apply(&cube, &no_orient_moves)), SOLVED);
 
     // 2. センター向きを揃える場合
-    // 色解決の 136手に加え、残ったセンターのズレを解消する定石マクロ（44手）が追加され、
-    // 合計手数は理論値 180手（136 + 44）となる。
+    // 色解決の 136手に加え、残ったセンターのズレを解消する定石マクロ（42手、対向面相殺適用後）が追加され、
+    // 合計手数は 178手（136 + 42）となる。
     let sol_orient =
         crate::solve_state_with_algorithm(&state, 5000, true, Some(initial_centers), "cfop")
             .unwrap();
     assert_eq!(
         sol_orient.moves.len(),
-        180,
-        "CFOP with center orientation for Superflip must exactly match theoretical 180 moves (136 color + 44 center)"
+        178,
+        "CFOP with center orientation for Superflip matches theoretical 178 moves (136 color + 42 center with commutative cancellation)"
     );
     assert!(
         sol_orient.moves.len() >= sol_no_orient.moves.len(),
@@ -1657,7 +1683,7 @@ fn test_superflip_cfop_move_counts_match_theoretical_values() {
     // センター向き解決フェーズが追加されていることを確認
     let last_phase = sol_orient.phases.last().unwrap();
     assert_eq!(last_phase.name, "センター向き解決");
-    assert_eq!(last_phase.end - last_phase.start, 44);
+    assert_eq!(last_phase.end - last_phase.start, 42);
 
     // キューブのピース配置およびセンター向きが完全に元通り（回転角0）になることを検証
     let orient_moves = parse_moves(&sol_orient.moves.join(" ")).unwrap();
@@ -1791,9 +1817,15 @@ fn test_superflip_thistlethwaite_move_counts_match_theoretical_bounds() {
     let state = facelets(&cube);
     let initial_centers = superflip_initial_centers(&moves);
 
+    let budget = if cfg!(debug_assertions) {
+        60_000
+    } else {
+        5_000
+    };
+
     // 1. センター向き無視（色のみ）
     let sol_no_orient =
-        crate::solve_state_with_algorithm(&state, 5000, false, None, "thistlethwaite")
+        crate::solve_state_with_algorithm(&state, budget, false, None, "thistlethwaite")
             .expect("Thistlethwaite must succeed on Superflip without error");
 
     assert!(
@@ -1816,7 +1848,7 @@ fn test_superflip_thistlethwaite_move_counts_match_theoretical_bounds() {
     // 2. センター向きを揃える場合
     let sol_orient = crate::solve_state_with_algorithm(
         &state,
-        5000,
+        budget,
         true,
         Some(initial_centers),
         "thistlethwaite",

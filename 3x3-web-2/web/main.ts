@@ -691,14 +691,13 @@ document.addEventListener("keydown", (event) => {
   ) {
     event.preventDefault();
     void play();
-  } else if (event.key === "ArrowLeft") {
+  } else if (
+    (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+    !(event.target instanceof HTMLButtonElement)
+  ) {
     event.preventDefault();
     stop();
-    void seek(store.getStep() - 1);
-  } else if (event.key === "ArrowRight") {
-    event.preventDefault();
-    stop();
-    void seek(store.getStep() + 1);
+    void seek(store.getStep() + (event.key === "ArrowRight" ? 1 : -1));
   } else if (event.key === "Home") {
     const solution = store.getSolution();
     if (solution) {

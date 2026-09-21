@@ -49,8 +49,8 @@
 2. **パースペクティブ補間サンプリング (`sampleFace`)**:
    - 3つの各クアッド領域（上面、前面左、前面右）を 3×3 グリッドに分割し、中心付近の画素値を抽出。
    - 基準パレット（U, R, F, D, L, B, ?）との色距離判定により 9 マスの色文字列を取得。
-     - **現行実装**: RGB 空間のユークリッド距離で色一致判定（[`web/image-sampler.ts`](file:///Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/web/image-sampler.ts) 参照）。
-     - **照明・色空間耐性の向上（今後の拡張方針）**: 知覚的色差（$L^*a^*b^*$ / HSV）や局所キャリブレーションによる改善を検討中。詳細は `docs/color-matching-improvement.md`（作成予定）を参照。
+     - **現行実装**: HSV 色空間（色相 H、彩度 S、明度 V）に基づく色分類判定（[`web/image-sampler.ts`](file:///Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/web/image-sampler.ts) の `classifyColor` / `rgbToHsv` 参照）。低彩度・高明度を白（U）、極端な暗所を未知（?）、有彩色は色相 H により赤（R）、橙（L）、黄（D）、緑（F）、青（B）に分類。
+     - **照明・色空間耐性の向上（今後の拡張方針）**: 知覚的色差（CIELAB / $L^*a^*b^*$）や適応型局所ホワイトバランス・キャリブレーションによる更なる改善を検討中。
 
 ### 3.2 処理時のセンターセル色チェック
 「この3面を読み取る」実行時に、各面の中央セル（インデックス 4）の色を検証する。

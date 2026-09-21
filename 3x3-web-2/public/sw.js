@@ -153,7 +153,7 @@ self.addEventListener("fetch", (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
 
       // バックグラウンドキャッシュ更新を event.waitUntil に接続して SW 早期終了を防止
       event.waitUntil(updatePromise);

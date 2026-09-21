@@ -281,7 +281,7 @@ impl ThistlethwaiteSearch {
         }
         let bad_co = c.co.iter().filter(|&&o| o != 0).count() as u8;
         let bad_eslice = (8..12).filter(|&i| (c.ep[i] as usize) < 8).count() as u8;
-        if bad_co.div_ceil(4) > depth || bad_eslice.div_ceil(4) > depth {
+        if bad_co.div_ceil(4) > depth || bad_eslice.div_ceil(2) > depth {
             return false;
         }
 
@@ -554,7 +554,12 @@ mod tests {
             serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
         let sc = parse_moves(preset["scramble"].as_str().unwrap()).unwrap();
         let cube = apply(&RawCube::default(), &sc);
-        let mut th = ThistlethwaiteSearch::new(10000);
+        let budget = if cfg!(debug_assertions) {
+            60_000
+        } else {
+            10_000
+        };
+        let mut th = ThistlethwaiteSearch::new(budget);
 
         let res = th.solve(&cube).unwrap();
         assert_eq!(res.phases.len(), 4, "All 4 phases must succeed");

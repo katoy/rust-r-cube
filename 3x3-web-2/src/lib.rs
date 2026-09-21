@@ -203,14 +203,33 @@ pub fn solve_state_with_algorithm(
 
     // 完成状態を確認
     let result_cube = cube::apply(&cube, &moves);
-    let is_solved = if include_orientation {
+    let is_pieces_solved = if include_orientation {
         result_cube == coord::RawCube::default()
     } else {
         cube::facelets(&result_cube) == cube::SOLVED
     };
 
-    if !is_solved {
+    if !is_pieces_solved {
         return Err("解法の検証に失敗しました。".into());
+    }
+
+    if include_orientation {
+        if let Some(initial) = initial_centers {
+            let mut final_centers = initial;
+            for &m in &moves {
+                let f = m / 3;
+                let t = match m % 3 {
+                    0 => 1,
+                    1 => 2,
+                    2 => -1,
+                    _ => unreachable!("m % 3 は 0, 1, 2 のみ"),
+                };
+                final_centers[f] = (final_centers[f] + t).rem_euclid(4);
+            }
+            if final_centers.iter().any(|&c| c != 0) {
+                return Err("センター向きの検証に失敗しました。".into());
+            }
+        }
     }
 
     result(
@@ -223,18 +242,9 @@ pub fn solve_state_with_algorithm(
     )
 }
 fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        value
-            .and_then(|v| serde_json::to_string(&v).map_err(|e| e.to_string()))
-            .map_err(|e| JsValue::from_str(&e))
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        match value {
-            Ok(v) => serde_json::to_string(&v).map_err(|_| unsafe { std::mem::zeroed() }),
-            Err(_) => Err(unsafe { std::mem::zeroed() }),
-        }
+    match value {
+        Ok(v) => serde_json::to_string(&v).map_err(|e| JsValue::from_str(&e.to_string())),
+        Err(e) => Err(JsValue::from_str(&e)),
     }
 }
 #[wasm_bindgen]

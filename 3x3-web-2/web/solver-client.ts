@@ -93,7 +93,7 @@ export class SolverClient {
   }
 
   cancel() {
-    this.restart();
+    this.disposeRequest();
   }
   private disposeRequest() {
     clearTimeout(this.timer);

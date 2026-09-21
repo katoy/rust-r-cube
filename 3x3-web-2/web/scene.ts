@@ -83,6 +83,10 @@ export class CubeScene {
   private dirty = true;
   private observer: ResizeObserver;
   private next = "";
+  private onContextLost = (event: Event) => {
+    event.preventDefault();
+    this.host.dispatchEvent(new Event("render-failed"));
+  };
 
   constructor(private host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -250,10 +254,10 @@ export class CubeScene {
     this.observer.observe(host);
     this.resize();
     this.renderer.setAnimationLoop((time) => this.frame(time));
-    this.renderer.domElement.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-      host.dispatchEvent(new Event("render-failed"));
-    });
+    this.renderer.domElement.addEventListener(
+      "webglcontextlost",
+      this.onContextLost,
+    );
   }
   private add(mesh: THREE.Object3D) {
     mesh.userData.origin = mesh.position.clone();
@@ -309,6 +313,10 @@ export class CubeScene {
   dispose() {
     this.finish();
     this.renderer.setAnimationLoop(null);
+    this.renderer.domElement.removeEventListener(
+      "webglcontextlost",
+      this.onContextLost,
+    );
     this.controls.dispose();
     this.observer.disconnect();
     this.scene.traverse((object) => {
@@ -329,6 +337,11 @@ export class CubeScene {
     this.colorMaterials.forEach((mat) => mat.dispose());
     this.colorMaterials.clear();
     this.renderer.dispose();
+    this.stickers = [];
+    this.pieces = [];
+    this.centerLabels = [];
+    this.outlineMeshes = [];
+    this.arrowMeshes = [];
   }
   show(state: string, next = "") {
     this.dirty = true;

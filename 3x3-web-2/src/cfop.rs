@@ -74,7 +74,7 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
     state.check_timeout()?;
 
     // 3. Second Layer Edges (中層エッジ: 8:FR, 9:FL, 10:BL, 11:BR)
-    let second_layer_moves = solve_second_layer(&current)?;
+    let second_layer_moves = solve_second_layer(&current, &mut state)?;
     current = apply(&current, &second_layer_moves);
     all_phases.push(CfopPhase {
         name: "Second Layer (中層エッジ)",
@@ -83,7 +83,7 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
     state.check_timeout()?;
 
     // 4. OLL (Orientation of Last Layer: U面エッジ・コーナーの向き)
-    let oll_moves = solve_oll(&current)?;
+    let oll_moves = solve_oll(&current, &mut state)?;
     current = apply(&current, &oll_moves);
     all_phases.push(CfopPhase {
         name: "OLL (ラストレイヤー向き)",
@@ -92,7 +92,7 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
     state.check_timeout()?;
 
     // 5. PLL (Permutation of Last Layer: U面エッジ・コーナーの位置)
-    let pll_moves = solve_pll(&current)?;
+    let pll_moves = solve_pll(&current, &mut state)?;
     current = apply(&current, &pll_moves);
     all_phases.push(CfopPhase {
         name: "PLL (ラストレイヤー配置)",
@@ -308,11 +308,12 @@ fn get_slot_macros(slot: usize) -> Vec<Vec<usize>> {
     }
 }
 
-fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
+fn solve_second_layer(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut result_moves = Vec::new();
 
     for (step_idx, &target_slot) in [8, 9, 10, 11].iter().enumerate() {
+        state.check_timeout()?;
         if current.ep[target_slot] as usize == target_slot && current.eo[target_slot] == 0 {
             continue;
         }
@@ -399,7 +400,7 @@ fn is_oll_solved(c: &RawCube) -> bool {
     is_f2l_intact(c) && is_oll_edges_solved(c) && (0..4).all(|i| c.co[i] == 0)
 }
 
-fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
+fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut total_moves = Vec::new();
 
@@ -413,10 +414,13 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
             moves("U'"),
         ];
         let mut queue = std::collections::VecDeque::new();
+        let mut seen = std::collections::HashSet::new();
+        seen.insert(current);
         queue.push_back((current, Vec::new(), 0usize));
         let mut found_path = None;
 
         while let Some((c, path, count)) = queue.pop_front() {
+            state.check_timeout()?;
             if is_oll_edges_solved(&c) {
                 found_path = Some(path);
                 break;
@@ -425,9 +429,11 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 for op in &edge_ops {
                     let next = apply(&c, op);
                     debug_assert!(is_f2l_intact(&next));
-                    let mut next_path = path.clone();
-                    next_path.extend(op.clone());
-                    queue.push_back((next, next_path, count + 1));
+                    if seen.insert(next) {
+                        let mut next_path = path.clone();
+                        next_path.extend(op.clone());
+                        queue.push_back((next, next_path, count + 1));
+                    }
                 }
             }
         }
@@ -447,10 +453,13 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
             moves("U'"),
         ];
         let mut queue = std::collections::VecDeque::new();
+        let mut seen = std::collections::HashSet::new();
+        seen.insert(current);
         queue.push_back((current, Vec::new(), 0usize));
         let mut found_path = None;
 
         while let Some((c, path, count)) = queue.pop_front() {
+            state.check_timeout()?;
             if is_oll_solved(&c) {
                 found_path = Some(path);
                 break;
@@ -459,9 +468,11 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 for op in &corner_ops {
                     let next = apply(&c, op);
                     debug_assert!(is_f2l_intact(&next) && is_oll_edges_solved(&next));
-                    let mut next_path = path.clone();
-                    next_path.extend(op.clone());
-                    queue.push_back((next, next_path, count + 1));
+                    if seen.insert(next) {
+                        let mut next_path = path.clone();
+                        next_path.extend(op.clone());
+                        queue.push_back((next, next_path, count + 1));
+                    }
                 }
             }
         }
@@ -476,7 +487,7 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
 // -------------------------------------------------------------
 // Step 5: PLL (U面の配置)
 // -------------------------------------------------------------
-fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
+fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut total_moves = Vec::new();
 
@@ -490,10 +501,13 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
     ];
 
     let mut queue = std::collections::VecDeque::new();
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(current);
     queue.push_back((current, Vec::new(), 0usize));
     let mut found_path = None;
 
     while let Some((c, path, count)) = queue.pop_front() {
+        state.check_timeout()?;
         // コーナーの相対配置が正しいかチェック
         let mut ok = false;
         for u_turns in 0..4 {
@@ -521,9 +535,11 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
         for op in &corner_ops {
             let next = apply(&c, op);
             debug_assert!(is_oll_solved(&next));
-            let mut next_path = path.clone();
-            next_path.extend(op.clone());
-            queue.push_back((next, next_path, count + 1));
+            if seen.insert(next) {
+                let mut next_path = path.clone();
+                next_path.extend(op.clone());
+                queue.push_back((next, next_path, count + 1));
+            }
         }
     }
 
@@ -532,7 +548,7 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
     total_moves.extend(p);
 
     // 5.2 エッジの位置を揃える (完成へ)
-    // コーナーを固定したままエッジだけを交換するマクロ（4面展開）
+    // コーナーを固定したままエッジだけを交換するマクロ（4面展開およびZ-perm）
     let edge_ops = vec![
         // Ua-perm (4面)
         moves("R U' R U R U R U' R' U' R2"),
@@ -549,10 +565,13 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
     ];
 
     let mut queue = std::collections::VecDeque::new();
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(current);
     queue.push_back((current, Vec::new(), 0usize));
     let mut found_path = None;
 
     while let Some((c, path, count)) = queue.pop_front() {
+        state.check_timeout()?;
         if c == RawCube::default() {
             found_path = Some(path);
             break;
@@ -565,9 +584,11 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
                         && (0..4).all(|i| next.cp[i] as usize == i && next.co[i] == 0)
                         && is_oll_edges_solved(&next)
                 );
-                let mut next_path = path.clone();
-                next_path.extend(op.clone());
-                queue.push_back((next, next_path, count + 1));
+                if seen.insert(next) {
+                    let mut next_path = path.clone();
+                    next_path.extend(op.clone());
+                    queue.push_back((next, next_path, count + 1));
+                }
             }
         }
     }
@@ -633,9 +654,15 @@ mod tests {
         assert!(solve_first_layer(&cube, &mut SolverState::new(10_000))
             .unwrap()
             .is_empty());
-        assert!(solve_second_layer(&cube).unwrap().is_empty());
-        assert!(solve_oll(&cube).unwrap().is_empty());
-        assert!(solve_pll(&cube).unwrap().is_empty());
+        assert!(solve_second_layer(&cube, &mut SolverState::new(10_000))
+            .unwrap()
+            .is_empty());
+        assert!(solve_oll(&cube, &mut SolverState::new(10_000))
+            .unwrap()
+            .is_empty());
+        assert!(solve_pll(&cube, &mut SolverState::new(10_000))
+            .unwrap()
+            .is_empty());
 
         // 各判定関数の網羅
         assert!(is_cross_solved(&cube));
@@ -665,33 +692,33 @@ mod tests {
         // 第2層エラー (目的のエッジが存在しない)
         let mut broken_e2_none = RawCube::default();
         broken_e2_none.ep[8] = Edge::UR;
-        assert!(solve_second_layer(&broken_e2_none).is_err());
+        assert!(solve_second_layer(&broken_e2_none, &mut SolverState::new(10_000)).is_err());
 
         // 第2層エラー (第1層が崩れているため解決不可)
         let mut broken_e2_unsolvable = RawCube::default();
         broken_e2_unsolvable.ep.swap(0, 8);
         broken_e2_unsolvable.eo[4] = 1;
-        assert!(solve_second_layer(&broken_e2_unsolvable).is_err());
+        assert!(solve_second_layer(&broken_e2_unsolvable, &mut SolverState::new(10_000)).is_err());
 
         // OLLエラー (単一Uエッジ反転でパリティ不正)
         let mut broken_oll = RawCube::default();
         broken_oll.eo[0] = 1;
-        assert!(solve_oll(&broken_oll).is_err());
+        assert!(solve_oll(&broken_oll, &mut SolverState::new(10_000)).is_err());
 
         // PLLコーナーエラー (U層コーナーが欠損しており解決不可)
         let mut broken_pll = RawCube::default();
         broken_pll.cp[0] = Corner::DLF;
-        assert!(solve_pll(&broken_pll).is_err());
+        assert!(solve_pll(&broken_pll, &mut SolverState::new(10_000)).is_err());
 
         // OLLコーナーエラー (単一コーナー反転でパリティ不正)
         let mut broken_oll_c = RawCube::default();
         broken_oll_c.co[0] = 1;
-        assert!(solve_oll(&broken_oll_c).is_err());
+        assert!(solve_oll(&broken_oll_c, &mut SolverState::new(10_000)).is_err());
 
         // PLLエッジエラー (単一エッジ交換でパリティ不正)
         let mut broken_pll_e = RawCube::default();
         broken_pll_e.ep.swap(0, 1);
-        assert!(solve_pll(&broken_pll_e).is_err());
+        assert!(solve_pll(&broken_pll_e, &mut SolverState::new(10_000)).is_err());
 
         // solve() における各フェーズのエラー伝播 (?) の網羅
         assert!(solve(&broken_cross, 10_000).is_err());

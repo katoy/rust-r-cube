@@ -73,23 +73,42 @@ pub fn rotate_center_180(face: usize) -> Vec<usize> {
     parse_moves(&alg).unwrap()
 }
 
-/// Cancel adjacent redundant moves (e.g. R R' -> nothing, U U -> U2)
+fn is_opposite_face(f1: usize, f2: usize) -> bool {
+    matches!(
+        (f1, f2),
+        (0, 3) | (3, 0) | (1, 4) | (4, 1) | (2, 5) | (5, 2)
+    )
+}
+
+/// Cancel adjacent redundant moves and commutative opposite-face moves (e.g. R R' -> nothing, U D U' -> D)
 pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
     let mut reduced: Vec<usize> = Vec::new();
     for &m in moves {
         let face = m / 3;
-        if let Some(&last) = reduced.last() {
-            if last / 3 == face {
-                reduced.pop();
-                // Move suffixes 0, 1, 2 encode one, two, three quarter turns.
-                let combined_turns = (last % 3 + 1 + m % 3 + 1) % 4;
-                if combined_turns != 0 {
-                    reduced.push(face * 3 + combined_turns - 1);
+        let mut turns = m % 3 + 1;
+        let mut i = reduced.len();
+        let mut matched = false;
+
+        while i > 0 {
+            let prev_face = reduced[i - 1] / 3;
+            if prev_face == face {
+                let prev_turns = reduced[i - 1] % 3 + 1;
+                turns = (prev_turns + turns) % 4;
+                reduced.remove(i - 1);
+                if turns != 0 {
+                    reduced.insert(i - 1, face * 3 + turns - 1);
                 }
-                continue;
+                matched = true;
+                break;
+            } else if is_opposite_face(prev_face, face) {
+                i -= 1;
+            } else {
+                break;
             }
         }
-        reduced.push(m);
+        if !matched && turns != 0 {
+            reduced.push(face * 3 + turns - 1);
+        }
     }
     reduced
 }

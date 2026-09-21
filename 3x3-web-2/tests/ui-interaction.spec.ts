@@ -71,8 +71,23 @@ test.describe("R11, R12 & Preset Metadata Fixes", () => {
     await solvedPresetBtn.click();
     await expect(page.locator("#preset-status")).toContainText("読み込み中");
 
+    const initialState = await page.evaluate(() => {
+      // @ts-ignore
+      return (window as any).cube_store?.getState?.();
+    });
+
     // 取得保留中にユーザーが手動で 'R' 操作を行う
     await page.keyboard.press("r");
+
+    // 手動操作が確実に store に反映されて状態が変化するまで待機
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          // @ts-ignore
+          return (window as any).cube_store?.getState?.();
+        });
+      })
+      .not.toBe(initialState);
 
     // 手動操作後のキューブ状態を取得（R操作後の状態）
     const stateAfterEdit = await page.evaluate(() => {

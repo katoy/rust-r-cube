@@ -580,6 +580,9 @@ h2 {
   border-radius: 3px;
   margin: 3px 0;
   width: 100%;
+  background: rgba(116, 184, 154, 0.1);
+  border: 1px solid rgba(116, 184, 154, 0.25);
+  color: var(--text);
 }
 .phase-badge.phase-1 {
   background: rgba(116, 184, 154, 0.15);
@@ -605,6 +608,11 @@ h2 {
   background: rgba(229, 86, 73, 0.15);
   border: 1px solid rgba(229, 86, 73, 0.35);
   color: #e55649;
+}
+.phase-badge.phase-6 {
+  background: rgba(175, 110, 235, 0.15);
+  border: 1px solid rgba(175, 110, 235, 0.35);
+  color: #af6eeb;
 }
 .solver-algo-row {
   display: flex;

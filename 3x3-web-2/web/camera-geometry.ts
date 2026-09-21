@@ -34,7 +34,7 @@ export function computeCenter(points: Point[]): Point {
 
 export function detectCubeOutline(
   canvas: HTMLCanvasElement,
-  image: HTMLImageElement,
+  _image?: HTMLImageElement,
 ): Point[] {
   const w = canvas.width;
   const h = canvas.height;

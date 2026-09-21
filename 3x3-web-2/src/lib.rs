@@ -166,6 +166,11 @@ pub fn solve_state_with_algorithm(
             };
 
             if let Some(m) = moves_opt {
+                phase_infos.push(PhaseInfo {
+                    name: "同時最適化 (色＆センター)".to_string(),
+                    start: 0,
+                    end: m.len(),
+                });
                 m
             } else {
                 let elapsed_ms = start.elapsed().as_millis() as u32;
@@ -273,17 +278,45 @@ fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
         Err(e) => Err(to_js_error(e)),
     }
 }
+/// 純粋な Rust 向けの内部・共通ロジック
+pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> {
+    cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0, "apply", Vec::new()))
+}
+
+pub fn validate_core(state: &str) -> Result<bool, String> {
+    cube::parse_state(state).map(|_| true)
+}
+
 #[wasm_bindgen]
 pub fn initialize() {
     let _ = tables::MoveTable::get();
     let _ = tables::PruningTable::get();
 }
+
+/// 状態が合法であるかを検証し、完成状態（SOLVED）であれば true、
+/// 合法だが未完成（スクランブル状態）であれば false、
+/// 不正な配色・パリティであれば Err を返します。
 #[wasm_bindgen]
 pub fn validate(state: &str) -> Result<bool, JsValue> {
     cube::parse_state(state)
         .map(|c| c == coord::RawCube::default())
         .map_err(to_js_error)
 }
+
+/// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
+#[wasm_bindgen]
+pub fn is_valid(state: &str) -> Result<bool, JsValue> {
+    cube::parse_state(state).map(|_| true).map_err(to_js_error)
+}
+
+/// 状態が完成状態（6面すべて揃っている状態）であるかを判定します。
+#[wasm_bindgen]
+pub fn is_solved(state: &str) -> Result<bool, JsValue> {
+    cube::parse_state(state)
+        .map(|c| c == coord::RawCube::default())
+        .map_err(to_js_error)
+}
+
 /// Required parity of the sum of center quarter turns. Each face quarter turn
 /// changes both this sum's parity and the corner permutation's parity.
 #[wasm_bindgen]
@@ -294,7 +327,7 @@ pub fn center_parity(state: &str) -> Result<u8, JsValue> {
 }
 #[wasm_bindgen]
 pub fn apply_moves(state: &str, moves: &str) -> Result<String, JsValue> {
-    json(cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0, "apply", Vec::new())))
+    json(apply_moves_core(state, moves))
 }
 #[wasm_bindgen]
 pub fn scramble(seed: u32) -> String {

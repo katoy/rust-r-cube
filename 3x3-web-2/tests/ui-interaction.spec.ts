@@ -6,6 +6,23 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test.describe("R11, R12 & Preset Metadata Fixes", () => {
+  test.beforeEach(async ({ page }) => {
+    // 既存の Service Worker や Cache Storage によるリクエスト横取りを防止
+    await page.goto("/");
+    await page.evaluate(async () => {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      }
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      }
+    });
+    // SW が完全に解除された状態で再読み込み
+    await page.reload();
+  });
+
   test("R11: arrow keys on tabs should navigate tabs without advancing cube solution playback", async ({
     page,
   }) => {

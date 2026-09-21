@@ -30,19 +30,39 @@ const TRIGGERS: { pattern: string[]; name: string }[] = [
 ];
 
 const PHASE_LABEL_MAP: Record<string, string> = {
-  // CFOP
+  // CFOP (Rust: cfop.rs)
+  "Cross (クロス)": "ステップ 1: 底面クロス (Cross)",
+  "First Layer (第1層コーナー)": "ステップ 2: 完全1層 (First Layer)",
+  "Second Layer (中層エッジ)": "ステップ 3: 中層エッジ (Second Layer)",
+  "OLL (ラストレイヤー向き)": "ステップ 4: 上面色揃え (OLL)",
+  "PLL (ラストレイヤー配置)": "ステップ 5: 上面完全配置 (PLL)",
   Cross: "ステップ 1: 底面クロス (Cross)",
   "First Layer": "ステップ 2: 完全1層 (First Layer)",
   "Second Layer": "ステップ 3: 中層エッジ (Second Layer)",
   OLL: "ステップ 4: 上面色揃え (OLL)",
   PLL: "ステップ 5: 上面完全配置 (PLL)",
-  // Thistlethwaite
+
+  // Thistlethwaite (Rust: thistlethwaite.rs)
+  "Phase 1 (G0→G1: エッジ向き)": "第1段階: G0→G1 (エッジ反転解消)",
+  "Phase 2 (G1→G2: コーナー向き&Eスライス)":
+    "第2段階: G1→G2 (コーナー向き+中層)",
+  "Phase 3 (G2→G3: オービット分離)": "第3段階: G2→G3 (角・辺軌道限定)",
+  "Phase 4 (G3→G4: 最終解決)": "第4段階: G3→G4 (最終揃え)",
+  "Phase 4 (最終解決フォールバック)": "第4段階: 最終揃え (フォールバック)",
   "Phase 1": "第1段階: G0→G1 (エッジ反転解消)",
   "Phase 2": "第2段階: G1→G2 (コーナー向き+中層)",
   "Phase 3": "第3段階: G2→G3 (角・辺軌道限定)",
   "Phase 4": "第4段階: G3→G4 (最終揃え)",
-  // Korf
+
+  // Korf (Rust: korf.rs)
+  "Korf 最短探索 (IDA*)": "IDA* 最短手順探索",
   "Korf IDA*": "IDA* 最短手順探索",
+  "Kociemba フォールバック": "Kociemba フォールバック解",
+
+  // センター向き解決 (Rust: lib.rs)
+  "同時最適化 (色＆センター)": "同時最適化: 色＆センター向き",
+  "色解法 (Kociemba)": "ステップ 1: 色解法 (Kociemba)",
+  センター向き解決: "ステップ 2: センター向き解決",
 };
 
 export function analyzeMoves(

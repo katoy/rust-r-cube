@@ -34,6 +34,7 @@ export class TwoViewCamera {
   private isStreaming = false;
   private streamRafId?: number;
   private streamRequestId = 0;
+  private isStartingStream = false;
   private loadGenerationA = 0;
   private loadGenerationB = 0;
   private captureRequestId = 0;
@@ -762,6 +763,11 @@ export class TwoViewCamera {
       );
       return;
     }
+    if (this.isStartingStream) return;
+    this.isStartingStream = true;
+    const liveBtn = $("camera-live-stream") as HTMLButtonElement | null;
+    if (liveBtn) liveBtn.disabled = true;
+
     // 既存のストリームがあれば確実に停止
     this.stopLiveStream();
 
@@ -796,7 +802,10 @@ export class TwoViewCamera {
         return;
       }
       this.isStreaming = true;
-      $("camera-live-stream").hidden = true;
+      if (liveBtn) {
+        liveBtn.hidden = true;
+        liveBtn.disabled = false;
+      }
       $("camera-take-photo").hidden = false;
       $("camera-stop-stream").hidden = false;
       $("camera-help").textContent =
@@ -818,6 +827,9 @@ export class TwoViewCamera {
           "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
         );
       }
+    } finally {
+      this.isStartingStream = false;
+      if (liveBtn) liveBtn.disabled = false;
     }
   }
 

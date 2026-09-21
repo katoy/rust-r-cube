@@ -1746,6 +1746,11 @@ fn test_superflip_kociemba_move_counts_match_theoretical_bounds() {
         "Adding center orientation constraint cannot decrease the required move count"
     );
     assert_eq!(sol_orient.state, SOLVED);
+    assert!(
+        !sol_orient.phases.is_empty(),
+        "Simultaneous orientation must have phase info"
+    );
+    assert_eq!(sol_orient.phases[0].name, "同時最適化 (色＆センター)");
 
     // キューブのピース配置およびセンター向きが完全に元通り（回転角0）になることを検証
     let orient_moves = parse_moves(&sol_orient.moves.join(" ")).unwrap();

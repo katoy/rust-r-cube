@@ -1,6 +1,22 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("PWA and Offline Support", () => {
+  test.afterEach(async ({ page }) => {
+    try {
+      await page.evaluate(async () => {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      });
+    } catch {
+      // ページが閉じられている場合等は安全に無視
+    }
+  });
   test("manifest.webmanifest and PWA meta tags are present and valid", async ({
     page,
   }) => {

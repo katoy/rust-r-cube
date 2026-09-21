@@ -426,8 +426,22 @@ async function solve(budget = 5000) {
   }
 }
 
+function promptReloadForUpdate() {
+  persist();
+  const reload = window.confirm(
+    "アプリの新しいバージョンがあります。ページを再読み込みして更新しますか？\n（現在のキューブ配置は自動保存されています）",
+  );
+  if (reload) {
+    window.location.reload();
+  } else {
+    message("アプリの更新があります。ページを再読み込みしてください。");
+  }
+}
+
 let editorInstance: import("./editor").ColorEditor | undefined;
-async function getEditor() {
+async function getEditor(): Promise<
+  import("./editor").ColorEditor | undefined
+> {
   if (!editorInstance) {
     try {
       const { ColorEditor } = await import("./editor");
@@ -435,17 +449,18 @@ async function getEditor() {
         (s) => validate(s),
         (s, centers) => replace(s, true, centers),
       );
-    } catch (err) {
-      persist();
-      message("アプリの更新があります。ページを再読み込みしてください。");
-      throw err;
+    } catch {
+      promptReloadForUpdate();
+      return undefined;
     }
   }
   return editorInstance;
 }
 
 let cameraInstance: import("./camera").TwoViewCamera | undefined;
-async function getCamera() {
+async function getCamera(): Promise<
+  import("./camera").TwoViewCamera | undefined
+> {
   if (!cameraInstance) {
     try {
       const { TwoViewCamera } = await import("./camera");
@@ -455,12 +470,11 @@ async function getCamera() {
           centers = automaticCenters(s);
         } catch {}
         const ed = await getEditor();
-        ed.open(s, centers);
+        if (ed) ed.open(s, centers);
       });
-    } catch (err) {
-      persist();
-      message("アプリの更新があります。ページを再読み込みしてください。");
-      throw err;
+    } catch {
+      promptReloadForUpdate();
+      return undefined;
     }
   }
   return cameraInstance;
@@ -470,11 +484,15 @@ $("edit-colors").onclick = async () => {
   stop();
   refresh();
   const ed = await getEditor();
-  ed.open(store.getState(), store.getCenterRotations());
+  if (ed) {
+    ed.open(store.getState(), store.getCenterRotations());
+  }
 };
 $("camera-colors").onclick = async () => {
   const cam = await getCamera();
-  cam.open();
+  if (cam) {
+    cam.open();
+  }
 };
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);
@@ -858,6 +876,7 @@ async function initializePresets() {
       button.className = "secondary";
       button.textContent = `${preset.emoji} ${preset.label}`;
       button.onclick = async () => {
+        stop();
         const requestId = ++presetRequestId;
         const initialRevision = store.getRevision();
         try {

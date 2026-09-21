@@ -179,7 +179,27 @@ pub fn solve_state_with_algorithm(
                 let m = search.solve(&cube).ok_or_else(|| {
                     "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
                 })?;
+                let p1 = search.best_phase1_len;
                 total_nodes += search.nodes;
+                let total_len = m.len();
+                if p1 > 0 && p1 < total_len {
+                    phase_infos.push(PhaseInfo {
+                        name: "Kociemba Phase 1 (G1縮約)".to_string(),
+                        start: 0,
+                        end: p1,
+                    });
+                    phase_infos.push(PhaseInfo {
+                        name: "Kociemba Phase 2 (群解決)".to_string(),
+                        start: p1,
+                        end: total_len,
+                    });
+                } else if total_len > 0 {
+                    phase_infos.push(PhaseInfo {
+                        name: "Kociemba 直接解決".to_string(),
+                        start: 0,
+                        end: total_len,
+                    });
+                }
                 m
             }
         }
@@ -283,8 +303,26 @@ pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> 
     cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0, "apply", Vec::new()))
 }
 
+/// 状態が合法であるかを検証し、完成状態（SOLVED）であれば true、
+/// 合法だが未完成（スクランブル状態）であれば false、
+/// 不正な配色・パリティであれば Err を返します。
 pub fn validate_core(state: &str) -> Result<bool, String> {
+    cube::parse_state(state).map(|c| c == coord::RawCube::default())
+}
+
+/// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
+pub fn is_valid_core(state: &str) -> Result<bool, String> {
     cube::parse_state(state).map(|_| true)
+}
+
+/// 状態が完成状態（6面すべて揃っている状態）であるかを判定します。
+pub fn is_solved_core(state: &str) -> Result<bool, String> {
+    cube::parse_state(state).map(|c| c == coord::RawCube::default())
+}
+
+/// Required parity of the sum of center quarter turns.
+pub fn center_parity_core(state: &str) -> Result<u8, String> {
+    cube::parse_state(state).map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
 }
 
 #[wasm_bindgen]
@@ -298,32 +336,26 @@ pub fn initialize() {
 /// 不正な配色・パリティであれば Err を返します。
 #[wasm_bindgen]
 pub fn validate(state: &str) -> Result<bool, JsValue> {
-    cube::parse_state(state)
-        .map(|c| c == coord::RawCube::default())
-        .map_err(to_js_error)
+    validate_core(state).map_err(to_js_error)
 }
 
 /// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
 #[wasm_bindgen]
 pub fn is_valid(state: &str) -> Result<bool, JsValue> {
-    cube::parse_state(state).map(|_| true).map_err(to_js_error)
+    is_valid_core(state).map_err(to_js_error)
 }
 
 /// 状態が完成状態（6面すべて揃っている状態）であるかを判定します。
 #[wasm_bindgen]
 pub fn is_solved(state: &str) -> Result<bool, JsValue> {
-    cube::parse_state(state)
-        .map(|c| c == coord::RawCube::default())
-        .map_err(to_js_error)
+    is_solved_core(state).map_err(to_js_error)
 }
 
 /// Required parity of the sum of center quarter turns. Each face quarter turn
 /// changes both this sum's parity and the corner permutation's parity.
 #[wasm_bindgen]
 pub fn center_parity(state: &str) -> Result<u8, JsValue> {
-    cube::parse_state(state)
-        .map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
-        .map_err(to_js_error)
+    center_parity_core(state).map_err(to_js_error)
 }
 #[wasm_bindgen]
 pub fn apply_moves(state: &str, moves: &str) -> Result<String, JsValue> {

@@ -17,7 +17,9 @@ async function start() {
         const centersStr =
           includeOrientation && data.centerRotations
             ? data.centerRotations
-                .map((r) => Math.round(r / (Math.PI / 2)).toString())
+                .map((r) =>
+                  (((Math.round(r / (Math.PI / 2)) % 4) + 4) % 4).toString(),
+                )
                 .join(",")
             : undefined;
         const result = solve_with_algorithm(

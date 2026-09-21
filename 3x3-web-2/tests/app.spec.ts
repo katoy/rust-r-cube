@@ -258,41 +258,53 @@ test("R04: presets load correctly under a subdirectory", async ({ page }) => {
   );
   expect(errors).toEqual([]);
 });
-test("worker loading failure offers retry", async ({ page }) => {
-  await page.route("**/web/solver.worker.ts*", (route) => route.abort());
-  await page.goto("/");
-  await expect(page.locator("#engine-status")).toContainText("読み込み失敗");
-  await page.unroute("**/web/solver.worker.ts*");
-  await page.locator("#solve").click();
-  await expect(page.locator("#engine-status")).toContainText("READY");
+test("worker loading failure offers retry", async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  try {
+    await page.route("**/web/solver.worker.ts*", (route) => route.abort());
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("読み込み失敗");
+    await page.unroute("**/web/solver.worker.ts*");
+    await page.locator("#solve").click();
+    await expect(page.locator("#engine-status")).toContainText("READY");
+  } finally {
+    await context.close();
+  }
 });
 test("cancelled and outdated worker results cannot change the cube", async ({
-  page,
+  browser,
 }) => {
-  await page.route("**/web/solver.worker.ts*", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  try {
+    await page.route("**/web/solver.worker.ts*", (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: `
     postMessage({kind:'ready',elapsed:1});
     onmessage=({data})=>setTimeout(()=>postMessage({kind:'result',id:data.id,revision:data.revision,result:{state:'${SOLVED}',moves:[],states:['${SOLVED}'],elapsed_ms:1,nodes:1}}),2000);
   `,
-    }),
-  );
-  await ready(page);
-  await page.locator("#scramble").click();
-  await page.locator("#solve").click();
-  await expect(page.locator("#cancel")).toBeVisible();
-  await page.locator("#cancel").click();
-  const cancelled = await state(page);
-  await page.waitForTimeout(2300);
-  expect(await state(page)).toBe(cancelled);
-  await expect(page.locator("#solution-empty")).toBeVisible();
-  await expect(page.locator("#engine-status")).toContainText("READY");
-  await page.locator("#solve").click();
-  await page.locator("#reset").click();
-  await page.waitForTimeout(2300);
-  expect(await state(page)).toBe(SOLVED);
-  await expect(page.locator("#solution-empty")).toBeVisible();
+      }),
+    );
+    await ready(page);
+    await page.locator("#scramble").click();
+    await page.locator("#solve").click();
+    await expect(page.locator("#cancel")).toBeVisible();
+    await page.locator("#cancel").click();
+    const cancelled = await state(page);
+    await page.waitForTimeout(2300);
+    expect(await state(page)).toBe(cancelled);
+    await expect(page.locator("#solution-empty")).toBeVisible();
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    await page.locator("#solve").click();
+    await page.locator("#reset").click();
+    await page.waitForTimeout(2300);
+    expect(await state(page)).toBe(SOLVED);
+    await expect(page.locator("#solution-empty")).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });
 test("2D fallback remains operable without WebGL", async ({ page }) => {
   await page.addInitScript(() => {
@@ -499,11 +511,11 @@ test("large number of moves is handled correctly", async ({ page }) => {
 test("speed setting affects playback duration", async ({ page }) => {
   await ready(page);
 
-  // 固定の短手番プリセット（簡単5手、実質3手）で再生速度の差異を確実に検証
+  // 固定の短手番プリセット（簡単3手）で再生速度の差異を確実に検証
   await page.locator("#tab-presets").click();
-  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await page.locator("button", { hasText: "簡単（3手）" }).click();
   await expect(page.locator("#preset-status")).toContainText(
-    "簡単（5手） を読み込みました",
+    "簡単（3手） を読み込みました",
   );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
@@ -519,9 +531,9 @@ test("speed setting affects playback duration", async ({ page }) => {
 
   // 再び同じプリセットを読み込む
   await page.locator("#tab-presets").click();
-  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await page.locator("button", { hasText: "簡単（3手）" }).click();
   await expect(page.locator("#preset-status")).toContainText(
-    "簡単（5手） を読み込みました",
+    "簡単（3手） を読み込みました",
   );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
@@ -980,9 +992,9 @@ test("all presets can be loaded and solved within configured move bounds", async
       description: "0 moves (already solved)",
     },
     {
-      label: "簡単（5手）",
-      expectedMovesMax: 5,
-      description: "3 to 5 moves",
+      label: "簡単（3手）",
+      expectedMovesMax: 3,
+      description: "3 moves",
     },
     {
       label: "T-Permutation",

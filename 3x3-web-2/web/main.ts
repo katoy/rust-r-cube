@@ -121,6 +121,9 @@ function replace(
   message();
   store.replace(next, record, centers);
 }
+let renderedSolution: ResultData | undefined = undefined;
+let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
+
 function refresh() {
   const state = store.getState();
   const solution = store.getSolution();
@@ -164,39 +167,54 @@ function refresh() {
     $("solve-time").textContent =
       `${solution.elapsed_ms < 1000 ? `${Math.round(solution.elapsed_ms)} ms` : `${(solution.elapsed_ms / 1000).toFixed(2)} 秒`} · 検証済み`;
     const list = $("move-list");
-    list.replaceChildren();
-    const analyzed = analyzeMoves(solution.moves, solution.phases);
-    analyzed.forEach((meta, i) => {
-      if (
-        i === 0 ||
-        meta.phase !== analyzed[i - 1].phase ||
-        meta.phaseLabel !== analyzed[i - 1].phaseLabel
-      ) {
-        const phaseBadge = document.createElement("span");
-        phaseBadge.className = `phase-badge phase-${meta.phase}`;
-        phaseBadge.textContent = meta.phaseLabel;
-        list.append(phaseBadge);
+    if (renderedSolution !== solution) {
+      renderedSolution = solution;
+      cachedAnalyzedMoves = analyzeMoves(solution.moves, solution.phases);
+      list.replaceChildren();
+      cachedAnalyzedMoves.forEach((meta, i) => {
+        if (
+          i === 0 ||
+          meta.phase !== cachedAnalyzedMoves[i - 1].phase ||
+          meta.phaseLabel !== cachedAnalyzedMoves[i - 1].phaseLabel
+        ) {
+          const phaseBadge = document.createElement("span");
+          phaseBadge.className = `phase-badge phase-${meta.phase}`;
+          phaseBadge.textContent = meta.phaseLabel;
+          list.append(phaseBadge);
+        }
+        const button = document.createElement("button");
+        button.className = "solution-move";
+        button.dataset.step = String(i);
+        button.textContent = meta.move;
+        const titleParts = [meta.phaseLabel];
+        if (meta.trigger) titleParts.push(`[${meta.trigger}]`);
+        button.title = titleParts.join(" ");
+        button.setAttribute(
+          "aria-label",
+          `${i + 1}手目 ${meta.move} (${meta.phaseLabel}${meta.trigger ? `, ${meta.trigger}` : ""}) の直後へ移動`,
+        );
+        button.onclick = () => {
+          stop();
+          void seek(i + 1, false);
+        };
+        list.append(button);
+      });
+    }
+
+    const buttons = list.querySelectorAll<HTMLButtonElement>(".solution-move");
+    buttons.forEach((button, i) => {
+      button.classList.toggle("done", i < step);
+      const isCurrent = i === step;
+      button.classList.toggle("current", isCurrent);
+      if (isCurrent) {
+        button.setAttribute("aria-current", "step");
+      } else {
+        button.removeAttribute("aria-current");
       }
-      const button = document.createElement("button");
-      button.className = `solution-move ${i < step ? "done" : ""} ${i === step ? "current" : ""}`;
-      button.dataset.step = String(i);
-      button.textContent = meta.move;
-      const titleParts = [meta.phaseLabel];
-      if (meta.trigger) titleParts.push(`[${meta.trigger}]`);
-      button.title = titleParts.join(" ");
-      button.setAttribute(
-        "aria-label",
-        `${i + 1}手目 ${meta.move} (${meta.phaseLabel}${meta.trigger ? `, ${meta.trigger}` : ""}) の直後へ移動`,
-      );
-      if (i === step) button.setAttribute("aria-current", "step");
-      button.onclick = () => {
-        stop();
-        void seek(i + 1, false);
-      };
-      list.append(button);
     });
+
     $("next-symbol").textContent = next || "✓";
-    const currentMeta = analyzed[step];
+    const currentMeta = cachedAnalyzedMoves[step];
     const phasePrefix = currentMeta
       ? `【${currentMeta.phaseLabel}${currentMeta.trigger ? ` · ${currentMeta.trigger}` : ""}】 `
       : "";
@@ -229,6 +247,9 @@ function refresh() {
         });
       }
     }
+  } else {
+    renderedSolution = undefined;
+    cachedAnalyzedMoves = [];
   }
 }
 store.subscribe((_s, { type }) => {
@@ -238,7 +259,12 @@ store.subscribe((_s, { type }) => {
     $("double").setAttribute("aria-pressed", String(mod === "2"));
     return;
   }
-  if (type !== "solution") {
+  if (
+    type === "replace" ||
+    type === "undo" ||
+    type === "redo" ||
+    type === "algorithm"
+  ) {
     persist();
   }
   refresh();
@@ -859,7 +885,7 @@ async function start() {
 const presets = [
   { id: "solved", label: "完成状態", emoji: "✅" },
   { id: "superflip", label: "スーパーフリップ", emoji: "⚡" },
-  { id: "easy-5-moves", label: "簡単（5手）", emoji: "🟢" },
+  { id: "easy-5-moves", label: "簡単（3手）", emoji: "🟢" },
   { id: "t-perm", label: "T-Permutation", emoji: "🔄" },
   { id: "seed-1-scramble", label: "ランダム（seed=1）", emoji: "🎲" },
 ];

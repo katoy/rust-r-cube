@@ -1730,6 +1730,14 @@ fn test_superflip_kociemba_move_counts_match_theoretical_bounds() {
         sol_no_orient.moves.len()
     );
     assert_eq!(sol_no_orient.state, SOLVED);
+    assert!(
+        !sol_no_orient.phases.is_empty(),
+        "Kociemba color-only solution must contain phase info"
+    );
+    assert_eq!(sol_no_orient.phases[0].name, "Kociemba Phase 1 (G1縮約)");
+    assert_eq!(sol_no_orient.phases[1].name, "Kociemba Phase 2 (群解決)");
+    assert_eq!(sol_no_orient.phases[0].end, sol_no_orient.phases[1].start);
+    assert_eq!(sol_no_orient.phases[1].end, sol_no_orient.moves.len());
 
     // 2. センター向きを揃える場合（同時最適化）
     // センター向きも揃える制約により、手数は色のみと同等以上かつ同時最適化により 20〜24手の範囲に収まる（実測 23手）
@@ -2076,4 +2084,37 @@ fn test_r07_invalid_center_input_rejected() {
     assert_eq!(crate::parse_initial_centers(None).unwrap(), None);
     assert_eq!(crate::parse_initial_centers(Some("")).unwrap(), None);
     assert_eq!(crate::parse_initial_centers(Some("   ")).unwrap(), None);
+}
+
+#[test]
+fn test_native_core_functions() {
+    let scrambled = crate::apply_moves_core(SOLVED, "R U F").unwrap();
+
+    // 1. validate_core: SOLVED は true, scrambled は false, 不正文字列は Err
+    assert_eq!(crate::validate_core(SOLVED), Ok(true));
+    assert_eq!(crate::validate_core(&scrambled.state), Ok(false));
+    let val_err = crate::validate_core("INVALID");
+    assert!(val_err.is_err());
+    // ネイティブ環境でフォーマットしてもパニックしないこと
+    let _ = format!("{:?}", val_err);
+
+    // 2. is_valid_core: 合法なら true, 不正は Err
+    assert_eq!(crate::is_valid_core(SOLVED), Ok(true));
+    assert_eq!(crate::is_valid_core(&scrambled.state), Ok(true));
+    let valid_err = crate::is_valid_core("INVALID");
+    assert!(valid_err.is_err());
+    let _ = format!("{:?}", valid_err);
+
+    // 3. is_solved_core: SOLVED のみ true
+    assert_eq!(crate::is_solved_core(SOLVED), Ok(true));
+    assert_eq!(crate::is_solved_core(&scrambled.state), Ok(false));
+    let solved_err = crate::is_solved_core("INVALID");
+    assert!(solved_err.is_err());
+    let _ = format!("{:?}", solved_err);
+
+    // 4. center_parity_core: パリティ値の取得
+    assert_eq!(crate::center_parity_core(SOLVED), Ok(0));
+    let parity_err = crate::center_parity_core("INVALID");
+    assert!(parity_err.is_err());
+    let _ = format!("{:?}", parity_err);
 }

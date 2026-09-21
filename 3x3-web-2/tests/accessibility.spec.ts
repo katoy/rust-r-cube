@@ -20,7 +20,7 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
     // プリセットを解いて解法を表示
     await page.locator("#tab-presets").click();
     await page
-      .locator("#preset-buttons button", { hasText: "簡単（5手）" })
+      .locator("#preset-buttons button", { hasText: "簡単（3手）" })
       .click();
     await page.locator("#solve").click();
     await expect(page.locator("#solution-content")).toBeVisible();

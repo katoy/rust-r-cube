@@ -59,9 +59,12 @@ const PHASE_LABEL_MAP: Record<string, string> = {
   "Korf IDA*": "IDA* 最短手順探索",
   "Kociemba フォールバック": "Kociemba フォールバック解",
 
-  // センター向き解決 (Rust: lib.rs)
+  // センター向き解決・Kociemba (Rust: lib.rs)
   "同時最適化 (色＆センター)": "同時最適化: 色＆センター向き",
   "色解法 (Kociemba)": "ステップ 1: 色解法 (Kociemba)",
+  "Kociemba Phase 1 (G1縮約)": "Phase 1: G1部分群縮約",
+  "Kociemba Phase 2 (群解決)": "Phase 2: 解決手順",
+  "Kociemba 直接解決": "直接探索解決",
   センター向き解決: "ステップ 2: センター向き解決",
 };
 

@@ -238,10 +238,7 @@ export function buildState(
     .map((face) => {
       const raw = faces[face];
       if (!raw) return "?????????";
-      if (raw[4] === "?") {
-        return raw.slice(0, 4) + face + raw.slice(5);
-      }
-      return raw;
+      return raw.slice(0, 4) + face + raw.slice(5);
     })
     .join("");
 }

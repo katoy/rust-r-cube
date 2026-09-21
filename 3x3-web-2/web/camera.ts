@@ -113,24 +113,12 @@ export class TwoViewCamera {
     };
 
     // ポインターイベント（マウス・トラックパッド・タッチ対応）
-    canvas.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch {}
-      handlePointerDown(e.clientX, e.clientY);
-    });
-    window.addEventListener("pointermove", (e) => {
+    const onWindowPointerMove = (e: PointerEvent) => {
       if (this.draggingIndex !== -1) {
         handlePointerMove(e.clientX, e.clientY);
       }
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (this.draggingIndex === -1) {
-        handlePointerMove(e.clientX, e.clientY);
-      }
-    });
-    window.addEventListener("pointerup", (e) => {
+    };
+    const onWindowPointerUp = (e: PointerEvent) => {
       if (this.draggingIndex !== -1) {
         try {
           if (canvas.hasPointerCapture(e.pointerId)) {
@@ -138,6 +126,25 @@ export class TwoViewCamera {
           }
         } catch {}
         handlePointerUp(e.clientX, e.clientY);
+      }
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+    };
+
+    canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {}
+      handlePointerDown(e.clientX, e.clientY);
+      if (this.draggingIndex !== -1) {
+        window.addEventListener("pointermove", onWindowPointerMove);
+        window.addEventListener("pointerup", onWindowPointerUp);
+      }
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (this.draggingIndex === -1) {
+        handlePointerMove(e.clientX, e.clientY);
       }
     });
     canvas.addEventListener("pointerup", (e) => {
@@ -156,6 +163,8 @@ export class TwoViewCamera {
           canvas.releasePointerCapture(e.pointerId);
         }
       } catch {}
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
       this.draggingIndex = -1;
       this.hoverIndex = -1;
       this.draw();

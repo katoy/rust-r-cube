@@ -1,6 +1,10 @@
 # 全体コードレビューレポート (Code Review Report)
 
-**実施日**: 2026-09-17  
+> [!NOTE]
+> 最新の総合深層レビューレポートは [code-review-acdb7f4-2026-09-22.md](code-review-acdb7f4-2026-09-22.md) を参照してください。
+
+**初版実施日**: 2026-09-17  
+**最新レビュー日**: 2026-09-22 (`acdb7f4`)  
 **対象リポジトリ**: `rust-r-cube/3x3-web-2`  
 **主要技術スタック**: Rust (WebAssembly), TypeScript, Three.js, Vite, Playwright
 

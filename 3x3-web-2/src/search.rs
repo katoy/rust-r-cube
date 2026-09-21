@@ -15,6 +15,8 @@ pub struct Search {
     target_centers: Option<[i32; 6]>,
     current_centers: [i32; 6],
     best_solution: Option<Vec<usize>>,
+    pub best_phase1_len: usize,
+    current_p1_len: usize,
 }
 impl Search {
     pub fn new(budget_ms: u32) -> Self {
@@ -31,6 +33,8 @@ impl Search {
             target_centers: None,
             current_centers: [0; 6],
             best_solution: None,
+            best_phase1_len: 0,
+            current_p1_len: 0,
         }
     }
     pub fn with_target_centers(mut self, centers: [i32; 6]) -> Self {
@@ -54,6 +58,7 @@ impl Search {
         }
         self.initial = *cube;
         self.best_solution = None;
+        self.best_phase1_len = 0;
 
         // 短い手数（深さ 1..=5）の直接探索（理論的最短手数を瞬時に見つける）
         for d in 1..=5 {
@@ -62,6 +67,7 @@ impl Search {
                 self.current_centers = target;
             }
             if self.direct_solve(cube, d, 99) {
+                self.best_phase1_len = self.path.len();
                 return Some(self.path.clone());
             }
             if self.timed_out {
@@ -224,6 +230,7 @@ impl Search {
             } else {
                 0
             };
+            self.current_p1_len = self.path.len();
             let mut found = false;
             for d in min_d..=max {
                 if self.path.len() + d > self.max_total {
@@ -306,6 +313,7 @@ impl Search {
                 return false;
             }
             self.best_solution = Some(self.path.clone());
+            self.best_phase1_len = self.current_p1_len;
             self.max_total = self.path.len().saturating_sub(1);
             return true;
         }

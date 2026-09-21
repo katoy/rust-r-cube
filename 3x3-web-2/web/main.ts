@@ -581,6 +581,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
   button.onkeydown = (event) => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
+      event.stopPropagation();
       const tabs = Array.from(
         document.querySelectorAll<HTMLButtonElement>("[data-tab]"),
       );
@@ -679,7 +680,7 @@ document.addEventListener("keydown", (event) => {
     $("prime")?.classList.add("active-press");
   }
 
-  if (!mainReady) return;
+  if (!mainReady || event.defaultPrevented) return;
   if (FACES.includes(face) && face.length === 1) {
     event.preventDefault();
     if (!event.repeat)
@@ -834,6 +835,7 @@ const presets = [
 async function initializePresets() {
   const presetButtons = $("preset-buttons");
   const presetStatus = $("preset-status");
+  let presetRequestId = 0;
 
   try {
     for (const preset of presets) {
@@ -841,6 +843,8 @@ async function initializePresets() {
       button.className = "secondary";
       button.textContent = `${preset.emoji} ${preset.label}`;
       button.onclick = async () => {
+        const requestId = ++presetRequestId;
+        const initialRevision = store.getRevision();
         try {
           presetStatus.textContent = "読み込み中…";
           const baseUrl = import.meta.env.BASE_URL.endsWith("/")
@@ -853,6 +857,17 @@ async function initializePresets() {
             );
           }
           const data = await response.json();
+
+          // 後から別のプリセットリクエストが発行されていた場合は破棄
+          if (requestId !== presetRequestId) {
+            return;
+          }
+
+          // 取得中にユーザーが手動でキューブを操作していた場合は上書きを防止
+          if (store.getRevision() !== initialRevision) {
+            presetStatus.textContent = `⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました`;
+            return;
+          }
 
           // scramble_seed がある場合は WASM の scramble() で生成
           if (typeof data.scramble_seed === "number") {

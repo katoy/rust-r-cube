@@ -395,4 +395,7 @@ async function generateTestImages() {
   console.log(`   - マニフェスト: ${manifestPath}`);
 }
 
-generateTestImages().catch(console.error);
+generateTestImages().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

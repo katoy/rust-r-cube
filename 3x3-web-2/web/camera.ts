@@ -34,6 +34,9 @@ export class TwoViewCamera {
   private isStreaming = false;
   private streamRafId?: number;
   private streamRequestId = 0;
+  private loadGenerationA = 0;
+  private loadGenerationB = 0;
+  private captureRequestId = 0;
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -340,20 +343,26 @@ export class TwoViewCamera {
   }
 
   private async processFile(file: File, view: "A" | "B"): Promise<void> {
-    if (view === "A") {
-      this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
-      this.sourceUrlA = URL.createObjectURL(file);
-    } else {
-      this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
-      this.sourceUrlB = URL.createObjectURL(file);
-    }
-    const url = view === "A" ? this.sourceUrlA : this.sourceUrlB;
+    const generation =
+      view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB;
+    const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const image = new Image();
       image.onload = () => {
+        const currentGen =
+          view === "A" ? this.loadGenerationA : this.loadGenerationB;
+        if (generation !== currentGen) {
+          URL.revokeObjectURL(url);
+          resolve();
+          return;
+        }
         if (view === "A") {
+          this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+          this.sourceUrlA = url;
           this.imageA = image;
         } else {
+          this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+          this.sourceUrlB = url;
           this.imageB = image;
         }
         this.currentView = view;
@@ -362,10 +371,15 @@ export class TwoViewCamera {
         resolve();
       };
       image.onerror = () => {
-        this.error(`画像${view}を読み込めませんでした。`);
+        URL.revokeObjectURL(url);
+        const currentGen =
+          view === "A" ? this.loadGenerationA : this.loadGenerationB;
+        if (generation === currentGen) {
+          this.error(`画像${view}を読み込めませんでした。`);
+        }
         resolve();
       };
-      image.src = url!;
+      image.src = url;
     });
   }
 
@@ -433,19 +447,21 @@ export class TwoViewCamera {
         return { defaultFace, quad, sampled, centerChar };
       });
 
-      // 3面の画像の各面のセンターを認識して、該当する面の色を設定する
+      // このビューが担当する面セット（A: U, R, F / B: D, L, B）
+      const allowedFaces: readonly string[] =
+        this.currentView === "A" ? ["U", "R", "F"] : ["D", "L", "B"];
       const usedFaces = new Set<string>();
       const faceAssignments: {
         targetFace: (typeof FACES)[number];
         sampled: string;
       }[] = [];
 
-      // 1. 有効なセンター色で、まだこのキャプチャ内で重複していないものを優先割り当て
+      // 1. このビューの許容面に含まれる有効なセンター色で、まだ重複していないものを割り当て
       const assignedIndices = new Set<number>();
       for (let i = 0; i < sampledItems.length; i++) {
         const item = sampledItems[i];
         if (
-          FACES.includes(item.centerChar) &&
+          allowedFaces.includes(item.centerChar as any) &&
           !usedFaces.has(item.centerChar)
         ) {
           usedFaces.add(item.centerChar);
@@ -457,15 +473,13 @@ export class TwoViewCamera {
         }
       }
 
-      // 2. センター色が '?' または重複している場合は、defaultFace または未割り当ての面から補填
+      // 2. センター色がビュー外、'?' または重複している場合は、defaultFace またはビューの未割り当て面から補填
       for (let i = 0; i < sampledItems.length; i++) {
         if (assignedIndices.has(i)) continue;
         const item = sampledItems[i];
-        let targetFace = item.defaultFace;
+        let targetFace: string = item.defaultFace;
         if (usedFaces.has(targetFace)) {
-          const fallback = rawQuads
-            .map((q) => q.defaultFace)
-            .find((f) => !usedFaces.has(f));
+          const fallback = allowedFaces.find((f) => !usedFaces.has(f));
           targetFace = fallback ?? item.defaultFace;
         }
         usedFaces.add(targetFace);
@@ -748,10 +762,14 @@ export class TwoViewCamera {
       );
       return;
     }
+    // 既存のストリームがあれば確実に停止
+    this.stopLiveStream();
+
     const requestId = ++this.streamRequestId;
     const dialog = $("camera-editor") as HTMLDialogElement;
+    let stream: MediaStream | undefined;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
           width: { ideal: 1280 },
@@ -779,6 +797,16 @@ export class TwoViewCamera {
         "キューブをカメラに向けて「📸 この映像で取り込む」をクリックしてください。";
       this.renderLiveStream();
     } catch {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      if (this.mediaStream === stream) {
+        this.mediaStream = undefined;
+      }
+      const video = $("camera-video") as HTMLVideoElement | null;
+      if (video && video.srcObject === stream) {
+        video.srcObject = null;
+      }
       if (requestId === this.streamRequestId && dialog.open) {
         this.error(
           "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
@@ -803,6 +831,9 @@ export class TwoViewCamera {
   public captureLiveFrame() {
     const video = $("camera-video") as HTMLVideoElement | null;
     if (!this.isStreaming || !video) return;
+    const targetView = this.currentView;
+    const captureRequestId = ++this.captureRequestId;
+
     const offscreen = document.createElement("canvas");
     offscreen.width = video.videoWidth || 640;
     offscreen.height = video.videoHeight || 480;
@@ -810,14 +841,15 @@ export class TwoViewCamera {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
 
+    this.stopLiveStream();
+
     offscreen.toBlob(
       (blob) => {
-        if (!blob) return;
-        const file = new File([blob], `camera-${this.currentView}.jpg`, {
+        if (!blob || captureRequestId !== this.captureRequestId) return;
+        const file = new File([blob], `camera-${targetView}.jpg`, {
           type: "image/jpeg",
         });
-        this.stopLiveStream();
-        void this.processFile(file, this.currentView);
+        void this.processFile(file, targetView);
       },
       "image/jpeg",
       0.92,
@@ -848,6 +880,9 @@ export class TwoViewCamera {
 
   private handleDialogClose() {
     this.stopLiveStream();
+    this.loadGenerationA++;
+    this.loadGenerationB++;
+    this.captureRequestId++;
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
     this.sourceUrlA = undefined;

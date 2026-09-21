@@ -111,8 +111,101 @@ export function classify(
   return best;
 }
 
+export function getPerspectiveTransform(points: Point[]) {
+  if (points.length !== 4) {
+    throw new Error("面の四隅を4点指定してください。");
+  }
+  const [p0, p1, p2, p3] = points;
+
+  // 1. 凸性・縮退の検証 (各頂点での外積の符号が同一かつ非ゼロ)
+  const edges = [
+    { x: p1.x - p0.x, y: p1.y - p0.y },
+    { x: p2.x - p1.x, y: p2.y - p1.y },
+    { x: p3.x - p2.x, y: p3.y - p2.y },
+    { x: p0.x - p3.x, y: p0.y - p3.y },
+  ];
+  const cross = [
+    edges[0].x * edges[1].y - edges[0].y * edges[1].x,
+    edges[1].x * edges[2].y - edges[1].y * edges[2].x,
+    edges[2].x * edges[3].y - edges[2].y * edges[3].x,
+    edges[3].x * edges[0].y - edges[3].y * edges[0].x,
+  ];
+
+  const allPositive = cross.every((c) => c > 1e-5);
+  const allNegative = cross.every((c) => c < -1e-5);
+  if (!allPositive && !allNegative) {
+    throw new Error("有効な四角形（単純な凸四角形）を指定してください。");
+  }
+
+  // 2. 単位正方形 [0, 1]x[0, 1] から p0, p1, p2, p3 へのホモグラフィ行列係数を計算
+  const x0 = p0.x,
+    y0 = p0.y;
+  const x1 = p1.x,
+    y1 = p1.y;
+  const x2 = p2.x,
+    y2 = p2.y;
+  const x3 = p3.x,
+    y3 = p3.y;
+
+  const dx1 = x1 - x2;
+  const dx2 = x3 - x2;
+  const dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2;
+  const dy2 = y3 - y2;
+  const dy3 = y0 - y1 + y2 - y3;
+
+  let a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number;
+
+  if (Math.abs(dx3) < 1e-7 && Math.abs(dy3) < 1e-7) {
+    // アフィン変換（平行四辺形）
+    a = x1 - x0;
+    b = x3 - x0;
+    c = x0;
+    d = y1 - y0;
+    e = y3 - y0;
+    f = y0;
+    g = 0;
+    h = 0;
+  } else {
+    const det = dx1 * dy2 - dx2 * dy1;
+    if (Math.abs(det) < 1e-7) {
+      throw new Error(
+        "有効な四角形を指定してください（行列式が退化しています）。",
+      );
+    }
+    g = (dx3 * dy2 - dx2 * dy3) / det;
+    h = (dx1 * dy3 - dx3 * dy1) / det;
+    a = x1 - x0 + g * x1;
+    b = x3 - x0 + h * x3;
+    c = x0;
+    d = y1 - y0 + g * y1;
+    e = y3 - y0 + h * y3;
+    f = y0;
+  }
+
+  return (u: number, v: number): Point => {
+    const w = g * u + h * v + 1;
+    if (w <= 1e-5) {
+      throw new Error("射影変換の分母が不正です。");
+    }
+    return {
+      x: (a * u + b * v + c) / w,
+      y: (d * u + e * v + f) / w,
+    };
+  };
+}
+
 export function sampleFace(image: HTMLImageElement, points: Point[]): string {
   if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
+  const transform = getPerspectiveTransform(points);
+
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
@@ -120,7 +213,7 @@ export function sampleFace(image: HTMLImageElement, points: Point[]): string {
   if (!context) throw new Error("画像を読み込めませんでした。");
   context.drawImage(image, 0, 0);
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-  const [topLeft, topRight, bottomRight, bottomLeft] = points;
+  const [topLeft, topRight] = points;
 
   // 四角形の辺の長さから適切なサンプリング半径を動的決定
   const edgeLen = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
@@ -131,20 +224,8 @@ export function sampleFace(image: HTMLImageElement, points: Point[]): string {
     for (let col = 0; col < 3; col++) {
       const u = (col + 0.5) / 3;
       const v = (row + 0.5) / 3;
-      const top = {
-        x: topLeft.x + (topRight.x - topLeft.x) * u,
-        y: topLeft.y + (topRight.y - topLeft.y) * u,
-      };
-      const bottom = {
-        x: bottomLeft.x + (bottomRight.x - bottomLeft.x) * u,
-        y: bottomLeft.y + (bottomRight.y - bottomLeft.y) * u,
-      };
-      result += classify(
-        pixels,
-        top.x + (bottom.x - top.x) * v,
-        top.y + (bottom.y - top.y) * v,
-        radius,
-      );
+      const pt = transform(u, v);
+      result += classify(pixels, pt.x, pt.y, radius);
     }
   }
   return result;

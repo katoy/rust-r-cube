@@ -127,7 +127,7 @@ async function main() {
   let serverProc = null;
   let browser = null;
 
-  const cleanup = async () => {
+  const cleanup = async (exitCode = 0) => {
     console.log("\n🧹 終了処理を実行中...");
     if (browser) {
       try {
@@ -137,7 +137,7 @@ async function main() {
     if (serverProc) {
       serverProc.kill();
     }
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on("SIGINT", cleanup);
@@ -290,7 +290,7 @@ async function main() {
     await cleanup();
   } catch (err) {
     console.error("❌ エラーが発生しました:", err);
-    await cleanup();
+    await cleanup(1);
   }
 }
 

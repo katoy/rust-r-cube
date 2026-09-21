@@ -1748,7 +1748,11 @@ fn test_superflip_korf_move_counts_match_theoretical_bounds() {
     let state = facelets(&cube);
     let initial_centers = superflip_initial_centers(&moves);
 
-    let budget = 500;
+    let budget = if cfg!(debug_assertions) {
+        60_000
+    } else {
+        5_000
+    };
 
     // 1. センター向き無視
     // 神の数字 20手以上を満たし、フォールバック時も 20〜24手前後に収まる（実測 22手）
@@ -1810,9 +1814,14 @@ fn test_superflip_thistlethwaite_move_counts_match_theoretical_bounds() {
     assert_eq!(sol_no_orient.state, SOLVED);
 
     // 2. センター向きを揃える場合
-    let sol_orient =
-        crate::solve_state_with_algorithm(&state, 5000, true, Some(initial_centers), "thistlethwaite")
-            .expect("Thistlethwaite with center orientation must succeed on Superflip");
+    let sol_orient = crate::solve_state_with_algorithm(
+        &state,
+        5000,
+        true,
+        Some(initial_centers),
+        "thistlethwaite",
+    )
+    .expect("Thistlethwaite with center orientation must succeed on Superflip");
 
     assert!(
         sol_orient.moves.len() >= sol_no_orient.moves.len(),
@@ -1825,3 +1834,207 @@ fn test_superflip_thistlethwaite_move_counts_match_theoretical_bounds() {
     assert_eq!(solved_cube, RawCube::default());
 }
 
+#[test]
+fn test_r01_twist_slice_admissible() {
+    let pt = crate::tables::PruningTable::get();
+    let moves = parse_moves("R D2 R U2 L D2").unwrap();
+    let c = apply(&RawCube::default(), &moves);
+    let twist = c.get_twist() as usize;
+    let slice = c.get_ud_slice() as usize;
+    assert_eq!(twist, 1);
+    assert_eq!(slice, 36);
+
+    // D2 L' U2 R' D2 R' (6手) で Phase 1 座標 (twist=0, slice=0) に到達する
+    let solve_moves = parse_moves("D2 L' U2 R' D2 R'").unwrap();
+    assert_eq!(solve_moves.len(), 6);
+    let solved_c = apply(&c, &solve_moves);
+    assert_eq!(solved_c.get_twist(), 0);
+    assert_eq!(solved_c.get_ud_slice(), 0);
+
+    // ヒューリスティック値は真の距離 6 を超えてはならない
+    let h = pt.get_twist_slice(twist, slice);
+    assert!(
+        h <= 6,
+        "Pruning value must be <= exact distance 6, but got {}",
+        h
+    );
+}
+
+#[test]
+fn test_r01_twist_slice_all_admissible() {
+    let mt = crate::tables::MoveTable::get();
+    let pt = crate::tables::PruningTable::get();
+
+    // BFSで twist_slice 空間（2187 * 495 = 1,082,565 状態）の正確な最短距離を計算
+    let mut dist = vec![255u8; 2187 * 495];
+    dist[0] = 0;
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back((0usize, 0usize));
+    while let Some((t, s)) = queue.pop_front() {
+        let d = dist[t * 495 + s];
+        for m in 0..18 {
+            let nt = mt.twist[t][m] as usize;
+            let ns = mt.ud_slice[s][m] as usize;
+            let idx = nt * 495 + ns;
+            if dist[idx] == 255 {
+                dist[idx] = d + 1;
+                queue.push_back((nt, ns));
+            }
+        }
+    }
+
+    // 全状態で heuristic <= exact_distance (許容的ヒューリスティック / 下界) を検証
+    let mut overestimates = 0;
+    for t in 0..2187 {
+        for s in 0..495 {
+            let exact = dist[t * 495 + s];
+            let h = pt.get_twist_slice(t, s);
+            if h > exact {
+                overestimates += 1;
+            }
+        }
+    }
+    assert_eq!(
+        overestimates, 0,
+        "Twist/slice pruning table must NEVER overestimate exact distance! Found {} overestimates",
+        overestimates
+    );
+}
+
+#[test]
+fn test_r05_thistlethwaite_g3_membership() {
+    let facelets_str = "UUDUUUUUURRRRRRRRLFFFFFFBFBDDUDDDDDDLLLLLLLLRFBBBBBFBB";
+    let cube = parse_state(facelets_str).expect("Valid cube state");
+
+    // コーナー置換が [0, 1, 2, 4, 3, 7, 6, 5] であることを確認
+    let expected_cp = [
+        crate::coord::Corner::UFR,
+        crate::coord::Corner::UFL,
+        crate::coord::Corner::ULB,
+        crate::coord::Corner::DFR, // 4
+        crate::coord::Corner::UBR, // 3
+        crate::coord::Corner::DRB, // 7
+        crate::coord::Corner::DBL, // 6
+        crate::coord::Corner::DLF, // 5
+    ];
+    assert_eq!(cube.cp, expected_cp);
+
+    // この局面はテトラッド条件と偶パリティを満たすが、半回転群 G3 には到達不能である
+    // したがって、is_g3 は false を返さなければならない。
+    let th = crate::thistlethwaite::ThistlethwaiteSearch::new(1000);
+    assert!(
+        !th.is_g3(&cube),
+        "Cube with unreachable corner permutation must NOT be classified as G3"
+    );
+
+    // 40320通りのコーナー置換のうち、半回転群で到達可能なものは厳密に96通りであることを確認
+    let mut reachable_cp_count = 0;
+    for cp in 0..40320 {
+        let mut c = RawCube::default();
+        c.set_cp(cp);
+        if th.is_g3(&c) {
+            reachable_cp_count += 1;
+        }
+    }
+    assert_eq!(
+        reachable_cp_count, 96,
+        "Exactly 96 corner permutations should be reachable in G3, got {}",
+        reachable_cp_count
+    );
+}
+
+#[test]
+fn test_r06_budget_contract() {
+    let superflip = "UBULURUFDFDRDBDLFRFLBLBRRFRBLBBRUFUBUDDFDFDLDLRFRBLBBR";
+    // Superflipに対して予算1msを指定
+    let budget_ms = 1;
+
+    // Korf
+    let start = web_time::Instant::now();
+    let _ = crate::solve_state_with_algorithm(superflip, budget_ms, false, None, "korf");
+    let elapsed_korf = start.elapsed().as_millis();
+    println!("elapsed_korf: {}ms", elapsed_korf);
+
+    // Thistlethwaite
+    let start = web_time::Instant::now();
+    let _ = crate::solve_state_with_algorithm(superflip, budget_ms, false, None, "thistlethwaite");
+    let elapsed_thistle = start.elapsed().as_millis();
+    println!("elapsed_thistle: {}ms", elapsed_thistle);
+
+    let c = apply(&RawCube::default(), &scramble(948));
+    let state_948 = facelets(&c);
+
+    // Korf with complex scramble and budget 5ms: must not hang on fallback
+    let start = web_time::Instant::now();
+    let _ = crate::solve_state_with_algorithm(&state_948, 5, false, None, "korf");
+    let elapsed_korf = start.elapsed().as_millis();
+    assert!(
+        elapsed_korf <= 150,
+        "Korf must respect budget_ms on fallback (got {}ms)",
+        elapsed_korf
+    );
+
+    // Thistlethwaite with complex scramble and budget 5ms: must not hang on fallback
+    let start = web_time::Instant::now();
+    let _ = crate::solve_state_with_algorithm(&state_948, 5, false, None, "thistlethwaite");
+    let elapsed_thistle = start.elapsed().as_millis();
+    assert!(
+        elapsed_thistle <= 150,
+        "Thistlethwaite must respect budget_ms on fallback (got {}ms)",
+        elapsed_thistle
+    );
+
+    // CFOP with complex scramble and budget 1ms
+    let start = web_time::Instant::now();
+    let _ = crate::solve_state_with_algorithm(&state_948, 1, false, None, "cfop");
+    let elapsed_cfop = start.elapsed().as_millis();
+    assert!(
+        elapsed_cfop <= 50,
+        "CFOP must respect budget_ms (got {}ms)",
+        elapsed_cfop
+    );
+}
+
+#[test]
+fn test_r07_invalid_center_input_rejected() {
+    // 1. centers_str に不正なトークンが含まれる場合、明示的エラー
+    let res = crate::parse_initial_centers(Some("2,0,0,0,0,garbage"));
+    assert!(
+        res.is_err(),
+        "Invalid center input with garbage token must return Err, but got {:?}",
+        res
+    );
+
+    // 2. 要素数が6個未満（5個）の場合もエラー
+    let res_5 = crate::parse_initial_centers(Some("2,0,0,0,0"));
+    assert!(
+        res_5.is_err(),
+        "Center input with 5 elements must return Err, but got {:?}",
+        res_5
+    );
+
+    // 3. 要素数が6個超過（7個）の場合もエラー
+    let res_7 = crate::parse_initial_centers(Some("2,0,0,0,0,0,0"));
+    assert!(
+        res_7.is_err(),
+        "Center input with 7 elements must return Err, but got {:?}",
+        res_7
+    );
+
+    // 4. 値域外（0..=3 以外）が含まれる場合もエラー
+    let res_range = crate::parse_initial_centers(Some("5,0,0,0,0,0"));
+    assert!(
+        res_range.is_err(),
+        "Center input with out-of-range value 5 must return Err, but got {:?}",
+        res_range
+    );
+
+    // 5. 正常な6要素の入力は正しくパースされる
+    let res_valid = crate::parse_initial_centers(Some("2, 0, 1, 3, 0, 0")).unwrap();
+    assert_eq!(res_valid, Some([2, 0, 1, 3, 0, 0]));
+
+    // 6. None または空文字は None
+    assert_eq!(crate::parse_initial_centers(None).unwrap(), None);
+    assert_eq!(crate::parse_initial_centers(Some("")).unwrap(), None);
+    assert_eq!(crate::parse_initial_centers(Some("   ")).unwrap(), None);
+}

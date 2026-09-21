@@ -116,6 +116,37 @@ test.describe("E2E Coverage with CDP", () => {
           ]);
         }
 
+        // 透視射影（非平行四辺形の一般四角形）サンプリング
+        const quadImg = new Image();
+        quadImg.src = cv.toDataURL();
+        await new Promise((r) => {
+          quadImg.onload = r;
+        });
+        sampler.sampleFace(quadImg, [
+          { x: 20, y: 10 },
+          { x: 90, y: 15 },
+          { x: 80, y: 95 },
+          { x: 10, y: 85 },
+        ]);
+
+        // 凸性エラー・退化エラー
+        try {
+          sampler.getPerspectiveTransform([
+            { x: 0, y: 0 },
+            { x: 100, y: 100 },
+            { x: 100, y: 0 },
+            { x: 0, y: 100 },
+          ]);
+        } catch {}
+        try {
+          sampler.getPerspectiveTransform([
+            { x: 0, y: 0 },
+            { x: 50, y: 0 },
+            { x: 100, y: 0 },
+            { x: 0, y: 100 },
+          ]);
+        } catch {}
+
         // --- centers.ts ---
         centers.centerTurns([
           0,

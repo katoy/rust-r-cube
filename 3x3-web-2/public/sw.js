@@ -16,10 +16,10 @@ function getScopeSlug() {
       return "root";
     }
 
-    // 記号を一意にエスケープ（ハイフン、アンダースコア、ドット等の衝突防止）
+    // 記号を一意にエスケープ（_ は _u_, - は _h_, . は _d_, その他は _xHH_）
     const escapeSegment = (seg) =>
       seg.replace(/[^a-zA-Z0-9]/g, (ch) => {
-        if (ch === "_") return "__";
+        if (ch === "_") return "_u_";
         if (ch === "-") return "_h_";
         if (ch === ".") return "_d_";
         return `_x${ch.charCodeAt(0).toString(16)}_`;
@@ -34,16 +34,10 @@ function getScopeSlug() {
 
     // /root/... 配下は "root_" で開始してルートスコープ "root-" との前方一致巻き込みを防止
     if (segments[0] === "root") {
-      return "root_" + segments.slice(1).join("_");
+      return "root_" + segments.slice(1).join("-");
     }
 
-    // 2階層までは "-" 結合（/nested/cube/ -> "nested-cube" で既存互換）
-    if (segments.length <= 2) {
-      return segments.join("-");
-    }
-
-    // 3階層目以降は "_" 結合（/nested/cube/child/ -> "nested-cube_child" で親スコープ "nested-cube-" との前方一致巻き込みを防止）
-    return segments.slice(0, 2).join("-") + "_" + segments.slice(2).join("_");
+    return segments.join("-");
   } catch {
     return "root";
   }
@@ -79,7 +73,14 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+            .filter(
+              (key) =>
+                key.startsWith(CACHE_PREFIX) &&
+                key !== CACHE_NAME &&
+                /^(v\d+|old-v\d+|[0-9a-f]{8,})$/i.test(
+                  key.slice(CACHE_PREFIX.length),
+                ),
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -105,7 +106,10 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const updatePromise = caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(request, clone));
+            event.waitUntil(updatePromise);
           }
           return response;
         })
@@ -113,6 +117,7 @@ self.addEventListener("fetch", (event) => {
           const ownCache = await caches.open(CACHE_NAME);
           const cached =
             (await ownCache.match(request)) ||
+            (await ownCache.match(request.url)) ||
             (await ownCache.match(request, { ignoreSearch: true }));
           if (cached) return cached;
           const scope = self.registration ? self.registration.scope : "./";
@@ -140,7 +145,7 @@ self.addEventListener("fetch", (event) => {
         (await ownCache.match(request.url)) ||
         (await ownCache.match(url.pathname));
 
-      const fetchPromise = fetch(request)
+      const updatePromise = fetch(request)
         .then(async (networkResponse) => {
           if (networkResponse.ok) {
             const clone = networkResponse.clone();
@@ -150,7 +155,10 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
 
-      return cached || fetchPromise;
+      // バックグラウンドキャッシュ更新を event.waitUntil に接続して SW 早期終了を防止
+      event.waitUntil(updatePromise);
+
+      return cached || updatePromise;
     })(),
   );
 });

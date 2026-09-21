@@ -102,7 +102,7 @@ pub fn solve_state_with_algorithm(
 
     let mut moves = match algorithm {
         "cfop" => {
-            let res = cfop::solve(&cube)?;
+            let res = cfop::solve(&cube, budget_ms)?;
             let mut offset = 0;
             for p in res.phases {
                 let len = p.moves.len();
@@ -160,7 +160,7 @@ pub fn solve_state_with_algorithm(
                 None
             };
 
-            let m = if let Some(m) = moves_opt {
+            if let Some(m) = moves_opt {
                 m
             } else {
                 let elapsed_ms = start.elapsed().as_millis() as u32;
@@ -171,8 +171,7 @@ pub fn solve_state_with_algorithm(
                 })?;
                 total_nodes += search.nodes;
                 m
-            };
-            m
+            }
         }
     };
 
@@ -224,9 +223,19 @@ pub fn solve_state_with_algorithm(
     )
 }
 fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
-    value
-        .and_then(|v| serde_json::to_string(&v).map_err(|e| e.to_string()))
-        .map_err(|e| JsValue::from_str(&e))
+    #[cfg(target_arch = "wasm32")]
+    {
+        value
+            .and_then(|v| serde_json::to_string(&v).map_err(|e| e.to_string()))
+            .map_err(|e| JsValue::from_str(&e))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        match value {
+            Ok(v) => serde_json::to_string(&v).map_err(|_| unsafe { std::mem::zeroed() }),
+            Err(_) => Err(unsafe { std::mem::zeroed() }),
+        }
+    }
 }
 #[wasm_bindgen]
 pub fn initialize() {
@@ -274,6 +283,32 @@ pub fn solve_with_orientation(
     solve_with_algorithm(state, budget_ms, include_orientation, centers_str, None)
 }
 
+pub(crate) fn parse_initial_centers(centers_str: Option<&str>) -> Result<Option<[i32; 6]>, String> {
+    match centers_str {
+        Some(s) if !s.trim().is_empty() => {
+            let tokens: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
+            if tokens.len() != 6 {
+                return Err("センター入力は6個のカンマ区切り数値である必要があります。".to_owned());
+            }
+            let mut nums = [0i32; 6];
+            for (i, tok) in tokens.iter().enumerate() {
+                let n: i32 = tok
+                    .parse()
+                    .map_err(|_| format!("不正なセンタートークンです: '{}'", tok))?;
+                if !(0..=3).contains(&n) {
+                    return Err(format!(
+                        "センター回転は0から3の範囲である必要があります: {}",
+                        n
+                    ));
+                }
+                nums[i] = n;
+            }
+            Ok(Some(nums))
+        }
+        _ => Ok(None),
+    }
+}
+
 #[wasm_bindgen]
 pub fn solve_with_algorithm(
     state: &str,
@@ -282,14 +317,10 @@ pub fn solve_with_algorithm(
     centers_str: Option<String>,
     algorithm: Option<String>,
 ) -> Result<String, JsValue> {
-    let initial_centers = centers_str.and_then(|s| {
-        let nums: Vec<i32> = s.split(',').filter_map(|p| p.trim().parse().ok()).collect();
-        if nums.len() == 6 {
-            Some([nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]])
-        } else {
-            None
-        }
-    });
+    let initial_centers = match parse_initial_centers(centers_str.as_deref()) {
+        Ok(c) => c,
+        Err(e) => return json(Err(e)),
+    };
     let alg = algorithm.as_deref().unwrap_or("kociemba");
     json(solve_state_with_algorithm(
         state,

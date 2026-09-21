@@ -1,0 +1,307 @@
+{
+  "date": "2026-09-21",
+  "scope": "3x3-web-2",
+  "commit": "6323d171d0970b0d701a83aa28c45d51e40f2079",
+  "initial_worktree": "clean",
+  "implementation_changed": false,
+  "environment": {
+    "os": "macOS",
+    "node": "26.7.0",
+    "npm": "11.19.0",
+    "rustc": "1.93.0",
+    "cargo": "1.93.0",
+    "playwright": "1.63.0",
+    "browser_test_project": "chromium"
+  },
+  "validation": {
+    "cargo_test_release_offline_initial": {
+      "passed": 105,
+      "failed": 1,
+      "ignored": 1,
+      "failure": "korf::tests::test_korf_exhausted_and_redundant",
+      "location": "src/korf.rs:174",
+      "elapsed_seconds": 12.17
+    },
+    "cargo_test_release_offline_repeat": {
+      "passed": 106,
+      "failed": 0,
+      "ignored": 1,
+      "elapsed_seconds": 16.35
+    },
+    "cargo_fmt_check": {
+      "passed": false,
+      "locations": [
+        "src/tests.rs:1810 and EOF",
+        "src/thistlethwaite.rs:120"
+      ]
+    },
+    "cargo_clippy_all_targets_deny_warnings": {
+      "passed": false,
+      "diagnostics": {
+        "manual_div_ceil": 11,
+        "manual_range_contains": 1,
+        "let_and_return": 1
+      }
+    },
+    "npm_format_check": { "passed": true },
+    "npm_build": {
+      "passed": true,
+      "includes": ["wasm", "typecheck", "vite", "sw-precache"],
+      "precache_assets": 19,
+      "sw_version": "a46f7fdfac",
+      "wasm_bytes_approx": 6260980,
+      "three_chunk_bytes_approx": 575900,
+      "warning": "Chunk exceeds 500 kB"
+    },
+    "playwright_primary": {
+      "passed": 95,
+      "failed": 0,
+      "reported_minutes": 5.0,
+      "command_prefix": "npm test --",
+      "files": [
+        "tests/app.spec.ts",
+        "tests/cube-store.spec.ts",
+        "tests/playback-controls.spec.ts",
+        "tests/settings-persistence.spec.ts",
+        "tests/share-link.spec.ts",
+        "tests/share-centers.spec.ts",
+        "tests/url-params.spec.ts",
+        "tests/accessibility.spec.ts",
+        "tests/storage-disabled.spec.ts",
+        "tests/tab-navigation.spec.ts",
+        "tests/solution-structure.spec.ts",
+        "tests/feedback.spec.ts",
+        "tests/beginner-guidance.spec.ts",
+        "tests/view-presets.spec.ts",
+        "tests/arrow-direction.spec.ts",
+        "tests/camera-live.spec.ts",
+        "tests/camera-fixture.spec.ts",
+        "tests/camera-unrecognized-center.spec.ts",
+        "tests/center-input.spec.ts",
+        "tests/pwa.spec.ts",
+        "tests/pwa-first-visit-offline.spec.ts",
+        "tests/sw-update.spec.ts"
+      ]
+    },
+    "playwright_additional": {
+      "passed": 36,
+      "failed": 0,
+      "reported_minutes": 1.5,
+      "command_prefix": "npm test --",
+      "files": [
+        "tests/e2e-comprehensive.spec.ts",
+        "tests/e2e-complete-coverage.spec.ts",
+        "tests/unit-tests.spec.ts",
+        "tests/camera-input.spec.ts"
+      ]
+    },
+    "playwright_not_executed": [
+      "tests/coverage.spec.ts",
+      "tests/coverage-advanced.spec.ts",
+      "tests/coverage-calc.spec.ts",
+      "tests/performance.spec.ts"
+    ],
+    "chrome_devtools_initial_page": {
+      "engine": "READY",
+      "console_errors": 0,
+      "console_warnings": 0
+    }
+  },
+  "reproductions": {
+    "R01": {
+      "method": "Native BFS independent of symmetry compression, using production basic coordinate move tables; public native API and browser UI",
+      "metric": "HTM, all 18 moves have unit cost",
+      "twist_slice_states_visited": 1082565,
+      "overestimates": 43700,
+      "underestimates": 654663,
+      "unreachable_sentinel_values": 0,
+      "flip_slice_states_visited": 1013760,
+      "flip_slice_mismatches": 0,
+      "scramble": "R D2 R U2 L D2",
+      "coordinate": { "twist": 1, "slice": 36 },
+      "exact_coordinate_distance": 6,
+      "heuristic": 7,
+      "six_move_solution": "D2 L' U2 R' D2 R'",
+      "browser_result": "U2 R2 L2 U2 D2 L' D2 R' U2 R L2",
+      "browser_result_length": 11,
+      "browser_elapsed_ms": 20.7,
+      "six_move_solution_verified_solved": true,
+      "limitation": "BFS shares basic move tables, not symmetry reduction or pruning; not a separately implemented physical move oracle"
+    },
+    "R02": {
+      "method": "Actual camera source with controlled media acquisition and video.play mocks",
+      "rejected_play_then_retry_then_stop": {
+        "old_track_stop_calls": 0,
+        "new_track_stop_calls": 1
+      },
+      "overlapping_starts": {
+        "isStreaming": false,
+        "old_track_stop_calls": 0,
+        "new_track_stop_calls": 1
+      },
+      "physical_camera_not_tested": true
+    },
+    "R03": {
+      "method": "Execute activation handler from current generated dist/sw.js in cache mock",
+      "activating_scope": "/nested/",
+      "activating_prefix": "cube-studio-nested-",
+      "foreign_scope": "/nested/cube/",
+      "deleted_foreign_cache": "cube-studio-nested-cube-a46f7fdfac",
+      "colliding_scopes": ["/a/b/c_/d/", "/a/b/c/_d/"],
+      "colliding_slug": "a-b_c___d"
+    },
+    "R04": {
+      "method": "Run actual npm typecheck against isolated source/config copies without pkg; existing pkg untouched",
+      "exit_code": 1,
+      "diagnostic": "TS2307 Cannot find module '../pkg/cube_studio'",
+      "locations": [
+        "web/centers.ts:1:31",
+        "web/main.ts:2:35",
+        "web/solver.worker.ts:5:8"
+      ]
+    },
+    "R05": {
+      "method": "Half-turn closure BFS on corner permutations versus enumeration of 8! permutations",
+      "half_turn_move_ids": [1, 4, 7, 10, 13, 16],
+      "reachable_corner_permutations": 96,
+      "accepted_by_current_condition": 288,
+      "accepted_but_unreachable": 192,
+      "corner_permutation": [0, 1, 2, 4, 3, 7, 6, 5],
+      "other_coordinates": "solved",
+      "facelets": "UUDUUUUUURRRRRRRRLFFFFFFBFBDDUDDDDDDLLLLLLLLRFBBBBBFBB",
+      "parse_state_accepted": true,
+      "requested_budget_ms": 100,
+      "elapsed_ms": 1120.46,
+      "phase_move_counts": [0, 0, 0, 12],
+      "phase4": "Kociemba fallback"
+    },
+    "R06": {
+      "method": "Initialized native engines",
+      "budget_ms": 1,
+      "superflip_elapsed_ms_approx": {
+        "kociemba": 1,
+        "korf": 1001,
+        "thistlethwaite": 1001
+      },
+      "cfop_seed": 948,
+      "cfop_elapsed_ms": 131.42
+    },
+    "R07": {
+      "method": "Public native API and browser WASM via Chrome DevTools",
+      "input_state": "solved",
+      "include_orientation": true,
+      "center_input": "2,0,0,0,0,garbage",
+      "algorithm": "cfop",
+      "budget_ms": 0,
+      "success": true,
+      "moves": [],
+      "browser_elapsed_ms": 0.1
+    },
+    "R08": {
+      "method": "Actual sampler on independently projectively rendered node-canvas fixture",
+      "homography": "x=(50+300u+275v)/(1+1.5v), y=(50+825v)/(1+1.5v)",
+      "corners": [[50, 50], [350, 50], [250, 350], [130, 350]],
+      "expected": "RRRFFFBBB",
+      "actual": "RRRRRRBBB",
+      "homography_reference": "RRRFFFBBB"
+    },
+    "R09": {
+      "method": "Actual camera capture with synthetic solved images",
+      "modified_view": "A",
+      "modified_rectangle": [305, 145, 30, 30],
+      "modified_color": "#efce66",
+      "after_A_keys": ["D", "R", "F"],
+      "after_A_D": "UUUUDUUUU",
+      "after_B_keys": ["D", "R", "F", "L", "B"],
+      "missing_face": "U",
+      "progress": "5 / 6"
+    },
+    "R10": {
+      "method": "Actual source with controlled image decoding and toBlob callbacks",
+      "reverse_decode": {
+        "imageA_url": "blob:review-1",
+        "sourceUrlA": "blob:review-2"
+      },
+      "encoding_after_close": {
+        "capture_started_view": "A",
+        "accepted_view": "B",
+        "accepted_filename": "camera-B.jpg"
+      }
+    },
+    "R11": {
+      "method": "Chromium UI with a solved solution list, reduced motion enabled",
+      "setup_query": "?alg=R_U_F",
+      "action": "Focus tab-scramble; press ArrowRight",
+      "before_step": 0,
+      "after_step": 1,
+      "after_selected_tab": "tab-presets",
+      "before_state": "UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB",
+      "after_state": "UUUUUUFFFUBBRRRRRRRRRFFDFFDDDBDDBDDBFFDLLLLLLLLLUBBUBB"
+    },
+    "R12": {
+      "method": "Chromium UI, service workers blocked to isolate route-controlled network delay",
+      "action": "Request solved preset; apply R while request pending; release response",
+      "edited_state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+      "final_state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
+    },
+    "R13": {
+      "method": "Chromium keyboard interaction",
+      "action": "Focus red camera palette radio; press Space",
+      "before_active_element": "BUTTON",
+      "after_active_element": "BODY",
+      "after_focus_in_palette": false
+    },
+    "R14": {
+      "method": "Actual scripts with dependency and failure mocks",
+      "offline_launcher_simulated_browser_failure_exit": 0,
+      "image_generator_simulated_write_failure": "error logged, promise resolves successfully"
+    },
+    "R15": {
+      "method": "SW fetch handler lifetime mock",
+      "cached_response_resolves": true,
+      "network_and_cache_write_still_pending": true,
+      "waitUntil_calls": 0,
+      "actual_browser_worker_termination_not_tested": true
+    },
+    "R16": {
+      "method": "Tracked symlink invocation with side-effect-free npm/node substitutes",
+      "entry": "scripts/start.sh --offline",
+      "working_directory_suffix": "3x3-web-2/scripts",
+      "attempted_launcher_suffix": "3x3-web-2/scripts/scripts/launch-offline.js"
+    },
+    "easy_preset_metadata": {
+      "method": "Browser WASM via Chrome DevTools",
+      "scramble": "R U F",
+      "supplied_solution": "R' F' U'",
+      "supplied_solution_solves": false,
+      "supplied_solution_final": "UUFUUBUUBUUDRRRRFFFFLFFDFFDDDBDDRDDRBLLLLLLLLRRRBBBUBB",
+      "correct_inverse": "F' U' R'",
+      "correct_inverse_solves": true
+    },
+    "model_orientation_positive": {
+      "method": "Independent rigid-body oracle versus getCellArrowInfo",
+      "physical_quarter_turns": 500,
+      "sticker_angle_comparisons": 27000,
+      "mismatches": 0
+    },
+    "cfop_additional_native_sample": {
+      "seeds": 1000,
+      "all_solved": true,
+      "mean_elapsed_ms": 42.421,
+      "max_elapsed_ms": 286.884,
+      "note": "Measurements on review environment, not a general performance guarantee"
+    }
+  },
+  "limitations": [
+    "Not a full npm test run",
+    "Existing ignored long-running Rust test not executed",
+    "No Safari or Firefox execution",
+    "No physical-camera permissions or driver testing",
+    "Some photographic test fixtures are author-local and not portable",
+    "No actual GitHub Actions runner execution",
+    "No actual service-worker termination timing reproduction",
+    "No old Node or Rust toolchain compatibility execution",
+    "No external dependency vulnerability database query or penetration test",
+    "Temporary comparison and mock harnesses were not added as permanent regression tests"
+  ]
+}

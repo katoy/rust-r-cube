@@ -12,9 +12,22 @@ export interface PaletteOptions {
 export function renderPalette(options: PaletteOptions): void {
   const { container, selectedColor, onSelectColor } = options;
   if (!container) return;
-  container.replaceChildren();
 
   const colors = [...FACES, "?"];
+  const existingButtons = container.querySelectorAll<HTMLButtonElement>(
+    "button.color-choice",
+  );
+
+  if (existingButtons.length === colors.length) {
+    existingButtons.forEach((button, i) => {
+      const c = colors[i];
+      button.setAttribute("aria-checked", String(selectedColor === c));
+    });
+    return;
+  }
+
+  container.replaceChildren();
+
   colors.forEach((c) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -32,6 +45,7 @@ export function renderPalette(options: PaletteOptions): void {
     button.append(swatch, text);
     button.onclick = () => {
       onSelectColor(c);
+      button.focus();
     };
     container.append(button);
   });

@@ -1,5 +1,6 @@
 use crate::coord::{move_cube_18, RawCube};
 use crate::cube::{apply, parse_moves};
+use web_time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct CfopPhase {
@@ -17,26 +18,60 @@ fn moves(text: &str) -> Vec<usize> {
     parse_moves(text).expect("定石パースエラー")
 }
 
+struct SolverState {
+    start: Instant,
+    budget_ms: f64,
+    nodes: u64,
+}
+
+impl SolverState {
+    fn new(budget_ms: u32) -> Self {
+        Self {
+            start: Instant::now(),
+            budget_ms: f64::from(budget_ms),
+            nodes: 0,
+        }
+    }
+
+    fn check_timeout(&mut self) -> Result<(), String> {
+        self.nodes += 1;
+        if self.budget_ms == 0.0
+            || (self.nodes & 511 == 0
+                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.budget_ms)
+        {
+            Err("探索時間の上限に達しました。".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// CFOP (Layer-By-Layer) ソルバー
-pub fn solve(cube: &RawCube) -> Result<CfopResult, String> {
+pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
+    let mut state = SolverState::new(budget_ms);
+    if budget_ms == 0 {
+        return Err("探索時間の上限に達しました。".to_owned());
+    }
     let mut current = *cube;
     let mut all_phases = Vec::new();
 
     // 1. Cross (D面エッジ: 4:DR, 5:DF, 6:DL, 7:DB)
-    let cross_moves = solve_cross(&current)?;
+    let cross_moves = solve_cross(&current, &mut state)?;
     current = apply(&current, &cross_moves);
     all_phases.push(CfopPhase {
         name: "Cross (クロス)",
         moves: cross_moves,
     });
+    state.check_timeout()?;
 
     // 2. First Layer Corners (D面コーナー: 4:DFR, 5:DLF, 6:DBL, 7:DRB)
-    let corner_moves = solve_first_layer(&current)?;
+    let corner_moves = solve_first_layer(&current, &mut state)?;
     current = apply(&current, &corner_moves);
     all_phases.push(CfopPhase {
         name: "First Layer (第1層コーナー)",
         moves: corner_moves,
     });
+    state.check_timeout()?;
 
     // 3. Second Layer Edges (中層エッジ: 8:FR, 9:FL, 10:BL, 11:BR)
     let second_layer_moves = solve_second_layer(&current)?;
@@ -45,6 +80,7 @@ pub fn solve(cube: &RawCube) -> Result<CfopResult, String> {
         name: "Second Layer (中層エッジ)",
         moves: second_layer_moves,
     });
+    state.check_timeout()?;
 
     // 4. OLL (Orientation of Last Layer: U面エッジ・コーナーの向き)
     let oll_moves = solve_oll(&current)?;
@@ -53,6 +89,7 @@ pub fn solve(cube: &RawCube) -> Result<CfopResult, String> {
         name: "OLL (ラストレイヤー向き)",
         moves: oll_moves,
     });
+    state.check_timeout()?;
 
     // 5. PLL (Permutation of Last Layer: U面エッジ・コーナーの位置)
     let pll_moves = solve_pll(&current)?;
@@ -86,7 +123,7 @@ fn is_cross_solved(c: &RawCube) -> bool {
     (4..8).all(|i| c.ep[i] as usize == i && c.eo[i] == 0)
 }
 
-fn solve_cross(cube: &RawCube) -> Result<Vec<usize>, String> {
+fn solve_cross(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     if is_cross_solved(cube) {
         return Ok(Vec::new());
     }
@@ -95,13 +132,14 @@ fn solve_cross(cube: &RawCube) -> Result<Vec<usize>, String> {
 
     // 4つのD面エッジ (4..8) を1つずつ揃える
     for target in 4..8 {
+        state.check_timeout()?;
         if current.ep[target] as usize == target && current.eo[target] == 0 {
             continue;
         }
         let mut found = false;
         for depth in 1..=5 {
             let mut path = Vec::new();
-            if search_cross_edge(&current, depth, 99, target, &mut path) {
+            if search_cross_edge(&current, depth, 99, target, &mut path, state)? {
                 for &m in &path {
                     current = current.multiply(move_cube_18(m));
                 }
@@ -123,9 +161,11 @@ fn search_cross_edge(
     last_face: usize,
     target: usize,
     path: &mut Vec<usize>,
-) -> bool {
+    state: &mut SolverState,
+) -> Result<bool, String> {
+    state.check_timeout()?;
     if depth == 0 {
-        return (4..=target).all(|i| c.ep[i] as usize == i && c.eo[i] == 0);
+        return Ok((4..=target).all(|i| c.ep[i] as usize == i && c.eo[i] == 0));
     }
 
     for face in 0..6 {
@@ -136,13 +176,13 @@ fn search_cross_edge(
             let m = face * 3 + turn;
             let next = c.multiply(move_cube_18(m));
             path.push(m);
-            if search_cross_edge(&next, depth - 1, face, target, path) {
-                return true;
+            if search_cross_edge(&next, depth - 1, face, target, path, state)? {
+                return Ok(true);
             }
             path.pop();
         }
     }
-    false
+    Ok(false)
 }
 
 // -------------------------------------------------------------
@@ -152,11 +192,12 @@ fn is_cross_intact(c: &RawCube) -> bool {
     (4..8).all(|i| c.ep[i] as usize == i && c.eo[i] == 0)
 }
 
-fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
+fn solve_first_layer(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut moves = Vec::new();
 
     for corner_slot in 4..8 {
+        state.check_timeout()?;
         if current.cp[corner_slot] as usize == corner_slot && current.co[corner_slot] == 0 {
             continue;
         }
@@ -164,7 +205,15 @@ fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
         let mut found = false;
         for depth in 1..=6 {
             let mut path = Vec::new();
-            if search_corner(&current, depth, 99, solved_slots, corner_slot, &mut path) {
+            if search_corner(
+                &current,
+                depth,
+                99,
+                solved_slots,
+                corner_slot,
+                &mut path,
+                state,
+            )? {
                 for &m in &path {
                     current = current.multiply(move_cube_18(m));
                 }
@@ -190,12 +239,14 @@ fn search_corner(
     solved_slots: usize,
     target_slot: usize,
     path: &mut Vec<usize>,
-) -> bool {
+    state: &mut SolverState,
+) -> Result<bool, String> {
+    state.check_timeout()?;
     if depth == 0 {
-        return is_cross_intact(c)
+        return Ok(is_cross_intact(c)
             && (4..solved_slots).all(|i| c.cp[i] as usize == i && c.co[i] == 0)
             && c.cp[target_slot] as usize == target_slot
-            && c.co[target_slot] == 0;
+            && c.co[target_slot] == 0);
     }
 
     for face in 0..6 {
@@ -206,13 +257,21 @@ fn search_corner(
             let m = face * 3 + turn;
             let next_cube = c.multiply(move_cube_18(m));
             path.push(m);
-            if search_corner(&next_cube, depth - 1, face, solved_slots, target_slot, path) {
-                return true;
+            if search_corner(
+                &next_cube,
+                depth - 1,
+                face,
+                solved_slots,
+                target_slot,
+                path,
+                state,
+            )? {
+                return Ok(true);
             }
             path.pop();
         }
     }
-    false
+    Ok(false)
 }
 
 // -------------------------------------------------------------
@@ -527,7 +586,7 @@ mod tests {
     #[test]
     fn test_cross_on_solved() {
         let cube = RawCube::default();
-        let res = solve_cross(&cube).unwrap();
+        let res = solve_cross(&cube, &mut SolverState::new(10_000)).unwrap();
         assert!(res.is_empty());
     }
 
@@ -537,7 +596,7 @@ mod tests {
             let sc = scramble(seed);
             let sc_10 = &sc[..10];
             let scrambled = apply(&RawCube::default(), sc_10);
-            let res = solve(&scrambled).expect("10手スクランブルのCFOP解法失敗");
+            let res = solve(&scrambled, 10_000).expect("10手スクランブルのCFOP解法失敗");
             let final_cube = apply(&scrambled, &res.moves);
             assert_eq!(final_cube, RawCube::default());
         }
@@ -548,7 +607,7 @@ mod tests {
         for seed in 1..=3 {
             let sc = scramble(seed);
             let scrambled = apply(&RawCube::default(), &sc);
-            let res = solve(&scrambled).expect("25手フルスクランブルのCFOP解法失敗");
+            let res = solve(&scrambled, 10_000).expect("25手フルスクランブルのCFOP解法失敗");
             let final_cube = apply(&scrambled, &res.moves);
             assert_eq!(final_cube, RawCube::default());
             println!(
@@ -568,10 +627,12 @@ mod tests {
     fn test_cfop_phases_on_solved() {
         let cube = RawCube::default();
         // 完成状態での各フェーズ呼び出し
-        let full = solve(&cube).unwrap();
+        let full = solve(&cube, 10_000).unwrap();
         assert!(full.moves.is_empty());
 
-        assert!(solve_first_layer(&cube).unwrap().is_empty());
+        assert!(solve_first_layer(&cube, &mut SolverState::new(10_000))
+            .unwrap()
+            .is_empty());
         assert!(solve_second_layer(&cube).unwrap().is_empty());
         assert!(solve_oll(&cube).unwrap().is_empty());
         assert!(solve_pll(&cube).unwrap().is_empty());
@@ -594,12 +655,12 @@ mod tests {
         // クロスエラー (目的のエッジが存在しない)
         let mut broken_cross = RawCube::default();
         broken_cross.ep[4] = Edge::UR;
-        assert!(solve_cross(&broken_cross).is_err());
+        assert!(solve_cross(&broken_cross, &mut SolverState::new(10_000)).is_err());
 
         // 第1層エラー (目的のコーナーが存在しない)
         let mut broken_c1 = RawCube::default();
         broken_c1.cp[4] = Corner::UFR;
-        assert!(solve_first_layer(&broken_c1).is_err());
+        assert!(solve_first_layer(&broken_c1, &mut SolverState::new(10_000)).is_err());
 
         // 第2層エラー (目的のエッジが存在しない)
         let mut broken_e2_none = RawCube::default();
@@ -633,10 +694,10 @@ mod tests {
         assert!(solve_pll(&broken_pll_e).is_err());
 
         // solve() における各フェーズのエラー伝播 (?) の網羅
-        assert!(solve(&broken_cross).is_err());
-        assert!(solve(&broken_c1).is_err());
-        assert!(solve(&broken_e2_none).is_err());
-        assert!(solve(&broken_oll).is_err());
-        assert!(solve(&broken_pll).is_err());
+        assert!(solve(&broken_cross, 10_000).is_err());
+        assert!(solve(&broken_c1, 10_000).is_err());
+        assert!(solve(&broken_e2_none, 10_000).is_err());
+        assert!(solve(&broken_oll, 10_000).is_err());
+        assert!(solve(&broken_pll, 10_000).is_err());
     }
 }

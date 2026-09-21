@@ -5,16 +5,20 @@ use web_time::Instant;
 pub struct KorfSearch {
     start: Instant,
     budget_ms: f64,
+    main_budget_ms: f64,
     pub nodes: u64,
     pub timed_out: bool,
-    pub path: Vec<usize>,
+    path: Vec<usize>,
 }
 
 impl KorfSearch {
     pub fn new(budget_ms: u32) -> Self {
+        let b = f64::from(budget_ms);
+        let main_b = (b * 0.7).min((b - 50.0).max(0.0));
         Self {
             start: Instant::now(),
-            budget_ms: f64::from(budget_ms),
+            budget_ms: b,
+            main_budget_ms: main_b,
             nodes: 0,
             timed_out: false,
             path: Vec::with_capacity(32),
@@ -25,7 +29,10 @@ impl KorfSearch {
         if self.timed_out {
             return true;
         }
-        if self.nodes & 4095 == 0 && self.start.elapsed().as_secs_f64() * 1000.0 > self.budget_ms {
+        if self.budget_ms == 0.0
+            || (self.nodes & 4095 == 0
+                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.main_budget_ms)
+        {
             self.timed_out = true;
             return true;
         }
@@ -40,10 +47,10 @@ impl KorfSearch {
         let bad_ep = (0..12).filter(|&i| cube.ep[i] as usize != i).count() as u8;
 
         // 1手で最大4つのコーナー、4つのエッジしか直らない
-        let h_co = (bad_co + 3) / 4;
-        let h_eo = (bad_eo + 3) / 4;
-        let h_cp = (bad_cp + 3) / 4;
-        let h_ep = (bad_ep + 3) / 4;
+        let h_co = bad_co.div_ceil(4);
+        let h_eo = bad_eo.div_ceil(4);
+        let h_cp = bad_cp.div_ceil(4);
+        let h_ep = bad_ep.div_ceil(4);
 
         h_co.max(h_eo).max(h_cp).max(h_ep)
     }
@@ -65,14 +72,12 @@ impl KorfSearch {
             }
         }
 
-        // 深さ制限または時間制限を超えた場合、Kociemba 2段階探索で確実に解を導出（準最短解フォールバック）
-        let min_fallback = if cfg!(debug_assertions) {
-            20_000.0
-        } else {
-            1_000.0
-        };
-        let remaining_ms =
-            (self.budget_ms - self.start.elapsed().as_secs_f64() * 1000.0).max(min_fallback) as u32;
+        // 深さ制限または時間制限を超えた場合、Kociemba 2段階探索で確実に解を導出（残余予算内）
+        let elapsed_ms = self.start.elapsed().as_millis() as u32;
+        let remaining_ms = (self.budget_ms as u32).saturating_sub(elapsed_ms);
+        if remaining_ms == 0 {
+            return None;
+        }
         let mut fallback = Search::new(remaining_ms);
         let sol = fallback.solve(cube);
         self.nodes += fallback.nodes;
@@ -169,7 +174,7 @@ mod tests {
     #[test]
     fn test_korf_exhausted_and_redundant() {
         let mut korf = KorfSearch::new(0);
-        // timed_out = false で nodes & 4095 == 0 かつ elapsed > budget
+        korf.start = Instant::now() - std::time::Duration::from_millis(10);
         korf.nodes = 4096;
         assert!(korf.exhausted());
         // すでに timed_out = true の場合

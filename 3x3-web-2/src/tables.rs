@@ -294,7 +294,11 @@ pub(crate) fn generate_x2_maps() -> SymmetryMaps {
             continue;
         }
         rc.set_twist(i as u16);
-        let sym_rc = rc.multiply(&x2_cube);
+        let mut sym_rc = RawCube::default();
+        for slot in 0..8 {
+            let src = x2_cube.cp[slot] as usize;
+            sym_rc.co[slot] = (3 - rc.co[src]) % 3;
+        }
         let sym_i = sym_rc.get_twist() as usize;
 
         twist_seen[i] = true;

@@ -1,6 +1,33 @@
 use crate::coord::{move_cube_18, RawCube};
 use crate::cube::apply;
+use std::sync::OnceLock;
 use web_time::Instant;
+
+fn is_valid_g3_corner_permutation(cp: u16) -> bool {
+    static G3_CP_SET: OnceLock<[bool; 40320]> = OnceLock::new();
+    let set = G3_CP_SET.get_or_init(|| {
+        let mut table = [false; 40320];
+        let mut queue = std::collections::VecDeque::new();
+        let g3_half_turns = [1, 4, 7, 10, 13, 16]; // U2, R2, F2, D2, L2, B2
+
+        let solved = RawCube::default();
+        table[solved.get_cp() as usize] = true;
+        queue.push_back(solved);
+
+        while let Some(c) = queue.pop_front() {
+            for &m in &g3_half_turns {
+                let next = c.multiply(move_cube_18(m));
+                let next_cp = next.get_cp() as usize;
+                if !table[next_cp] {
+                    table[next_cp] = true;
+                    queue.push_back(next);
+                }
+            }
+        }
+        table
+    });
+    set[cp as usize]
+}
 
 #[derive(Debug, Clone)]
 pub struct ThistlePhase {
@@ -17,25 +44,32 @@ pub struct ThistleResult {
 pub struct ThistlethwaiteSearch {
     start: Instant,
     budget_ms: f64,
+    main_budget_ms: f64,
     pub nodes: u64,
     pub timed_out: bool,
 }
 
 impl ThistlethwaiteSearch {
     pub fn new(budget_ms: u32) -> Self {
+        let b = f64::from(budget_ms);
+        let main_b = (b * 0.7).min((b - 50.0).max(0.0));
         Self {
             start: Instant::now(),
-            budget_ms: f64::from(budget_ms),
+            budget_ms: b,
+            main_budget_ms: main_b,
             nodes: 0,
             timed_out: false,
         }
     }
 
-    fn exhausted(&mut self) -> bool {
+    pub fn exhausted(&mut self) -> bool {
         if self.timed_out {
             return true;
         }
-        if self.nodes & 4095 == 0 && self.start.elapsed().as_secs_f64() * 1000.0 > self.budget_ms {
+        if self.budget_ms == 0.0
+            || (self.nodes & 4095 == 0
+                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.main_budget_ms)
+        {
             self.timed_out = true;
             return true;
         }
@@ -112,17 +146,15 @@ impl ThistlethwaiteSearch {
         current: &RawCube,
         mut all_phases: Vec<ThistlePhase>,
     ) -> Result<ThistleResult, String> {
-        let min_fallback = if cfg!(debug_assertions) {
-            20_000.0
-        } else {
-            1_000.0
-        };
-        let remaining_ms =
-            (self.budget_ms - self.start.elapsed().as_secs_f64() * 1000.0).max(min_fallback) as u32;
+        let elapsed_ms = self.start.elapsed().as_millis() as u32;
+        let remaining_ms = (self.budget_ms as u32).saturating_sub(elapsed_ms);
+        if remaining_ms == 0 {
+            return Err("探索時間の上限に達しました。".to_owned());
+        }
         let mut fallback = crate::search::Search::new(remaining_ms);
-        let moves = fallback.solve(current).ok_or_else(|| {
-            "探索時間の上限に達しました。".to_owned()
-        })?;
+        let moves = fallback
+            .solve(current)
+            .ok_or_else(|| "探索時間の上限に達しました。".to_owned())?;
         self.nodes += fallback.nodes;
         if !moves.is_empty() {
             all_phases.push(ThistlePhase {
@@ -176,7 +208,7 @@ impl ThistlethwaiteSearch {
             return self.is_g1(c);
         }
         let bad_eo = c.eo.iter().filter(|&&o| o != 0).count() as u8;
-        if (bad_eo + 3) / 4 > depth {
+        if bad_eo.div_ceil(4) > depth {
             return false;
         }
 
@@ -203,7 +235,7 @@ impl ThistlethwaiteSearch {
             && c.co.iter().all(|&o| o == 0)
             && (8..12).all(|slot| {
                 let p = c.ep[slot] as usize;
-                p >= 8 && p <= 11
+                (8..=11).contains(&p)
             })
     }
 
@@ -249,7 +281,7 @@ impl ThistlethwaiteSearch {
         }
         let bad_co = c.co.iter().filter(|&&o| o != 0).count() as u8;
         let bad_eslice = (8..12).filter(|&i| (c.ep[i] as usize) < 8).count() as u8;
-        if (bad_co + 3) / 4 > depth || (bad_eslice + 3) / 4 > depth {
+        if bad_co.div_ceil(4) > depth || bad_eslice.div_ceil(4) > depth {
             return false;
         }
 
@@ -269,7 +301,7 @@ impl ThistlethwaiteSearch {
     }
 
     // Phase 3: G2 -> G3 (許可手: U, D, L2, R2, F2, B2)
-    fn is_g3(&self, c: &RawCube) -> bool {
+    pub(crate) fn is_g3(&self, c: &RawCube) -> bool {
         if !self.is_g2(c) {
             return false;
         }
@@ -294,7 +326,11 @@ impl ThistlethwaiteSearch {
             return false;
         }
         // 3. パリティ: G3 のすべての操作は偶置換なので、コーナー置換パリティは偶数 (0)
-        crate::cube::parity(&c.cp.map(|x| x as u8)) == 0
+        if crate::cube::parity(&c.cp.map(|x| x as u8)) != 0 {
+            return false;
+        }
+        // 4. 半回転群 <U2, D2, L2, R2, F2, B2> で到達可能な 96 通りのコーナー置換に完全に属すること
+        is_valid_g3_corner_permutation(c.get_cp())
     }
 
     fn solve_phase3(&mut self, cube: &RawCube) -> Result<Vec<usize>, String> {
@@ -345,7 +381,7 @@ impl ThistlethwaiteSearch {
             .iter()
             .filter(|&&i| !matches!(c.cp[i] as usize, 0 | 2 | 5 | 7))
             .count() as u8;
-        if (bad_s + 3) / 4 > depth || (bad_tetrad + 3) / 4 > depth {
+        if bad_s.div_ceil(4) > depth || bad_tetrad.div_ceil(4) > depth {
             return false;
         }
 
@@ -400,7 +436,7 @@ impl ThistlethwaiteSearch {
         }
         let bad_cp = (0..8).filter(|&i| c.cp[i] as usize != i).count() as u8;
         let bad_ep = (0..12).filter(|&i| c.ep[i] as usize != i).count() as u8;
-        if (bad_cp + 3) / 4 > depth || (bad_ep + 3) / 4 > depth {
+        if bad_cp.div_ceil(4) > depth || bad_ep.div_ceil(4) > depth {
             return false;
         }
 
@@ -471,6 +507,7 @@ mod tests {
 
         // タイムアウト / exhausted
         let mut th2 = ThistlethwaiteSearch::new(0);
+        th2.start = Instant::now() - std::time::Duration::from_millis(10);
         th2.nodes = 4096;
         assert!(th2.exhausted());
         assert!(th2.exhausted()); // 2回目 (timed_out == true)

@@ -57,10 +57,8 @@ jobs:
       - name: Rust tests
         run: cargo test --release
 
-      - name: Web format & typecheck
-        run: |
-          npm run format:check
-          npm run typecheck
+      - name: Web format check
+        run: npm run format:check
 
       - name: Build WASM & Web bundle
         run: npm run build

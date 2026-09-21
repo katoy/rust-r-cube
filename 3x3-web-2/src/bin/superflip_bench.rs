@@ -82,24 +82,72 @@ fn main() {
 
     println!();
 
-    // ── 2. 逐次方式（キューブ解法 → センター後付け補正）────────────────────
+    // ── 2. 逐次方式（色のみ解法 → センター後付け補正）──────────────────────
     {
         let budget_ms: u32 = 30_000;
         let start = std::time::Instant::now();
-        let sol =
-            cube_studio::solve_state_with_centers(&state, budget_ms, true, Some(initial_centers));
+        // センター制約なしで色解法を求める
+        let color_sol =
+            cube_studio::solve_state_with_algorithm(&state, budget_ms, false, None, "kociemba");
         let elapsed = start.elapsed();
 
         print!("[逐次方式 30s] ");
-        match sol {
-            Ok(res) => {
+        match color_sol {
+            Ok(color_res) => {
+                let parsed_moves =
+                    cube_studio::cube::parse_moves(&color_res.moves.join(" ")).unwrap();
+                let mut current_centers = initial_centers;
+                for &m in &parsed_moves {
+                    let f = m / 3;
+                    let t = match m % 3 {
+                        0 => 1,
+                        1 => 2,
+                        2 => -1,
+                        _ => 0,
+                    };
+                    current_centers[f] = (current_centers[f] + t).rem_euclid(4);
+                }
+                let center_fixes =
+                    cube_studio::supercube::solve_center_orientations(current_centers);
+
+                let mut total_moves = color_res.moves.clone();
+                for &m in &center_fixes {
+                    total_moves.push(cube_studio::cube::notation(m).to_string());
+                }
+
+                // センター検証
+                let mut final_centers = current_centers;
+                for &m in &center_fixes {
+                    let f = m / 3;
+                    let t = match m % 3 {
+                        0 => 1,
+                        1 => 2,
+                        2 => -1,
+                        _ => 0,
+                    };
+                    final_centers[f] = (final_centers[f] + t).rem_euclid(4);
+                }
+                let mut all_moves = parsed_moves;
+                all_moves.extend(center_fixes);
+                let final_cube = cube_studio::cube::apply(&cube, &all_moves);
+
                 println!(
-                    "{}手 ({:.1}秒, {}ノード)",
-                    res.moves.len(),
+                    "合計{}手 (色{}手 + センター補正{}手) ({:.1}秒, {}ノード)",
+                    total_moves.len(),
+                    color_res.moves.len(),
+                    total_moves.len() - color_res.moves.len(),
                     elapsed.as_secs_f64(),
-                    res.nodes
+                    color_res.nodes
                 );
-                println!("  手順: {}", res.moves.join(" "));
+                println!("  手順: {}", total_moves.join(" "));
+                println!(
+                    "  最終センター: {final_centers:?} (全て0 = {})",
+                    final_centers.iter().all(|&c| c == 0)
+                );
+                println!(
+                    "  キューブ完成: {}",
+                    final_cube == cube_studio::coord::RawCube::default()
+                );
             }
             Err(e) => println!("エラー: {e}"),
         }

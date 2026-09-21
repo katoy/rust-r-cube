@@ -77,13 +77,13 @@ export function analyzeMoves(
   // phases 情報が与えられている場合はそれを使用
   if (phases && phases.length > 0) {
     return moves.map((move, idx) => {
-      let phaseNum = 1;
+      let matchedPhaseIdx = -1;
       let phaseLabel = "解決手順";
 
       for (let p = 0; p < phases.length; p++) {
         const ph = phases[p];
         if (idx >= ph.start && idx < ph.end) {
-          phaseNum = p + 1;
+          matchedPhaseIdx = p;
           phaseLabel = PHASE_LABEL_MAP[ph.name] || ph.name;
           break;
         }
@@ -91,7 +91,7 @@ export function analyzeMoves(
 
       return {
         move,
-        phase: phaseNum,
+        phase: matchedPhaseIdx >= 0 ? matchedPhaseIdx + 1 : 0,
         phaseLabel,
         trigger: triggerMap.get(idx),
       };

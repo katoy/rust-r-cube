@@ -167,7 +167,11 @@ function refresh() {
     list.replaceChildren();
     const analyzed = analyzeMoves(solution.moves, solution.phases);
     analyzed.forEach((meta, i) => {
-      if (i === 0 || meta.phase !== analyzed[i - 1].phase) {
+      if (
+        i === 0 ||
+        meta.phase !== analyzed[i - 1].phase ||
+        meta.phaseLabel !== analyzed[i - 1].phaseLabel
+      ) {
         const phaseBadge = document.createElement("span");
         phaseBadge.className = `phase-badge phase-${meta.phase}`;
         phaseBadge.textContent = meta.phaseLabel;
@@ -425,11 +429,17 @@ async function solve(budget = 5000) {
 let editorInstance: import("./editor").ColorEditor | undefined;
 async function getEditor() {
   if (!editorInstance) {
-    const { ColorEditor } = await import("./editor");
-    editorInstance = new ColorEditor(
-      (s) => validate(s),
-      (s, centers) => replace(s, true, centers),
-    );
+    try {
+      const { ColorEditor } = await import("./editor");
+      editorInstance = new ColorEditor(
+        (s) => validate(s),
+        (s, centers) => replace(s, true, centers),
+      );
+    } catch (err) {
+      persist();
+      message("アプリの更新があります。ページを再読み込みしてください。");
+      throw err;
+    }
   }
   return editorInstance;
 }
@@ -437,15 +447,21 @@ async function getEditor() {
 let cameraInstance: import("./camera").TwoViewCamera | undefined;
 async function getCamera() {
   if (!cameraInstance) {
-    const { TwoViewCamera } = await import("./camera");
-    cameraInstance = new TwoViewCamera(async (s) => {
-      let centers = [0, 0, 0, 0, 0, 0];
-      try {
-        centers = automaticCenters(s);
-      } catch {}
-      const ed = await getEditor();
-      ed.open(s, centers);
-    });
+    try {
+      const { TwoViewCamera } = await import("./camera");
+      cameraInstance = new TwoViewCamera(async (s) => {
+        let centers = [0, 0, 0, 0, 0, 0];
+        try {
+          centers = automaticCenters(s);
+        } catch {}
+        const ed = await getEditor();
+        ed.open(s, centers);
+      });
+    } catch (err) {
+      persist();
+      message("アプリの更新があります。ページを再読み込みしてください。");
+      throw err;
+    }
   }
   return cameraInstance;
 }

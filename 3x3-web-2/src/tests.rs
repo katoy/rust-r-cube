@@ -1599,6 +1599,7 @@ fn test_solve_state_with_all_algorithms() {
     assert_eq!(res_korf.state, SOLVED);
     assert_eq!(res_korf.algorithm, "korf");
     assert!(!res_korf.phases.is_empty());
+    assert_eq!(res_korf.phases[0].name, "Korf 最短探索 (IDA*)");
     assert_eq!(res_korf.moves.len(), 4); // R U R' U' は最短4手
 
     // 4. Kociemba (デフォルト / 未知の文字列)
@@ -1790,6 +1791,7 @@ fn test_superflip_korf_move_counts_match_theoretical_bounds() {
         sol_no_orient.moves.len()
     );
     assert_eq!(sol_no_orient.state, SOLVED);
+    assert_eq!(sol_no_orient.phases[0].name, "Kociemba フォールバック");
 
     // 2. センター向きを揃える場合
     // 色解法（22手）にセンター後付け補正（52手）が加わり、理論下界 20手以上を満たす（実測 74手）

@@ -272,6 +272,19 @@ test.describe("E2E Coverage with CDP", () => {
         const client = new SolverClient(() => {});
         client.cancel();
         // @ts-ignore
+        client.ready = true;
+        // @ts-ignore
+        const p = client.solve(
+          solved,
+          1,
+          1000,
+          true,
+          [0, 0, 0, 0, 0, 0],
+          "kociemba",
+        );
+        p.catch(() => {});
+        client.cancel();
+        // @ts-ignore
         client.fail("テストエラー");
 
         // --- camera-ui-helper.ts ---

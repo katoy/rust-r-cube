@@ -133,16 +133,21 @@ pub fn solve_state_with_algorithm(
         }
         "korf" => {
             let mut korf = korf::KorfSearch::new(budget_ms);
-            let m = korf
+            let sol = korf
                 .solve(&cube)
                 .ok_or_else(|| "探索時間の上限に達しました。".to_owned())?;
             total_nodes += korf.nodes;
+            let phase_name = if sol.is_optimal {
+                "Korf 最短探索 (IDA*)"
+            } else {
+                "Kociemba フォールバック"
+            };
             phase_infos.push(PhaseInfo {
-                name: "IDA* 最短探索".to_string(),
+                name: phase_name.to_string(),
                 start: 0,
-                end: m.len(),
+                end: sol.moves.len(),
             });
-            m
+            sol.moves
         }
         _ => {
             // Kociemba (Two-Phase)
@@ -191,6 +196,13 @@ pub fn solve_state_with_algorithm(
             let center_fixes = supercube::solve_center_orientations(centers);
             if !center_fixes.is_empty() {
                 let start_idx = moves.len();
+                if phase_infos.is_empty() && start_idx > 0 {
+                    phase_infos.push(PhaseInfo {
+                        name: "色解法 (Kociemba)".to_string(),
+                        start: 0,
+                        end: start_idx,
+                    });
+                }
                 moves.extend(center_fixes);
                 phase_infos.push(PhaseInfo {
                     name: "センター向き解決".to_string(),
@@ -241,10 +253,24 @@ pub fn solve_state_with_algorithm(
         phase_infos,
     )
 }
+
+#[inline]
+fn to_js_error(err: impl std::fmt::Display) -> JsValue {
+    #[cfg(target_arch = "wasm32")]
+    {
+        JsValue::from_str(&err.to_string())
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = err;
+        JsValue::UNDEFINED
+    }
+}
+
 fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
     match value {
-        Ok(v) => serde_json::to_string(&v).map_err(|e| JsValue::from_str(&e.to_string())),
-        Err(e) => Err(JsValue::from_str(&e)),
+        Ok(v) => serde_json::to_string(&v).map_err(to_js_error),
+        Err(e) => Err(to_js_error(e)),
     }
 }
 #[wasm_bindgen]
@@ -256,7 +282,7 @@ pub fn initialize() {
 pub fn validate(state: &str) -> Result<bool, JsValue> {
     cube::parse_state(state)
         .map(|c| c == coord::RawCube::default())
-        .map_err(|e| JsValue::from_str(&e))
+        .map_err(to_js_error)
 }
 /// Required parity of the sum of center quarter turns. Each face quarter turn
 /// changes both this sum's parity and the corner permutation's parity.
@@ -264,7 +290,7 @@ pub fn validate(state: &str) -> Result<bool, JsValue> {
 pub fn center_parity(state: &str) -> Result<u8, JsValue> {
     cube::parse_state(state)
         .map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
-        .map_err(|e| JsValue::from_str(&e))
+        .map_err(to_js_error)
 }
 #[wasm_bindgen]
 pub fn apply_moves(state: &str, moves: &str) -> Result<String, JsValue> {
@@ -346,7 +372,7 @@ pub fn solve_with_algorithm(
 /// エッジの向き: 0=正常, 1=反転
 #[wasm_bindgen]
 pub fn get_orientations(state: &str) -> Result<String, JsValue> {
-    let raw_cube = cube::parse_state(state).map_err(|e| JsValue::from_str(&e))?;
+    let raw_cube = cube::parse_state(state).map_err(to_js_error)?;
 
     let corner_orientations: Vec<usize> = raw_cube.co.iter().map(|&o| o as usize).collect();
     let edge_orientations: Vec<usize> = raw_cube.eo.iter().map(|&o| o as usize).collect();
@@ -357,7 +383,7 @@ pub fn get_orientations(state: &str) -> Result<String, JsValue> {
     });
 
     serde_json::to_string(&result)
-        .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
+        .map_err(|e| to_js_error(format!("JSON serialization error: {}", e)))
 }
 
 #[cfg(test)]

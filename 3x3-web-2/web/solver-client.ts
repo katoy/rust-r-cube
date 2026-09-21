@@ -93,15 +93,18 @@ export class SolverClient {
   }
 
   cancel() {
-    this.disposeRequest();
+    if (this.pending) {
+      this.disposeRequest("cancelled");
+      this.restart();
+    }
   }
-  private disposeRequest() {
+  private disposeRequest(reason = "cancelled") {
     clearTimeout(this.timer);
-    this.pending?.reject(new Error("cancelled"));
+    this.pending?.reject(new Error(reason));
     this.pending = undefined;
   }
   private fail(message: string) {
-    this.disposeRequest();
+    this.disposeRequest(message);
     this.worker?.terminate();
     this.generation++;
     this.ready = false;

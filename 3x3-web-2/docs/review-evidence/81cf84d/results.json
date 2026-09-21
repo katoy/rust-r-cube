@@ -1,0 +1,128 @@
+{
+  "commit": "81cf84dc5aa30da4c162b700ac40bee5d269639b",
+  "date": "2026-09-21",
+  "environment": {
+    "os": "Darwin arm64",
+    "node": "26.7.0",
+    "npm": "11.19.0",
+    "rustc": "1.98.1",
+    "browser": "Playwright Chromium headless"
+  },
+  "rust_release": [
+    "test result: ok. 112 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.69s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "rust_debug": [
+    "test result: ok. 112 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 136.25s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "build": "passed (WASM + TypeScript typecheck + Vite + SW precache)",
+  "format": "cargo fmt --check and npm run format:check passed",
+  "clippy": "cargo clippy --all-targets -- -D warnings passed",
+  "npm_audit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "browser_probes": {
+    "cancel": {
+      "first": "cancelled",
+      "second": {
+        "ok": false,
+        "error": "cancelled"
+      },
+      "elapsed_ms": 6501.400000095367,
+      "ready": false,
+      "events": [
+        {
+          "s": "loading",
+          "m": "エンジンを準備中"
+        },
+        {
+          "s": "ready",
+          "m": "準備完了 · 32 ms"
+        },
+        {
+          "s": "error",
+          "m": "探索時間の上限に達しました。エンジンを再起動してください。"
+        }
+      ]
+    },
+    "camera-stale-play": {
+      "before": {
+        "streaming": true,
+        "hasNew": true,
+        "stops": [1, 0]
+      },
+      "after": {
+        "streaming": false,
+        "hasNew": false,
+        "stops": [1, 1]
+      }
+    }
+  },
+  "pwa_update": {
+    "oldCaches": ["cube-studio-root-fb710d6672"],
+    "newCaches": ["cube-studio-root-decafbad42"],
+    "sameDocument": true,
+    "cameraOpened": false,
+    "errors": [
+      "Failed to fetch dynamically imported module: http://127.0.0.1:50703/assets/camera-BRz91Qe4.js"
+    ]
+  },
+  "native_error": {
+    "command": "probe native-error",
+    "exit_code": 134,
+    "message": "function not implemented on non-wasm32 targets; panic in a function that cannot unwind"
+  },
+  "center_and_cfop_probe": [
+    "centers=[1, 0, 3, 0, 0, 0] correction_moves=30 pieces_solved=true",
+    "centers=[1, 0, 0, 3, 0, 0] correction_moves=60 pieces_solved=true",
+    "centers=[1, 1, 0, 0, 0, 0] correction_moves=42 pieces_solved=true",
+    "centers=[2, 0, 0, 0, 0, 0] correction_moves=12 pieces_solved=true",
+    "cfop100 failures=[] moves_p50=120 moves_range=(Some(75), Some(155)) ms_p50=23.491292 ms_max=227.61516600000002"
+  ],
+  "korf_metadata": "known_solution_upper_bound=20 returned_moves=21 algorithm=korf phases=[PhaseInfo { name: \"IDA* 最短探索\", start: 0, end: 21 }] elapsed_ms=1035.9965",
+  "playwright": {
+    "passed": 152,
+    "skipped": 1,
+    "failed": 0,
+    "duration": "7.0m",
+    "total": 153
+  },
+  "center_phase": {
+    "input": "state after R; centers [1,0,0,0,0,0]; budget 0 for forced fallback",
+    "moves": 31,
+    "phases": [
+      {
+        "name": "センター向き解決",
+        "start": 1,
+        "end": 31
+      }
+    ],
+    "analyzeMoves_probe": [
+      {
+        "move": "R",
+        "phase": 1,
+        "phaseLabel": "解決手順"
+      },
+      {
+        "move": "U",
+        "phase": 1,
+        "phaseLabel": "解決手順"
+      },
+      {
+        "move": "F",
+        "phase": 1,
+        "phaseLabel": "センター向き解決"
+      }
+    ]
+  }
+}

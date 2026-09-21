@@ -786,7 +786,13 @@ export class TwoViewCamera {
       video.srcObject = this.mediaStream;
       await video.play();
       if (requestId !== this.streamRequestId || !dialog.open) {
-        this.stopLiveStream();
+        stream.getTracks().forEach((track) => track.stop());
+        if (this.mediaStream === stream) {
+          this.mediaStream = undefined;
+        }
+        if (video.srcObject === stream) {
+          video.srcObject = null;
+        }
         return;
       }
       this.isStreaming = true;

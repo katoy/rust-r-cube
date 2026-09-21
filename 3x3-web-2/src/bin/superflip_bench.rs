@@ -107,25 +107,43 @@ fn main() {
 
     println!();
 
-    // ── 3. 色だけモード（センター無視, 30秒）──────────────────────────────
-    {
-        let budget_ms: u32 = 30_000;
+    // ── 3. 各アルゴリズムでの検証（センター無視 vs センター向き揃える）──────
+    let algorithms = ["kociemba", "cfop", "thistlethwaite", "korf"];
+    for alg in algorithms {
+        println!("=== Algorithm: {alg} ===");
+        // センター向き無視
         let start = std::time::Instant::now();
-        let sol = cube_studio::solve_state(&state, budget_ms, false);
+        let sol_no_orient =
+            cube_studio::solve_state_with_algorithm(&state, 10_000, false, None, alg);
         let elapsed = start.elapsed();
+        match sol_no_orient {
+            Ok(res) => println!(
+                "  [センター無視] {}手 ({:.2}ms, {}ノード)",
+                res.moves.len(),
+                elapsed.as_secs_f64() * 1000.0,
+                res.nodes
+            ),
+            Err(e) => println!("  [センター無視] エラー: {e}"),
+        }
 
-        print!("[色だけモード 30s] ");
-        match sol {
-            Ok(res) => {
-                println!(
-                    "{}手 ({:.1}秒, {}ノード)",
-                    res.moves.len(),
-                    elapsed.as_secs_f64(),
-                    res.nodes
-                );
-                println!("  手順: {}", res.moves.join(" "));
-            }
-            Err(e) => println!("エラー: {e}"),
+        // センター向き揃える
+        let start = std::time::Instant::now();
+        let sol_orient = cube_studio::solve_state_with_algorithm(
+            &state,
+            10_000,
+            true,
+            Some(initial_centers),
+            alg,
+        );
+        let elapsed = start.elapsed();
+        match sol_orient {
+            Ok(res) => println!(
+                "  [センター揃える] {}手 ({:.2}ms, {}ノード)",
+                res.moves.len(),
+                elapsed.as_secs_f64() * 1000.0,
+                res.nodes
+            ),
+            Err(e) => println!("  [センター揃える] エラー: {e}"),
         }
     }
 }

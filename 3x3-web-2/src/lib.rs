@@ -1,12 +1,12 @@
+pub mod cfop;
 #[allow(clippy::upper_case_acronyms)]
 pub mod coord;
 pub mod cube;
+pub mod korf;
 pub mod search;
 pub mod supercube;
-pub mod cfop;
-pub mod korf;
-pub mod thistlethwaite;
 mod tables;
+pub mod thistlethwaite;
 
 const TABLE_BYTES: Option<&[u8]> = Some(include_bytes!(concat!(env!("OUT_DIR"), "/tables.bin")));
 
@@ -70,7 +70,13 @@ pub fn solve_state_with_centers(
     include_orientation: bool,
     initial_centers: Option<[i32; 6]>,
 ) -> Result<ResultData, String> {
-    solve_state_with_algorithm(state, budget_ms, include_orientation, initial_centers, "kociemba")
+    solve_state_with_algorithm(
+        state,
+        budget_ms,
+        include_orientation,
+        initial_centers,
+        "kociemba",
+    )
 }
 
 pub fn solve_state_with_algorithm(
@@ -127,9 +133,9 @@ pub fn solve_state_with_algorithm(
         }
         "korf" => {
             let mut korf = korf::KorfSearch::new(budget_ms);
-            let m = korf.solve(&cube).ok_or_else(|| {
-                "探索時間の上限に達しました。".to_owned()
-            })?;
+            let m = korf
+                .solve(&cube)
+                .ok_or_else(|| "探索時間の上限に達しました。".to_owned())?;
             total_nodes += korf.nodes;
             phase_infos.push(PhaseInfo {
                 name: "IDA* 最短探索".to_string(),
@@ -145,7 +151,8 @@ pub fn solve_state_with_algorithm(
                     .saturating_sub(1000)
                     .max(budget_ms * 4 / 5)
                     .min(25000);
-                let mut search_oriented = search::Search::new(oriented_budget).with_target_centers(centers);
+                let mut search_oriented =
+                    search::Search::new(oriented_budget).with_target_centers(centers);
                 let res = search_oriented.solve(&cube);
                 total_nodes += search_oriented.nodes;
                 res

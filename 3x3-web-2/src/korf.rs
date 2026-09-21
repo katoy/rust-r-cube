@@ -66,7 +66,13 @@ impl KorfSearch {
         }
 
         // 深さ制限または時間制限を超えた場合、Kociemba 2段階探索で確実に解を導出（準最短解フォールバック）
-        let remaining_ms = (self.budget_ms - self.start.elapsed().as_secs_f64() * 1000.0).max(100.0) as u32;
+        let min_fallback = if cfg!(debug_assertions) {
+            20_000.0
+        } else {
+            1_000.0
+        };
+        let remaining_ms =
+            (self.budget_ms - self.start.elapsed().as_secs_f64() * 1000.0).max(min_fallback) as u32;
         let mut fallback = Search::new(remaining_ms);
         let sol = fallback.solve(cube);
         self.nodes += fallback.nodes;
@@ -178,4 +184,3 @@ mod tests {
         assert!(!redundant(3, 0)); // DとU
     }
 }
-

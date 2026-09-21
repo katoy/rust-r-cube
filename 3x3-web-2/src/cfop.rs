@@ -68,7 +68,6 @@ pub fn solve(cube: &RawCube) -> Result<CfopResult, String> {
         "CFOP解法の検証に失敗しました。"
     );
 
-
     let mut total_moves = Vec::new();
     for p in &all_phases {
         total_moves.extend(&p.moves);
@@ -117,7 +116,6 @@ fn solve_cross(cube: &RawCube) -> Result<Vec<usize>, String> {
     }
     Ok(total_moves)
 }
-
 
 fn search_cross_edge(
     c: &RawCube,
@@ -176,12 +174,14 @@ fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
             }
         }
         if !found {
-            return Err(format!("第1層コーナー {} の探索に失敗しました。", corner_slot));
+            return Err(format!(
+                "第1層コーナー {} の探索に失敗しました。",
+                corner_slot
+            ));
         }
     }
     Ok(moves)
 }
-
 
 fn search_corner(
     c: &RawCube,
@@ -262,7 +262,12 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
 
         let current_pos = match (0..12).position(|i| current.ep[i] as usize == target_slot) {
             Some(p) => p,
-            None => return Err(format!("第2層エッジ {} の探索に失敗しました。", target_slot)),
+            None => {
+                return Err(format!(
+                    "第2層エッジ {} の探索に失敗しました。",
+                    target_slot
+                ))
+            }
         };
         if (8..=11).contains(&current_pos) {
             // 中層にあるので抜き出す（1つ目のマクロでU層に追い出す）
@@ -291,7 +296,9 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
             for mac in &slot_macs {
                 let after = apply(&c_u, mac);
                 if is_first_layer_intact(&after)
-                    && solved_slots.iter().all(|&s| after.ep[s] as usize == s && after.eo[s] == 0)
+                    && solved_slots
+                        .iter()
+                        .all(|&s| after.ep[s] as usize == s && after.eo[s] == 0)
                     && after.ep[target_slot] as usize == target_slot
                     && after.eo[target_slot] == 0
                 {
@@ -308,7 +315,10 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
         }
 
         if !solved {
-            return Err(format!("第2層エッジ {} の解決に失敗しました。", target_slot));
+            return Err(format!(
+                "第2層エッジ {} の解決に失敗しました。",
+                target_slot
+            ));
         }
     }
 
@@ -319,8 +329,7 @@ fn solve_second_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
 // Step 4: OLL (U面の向き)
 // -------------------------------------------------------------
 fn is_f2l_intact(c: &RawCube) -> bool {
-    is_first_layer_intact(c)
-        && (8..12).all(|slot| c.ep[slot] as usize == slot && c.eo[slot] == 0)
+    is_first_layer_intact(c) && (8..12).all(|slot| c.ep[slot] as usize == slot && c.eo[slot] == 0)
 }
 
 fn is_oll_edges_solved(c: &RawCube) -> bool {
@@ -328,9 +337,7 @@ fn is_oll_edges_solved(c: &RawCube) -> bool {
 }
 
 fn is_oll_solved(c: &RawCube) -> bool {
-    is_f2l_intact(c)
-        && is_oll_edges_solved(c)
-        && (0..4).all(|i| c.co[i] == 0)
+    is_f2l_intact(c) && is_oll_edges_solved(c) && (0..4).all(|i| c.co[i] == 0)
 }
 
 fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
@@ -399,7 +406,6 @@ fn solve_oll(cube: &RawCube) -> Result<Vec<usize>, String> {
                 }
             }
         }
-
 
         let p = found_path.ok_or_else(|| "OLLコーナーの解決に失敗しました。".to_string())?;
         total_moves.extend(p);
@@ -506,7 +512,6 @@ fn solve_pll(cube: &RawCube) -> Result<Vec<usize>, String> {
             }
         }
     }
-
 
     let p = found_path.ok_or_else(|| "PLLエッジの解決に失敗しました。".to_string())?;
     total_moves.extend(p);
@@ -635,5 +640,3 @@ mod tests {
         assert!(solve(&broken_pll).is_err());
     }
 }
-
-

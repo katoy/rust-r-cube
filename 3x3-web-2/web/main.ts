@@ -694,14 +694,18 @@ $("save").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 $("load").onclick = () => $<HTMLInputElement>("file").click();
+let fileLoadRequestId = 0;
 $<HTMLInputElement>("file").onchange = async () => {
   const file = $<HTMLInputElement>("file").files?.[0];
   if (!file) return;
+  const requestId = ++fileLoadRequestId;
   const at = store.getRevision();
   try {
     if (file.size > 65536)
       throw new Error("ファイルは64KB以内にしてください。");
-    const data: unknown = JSON.parse(await file.text());
+    const content = await file.text();
+    if (requestId !== fileLoadRequestId) return;
+    const data: unknown = JSON.parse(content);
     if (
       !data ||
       typeof data !== "object" ||
@@ -725,9 +729,9 @@ $<HTMLInputElement>("file").onchange = async () => {
       ),
     );
   } catch (error) {
-    message(String(error));
+    if (requestId === fileLoadRequestId) message(String(error));
   } finally {
-    $<HTMLInputElement>("file").value = "";
+    if (requestId === fileLoadRequestId) $<HTMLInputElement>("file").value = "";
   }
 };
 document.addEventListener("keydown", (event) => {

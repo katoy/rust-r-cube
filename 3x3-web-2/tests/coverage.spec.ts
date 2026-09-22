@@ -266,6 +266,20 @@ test.describe("E2E Coverage with CDP", () => {
         const { registerServiceWorker } = await import("/web/pwa.ts");
         registerServiceWorker();
         registerServiceWorker("./nonexistent-sw.js");
+        window.__DISABLE_SW__ = true;
+        registerServiceWorker();
+        delete window.__DISABLE_SW__;
+        try {
+          Object.defineProperty(navigator, "webdriver", {
+            get: () => false,
+            configurable: true,
+          });
+          registerServiceWorker();
+          Object.defineProperty(navigator, "webdriver", {
+            get: () => true,
+            configurable: true,
+          });
+        } catch {}
 
         // --- solver-client.ts ---
         const { SolverClient } = await import("/web/solver-client.ts");

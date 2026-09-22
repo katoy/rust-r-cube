@@ -33,7 +33,8 @@ mount();
 registerServiceWorker();
 export function getScopedStorageKey(baseKey: string): string {
   const p = typeof window !== "undefined" ? window.location.pathname : "/";
-  return p.length > 1 ? `${baseKey}:${p}` : baseKey;
+  const normalized = p.replace(/\/+$/, "") || "/";
+  return normalized !== "/" ? `${baseKey}:${normalized}` : baseKey;
 }
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -154,7 +155,7 @@ function refresh() {
   $<HTMLButtonElement>("redo").disabled = !mainReady || !store.canRedo();
   document
     .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load",
+      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#preset-buttons button",
     )
     .forEach((b) => (b.disabled = !mainReady));
   $("solution-empty").hidden = !!solution;
@@ -901,7 +902,9 @@ async function initializePresets() {
       const button = document.createElement("button");
       button.className = "secondary";
       button.textContent = `${preset.emoji} ${preset.label}`;
+      button.disabled = !mainReady;
       button.onclick = async () => {
+        if (!mainReady) return;
         stop();
         const requestId = ++presetRequestId;
         const initialRevision = store.getRevision();

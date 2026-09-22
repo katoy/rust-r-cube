@@ -218,7 +218,7 @@ pub fn solve_state_with_algorithm(
                 };
                 centers[f] = (centers[f] + t).rem_euclid(4);
             }
-            let center_fixes = supercube::solve_center_orientations(centers);
+            let center_fixes = supercube::solve_center_orientations(centers)?;
             if !center_fixes.is_empty() {
                 let start_idx = moves.len();
                 if phase_infos.is_empty() && start_idx > 0 {

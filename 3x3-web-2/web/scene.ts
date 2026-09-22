@@ -82,6 +82,7 @@ export class CubeScene {
   };
   private dirty = true;
   private observer: ResizeObserver;
+  private resizeRafId?: number;
   private next = "";
   private onContextLost = (event: Event) => {
     event.preventDefault();
@@ -250,9 +251,9 @@ export class CubeScene {
     this.controls.minPolarAngle = 0.12;
     this.controls.maxPolarAngle = Math.PI - 0.12;
     this.resetView();
-    this.observer = new ResizeObserver(() => this.resize());
+    this.observer = new ResizeObserver(() => this.resize(false));
     this.observer.observe(host);
-    this.resize();
+    this.resize(true);
     this.renderer.setAnimationLoop((time) => this.frame(time));
     this.renderer.domElement.addEventListener(
       "webglcontextlost",
@@ -265,7 +266,22 @@ export class CubeScene {
     this.pieces.push(mesh);
     this.root.add(mesh);
   }
-  private resize() {
+  private resize(immediate = false) {
+    if (immediate) {
+      if (this.resizeRafId !== undefined) {
+        cancelAnimationFrame(this.resizeRafId);
+        this.resizeRafId = undefined;
+      }
+      this.applyResize();
+      return;
+    }
+    if (this.resizeRafId !== undefined) return;
+    this.resizeRafId = requestAnimationFrame(() => {
+      this.resizeRafId = undefined;
+      this.applyResize();
+    });
+  }
+  private applyResize() {
     this.dirty = true;
     const w = this.host.clientWidth,
       h = this.host.clientHeight;
@@ -311,6 +327,10 @@ export class CubeScene {
   }
 
   dispose() {
+    if (this.resizeRafId !== undefined) {
+      cancelAnimationFrame(this.resizeRafId);
+      this.resizeRafId = undefined;
+    }
     this.finish();
     this.renderer.setAnimationLoop(null);
     this.renderer.domElement.removeEventListener(

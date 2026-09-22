@@ -8,6 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 test.describe("R11, R12 & Preset Metadata Fixes", () => {
   test.beforeEach(async ({ page }) => {
     // 既存の Service Worker や Cache Storage によるリクエスト横取りを防止
+    await page.addInitScript(() => {
+      (window as any).__DISABLE_SW__ = true;
+    });
     await page.goto("/");
     await page.evaluate(async () => {
       if ("serviceWorker" in navigator) {
@@ -158,5 +161,28 @@ test.describe("R11, R12 & Preset Metadata Fixes", () => {
     }, content.solution_moves);
 
     expect(isSolved).toBe(true);
+  });
+
+  test("R01: preset buttons are properly disabled before ready and enabled after ready", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const presetTab = page.locator('button[data-tab="presets"]');
+    await presetTab.click();
+
+    // 準備完了後は全プリセットボタンが活性化されていること
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    const buttons = page.locator("#preset-buttons button");
+    const count = await buttons.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      await expect(buttons.nth(i)).toBeEnabled();
+    }
+
+    // プリセットをクリックして正常に読み込めること
+    await buttons.first().click();
+    await expect(page.locator("#preset-status")).toContainText(
+      "を読み込みました",
+    );
   });
 });

@@ -1326,7 +1326,7 @@ fn test_supercube_centers() {
                                 continue;
                             }
                             let needed = [c0, c1, c2, c3, c4, c5];
-                            let moves = supercube::solve_center_orientations(needed);
+                            let moves = supercube::solve_center_orientations(needed).unwrap();
 
                             // Apply to solved cube
                             let res = apply(&solved, &moves);

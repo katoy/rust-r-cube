@@ -5,19 +5,24 @@ declare global {
 }
 
 export function registerServiceWorker(swUrl = "./sw.js") {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("no-sw") || window.__DISABLE_SW__) {
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistrations().then((regs) => {
-          regs.forEach((r) => r.unregister());
-        });
-      }
+    const isDev = Boolean(import.meta.env?.DEV);
+    const isAutomatedTest = Boolean(navigator.webdriver);
+    const forceSw = params.has("force-sw");
+
+    // 開発環境 (Vite dev) では、自動テスト中または ?force-sw が明示されない限り
+    // ローカルキャッシュ汚染と HMR 阻害を防ぐため登録をスキップし既存 SW を解除
+    const isDevSuppressed = isDev && !isAutomatedTest && !forceSw;
+    const isExplicitlyDisabled = params.has("no-sw") || window.__DISABLE_SW__;
+
+    if (isDevSuppressed || isExplicitlyDisabled) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
       return;
     }
-  }
 
-  if ("serviceWorker" in navigator) {
     const register = () => {
       navigator.serviceWorker.register(swUrl, { scope: "./" }).catch((err) => {
         console.warn("ServiceWorker registration failed:", err);

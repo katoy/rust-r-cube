@@ -1,10 +1,10 @@
 # 全体コードレビューレポート (Code Review Report)
 
 > [!NOTE]
-> 最新の総合深層レビューレポートは [code-review-616023c-2026-09-22.md](code-review-616023c-2026-09-22.md) を参照してください。
+> 最新の総合深層レビューレポートは [code-review-e6cf95e-2026-09-22.md](code-review-e6cf95e-2026-09-22.md) を参照してください。
 
 **初版実施日**: 2026-09-17  
-**最新レビュー日**: 2026-09-22 (`616023c`)  
+**最新レビュー日**: 2026-09-22 (`e6cf95e` / `fix/superflip-preset`)  
 **対象リポジトリ**: `rust-r-cube/3x3-web-2`  
 **主要技術スタック**: Rust (WebAssembly), TypeScript, Three.js, Vite, Playwright
 

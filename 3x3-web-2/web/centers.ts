@@ -9,6 +9,10 @@ export function centerTurns(rotations: number[]): number[] {
   );
 }
 
+export function turnsToCenters(turns: number[]): number[] {
+  return turns.map((t) => (((t % 4) + 4) % 4) * quarterTurn);
+}
+
 export function automaticCenters(state: string): number[] {
   // Any legal quarter turn changes both corner permutation parity and the
   // parity of the center-turn sum. This picks one compatible orientation.

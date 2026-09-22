@@ -1,5 +1,5 @@
 import { SOLVED, type ResultData } from "./model";
-import { automaticCenters, centerTurns, centersFromInput } from "./centers";
+import { automaticCenters, centerTurns, turnsToCenters } from "./centers";
 
 export interface CubeSnapshot {
   state: string;
@@ -100,7 +100,7 @@ export class CubeStore {
     if (!prev) return false;
     this.future.push(this.getSnapshot());
     this.state = prev.state;
-    this.centerRotations = centersFromInput(prev.state, prev.centerTurns);
+    this.centerRotations = turnsToCenters(prev.centerTurns);
     this.revision++;
     this.solution = undefined;
     this.step = 0;
@@ -113,7 +113,7 @@ export class CubeStore {
     if (!next) return false;
     this.history.push(this.getSnapshot());
     this.state = next.state;
-    this.centerRotations = centersFromInput(next.state, next.centerTurns);
+    this.centerRotations = turnsToCenters(next.centerTurns);
     this.revision++;
     this.solution = undefined;
     this.step = 0;

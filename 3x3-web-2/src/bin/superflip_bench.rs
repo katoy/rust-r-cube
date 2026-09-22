@@ -108,7 +108,8 @@ fn main() {
                     current_centers[f] = (current_centers[f] + t).rem_euclid(4);
                 }
                 let center_fixes =
-                    cube_studio::supercube::solve_center_orientations(current_centers);
+                    cube_studio::supercube::solve_center_orientations(current_centers)
+                        .unwrap_or_default();
 
                 let mut total_moves = color_res.moves.clone();
                 for &m in &center_fixes {

@@ -172,4 +172,49 @@ test.describe("PWA and Offline Support", () => {
     // 3. 同一スコープ（root）の旧バージョンキャッシュは削除されていること
     expect(cacheKeys).not.toContain("cube-studio-root-old-v0");
   });
+
+  test("R04: suppresses SW auto-registration in dev mode when not automated or forced", async ({
+    page,
+  }) => {
+    // navigator.webdriver = false を模倣（人間のブラウザ開発環境をシミュレート）
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => false,
+      });
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const regCount = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return 0;
+      const regs = await navigator.serviceWorker.getRegistrations();
+      return regs.length;
+    });
+
+    // 開発サーバーで人間のアクセス時は SW 登録が抑止され 0 件であること
+    expect(regCount).toBe(0);
+  });
+
+  test("R04: allows SW registration in dev mode when ?force-sw is present", async ({
+    page,
+  }) => {
+    // navigator.webdriver = false の人間環境でも ?force-sw があれば登録されること
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => false,
+      });
+    });
+
+    await page.goto("/?force-sw");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const hasReg = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return false;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return !!reg;
+    });
+
+    expect(hasReg).toBe(true);
+  });
 });

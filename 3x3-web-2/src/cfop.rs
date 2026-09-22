@@ -249,8 +249,21 @@ fn search_corner(
             && c.co[target_slot] == 0);
     }
 
+    let broken_cross = (4..8)
+        .filter(|&i| c.ep[i] as usize != i || c.eo[i] != 0)
+        .count();
+    if broken_cross > depth {
+        return Ok(false);
+    }
+
     for face in 0..6 {
-        if face == last_face {
+        // D面 (face == 3) は除外する:
+        // 1. 第1層コーナーの挿入にD面回転は不要
+        // 2. D面を回すと broken_cross = 4 となり、D' 1手で復帰可能にもかかわらず
+        //    broken_cross > depth による非アドミッシブルな誤枝刈りが発生する
+        // 3. D面を除外することで各手番で動くクロスエッジは高々1個となり、
+        //    broken_cross <= depth が数学的にアドミッシブルな許容下界として成立する
+        if face == 3 || face == last_face {
             continue;
         }
         for turn in 0..3 {
@@ -609,6 +622,31 @@ mod tests {
         let cube = RawCube::default();
         let res = solve_cross(&cube, &mut SolverState::new(10_000)).unwrap();
         assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_cfop_corner_search_d_face_exclusion() {
+        // D面 (face == 3) がコーナー解法の手順に含まれないことと、
+        // アドミッシブルな探索によりクロスを崩さず第1層を解決できることを検証
+        let cube = RawCube::default();
+        let test_scramble = moves("R U R' U'");
+        let scrambled = apply(&cube, &test_scramble);
+        assert!(is_cross_intact(&scrambled));
+        assert!(!is_first_layer_intact(&scrambled));
+
+        let mut state = SolverState::new(10_000);
+        let first_layer_moves =
+            solve_first_layer(&scrambled, &mut state).expect("第1層解決成功");
+
+        let solved_fl = apply(&scrambled, &first_layer_moves);
+        assert!(is_cross_intact(&solved_fl));
+        assert!(is_first_layer_intact(&solved_fl));
+
+        // 第1層コーナー解法の手順にD面 (face == 3: D, D2, D') が一切含まれていないこと
+        for &m in &first_layer_moves {
+            let face = m / 3;
+            assert_ne!(face, 3, "第1層コーナー解法にD面回転が含まれてはならない");
+        }
     }
 
     #[test]

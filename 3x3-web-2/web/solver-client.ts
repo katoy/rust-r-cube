@@ -77,7 +77,7 @@ export class SolverClient {
           this.fail(
             "探索時間の上限に達しました。エンジンを再起動してください。",
           ),
-        budget + 1500,
+        Math.max(budget * 1.5, budget + 4000),
       );
       this.worker!.postMessage({
         kind: "solve",

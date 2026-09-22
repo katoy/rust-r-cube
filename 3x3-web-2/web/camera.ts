@@ -914,6 +914,8 @@ export class TwoViewCamera {
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
     this.sourceUrlA = undefined;
     this.sourceUrlB = undefined;
+    this.imageA = undefined;
+    this.imageB = undefined;
   }
 
   private close() {

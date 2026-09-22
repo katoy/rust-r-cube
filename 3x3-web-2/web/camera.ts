@@ -336,7 +336,7 @@ export class TwoViewCamera {
   }
 
   private switchView(view: "A" | "B") {
-    if (this.currentView === view && this.points.length === 0) return;
+    if (this.currentView === view) return;
     this.currentView = view;
     this.points = [];
     this.centerPoint = undefined;
@@ -357,6 +357,8 @@ export class TwoViewCamera {
     view: "A" | "B",
     existingGeneration?: number,
   ): Promise<void> {
+    // File selection (including drops) replaces live mode, even while camera access is pending.
+    if (existingGeneration === undefined) this.stopLiveStream();
     const generation =
       existingGeneration ??
       (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
@@ -407,9 +409,14 @@ export class TwoViewCamera {
       this.update();
       return;
     }
-    // まず画像をCanvasに描画した上で検出
-    this.draw();
-    this.points = detectCubeOutline(this.canvas, activeImage);
+    // Detect from the image alone: the visible canvas also contains editable guides.
+    const rawCanvas = document.createElement("canvas");
+    rawCanvas.width = this.canvas.width;
+    rawCanvas.height = this.canvas.height;
+    const ctx = rawCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(activeImage, 0, 0, rawCanvas.width, rawCanvas.height);
+    this.points = detectCubeOutline(rawCanvas);
     this.centerPoint = undefined;
     if (this.points.length === 6) this.updateDetectedLabels();
     this.draw();

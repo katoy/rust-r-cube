@@ -12,6 +12,7 @@ pub struct CfopPhase {
 pub struct CfopResult {
     pub moves: Vec<usize>,
     pub phases: Vec<CfopPhase>,
+    pub nodes: u64,
 }
 
 fn moves(text: &str) -> Vec<usize> {
@@ -113,6 +114,7 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
     Ok(CfopResult {
         moves: total_moves,
         phases: all_phases,
+        nodes: state.nodes,
     })
 }
 

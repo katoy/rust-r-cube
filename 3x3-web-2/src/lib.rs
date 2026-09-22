@@ -103,6 +103,7 @@ pub fn solve_state_with_algorithm(
     let mut moves = match algorithm {
         "cfop" => {
             let res = cfop::solve(&cube, budget_ms)?;
+            total_nodes += res.nodes;
             let mut offset = 0;
             for p in res.phases {
                 let len = p.moves.len();

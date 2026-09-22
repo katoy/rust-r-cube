@@ -1638,6 +1638,18 @@ fn superflip_initial_centers(moves: &[usize]) -> [i32; 6] {
 }
 
 #[test]
+fn cfop_reports_visited_nodes_in_solution_statistics() {
+    let cube = apply(&RawCube::default(), &parse_moves("R U F").unwrap());
+    let solution =
+        crate::solve_state_with_algorithm(&facelets(&cube), 5000, false, None, "cfop").unwrap();
+    assert!(solution.nodes > 0, "CFOP must report the nodes it visits");
+    assert_eq!(
+        apply(&cube, &parse_moves(&solution.moves.join(" ")).unwrap()),
+        RawCube::default()
+    );
+}
+
+#[test]
 fn test_superflip_cfop_move_counts_match_theoretical_values() {
     // CFOP (Layer-By-Layer: 階層解法)
     // 人間向け定石マクロ（Cross -> F2L -> OLL -> PLL）を決定論的に適用するため、

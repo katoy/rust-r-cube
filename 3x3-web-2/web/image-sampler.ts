@@ -33,17 +33,18 @@ export function rgbToHsv(r: number, g: number, b: number) {
 export function classifyColor(r: number, g: number, b: number): string {
   const { h, s, v } = rgbToHsv(r, g, b);
 
-  // 1. 極端に暗いピクセル（黒プラスチック目地、影など）
-  if (v < 0.2 || (s < 0.3 && v < 0.45)) {
+  // 1. 極端に暗いピクセル（黒プラスチック目地、完全な暗闇など）
+  if (v < 0.18 || (s < 0.25 && v < 0.45)) {
     return "?";
   }
 
   // 2. 白（低彩度かつ十分な明度）
-  if (s < 0.3 && v >= 0.45) {
+  if (s < 0.28 && v >= 0.45) {
     return "U";
   }
 
   // 3. 有彩色（色相 H: 0〜360 による判定）
+  // 影や室内照明の偏りにより彩度・明度がやや低下した場合でも、色相特性に基づいて堅牢に分類
   if (h >= 75 && h <= 170) {
     return "F"; // 緑
   }

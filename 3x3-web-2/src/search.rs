@@ -172,26 +172,7 @@ impl Search {
         self.timed_out
     }
     fn min_phase2_center_moves(&self) -> u8 {
-        let mut count = 0u8;
-        if self.current_centers[0] != 0 {
-            count += 1;
-        }
-        if self.current_centers[1] == 2 {
-            count += 1;
-        }
-        if self.current_centers[2] == 2 {
-            count += 1;
-        }
-        if self.current_centers[3] != 0 {
-            count += 1;
-        }
-        if self.current_centers[4] == 2 {
-            count += 1;
-        }
-        if self.current_centers[5] == 2 {
-            count += 1;
-        }
-        count
+        self.current_centers.iter().filter(|&&c| c != 0).count() as u8
     }
     fn phase1(&mut self, twist: u16, flip: u16, slice: u16, depth: u8, last: usize) -> bool {
         if self.exhausted() {
@@ -349,4 +330,25 @@ impl Search {
 }
 fn redundant(face: usize, last: usize) -> bool {
     face == last || ((3..6).contains(&last) && face + 3 == last)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_min_phase2_center_moves() {
+        let mut search = Search::new(1000);
+        assert_eq!(search.min_phase2_center_moves(), 0);
+
+        search.current_centers = [1, 2, 0, 3, 2, 0];
+        // 非ゼロのセンター回転面 (0, 1, 3, 4) の個数は 4
+        assert_eq!(search.min_phase2_center_moves(), 4);
+
+        search.current_centers = [0, 0, 0, 0, 0, 0];
+        assert_eq!(search.min_phase2_center_moves(), 0);
+
+        search.current_centers = [2, 2, 2, 2, 2, 2];
+        assert_eq!(search.min_phase2_center_moves(), 6);
+    }
 }

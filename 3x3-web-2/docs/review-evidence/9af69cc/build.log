@@ -1,0 +1,16 @@
+
+> cube-studio@0.1.0 build
+> npm run wasm && npm run typecheck && vite build && node scripts/generate-sw-precache.js
+
+
+> cube-studio@0.1.0 wasm
+> wasm-pack build --target web --release --out-dir pkg --no-pack
+
+[INFO]: 🎯  Checking for the Wasm target...
+[INFO]: 🌀  Compiling to Wasm...
+    Finished `release` profile [optimized] target(s) in 0.16s
+[INFO]: ⬇️  Installing wasm-bindgen...
+Error: Operation not permitted (os error 1)
+To disable `wasm-opt`, add `wasm-opt = false` to your package metadata in your `Cargo.toml`.
+Caused by: Operation not permitted (os error 1)
+To disable `wasm-opt`, add `wasm-opt = false` to your package metadata in your `Cargo.toml`.

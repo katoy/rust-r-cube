@@ -1,0 +1,308 @@
+
+> cube-studio@0.1.0 test
+> playwright test --output=/tmp/cube-fixes-9af69cc-e2e
+
+[WebServer] (node:78745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 172 tests using 1 worker
+
+(node:78746) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓    1 [chromium] › tests/accessibility.spec.ts:10:3 › Comprehensive Accessibility (a11y) Audits › initial main page meets WCAG accessibility standards (2.4s)
+  ✓    2 [chromium] › tests/accessibility.spec.ts:17:3 › Comprehensive Accessibility (a11y) Audits › solution content page meets accessibility standards (2.6s)
+  ✓    3 [chromium] › tests/accessibility.spec.ts:32:3 › Comprehensive Accessibility (a11y) Audits › help dialog meets accessibility standards (2.0s)
+  ✓    4 [chromium] › tests/accessibility.spec.ts:42:3 › Comprehensive Accessibility (a11y) Audits › camera editor dialog meets accessibility standards (2.0s)
+  ✓    5 [chromium] › tests/app.spec.ts:15:1 › initial screen, keyboard, inverse, undo and redo (2.1s)
+  ✓    6 [chromium] › tests/app.spec.ts:42:1 › scramble, solve, step, backwards, jump and complete playback (4.8s)
+  ✓    7 [chromium] › tests/app.spec.ts:71:1 › all eighteen moves match their inverse and manual edits invalidate solution (6.4s)
+  ✓    8 [chromium] › tests/app.spec.ts:94:1 › physical color input, unknown colors, validation and solve (9.7s)
+  ✓    9 [chromium] › tests/app.spec.ts:122:1 › persistence, valid JSON import and invalid JSON rejection (3.3s)
+  ✓   10 [chromium] › tests/app.spec.ts:148:1 › animation interruption, pause and speed changes do not corrupt state (6.5s)
+  ✓   11 [chromium] › tests/app.spec.ts:171:1 › responsive layout and accessibility (2.8s)
+  ✓   12 [chromium] › tests/app.spec.ts:195:1 › mobile layout keeps 3D scene and solution controls visible simultaneously (9.6s)
+  ✓   13 [chromium] › tests/app.spec.ts:230:1 › production assets and worker load under a subdirectory (6.1s)
+  ✓   14 [chromium] › tests/app.spec.ts:245:1 › R04: presets load correctly under a subdirectory (1.5s)
+  ✓   15 [chromium] › tests/app.spec.ts:261:1 › worker loading failure offers retry (1.9s)
+  ✓   16 [chromium] › tests/app.spec.ts:275:1 › cancelled and outdated worker results cannot change the cube (6.9s)
+  ✓   17 [chromium] › tests/app.spec.ts:309:1 › 2D fallback remains operable without WebGL (1.6s)
+  ✓   18 [chromium] › tests/app.spec.ts:329:1 › orientation mode toggle correctly changes solve behavior (3.4s)
+  ✓   19 [chromium] › tests/app.spec.ts:371:1 › orientation mode unchecked solves to color-only completion (2.1s)
+  ✓   20 [chromium] › tests/app.spec.ts:397:1 › arrow indicators display piece orientation (1.9s)
+  ✓   21 [chromium] › tests/app.spec.ts:435:1 › orientation toggle does not affect UI state or undo/redo (1.9s)
+  ✓   22 [chromium] › tests/app.spec.ts:465:1 › error handling for invalid algorithm syntax (1.8s)
+  ✓   23 [chromium] › tests/app.spec.ts:474:1 › persistence saves and loads state correctly (3.0s)
+  ✓   24 [chromium] › tests/app.spec.ts:488:1 › large number of moves is handled correctly (2.0s)
+  ✓   25 [chromium] › tests/app.spec.ts:511:1 › speed setting affects playback duration (6.5s)
+  ✓   26 [chromium] › tests/app.spec.ts:554:1 › arrows are displayed on initial solved state (1.8s)
+  ✓   27 [chromium] › tests/app.spec.ts:581:1 › arrows update after scramble (1.8s)
+  ✓   28 [chromium] › tests/app.spec.ts:623:1 › arrows visibility persists during solve (3.7s)
+  ✓   29 [chromium] › tests/app.spec.ts:669:1 › arrow orientations update correctly on all faces for all moves (U, R, F, D, L, B, inverses, doubles) (4.3s)
+  ✓   30 [chromium] › tests/app.spec.ts:780:1 › all 18 basic moves correctly update arrow orientations on all faces (5.7s)
+  ✓   31 [chromium] › tests/app.spec.ts:859:1 › orientation mode solves cube so that all centers are also oriented correctly to 0 (2.5s)
+  ✓   32 [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves orientation within 24 moves (5.9s)
+Preset '簡単（3手）' solved in 3 moves (3 moves): F' U' R'
+Preset 'T-Permutation' solved in 11 moves (at most 14 moves): U F2 U' F2 D R2 B2 U B2 D' R2
+Preset 'スーパーフリップ' solved in 23 moves (at most 24 moves (color-only optimum is 20)): R L' F' U D R' B2 U2 L F B' L2 U2 B2 U2 B2 D2 L2 D L2 D R2 U
+Preset 'ランダム（seed=1）' solved in 24 moves (at most 25 moves): D L' B D B U L F' R' U' B' U2 F2 R2 U2 R2 U2 B2 L2 F2 D L2 D R2
+  ✓   33 [chromium] › tests/app.spec.ts:982:1 › all presets can be loaded and solved within configured move bounds (13.2s)
+CFOP Phase Badges: [ 'ステップ 2: 完全1層 (First Layer)', 'ステップ 3: 中層エッジ (Second Layer)' ]
+Thistlethwaite Phase Badges: [ '第2段階: G1→G2 (コーナー向き+中層)', '第4段階: G3→G4 (最終揃え)' ]
+  ✓   34 [chromium] › tests/app.spec.ts:1053:1 › solver algorithm selection, persistence, and phase badges (6.5s)
+  ✓   35 [chromium] › tests/arrow-direction.spec.ts:9:3 › R05: 3D arrow and center label rotation directions › U center arrow points to +X (right, [1, 0, 0]) after clockwise U turn (1.8s)
+  ✓   36 [chromium] › tests/beginner-guidance.spec.ts:9:3 › Beginner Guidance and Notation UI › face-buttons have informative title tooltips for beginners (1.6s)
+  ✓   37 [chromium] › tests/beginner-guidance.spec.ts:38:3 › Beginner Guidance and Notation UI › help dialog provides notation table for beginners (1.7s)
+  ✓   38 [chromium] › tests/camera-face-and-focus.spec.ts:5:3 › R09 & R13: Camera Face Assignment and Palette Focus › R09: unrecognized or mismatched center colors in view A do not overwrite view B faces (1.8s)
+  ✓   39 [chromium] › tests/camera-face-and-focus.spec.ts:97:3 › R09 & R13: Camera Face Assignment and Palette Focus › R13: clicking or selecting palette buttons does not drop focus to body (1.9s)
+  ✓   40 [chromium] › tests/camera-fixture.spec.ts:12:3 › R03: Camera fixture availability in clean environment › loadFullManifest automatically ensures manifest and test images exist (1.2s)
+  ✓   41 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via file stops live video and displays that image (2.1s)
+  ✓   42 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via card-drop stops live video and displays that image (2.7s)
+  ✓   43 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via canvas-drop stops live video and displays that image (2.5s)
+  ✓   44 [chromium] › tests/camera-image-state.spec.ts:124:1 › selecting an image cancels a pending camera start (1.8s)
+  ✓   45 [chromium] › tests/camera-image-state.spec.ts:156:1 › outline detection ignores previously drawn and manually moved guides (2.5s)
+  ✓   46 [chromium] › tests/camera-image-state.spec.ts:171:1 › reselecting the active image preserves manually adjusted vertices and center (2.4s)
+  ✓   47 [chromium] › tests/camera-input.spec.ts:23:3 › カメラ入力 - 画像処理テスト › マニフェストが存在し、すべての画像ファイルと立体座標が揃っている (5ms)
+  ✓   48 [chromium] › tests/camera-input.spec.ts:58:3 › カメラ入力 - 画像処理テスト › solved 状態の画像をアップロードできる (2.2s)
+  ✓   49 [chromium] › tests/camera-input.spec.ts:76:3 › カメラ入力 - 画像処理テスト › ビューAとビューBの両方をアップロードできる (3.0s)
+  ✓   50 [chromium] › tests/camera-input.spec.ts:125:3 › カメラ入力 - 画像処理テスト › フェース・ビュー選択セレクトが正常に動作する (2.1s)
+  ✓   51 [chromium] › tests/camera-input.spec.ts:149:3 › カメラ入力 - 画像処理テスト › 画像をアップロードすると外周6角が自動検出されキャプチャボタンが有効になる (2.3s)
+  ✓   52 [chromium] › tests/camera-input.spec.ts:182:3 › カメラ入力 - 画像処理テスト › クリアボタンで角をリセットし手動クリックで再指定できる (2.7s)
+  ✓   53 [chromium] › tests/camera-input.spec.ts:218:3 › カメラ入力 - 画像処理テスト › 自動検出された頂点をドラッグして微調整できる (2.4s)
+  ✓   54 [chromium] › tests/camera-input.spec.ts:259:3 › カメラ入力 - 画像処理テスト › 5点（5角形）など途中の頂点もドラッグして移動や右クリック削除ができる (2.8s)
+  ✓   55 [chromium] › tests/camera-input.spec.ts:321:3 › カメラ入力 - 画像処理テスト › 外周6点指定で画像A・画像Bをキャプチャしてから apply が有効になる (3.6s)
+  ✓   56 [chromium] › tests/camera-input.spec.ts:354:3 › カメラ入力 - 画像処理テスト › ビューを切り替えると自動検出が再実行される (2.3s)
+  ✓   57 [chromium] › tests/camera-input.spec.ts:373:3 › カメラ入力 - 画像処理テスト › エラー表示領域が存在する (2.3s)
+  ✓   58 [chromium] › tests/camera-input.spec.ts:391:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › solved 状態を画像から認識して色入力および3Dキューブへ正しく反映できる (4.4s)
+  ✓   59 [chromium] › tests/camera-input.spec.ts:429:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › scrambled-1 状態を対角画像から正確に認識できる (3.7s)
+  ✓   60 [chromium] › tests/camera-input.spec.ts:460:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › superflip 状態を対角画像から正確に認識できる (3.5s)
+  ✓   61 [chromium] › tests/camera-input.spec.ts:482:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › mixed-colors 状態を対角画像から正確に認識できる (3.3s)
+  ✓   62 [chromium] › tests/camera-input.spec.ts:503:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › partial 状態（未入力を含む）を対角画像から正確に認識できる (3.4s)
+  ✓   63 [chromium] › tests/camera-input.spec.ts:527:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › 読み取り結果が表示され、通常セルの色を補正でき、センターセルの色は編集できない (2.5s)
+  ✓   64 [chromium] › tests/camera-input.spec.ts:579:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › 実機写真（IMG_3243.png）から白・緑・赤の3面を自動検出・正確に読み取れる (2.6s)
+  ✓   65 [chromium] › tests/camera-input.spec.ts:630:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › 実機写真2枚（IMG_3243.png と IMG_3244.png）から全6面を読み取り、色入力へ反映できる (3.5s)
+  ✓   66 [chromium] › tests/camera-input.spec.ts:676:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › 枠を回転ボタン（および 'r' キー）で六角形枠を60度ずつ回転できる (2.4s)
+  ✓   67 [chromium] › tests/camera-input.spec.ts:709:3 › カメラ入力 - エンドツーエンドテスト（対角2方向立体認識検証） › 実機写真Bで枠を回転させて逆Y字型キューブに適合させて認識できる (3.1s)
+  ✓   68 [chromium] › tests/camera-lifecycle.spec.ts:5:3 › R02 & R10: Camera Lifecycle and Decode Generation › R02: startLiveStream cleans up tracks on video.play() rejection or duplicate starts (1.8s)
+  ✓   69 [chromium] › tests/camera-lifecycle.spec.ts:55:3 › R02 & R10: Camera Lifecycle and Decode Generation › R10: processFile respects decode generation and does not overwrite with stale image (1.7s)
+  ✓   70 [chromium] › tests/camera-lifecycle.spec.ts:145:3 › R02 & R10: Camera Lifecycle and Decode Generation › R10: captureLiveFrame captures to the view active at capture invocation (1.9s)
+  ✓   71 [chromium] › tests/camera-live.spec.ts:9:3 › Camera WebRTC Live Stream UI › camera editor provides live stream camera controls (1.8s)
+  ✓   72 [chromium] › tests/camera-live.spec.ts:27:3 › Camera WebRTC Live Stream UI › R01: stops camera stream and tracks when dialog is closed with Escape (1.8s)
+  ✓   73 [chromium] › tests/camera-unrecognized-center.spec.ts:15:3 › R11: Unrecognized center recovery in camera and editor › unrecognized centers '?' are normalized to face color when applied to editor (3.3s)
+  ✓   74 [chromium] › tests/center-input.spec.ts:14:1 › manual centers survive apply, undo, redo and reload, and solve to zero (9.0s)
+  ✓   75 [chromium] › tests/center-input.spec.ts:42:1 › incompatible manual centers are rejected and automatic centers are solvable (7.1s)
+  ✓   76 [chromium] › tests/center-input.spec.ts:64:1 › all four angles survive JSON export/import and cancel leaves centers unchanged (2.6s)
+  ✓   77 [chromium] › tests/center-input.spec.ts:95:1 › legacy color-only import gets compatible centers and malformed center input is rejected (2.2s)
+  ✓   78 [chromium] › tests/center-input.spec.ts:119:1 › center input works without WebGL (5.3s)
+  ✓   79 [chromium] › tests/center-input.spec.ts:142:1 › center controls are keyboard accessible and fit narrow screens (3.0s)
+  ✓   80 [chromium] › tests/center-input.spec.ts:170:1 › clearing colors preserves manually specified center directions (1.9s)
+  ✓   81 [chromium] › tests/center-input.spec.ts:184:1 › two-view image input opens with camera and file capture controls (1.9s)
+  ✓   82 [chromium] › tests/code-review-0bd0d8c-regression.spec.ts:5:3 › 0bd0d8c Code Review Regression Tests (R01 - R04) › R01: SW suppression or ?no-sw must not unregister unrelated SW registrations under other scopes (3.1s)
+  ✓   83 [chromium] › tests/code-review-0bd0d8c-regression.spec.ts:51:3 › 0bd0d8c Code Review Regression Tests (R01 - R04) › R02: solution seek, finish, and close must persist state to localStorage and restore on reload (3.8s)
+  ✓   84 [chromium] › tests/code-review-0bd0d8c-regression.spec.ts:100:3 › 0bd0d8c Code Review Regression Tests (R01 - R04) › R03: delayed camera capture frame must not overwrite newly selected file (2.3s)
+  ✓   85 [chromium] › tests/code-review-0bd0d8c-regression.spec.ts:155:3 › 0bd0d8c Code Review Regression Tests (R01 - R04) › R04: sticker color correction retains focus and Tab moves to next cell (1.8s)
+📍 ページを開く...
+✓ ページ読み込み完了 (1251ms)
+🎮 スクランブル実行...
+✓ スクランブル完了 - 状態: DURUUFBLDLUUDRDUDBUB...
+🔍 解法探索実行...
+✓ 解法探索完了 - 手数: 24 手 (987ms)
+▶️  解法再生開始...
+✓ 解法再生完了 (693ms)
+🔄 リセット実行...
+✓ リセット完了 (349ms)
+✅ 詳細レポート生成完了:
+   📄 HTML: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e-advanced/index.html
+   📋 JSON: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e-advanced/operations.json
+
+✅ テスト完了: 5 個の操作をトレース
+  ✓   86 [chromium] › tests/coverage-advanced.spec.ts:12:3 › Advanced E2E Coverage Tracking › UI 操作ベースの WASM 呼び出し追跡 (3.8s)
+📍 ページを開く...
+🔍 すべての WASM 関数をテスト...
+1️⃣  initialize() テスト
+2️⃣  scramble() テスト
+   結果: U L U' L B2 R F' B' U2 R D2 B' L' F D F2 D2 R L D2 B R' B F' U
+3️⃣  apply_moves() テスト
+4️⃣  validate() テスト
+5️⃣  solve() テスト
+6️⃣  solve_with_orientation() テスト
+7️⃣  get_orientations() テスト
+
+✅ すべての WASM 関数テスト完了
+✅ WASM カバレッジレポート生成完了: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e-advanced/wasm-coverage.html
+
+✅ 7 個の WASM 関数をすべてテスト完了
+  ✓   87 [chromium] › tests/coverage-advanced.spec.ts:127:3 › Advanced E2E Coverage Tracking › すべての WASM 関数の完全テスト (2.3s)
+📍 ページを開く...
+🎯 向きモードを有効化...
+✓ 向きモード有効でスクランブル完了 (554ms)
+✓ 向きモード有効で解法完了 - 24 手 (1763ms)
+🎯 向きモードを無効化...
+✓ 向きモード無効でスクランブル完了 (537ms)
+✓ 向きモード無効で解法完了 - 19 手 (451ms)
+✅ 向きモード比較レポート生成完了: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e-advanced/orientation-comparison.html
+
+✅ 向きモード比較テスト完了
+  ✓   88 [chromium] › tests/coverage-advanced.spec.ts:263:3 › Advanced E2E Coverage Tracking › orientation モード有効時のカバレッジ計測 (5.6s)
+  ✓   89 [chromium] › tests/coverage-calc.spec.ts:5:3 › R13: Coverage calculation with uncalled functions › does not report 100% coverage when uncalled functions exist (0ms)
+✅ カバレッジレポート生成完了:
+   📄 HTML: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e/index.html
+   📋 JSON: /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/coverage-e2e/coverage.json
+✓ 総合テスト実行完了: ユニット＆E2E統合
+✓ JS カバレッジ対象: 37 ファイル
+
+📊 Web モジュールカバレッジ (18 ファイル):
+   - style.css: 100.00% (6/6) 
+   - model.ts: 100.00% (393/393) 
+   - centers.ts: 100.00% (41/41) 
+   - pwa.ts: 100.00% (38/38) 
+   - triggers.ts: 100.00% (158/158) 
+   - camera-ui-helper.ts: 100.00% (59/59) 
+   - camera-canvas-renderer.ts: 100.00% (78/78) 
+   - camera-results-ui.ts: 99.23% (129/130) Uncovered: 121
+   - camera-geometry.ts: 98.17% (107/109) Uncovered: 106,107
+   - view.ts: 98.04% (100/102) Uncovered: 80,81
+   - editor.ts: 97.79% (177/181) Uncovered: 74,75,131,132
+   - solver-client.ts: 97.59% (81/83) Uncovered: 22,36
+   - image-sampler.ts: 96.74% (208/215) Uncovered: 59,103,104,161,162,175,176
+   - camera.ts: 96.69% (877/907) Uncovered: 150,151,329,330,331,332,503,504,505,525,526,528,529,644,785,786,787,793,794,795,796,797,798,799,800,801,813,814,820,821
+   - cube-store.ts: 96.48% (137/142) Uncovered: 105,106,107,108,132
+   - scene.ts: 96.04% (461/480) Uncovered: 95,96,254,255,256,351,352,353,354,355,356,368,369,370,468,469,470,471,472
+   - sound.ts: 95.24% (80/84) Uncovered: 11,12,22,23
+   - main.ts: 67.65% (571/844) Uncovered: 36,66,67,68,69,82,83,142,143,183,184,185,186,187,206,207,208,209,210,211,212,213,214,220,221,246,247,269,270,271,272,287,288,293,294,297,298,302,303,304,305,306,325,326,327,328,329,333,334,335,342,343,344,345,346,347,348,349,350,358,359,360,385,386,387,408,409,410,411,455,456,464,465,476,477,478,479,480,497,503,504,505,506,536,537,538,539,540,541,542,543,544,545,546,547,548,549,550,553,554,555,556,557,558,559,560,561,562,567,568,569,570,571,572,573,574,575,576,577,578,579,580,581,582,583,584,600,601,603,604,605,607,608,609,610,611,612,614,615,616,617,618,619,620,632,633,634,635,636,639,640,651,652,653,654,655,656,657,658,659,660,661,662,663,664,665,666,667,668,670,671,675,676,677,678,680,681,686,687,688,689,690,691,692,693,694,695,696,698,699,700,701,702,703,704,705,706,707,708,709,710,711,712,724,725,726,768,769,770,771,772,773,774,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789,790,791,792,793,794,795,796,797,798,799,800,801,802,803,804,805,806,807,808,809,810,811,812,813,814,815,816,817,818,819,820,821,822,823,824,825,826,827,828,829,830,831,832,838,839
+  ✓   90 [chromium] › tests/coverage.spec.ts:18:3 › E2E Coverage with CDP › ユニットテストおよびE2Eテストによるブラウザ配信JavaScriptの行カバレッジ計測 (12.7s)
+  ✓   91 [chromium] › tests/cube-store.spec.ts:4:3 › CubeStore Unit Tests › initial state and properties (1.6s)
+  ✓   92 [chromium] › tests/cube-store.spec.ts:36:3 › CubeStore Unit Tests › replace updates state, records history, and increments revision (1.6s)
+  ✓   93 [chromium] › tests/cube-store.spec.ts:65:3 › CubeStore Unit Tests › undo and redo restore states and center turns (2.1s)
+  ✓   94 [chromium] › tests/cube-store.spec.ts:109:3 › CubeStore Unit Tests › modifier toggle and set (1.6s)
+  ✓   95 [chromium] › tests/cube-store.spec.ts:136:3 › CubeStore Unit Tests › solution and step tracking (1.5s)
+  ✓   96 [chromium] › tests/cube-store.spec.ts:170:3 › CubeStore Unit Tests › subscribe triggers listener on store changes (1.5s)
+  ✓   97 [chromium] › tests/cube-store.spec.ts:199:3 › CubeStore Unit Tests › subscribe passes event type for distinct store mutations (1.6s)
+✅ E2E Coverage Test Results:
+✓ initialize()
+✓ All functions tested with seed 1
+✓ All functions tested with seed 50
+✓ All functions tested with seed 100
+✓ All functions tested with seed 500
+✓ All functions tested with seed 1000
+  ✓   98 [chromium] › tests/e2e-complete-coverage.spec.ts:8:3 › Complete WASM and Tables Coverage › all WASM functions with comprehensive scenarios (3.1s)
+✅ Edge case tests passed
+  ✓   99 [chromium] › tests/e2e-complete-coverage.spec.ts:93:3 › Complete WASM and Tables Coverage › edge cases and error handling (1.4s)
+✅ Performance Metrics:
+      Average: 261.88ms
+      Max: 488.50ms
+      Min: 30.00ms
+      Tests: 10
+  ✓  100 [chromium] › tests/e2e-complete-coverage.spec.ts:140:3 › Complete WASM and Tables Coverage › table consistency and performance (4.1s)
+  ✓  101 [chromium] › tests/e2e-comprehensive.spec.ts:8:3 › Comprehensive E2E Coverage › 完成状態の検証と操作 (1.5s)
+  ✓  102 [chromium] › tests/e2e-comprehensive.spec.ts:34:3 › Comprehensive E2E Coverage › スクランブルと状態操作 (1.5s)
+  ✓  103 [chromium] › tests/e2e-comprehensive.spec.ts:103:3 › Comprehensive E2E Coverage › 解法と向き情報の取得 (2.0s)
+  ✓  104 [chromium] › tests/e2e-comprehensive.spec.ts:200:3 › Comprehensive E2E Coverage › エラーハンドリングと境界値 (1.5s)
+  ✓  105 [chromium] › tests/e2e-comprehensive.spec.ts:284:3 › Comprehensive E2E Coverage › パフォーマンスと一貫性の検証 (2.2s)
+  ✓  106 [chromium] › tests/feedback.spec.ts:9:3 › Interaction Feedback and Sound UI › sound toggle button exists and can be toggled (2.9s)
+  ✓  107 [chromium] › tests/feedback.spec.ts:28:3 › Interaction Feedback and Sound UI › keyboard key press highlights corresponding face button (2.4s)
+  ✓  108 [chromium] › tests/image-sampler-color-resilience.spec.ts:4:3 › Image Sampler Color Classification Resilience › O02: accurately classifies colors under shadows and low lighting conditions (1.5s)
+  ✓  109 [chromium] › tests/image-sampler-perspective.spec.ts:4:3 › R08: Image Sampler Perspective Projection › sampleFace correctly uses perspective projection instead of bilinear interpolation (1.5s)
+  ✓  110 [chromium] › tests/image-sampler-perspective.spec.ts:88:3 › R08: Image Sampler Perspective Projection › sampleFace rejects degenerate or non-convex quadrilaterals (1.6s)
+  ✓  111 [chromium] › tests/json-load-race.spec.ts:73:5 › JSON file selection races › latest selection wins when older.json finishes first (1.5s)
+  ✓  112 [chromium] › tests/json-load-race.spec.ts:73:5 › JSON file selection races › latest selection wins when newer.json finishes first (1.6s)
+  ✓  113 [chromium] › tests/json-load-race.spec.ts:91:3 › JSON file selection races › an obsolete read error preserves the pending selection and message (1.6s)
+  ✓  114 [chromium] › tests/json-load-race.spec.ts:118:3 › JSON file selection races › manual moves during the latest read still prevent replacement (1.8s)
+  -  115 [chromium] › tests/performance.spec.ts:2:1 › 1000 deterministic states in a real WASM worker
+  ✓  116 [chromium] › tests/playback-controls.spec.ts:18:3 › Playback Controls Enhancement › jump to first step and last step with buttons (#first and #last) (6.8s)
+  ✓  117 [chromium] › tests/playback-controls.spec.ts:65:3 › Playback Controls Enhancement › keyboard shortcuts Home and End jump to start and finish (3.2s)
+  ✓  118 [chromium] › tests/playback-controls.spec.ts:95:3 › Playback Controls Enhancement › current step button in move-list automatically stays in view during seek/playback (6.9s)
+Cached URLs before offline: [
+  'http://127.0.0.1:4173/nested/cube/',
+  'http://127.0.0.1:4173/nested/cube/assets/camera-BSpnddRw.js',
+  'http://127.0.0.1:4173/nested/cube/assets/editor-CLeZi1g1.js',
+  'http://127.0.0.1:4173/nested/cube/assets/index-4QfmvZJw.js',
+  'http://127.0.0.1:4173/nested/cube/assets/index-DijXbCo-.css',
+  'http://127.0.0.1:4173/nested/cube/assets/three-D5iOqr06.js',
+  'http://127.0.0.1:4173/nested/cube/cubes/README.md',
+  'http://127.0.0.1:4173/nested/cube/cubes/easy-5-moves.json',
+  'http://127.0.0.1:4173/nested/cube/cubes/seed-1-scramble.json',
+  'http://127.0.0.1:4173/nested/cube/cubes/solved.json',
+  'http://127.0.0.1:4173/nested/cube/cubes/superflip.json',
+  'http://127.0.0.1:4173/nested/cube/cubes/t-perm.json',
+  'http://127.0.0.1:4173/nested/cube/icon-192.png',
+  'http://127.0.0.1:4173/nested/cube/icon-512.png',
+  'http://127.0.0.1:4173/nested/cube/icon.svg',
+  'http://127.0.0.1:4173/nested/cube/index.html',
+  'http://127.0.0.1:4173/nested/cube/manifest.webmanifest',
+  'http://127.0.0.1:4173/nested/cube/assets/solver.worker-DRxwi1Au.js',
+  'http://127.0.0.1:4173/nested/cube/assets/cube_studio_bg-Cpdqt3co.wasm'
+]
+  ✓  119 [chromium] › tests/pwa-first-visit-offline.spec.ts:4:3 › R10: Complete offline boot after single visit without prior reload › app boots offline after single initial visit on production preview (2.9s)
+  ✓  120 [chromium] › tests/pwa.spec.ts:20:3 › PWA and Offline Support › manifest.webmanifest and PWA meta tags are present and valid (1.7s)
+  ✓  121 [chromium] › tests/pwa.spec.ts:52:3 › PWA and Offline Support › service worker registers successfully (1.9s)
+  ✓  122 [chromium] › tests/pwa.spec.ts:65:3 › PWA and Offline Support › app loads and solves cube while completely offline (5.0s)
+  ✓  123 [chromium] › tests/pwa.spec.ts:124:3 › PWA and Offline Support › R02: isolates cache per deployment path and preserves other apps and other paths (3.6s)
+  ✓  124 [chromium] › tests/pwa.spec.ts:176:3 › PWA and Offline Support › R04: suppresses SW auto-registration in dev mode when not automated or forced (1.5s)
+  ✓  125 [chromium] › tests/pwa.spec.ts:199:3 › PWA and Offline Support › R04: allows SW registration in dev mode when ?force-sw is present (1.6s)
+  ✓  126 [chromium] › tests/scene-lifecycle.spec.ts:4:3 › CubeScene Lifecycle and Cleanup › R05: cancels pending resize rAF when dispose() is called (1.5s)
+  ✓  127 [chromium] › tests/scripts-regression.spec.ts:11:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R14: generate-test-images.js exits with code 1 on failure (354ms)
+  ✓  128 [chromium] › tests/scripts-regression.spec.ts:51:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R14: launch-offline.js exits with code 1 on failure (239ms)
+  ✓  129 [chromium] › tests/scripts-regression.spec.ts:86:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R16: scripts/start.sh resolves symlink and sets working directory to project root (103ms)
+  ✓  130 [chromium] › tests/settings-persistence.spec.ts:4:3 › R09: Settings persistence across multiple reloads › playback speed and reduced-motion settings survive reloads and are not overwritten during restore (6.1s)
+  ✓  131 [chromium] › tests/settings-persistence.spec.ts:50:3 › R09: Settings persistence across multiple reloads › R09-scope: localStorage state and settings are isolated per deployment scope on same origin (3.0s)
+  ✓  132 [chromium] › tests/share-centers.spec.ts:4:3 › R07: Supercube center orientation preserved in share link › share link includes center turns and restores supercube center state (3.8s)
+  ✓  133 [chromium] › tests/share-link.spec.ts:4:3 › Cube State and Algorithm URL Sharing › loads cube state from url query parameter ?alg= (1.6s)
+  ✓  134 [chromium] › tests/share-link.spec.ts:16:3 › Cube State and Algorithm URL Sharing › share button copies valid URL to clipboard and shows feedback (1.8s)
+  ✓  135 [chromium] › tests/solution-structure.spec.ts:9:3 › Solution Structure and Phase Guide UI › solution display includes phase information and move tags (2.4s)
+  ✓  136 [chromium] › tests/storage-disabled.spec.ts:4:3 › R08: App boots and works even when localStorage throws SecurityError › app boots and sound toggle functions when localStorage is restricted (1.8s)
+  ✓  137 [chromium] › tests/sw-collision-and-waituntil.spec.ts:9:3 › R03 & R15: Service Worker Cache Scope and waitUntil › R03: activate on parent scope /nested/ does not delete /nested/cube/ cache (1.7s)
+  ✓  138 [chromium] › tests/sw-collision-and-waituntil.spec.ts:100:3 › R03 & R15: Service Worker Cache Scope and waitUntil › R03: distinct scopes /a/b/c_/d/ and /a/b/c/_d/ do not generate identical cache prefixes (2.2s)
+  ✓  139 [chromium] › tests/sw-collision-and-waituntil.spec.ts:137:3 › R03 & R15: Service Worker Cache Scope and waitUntil › R15: stale-while-revalidate and navigation pass cache update promises to event.waitUntil (1.8s)
+
+  ✓  140 [chromium] › tests/sw-update.spec.ts:172:1 › R14: actual precache generator changes SW only when asset content changes (242ms)
+
+  ✓  141 [chromium] › tests/sw-update.spec.ts:202:3 › R02/R14: / preserves foreign caches through activation and a real SW update (1.3s)
+
+  ✓  142 [chromium] › tests/sw-update.spec.ts:202:3 › R02/R14: /nested/cube/ preserves foreign caches through activation and a real SW update (1.2s)
+
+  ✓  143 [chromium] › tests/sw-update.spec.ts:263:1 › R14: cached preset returns before revalidation finishes and the updated value works offline (159ms)
+
+  ✓  144 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /nested/cube/ preserves the real deployment at /nested/cube-alt/ through activation and update (1.3s)
+
+  ✓  145 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /nested/cube/ preserves the real deployment at /nested-cube/ through activation and update (1.3s)
+
+  ✓  146 [chromium] › tests/sw-update.spec.ts:324:3 › R02: / preserves the real deployment at /root/ through activation and update (1.3s)
+
+  ✓  147 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /nested/cube-alt/ preserves the real deployment at /nested/cube_alt/ through activation and update (1.4s)
+
+  ✓  148 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /nested/cube/ preserves the real deployment at /nested/cube/child/ through activation and update (1.3s)
+
+  ✓  149 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /root/ preserves the real deployment at /path/root/ through activation and update (1.3s)
+
+  ✓  150 [chromium] › tests/sw-update.spec.ts:324:3 › R02: / preserves the real deployment at /root/child/ through activation and update (1.3s)
+
+  ✓  151 [chromium] › tests/sw-update.spec.ts:324:3 › R02: /version.1/ preserves the real deployment at /version_1/ through activation and update (1.3s)
+
+  ✓  152 [chromium] › tests/sw-update.spec.ts:377:3 › R14: updated preset overrides a legacy cache while online (1.2s)
+
+  ✓  153 [chromium] › tests/sw-update.spec.ts:377:3 › R14: updated preset overrides a legacy cache while offline (1.3s)
+
+  ✓  154 [chromium] › tests/sw-update.spec.ts:418:1 › offline navigation with query parameters (?state=...&alg=...) returns cached index.html from own cache (172ms)
+
+  ✓  155 [chromium] › tests/sw-update.spec.ts:440:1 › preserves legacy un-scoped cache (e.g. cube-studio-v1) as foreign deployment on activation without touching other apps (145ms)
+
+  ✓  156 [chromium] › tests/sw-update.spec.ts:470:1 › offline navigation does not leak root scope's index.html into nested subscope (159ms)
+  ✓  157 [chromium] › tests/tab-navigation.spec.ts:10:3 › R12: 4-tab keyboard navigation and wrap-around › ArrowRight and ArrowLeft traverse all 4 tabs with proper wrap-around (2.4s)
+  ✓  158 [chromium] › tests/ui-interaction.spec.ts:29:3 › R11, R12 & Preset Metadata Fixes › R11: arrow keys on tabs should navigate tabs without advancing cube solution playback (4.8s)
+  ✓  159 [chromium] › tests/ui-interaction.spec.ts:67:3 › R11, R12 & Preset Metadata Fixes › R12: delayed preset response does not overwrite concurrent user edits (5.1s)
+  ✓  160 [chromium] › tests/ui-interaction.spec.ts:134:3 › R11, R12 & Preset Metadata Fixes › Preset Metadata: easy-5-moves.json solution correctly solves scramble (3.9s)
+  ✓  161 [chromium] › tests/ui-interaction.spec.ts:166:3 › R11, R12 & Preset Metadata Fixes › R01: preset buttons are properly disabled before ready and enabled after ready (4.0s)
+  ✓  162 [chromium] › tests/unit-tests.spec.ts:4:3 › Web Modules Unit Tests › model.ts - inverse and instruction (1.6s)
+  ✓  163 [chromium] › tests/unit-tests.spec.ts:58:3 › Web Modules Unit Tests › model.ts - getCellArrowInfo calculation (1.6s)
+  ✓  164 [chromium] › tests/unit-tests.spec.ts:110:3 › Web Modules Unit Tests › model.ts - getErrorIndices extraction (1.5s)
+  ✓  165 [chromium] › tests/unit-tests.spec.ts:151:3 › Web Modules Unit Tests › image-sampler.ts - buildState and sampleFace (1.6s)
+  ✓  166 [chromium] › tests/unit-tests.spec.ts:280:3 › Web Modules Unit Tests › centers.ts - centerTurns, rotateCenters, automaticCenters, centersFromInput (1.6s)
+  ✓  167 [chromium] › tests/unit-tests.spec.ts:360:3 › Web Modules Unit Tests › camera.ts - computeCenter and detectCubeOutline unit functions (1.7s)
+  ✓  168 [chromium] › tests/unit-tests.spec.ts:435:3 › Web Modules Unit Tests › view.ts - icon and net rendering (1.8s)
+  ✓  169 [chromium] › tests/url-params.spec.ts:4:3 › R06: URL ?alg= parameter idempotency › ?alg= parameter produces identical state across page reloads and does not accumulate onto saved state (3.2s)
+  ✓  170 [chromium] › tests/url-params.spec.ts:24:3 › R06: URL ?alg= parameter idempotency › R15: invalid ?alg= parameter does not reset restored saved state to solved (4.9s)
+  ✓  171 [chromium] › tests/url-params.spec.ts:57:3 › R06: URL ?alg= parameter idempotency › R16: ?alg= parameter with underscores (e.g. R_U_R'_U') applies moves to cube state (3.2s)
+  ✓  172 [chromium] › tests/view-presets.spec.ts:9:3 › 3D Camera View Presets UI › view preset buttons exist and change active view (2.1s)
+
+  1 skipped
+  171 passed (7.9m)

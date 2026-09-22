@@ -1,0 +1,17 @@
+
+> cube-studio@0.1.0 build
+> npm run wasm && npm run typecheck && vite build && node scripts/generate-sw-precache.js
+
+
+> cube-studio@0.1.0 wasm
+> wasm-pack build --target web --release --out-dir pkg --no-pack
+
+[INFO]: 🎯  Checking for the Wasm target...
+[INFO]: 🌀  Compiling to Wasm...
+   Compiling cube-studio v0.1.0 (/Users/katoy/github/study-rust/rust-r-cube/3x3-web-2)
+    Finished `release` profile [optimized] target(s) in 1.88s
+[INFO]: ⬇️  Installing wasm-bindgen...
+Error: Operation not permitted (os error 1)
+To disable `wasm-opt`, add `wasm-opt = false` to your package metadata in your `Cargo.toml`.
+Caused by: Operation not permitted (os error 1)
+To disable `wasm-opt`, add `wasm-opt = false` to your package metadata in your `Cargo.toml`.

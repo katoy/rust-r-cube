@@ -1,0 +1,147 @@
+   Compiling cube-studio v0.1.0 (/Users/katoy/github/study-rust/rust-r-cube/3x3-web-2)
+    Finished `release` profile [optimized] target(s) in 11.08s
+     Running unittests src/lib.rs (target/release/deps/cube_studio-768701c8a5f18124)
+
+running 121 tests
+test cfop::tests::test_cfop_corner_search_d_face_exclusion ... ok
+test korf::tests::test_korf_exhausted_and_redundant ... ok
+test cfop::tests::test_cross_on_solved ... ok
+test korf::tests::test_korf_solved ... ok
+test cfop::tests::test_cfop_phases_on_solved ... ok
+test cfop::tests::test_cfop_scramble_full_25_moves ... ok
+test supercube::tests::test_odd_center_rotations_parity_rejected ... ok
+test cfop::tests::test_cfop_scramble_10_moves ... ok
+test supercube::tests::test_perfect_matching_optimality ... ok
+test supercube::tests::test_rotate_center_180_invariance ... ok
+test tests::all_move_cube_18_patterns_covered ... ok
+test tests::all_moves_match_geometry ... ok
+test tests::apply_multiple_moves_consistency ... ok
+test tests::center_input_parity_matches_legal_moves ... ok
+test tests::cfop_reports_visited_nodes_in_solution_statistics ... ok
+test tests::complex_algorithms_are_invertible ... ok
+test tests::coord_cube_default_is_solved ... ok
+test tests::corner_and_edge_consistency ... ok
+test korf::tests::test_korf_short_scramble ... ok
+test korf::tests::test_korf_timeout_in_search ... ok
+test korf::tests::test_korf_medium_scramble_optimal ... ok
+test search::tests::test_min_phase2_center_moves ... ok
+test tests::empty_move_list_produces_no_state_changes ... ok
+test tests::extensive_error_cases ... ok
+test tests::facelets_all_colors_present ... ok
+test tests::facelets_have_correct_sticker_count ... ok
+test tests::incompatible_center_input_is_rejected_before_search ... ok
+test tests::invalid_notation_rejected ... ok
+test tests::facelets_encode_decode_roundtrip ... ok
+test tests::invalid_state_format_error ... ok
+test tests::move_notation_accuracy ... ok
+test tests::moves_and_inverse_roundtrip ... ok
+test tests::notation_roundtrip ... ok
+test tests::orientation_invalid_for_unsolvable ... ok
+test tests::orientation_mode_false_empty_state ... ok
+test tests::deadline_and_table_integrity ... ok
+test tests::parse_state_center_validation ... ok
+test tests::parse_state_invalid_color_counts ... ok
+test tests::parse_state_rejects_invalid_corner_colors ... ok
+test tests::parse_state_roundtrip_after_moves ... ok
+test tests::parse_state_validates_color_counts ... ok
+test tests::rejects_impossible_states ... ok
+test cfop::tests::test_cfop_error_paths_and_helpers ... ok
+test tests::scramble_produces_different_states ... ok
+test tests::single_move_affects_cube_state ... ok
+test tests::solve_state_error_handling ... ok
+test tests::multiple_solve_calls_are_consistent ... ok
+test tests::solve_state_with_different_budgets ... ok
+test tests::solve_with_empty_state ... ok
+test korf::tests::test_korf_fallback_on_deep_scramble ... ok
+test tests::solves_one_thousand_scrambles ... ignored, long-running solver regression; run explicitly before releases or after search changes
+test tests::orientation_modes_produce_different_solutions ... ok
+test tests::solves_with_orientation_mode_false ... ok
+test tests::superflip_preset_flips_all_edges_without_moving_pieces ... ok
+test tests::solves_with_orientation_mode_true ... ok
+test tests::tables_caching_mechanism ... ok
+test tests::tables_cp_slice_pruning_generation ... ok
+test tests::tables_encode_decode_roundtrip ... ok
+test tests::tables_ep8_slice_pruning_generation ... ok
+test tests::tables_extensive_consistency_checks ... ok
+test tests::tables_generation_functions_exist ... ok
+test tests::tables_move_table_consistency ... ok
+test tests::tables_symmetry_maps_generation ... ok
+test tests::test_cancel_redundant_moves_opposite_faces ... ok
+test tests::test_coord_cube_cp_roundtrip ... ok
+test tests::test_coord_cube_default ... ok
+test tests::test_coord_cube_ep8_roundtrip ... ok
+test tests::test_coord_cube_flip_roundtrip ... ok
+test tests::test_coord_cube_slice_p_roundtrip ... ok
+test tests::test_coord_cube_twist_roundtrip ... ok
+test tests::test_coord_cube_ud_slice_roundtrip ... ok
+test tests::test_easy_5_moves_length ... ok
+test tests::test_get_flip_slice ... ok
+test tests::test_get_twist_slice ... ok
+test tests::test_move_cube_18_all_moves ... ok
+test tests::test_move_cube_operations ... ok
+test tests::test_move_table_integrity ... ok
+test tests::test_multiply_operation ... ok
+test tests::test_native_core_functions ... ok
+test tests::test_pruning_table_integrity ... ok
+test tests::test_r01_twist_slice_admissible ... ok
+test tests::test_r01_twist_slice_all_admissible ... ok
+test tests::test_r05_thistlethwaite_g3_membership ... ok
+test tests::orientation_mode_comparison ... ok
+test tests::test_r07_invalid_center_input_rejected ... ok
+test tests::test_solve_state_invalid_state ... ok
+test tests::test_r06_budget_contract ... ok
+test tests::test_solve_state_orientation_true ... ok
+test tests::test_solve_state_timeout ... ok
+test tests::test_solve_state_unsolvable_with_orientation ... ok
+test tests::test_solve_state_with_all_algorithms ... ok
+test tests::test_solve_state_orientation_false ... ok
+test tests::orientation_colors_always_solvable ... ok
+test tests::test_superflip_cfop_move_counts_match_implementation_values ... ok
+test tests::solve_state_with_various_scrambles ... ok
+test tests::solves_known_states ... ok
+test tests::superflip_solver_returns_valid_solution ... ok
+test tests::test_superflip_thistlethwaite_move_counts_match_theoretical_bounds ... ok
+test tests::test_tables_encode_and_decode ... ok
+test tests::timeout_on_hard_scrambles ... ok
+test tests::wasm_apply_moves_function ... ok
+test tests::wasm_get_orientations_function ... ok
+test tests::wasm_result_data_serialization ... ok
+test tests::wasm_scramble_function ... ok
+test tests::wasm_solve_function ... ok
+test tests::test_superflip_5s_budget_solves_colors_and_centers ... ok
+test tests::wasm_validate_function ... ok
+test thistlethwaite::tests::test_thistlethwaite_direct_phases_on_solved ... ok
+test thistlethwaite::tests::test_thistlethwaite_is_g3_not_ud_edges ... ok
+test thistlethwaite::tests::test_thistlethwaite_phase2_explicit ... ok
+test thistlethwaite::tests::test_thistlethwaite_phases_1_and_2 ... ok
+test thistlethwaite::tests::test_thistlethwaite_short_scramble ... ok
+test thistlethwaite::tests::test_thistlethwaite_solved ... ok
+test tests::test_supercube_centers ... ok
+test thistlethwaite::tests::test_thistlethwaite_superflip_solves_under_45_moves ... ok
+test tests::sample_face_turn_sequences_are_solvable ... ok
+test tests::wasm_solve_with_orientation_function ... ok
+test tests::complete_end_to_end_multiple_seeds ... ok
+test tests::test_superflip_orientation_solve_length ... ok
+test tests::test_superflip_kociemba_move_counts_match_theoretical_bounds ... ok
+test tests::test_superflip_korf_move_counts_match_theoretical_bounds ... ok
+
+test result: ok. 120 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 12.52s
+
+     Running unittests src/bin/benchmark.rs (target/release/deps/benchmark-11f1812c255ea91b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/superflip_bench.rs (target/release/deps/superflip_bench-ede52f2d68366468)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests cube_studio
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

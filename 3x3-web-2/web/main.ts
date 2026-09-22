@@ -80,11 +80,15 @@ function message(text = "") {
   $("message").textContent = text;
 }
 function stop() {
+  const wasPlaying = playing;
   playing = false;
   playbackRun++;
   motion++;
   scene?.finish();
   inMotion = false;
+  if (wasPlaying) {
+    persist();
+  }
 }
 function cancelSearch() {
   if (solving) {
@@ -323,6 +327,9 @@ async function seek(target: number, animate = true) {
   if (move) sound.playMove();
   if (token === motion) {
     inMotion = false;
+    if (!playing) {
+      persist();
+    }
     refresh();
     if (target === data.moves.length) {
       sound.playSuccess();
@@ -363,6 +370,7 @@ async function play() {
   }
   if (store.getSolution() === data && run === playbackRun) {
     playing = false;
+    persist();
     refresh();
   }
 }
@@ -620,6 +628,7 @@ $("copy").onclick = async () => {
 $("solution-close").onclick = () => {
   stop();
   store.setSolution(undefined);
+  persist();
   refresh();
 };
 $("help").onclick = () => {
@@ -787,8 +796,13 @@ document.addEventListener("keyup", (event) => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     stop();
+    persist();
     refresh();
   }
+});
+window.addEventListener("pagehide", () => {
+  stop();
+  persist();
 });
 refresh();
 async function start() {

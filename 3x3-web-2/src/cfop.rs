@@ -635,8 +635,7 @@ mod tests {
         assert!(!is_first_layer_intact(&scrambled));
 
         let mut state = SolverState::new(10_000);
-        let first_layer_moves =
-            solve_first_layer(&scrambled, &mut state).expect("第1層解決成功");
+        let first_layer_moves = solve_first_layer(&scrambled, &mut state).expect("第1層解決成功");
 
         let solved_fl = apply(&scrambled, &first_layer_moves);
         assert!(is_cross_intact(&solved_fl));

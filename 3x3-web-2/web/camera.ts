@@ -352,9 +352,14 @@ export class TwoViewCamera {
     input.value = "";
   }
 
-  private async processFile(file: File, view: "A" | "B"): Promise<void> {
+  private async processFile(
+    file: File,
+    view: "A" | "B",
+    existingGeneration?: number,
+  ): Promise<void> {
     const generation =
-      view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB;
+      existingGeneration ??
+      (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
     const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const image = new Image();
@@ -664,6 +669,11 @@ export class TwoViewCamera {
 
         this.renderResults();
         this.update();
+        document
+          .querySelector<HTMLElement>(
+            `#camera-face-card-${face} button[data-index="${i}"]`,
+          )
+          ?.focus();
       },
     });
   }
@@ -859,6 +869,8 @@ export class TwoViewCamera {
     const video = $("camera-video") as HTMLVideoElement | null;
     if (!this.isStreaming || !video) return;
     const targetView = this.currentView;
+    const generation =
+      targetView === "A" ? ++this.loadGenerationA : ++this.loadGenerationB;
     const captureRequestId = ++this.captureRequestId;
 
     const offscreen = document.createElement("canvas");
@@ -872,11 +884,18 @@ export class TwoViewCamera {
 
     offscreen.toBlob(
       (blob) => {
-        if (!blob || captureRequestId !== this.captureRequestId) return;
+        const currentGen =
+          targetView === "A" ? this.loadGenerationA : this.loadGenerationB;
+        if (
+          !blob ||
+          captureRequestId !== this.captureRequestId ||
+          generation !== currentGen
+        )
+          return;
         const file = new File([blob], `camera-${targetView}.jpg`, {
           type: "image/jpeg",
         });
-        void this.processFile(file, targetView);
+        void this.processFile(file, targetView, generation);
       },
       "image/jpeg",
       0.92,

@@ -1,0 +1,12 @@
+progress=100 accepted=100 rejected=0
+progress=200 accepted=200 rejected=0
+progress=300 accepted=300 rejected=0
+progress=400 accepted=400 rejected=0
+progress=500 accepted=500 rejected=0
+progress=600 accepted=600 rejected=0
+progress=700 accepted=700 rejected=0
+progress=800 accepted=800 rejected=0
+progress=900 accepted=900 rejected=0
+progress=1000 accepted=1000 rejected=0
+CFOP accepted=1000 rejected=0 incorrect=0 max_ms=14.503
+CENTER_EXHAUSTIVE legal_solved=2048 illegal_rejected=2048

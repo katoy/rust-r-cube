@@ -17,8 +17,17 @@ export function registerServiceWorker(swUrl = "./sw.js") {
     const isExplicitlyDisabled = params.has("no-sw") || window.__DISABLE_SW__;
 
     if (isDevSuppressed || isExplicitlyDisabled) {
+      const targetScope = new URL("./", window.location.href).href;
+      const targetScript = new URL(swUrl, window.location.href).href;
       navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister());
+        regs.forEach((r) => {
+          const scriptUrl = (r.active || r.waiting || r.installing)?.scriptURL;
+          const matchesScope = r.scope === targetScope;
+          const matchesScript = !scriptUrl || scriptUrl === targetScript;
+          if (matchesScope && matchesScript) {
+            void r.unregister();
+          }
+        });
       });
       return;
     }

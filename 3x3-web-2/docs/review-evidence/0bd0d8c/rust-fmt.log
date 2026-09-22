@@ -1,0 +1,10 @@
+Diff in /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/src/cfop.rs:635:
+         assert!(!is_first_layer_intact(&scrambled));
+ 
+         let mut state = SolverState::new(10_000);
+[31m-        let first_layer_moves =
+(B[m[31m-            solve_first_layer(&scrambled, &mut state).expect("第1層解決成功");
+(B[m[32m+        let first_layer_moves = solve_first_layer(&scrambled, &mut state).expect("第1層解決成功");
+(B[m 
+         let solved_fl = apply(&scrambled, &first_layer_moves);
+         assert!(is_cross_intact(&solved_fl));

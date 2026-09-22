@@ -1079,6 +1079,13 @@ test("solver algorithm selection, persistence, and phase badges", async ({
   // フェーズバッジが表示されることを確認
   const cfopBadges = await page.locator(".phase-badge").allTextContents();
   expect(cfopBadges.length).toBeGreaterThan(0);
+  const cfopNodes = await page.evaluate(
+    () => window.cube_store.getSolution()!.nodes,
+  );
+  expect(cfopNodes).toBeGreaterThan(0);
+  await expect(page.locator("#solver-note")).toContainText(
+    `${cfopNodes.toLocaleString()} ノードを探索`,
+  );
   console.log("CFOP Phase Badges:", cfopBadges);
 
   // 解法の最後まで進んで完成状態を検証

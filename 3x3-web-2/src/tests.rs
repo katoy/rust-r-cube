@@ -1650,23 +1650,23 @@ fn cfop_reports_visited_nodes_in_solution_statistics() {
 }
 
 #[test]
-fn test_superflip_cfop_move_counts_match_theoretical_values() {
+fn test_superflip_cfop_move_counts_match_implementation_values() {
     // CFOP (Layer-By-Layer: 階層解法)
     // 人間向け定石マクロ（Cross -> F2L -> OLL -> PLL）を決定論的に適用するため、
-    // Superflip に対する手数は常に理論値と一致する。
+    // Superflip に対する本実装の手順値を固定して検証する（理論最短手数ではない）。
     let moves = superflip_preset_moves();
     let cube = apply(&RawCube::default(), &moves);
     let state = facelets(&cube);
     let initial_centers = superflip_initial_centers(&moves);
 
     // 1. センター向き無視（色のみ解決）
-    // Cross -> F2L -> OLL -> PLL の合計手数は理論値 136手 となる（God's Number 20手以上を満たす）。
+    // Cross -> F2L -> OLL -> PLL の合計は本実装では 136手（Superflip の下界20手以上）。
     let sol_no_orient =
         crate::solve_state_with_algorithm(&state, 5000, false, None, "cfop").unwrap();
     assert_eq!(
         sol_no_orient.moves.len(),
         136,
-        "CFOP color-only solution for Superflip must exactly match theoretical 136 moves"
+        "This CFOP implementation solves Superflip colors in 136 moves"
     );
     assert!(
         sol_no_orient.moves.len() >= 20,
@@ -1685,7 +1685,7 @@ fn test_superflip_cfop_move_counts_match_theoretical_values() {
     assert_eq!(
         sol_orient.moves.len(),
         178,
-        "CFOP with center orientation for Superflip matches theoretical 178 moves (136 color + 42 center with commutative cancellation)"
+        "This CFOP implementation solves Superflip in 178 moves (136 color + 42 center with commutative cancellation)"
     );
     assert!(
         sol_orient.moves.len() >= sol_no_orient.moves.len(),
@@ -1807,7 +1807,7 @@ fn test_superflip_korf_move_counts_match_theoretical_bounds() {
     };
 
     // 1. センター向き無視
-    // 神の数字 20手以上を満たし、フォールバック時も 20〜24手前後に収まる（実測 22手）
+    // フォールバック時も Superflip の下界20手以上を満たし、配色が完成することを検証。
     let sol_no_orient =
         crate::solve_state_with_algorithm(&state, budget, false, None, "korf").unwrap();
     assert!(
@@ -1819,7 +1819,7 @@ fn test_superflip_korf_move_counts_match_theoretical_bounds() {
     assert_eq!(sol_no_orient.phases[0].name, "Kociemba フォールバック");
 
     // 2. センター向きを揃える場合
-    // 色解法（22手）にセンター後付け補正（52手）が加わり、理論下界 20手以上を満たす（実測 74手）
+    // 色解法にセンター補正を追加しても配色が完成することを検証。手数の固定値は要求しない。
     let sol_orient =
         crate::solve_state_with_algorithm(&state, budget, true, Some(initial_centers), "korf")
             .unwrap();

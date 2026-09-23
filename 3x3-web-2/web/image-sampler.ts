@@ -203,19 +203,24 @@ export function getPerspectiveTransform(points: Point[]) {
   };
 }
 
-export function sampleFace(image: HTMLImageElement, points: Point[]): string {
-  if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
-  const transform = getPerspectiveTransform(points);
-
+export function getImagePixels(image: HTMLImageElement): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("画像を読み込めませんでした。");
   context.drawImage(image, 0, 0);
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-  const [topLeft, topRight] = points;
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
 
+export function sampleFaceFromPixels(
+  pixels: ImageData,
+  points: Point[],
+): string {
+  if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
+  const transform = getPerspectiveTransform(points);
+
+  const [topLeft, topRight] = points;
   // 四角形の辺の長さから適切なサンプリング半径を動的決定
   const edgeLen = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
   const radius = Math.max(3, Math.min(25, Math.round(edgeLen / 25)));
@@ -230,6 +235,11 @@ export function sampleFace(image: HTMLImageElement, points: Point[]): string {
     }
   }
   return result;
+}
+
+export function sampleFace(image: HTMLImageElement, points: Point[]): string {
+  if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
+  return sampleFaceFromPixels(getImagePixels(image), points);
 }
 
 export function buildState(

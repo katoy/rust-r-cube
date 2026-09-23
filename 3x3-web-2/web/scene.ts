@@ -343,24 +343,36 @@ export class CubeScene {
     );
     this.controls.dispose();
     this.observer.disconnect();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+
     this.scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
-        object.geometry.dispose();
-        const materials = Array.isArray(object.material)
+        if (object.geometry) geometries.add(object.geometry);
+        const mats = Array.isArray(object.material)
           ? object.material
           : [object.material];
-        for (const material of materials) {
-          material.map?.dispose();
-          material.dispose();
+        for (const mat of mats) {
+          if (mat) {
+            if ("map" in mat && mat.map instanceof THREE.Texture) {
+              mat.map.dispose();
+            }
+            materials.add(mat);
+          }
         }
       }
     });
+
+    geometries.forEach((g) => g.dispose());
+    materials.forEach((m) => m.dispose());
+
     this.arrowGeometry?.dispose();
     this.outlineGeometry?.dispose();
     this.outlineMaterial?.dispose();
     this.colorMaterials.forEach((mat) => mat.dispose());
     this.colorMaterials.clear();
     this.renderer.dispose();
+    this.renderer.domElement.remove();
     this.stickers = [];
     this.pieces = [];
     this.centerLabels = [];

@@ -97,9 +97,9 @@ fn parse_state_rejects_invalid_corner_colors() {
 #[test]
 fn parse_state_invalid_color_counts() {
     // 色の数が不正（5 個の R、4 個の U）
-    let mut state = SOLVED.to_string();
-    let bytes = unsafe { state.as_bytes_mut() };
-    bytes[0] = 82; // ‘R’ の ASCII コード - U 面の 1 つを R に変更
+    let mut bytes = SOLVED.as_bytes().to_vec();
+    bytes[0] = b'R'; // U 面の 1 つを R に変更
+    let state = String::from_utf8(bytes).unwrap();
     let result = parse_state(&state);
     assert!(result.is_err());
 }

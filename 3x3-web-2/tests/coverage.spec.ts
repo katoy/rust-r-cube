@@ -208,6 +208,37 @@ test.describe("E2E Coverage with CDP", () => {
         });
         camera.detectCubeOutline(cCanvas, cImg);
 
+        // --- camera.ts processFile & image validation / downsampling ---
+        const camInst = new camera.TwoViewCamera(() => {});
+        const textFile = new File(["not an image"], "test.txt", {
+          type: "text/plain",
+        });
+        await (camInst as any).processFile(textFile, "A");
+
+        const hugeFile = {
+          name: "huge.png",
+          type: "image/png",
+          size: 25 * 1024 * 1024,
+        } as File;
+        await (camInst as any).processFile(hugeFile, "A");
+
+        const bigCanvas = document.createElement("canvas");
+        bigCanvas.width = 1800;
+        bigCanvas.height = 1200;
+        const bCtx = bigCanvas.getContext("2d")!;
+        bCtx.fillStyle = "#ffffff";
+        bCtx.fillRect(0, 0, 1800, 1200);
+        bCtx.fillStyle = "#ff0000";
+        bCtx.fillRect(100, 100, 400, 400);
+        const bigBlob = await new Promise<Blob>((resolve) =>
+          bigCanvas.toBlob((b) => resolve(b!), "image/jpeg"),
+        );
+        const bigFile = new File([bigBlob], "large.jpg", {
+          type: "image/jpeg",
+        });
+        await (camInst as any).processFile(bigFile, "A");
+        await (camInst as any).processFile(bigFile, "B");
+
         // --- triggers.ts ---
         const triggers = await import("/web/triggers.ts");
         triggers.analyzeMoves([]);
@@ -287,8 +318,8 @@ test.describe("E2E Coverage with CDP", () => {
         client.cancel();
         // @ts-ignore
         client.ready = true;
-        // @ts-ignore
-        const p = client.solve(
+        // 1回目 (pending セット)
+        const p1 = client.solve(
           solved,
           1,
           1000,
@@ -296,8 +327,18 @@ test.describe("E2E Coverage with CDP", () => {
           [0, 0, 0, 0, 0, 0],
           "kociemba",
         );
-        p.catch(() => {});
+        p1.catch(() => {});
+        // 2回目 (先行探索の即時キャンセル分岐の網羅)
+        const p2 = client.solve(solved, 2, 1000);
+        p2.catch(() => {});
+        // 準備完了前の呼び出しパス (!this.ready)
+        // @ts-ignore
+        client.ready = false;
+        const p3 = client.solve(solved, 3, 1000);
+        p3.catch(() => {});
+        // 明示的な cancel と restart
         client.cancel();
+        client.restart();
         // @ts-ignore
         client.fail("テストエラー");
 

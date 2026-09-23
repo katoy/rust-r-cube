@@ -68,6 +68,10 @@ export class SolverClient {
   ) {
     if (!this.ready)
       return Promise.reject(new Error("エンジンの準備完了をお待ちください。"));
+    if (this.pending) {
+      this.cancel();
+      return Promise.reject(new Error("cancelled"));
+    }
     this.disposeRequest();
     return new Promise<ResultData>((resolve, reject) => {
       const id = ++this.nextId;

@@ -9,9 +9,14 @@ import {
   rotatePointsArray,
 } from "./camera-ui-helper";
 import { renderCanvasOverlay } from "./camera-canvas-renderer";
-import { renderPalette, renderResultFaces } from "./camera-results-ui";
-import { buildState, sampleFace } from "./image-sampler";
+import {
+  buildState,
+  sampleFace,
+  sampleFaceFromPixels,
+  getImagePixels,
+} from "./image-sampler";
 import { FACES, FACE_NAMES, NAMES } from "./model";
+import { renderPalette, renderResultFaces } from "./camera-results-ui";
 
 export { computeCenter, detectCubeOutline, type Point };
 type Apply = (state: string) => void;
@@ -529,9 +534,10 @@ export class TwoViewCamera {
               { defaultFace: "B", quad: [p3, p4, center, p2] },
             ];
 
-      // 3面の各面をサンプリング
+      // 3面の各面をサンプリング（同一画像からのImageData抽出を1回に集約してGPU同期とメモリ確保を削減）
+      const pixels = getImagePixels(activeImage);
       const sampledItems = rawQuads.map(({ defaultFace, quad }) => {
-        const sampled = sampleFace(activeImage, quad);
+        const sampled = sampleFaceFromPixels(pixels, quad);
         const centerChar = sampled[4];
         return { defaultFace, quad, sampled, centerChar };
       });
@@ -686,8 +692,9 @@ export class TwoViewCamera {
                 [p3, p4, center, p2],
               ];
 
+        const pixels = getImagePixels(img);
         const sampledNames = quads.map((quad) => {
-          const sampled = sampleFace(img, quad);
+          const sampled = sampleFaceFromPixels(pixels, quad);
           const c = sampled[4];
           return c && c !== "?" ? NAMES[c] : undefined;
         });

@@ -94,17 +94,20 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
 
     // 5. PLL (Permutation of Last Layer: U面エッジ・コーナーの位置)
     let pll_moves = solve_pll(&current, &mut state)?;
-    current = apply(&current, &pll_moves);
     all_phases.push(CfopPhase {
         name: "PLL (ラストレイヤー配置)",
-        moves: pll_moves,
+        moves: pll_moves.clone(),
     });
 
-    debug_assert_eq!(
-        current,
-        RawCube::default(),
-        "CFOP解法の検証に失敗しました。"
-    );
+    #[cfg(debug_assertions)]
+    {
+        current = apply(&current, &pll_moves);
+        debug_assert_eq!(
+            current,
+            RawCube::default(),
+            "CFOP解法の検証に失敗しました。"
+        );
+    }
 
     let mut total_moves = Vec::new();
     for p in &all_phases {
@@ -594,6 +597,7 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
         if count < 2 {
             for op in &edge_ops {
                 let next = apply(&c, op);
+                #[cfg(debug_assertions)]
                 debug_assert!(
                     is_f2l_intact(&next)
                         && (0..4).all(|i| next.cp[i] as usize == i && next.co[i] == 0)
@@ -765,5 +769,23 @@ mod tests {
         assert!(solve(&broken_e2_none, 10_000).is_err());
         assert!(solve(&broken_oll, 10_000).is_err());
         assert!(solve(&broken_pll, 10_000).is_err());
+        assert!(solve(&RawCube::default(), 0).is_err());
+
+        // search_corner 再帰中の check_timeout による Err 伝播 (?)
+        let sc = crate::cube::parse_moves("U").unwrap();
+        let c1_scrambled = apply(&RawCube::default(), &sc);
+        let mut state_timeout = SolverState::new(10);
+        state_timeout.nodes = 510;
+        state_timeout.start = web_time::Instant::now() - std::time::Duration::from_millis(10_000);
+        let mut path = Vec::new();
+        let res = search_corner(&c1_scrambled, 2, 99, 4, 4, &mut path, &mut state_timeout);
+        assert!(res.is_err());
+
+        // solve_first_layer での search_corner エラー伝播 (?)
+        let mut state_c1_timeout = SolverState::new(10);
+        state_c1_timeout.nodes = 510;
+        state_c1_timeout.start =
+            web_time::Instant::now() - std::time::Duration::from_millis(10_000);
+        assert!(solve_first_layer(&c1_scrambled, &mut state_c1_timeout).is_err());
     }
 }

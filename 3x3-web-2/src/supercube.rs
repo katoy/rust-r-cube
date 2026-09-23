@@ -60,15 +60,10 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
 pub fn rotate_center_180(face: usize) -> Vec<usize> {
     let names = ["U", "R", "F", "D", "L", "B"];
     let (a, b) = match face {
-        0 => ("R", "L"),
-        1 => ("U", "D"),
-        2 => ("U", "D"),
-        3 => ("R", "L"),
-        4 => ("U", "D"),
-        5 => ("U", "D"),
-        _ => unreachable!("face index must be 0..5, got {face}"),
+        0 | 3 => ("R", "L"),
+        _ => ("U", "D"),
     };
-    let x = names[face];
+    let x = names[face % 6];
     let alg = format!("{x} {a} {b} {x}2 {a}' {b}' {x} {a} {b} {x}2 {a}' {b}'");
     parse_moves(&alg).unwrap()
 }
@@ -228,8 +223,7 @@ mod tests {
                 let turns = match m % 3 {
                     0 => 1,
                     1 => 2,
-                    2 => -1,
-                    _ => 0,
+                    _ => -1,
                 };
                 centers[face] = (centers[face] + turns).rem_euclid(4);
             }

@@ -76,20 +76,9 @@ impl Search {
         }
 
         for total in [22, 24, 30] {
-            if let Some(ref best) = self.best_solution {
-                if best.len() <= total {
-                    return self.best_solution.clone();
-                }
-            }
-            self.max_total = self
-                .best_solution
-                .as_ref()
-                .map_or(total, |b| (b.len().saturating_sub(1)).min(total));
+            self.max_total = total;
 
             for depth in 0..=12 {
-                if depth > self.max_total {
-                    break;
-                }
                 self.path.clear();
                 if let Some(target) = self.target_centers {
                     self.current_centers = target;
@@ -100,21 +89,13 @@ impl Search {
                     cube.get_ud_slice(),
                     depth as u8,
                     99,
-                ) {
-                    // 解が見つかった場合、max_total はすでに短縮されている。
-                    // 非常に短い解（<= 5手）なら直ちに最善解として終了してよい
-                    if let Some(ref b) = self.best_solution {
-                        if b.len() <= depth || b.len() <= 5 {
-                            return self.best_solution.clone();
-                        }
-                    }
-                }
-                if self.timed_out {
-                    return self.best_solution.clone();
+                ) || self.timed_out
+                {
+                    break;
                 }
             }
-            if self.best_solution.is_some() {
-                return self.best_solution.clone();
+            if self.best_solution.is_some() || self.timed_out {
+                break;
             }
         }
         self.best_solution.clone()
@@ -213,10 +194,8 @@ impl Search {
             };
             self.current_p1_len = self.path.len();
             let mut found = false;
-            for d in min_d..=max {
-                if self.path.len() + d > self.max_total {
-                    break;
-                }
+            let max_d = max.min(self.max_total.saturating_sub(self.path.len()));
+            for d in min_d..=max_d {
                 if self.phase2(
                     cube.get_cp(),
                     cube.get_ep8(),
@@ -227,9 +206,6 @@ impl Search {
                     found = true;
                     // 見つかった解で max_total が縮小されたので、これ以上大きい d は探索不要
                     break;
-                }
-                if self.timed_out {
-                    return false;
                 }
             }
             return found;
@@ -287,12 +263,6 @@ impl Search {
             }
         }
         if depth == 0 {
-            if cp != 0 || ep != 0 || sp != 0 {
-                return false;
-            }
-            if self.target_centers.is_some() && !self.current_centers.iter().all(|&c| c == 0) {
-                return false;
-            }
             self.best_solution = Some(self.path.clone());
             self.best_phase1_len = self.current_p1_len;
             self.max_total = self.path.len().saturating_sub(1);
@@ -321,9 +291,6 @@ impl Search {
             }
             self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
             self.path.pop();
-            if self.timed_out {
-                return false;
-            }
         }
         false
     }
@@ -350,5 +317,96 @@ mod tests {
 
         search.current_centers = [2, 2, 2, 2, 2, 2];
         assert_eq!(search.min_phase2_center_moves(), 6);
+    }
+
+    #[test]
+    fn test_search_solved_with_zero_target_centers() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+        let res = search.solve(&RawCube::default());
+        assert_eq!(res, Some(Vec::new()));
+    }
+
+    #[test]
+    fn test_search_direct_solve_edge_cases() {
+        let mut search = Search::new(1000).with_target_centers([1, 0, 0, 0, 0, 0]);
+        search.current_centers = [1, 0, 0, 0, 0, 0];
+        // キューブは default だが centers が 0 ではないので false
+        assert!(!search.direct_solve(&RawCube::default(), 0, 99));
+
+        // キューブが default でない場合
+        let mut non_default = RawCube::default();
+        non_default.co[0] = 1;
+        assert!(!search.direct_solve(&non_default, 0, 99));
+
+        // non_zero_centers > depth
+        search.current_centers = [1, 2, 1, 2, 1, 0];
+        assert!(!search.direct_solve(&RawCube::default(), 2, 99));
+    }
+
+    #[test]
+    fn test_search_phase2_branch_coverage() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+
+        // depth == 0 でパーツ未解決 (cp != 0)
+        assert!(!search.phase2(1, 0, 0, 0, 99));
+        assert!(!search.phase2(0, 1, 0, 0, 99));
+        assert!(!search.phase2(0, 0, 1, 0, 99));
+
+        // depth == 0 でパーツは解決 (0, 0, 0) だが centers が 0 ではない
+        search.current_centers = [1, 0, 0, 0, 0, 0];
+        assert!(!search.phase2(0, 0, 0, 0, 99));
+
+        // センター奇数回転チェック (face 1, 2, 4, 5 のいずれかが奇数)
+        search.current_centers = [0, 1, 0, 0, 0, 0]; // R が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 1, 0, 0, 0]; // F が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 0, 0, 1, 0]; // L が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 0, 0, 0, 1]; // B が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        // min_phase2_center_moves > depth
+        search.current_centers = [2, 2, 2, 2, 2, 2]; // 6手必要
+        assert!(!search.phase2(0, 0, 0, 2, 99));
+
+        // depth == 0 で完全解決
+        search.current_centers = [0; 6];
+        assert!(search.phase2(0, 0, 0, 0, 99));
+        assert!(search.best_solution.is_some());
+
+        // phase2 先頭でのタイムアウト分岐
+        search.timed_out = true;
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        // phase2 再帰ループ内でのタイムアウト分岐 (timed_out チェック)
+        let mut search2 = Search::new(0);
+        search2.timed_out = true;
+        assert!(!search2.phase2(1, 0, 0, 1, 99));
+    }
+
+    #[test]
+    fn test_search_phase1_branch_coverage() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+        search.max_total = 5;
+        search.path = vec![0; 10]; // path.len() > max_total
+        assert!(!search.phase1(0, 0, 0, 0, 99));
+
+        // phase1 depth == 0 で target_centers の奇数回転チェック
+        search.path = vec![0; 2];
+        search.max_total = 10;
+        search.current_centers = [0, 1, 0, 0, 0, 0]; // R が奇数
+        assert!(!search.phase1(0, 0, 0, 0, 99));
+    }
+
+    #[test]
+    fn test_search_timeout_returns_none() {
+        let sc = crate::cube::parse_moves("R U F B L D R U F B L D").unwrap();
+        let scrambled = crate::cube::apply(&RawCube::default(), &sc);
+        let mut search = Search::new(0);
+        assert!(search.solve(&scrambled).is_none());
     }
 }

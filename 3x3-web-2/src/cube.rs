@@ -174,3 +174,86 @@ pub fn scramble(seed: u32) -> Vec<usize> {
 
 // Keep enum references explicit for stable serialization-free piece identities.
 const _: usize = Corner::UFR as usize + Edge::UR as usize;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_moves_too_long() {
+        let long_str = "R ".repeat(2049); // 4098 chars > 4096
+        assert!(parse_moves(&long_str).is_err());
+    }
+
+    #[test]
+    fn test_parse_moves_tokens() {
+        assert_eq!(parse_moves("R U' F2").unwrap(), vec![3, 2, 7]);
+        assert!(parse_moves("X").is_err());
+        assert!(parse_moves("R3").is_err());
+    }
+
+    #[test]
+    fn test_parse_state_center_mismatch() {
+        // 各面9枚あるが、センター（index 4と13）が入れ替わっている
+        let mut f = SOLVED.as_bytes().to_vec();
+        f.swap(4, 13);
+        let s = String::from_utf8(f).unwrap();
+        let err = parse_state(&s).unwrap_err();
+        assert!(err.contains("センターの色は変更できません"));
+    }
+
+    #[test]
+    fn test_parse_state_corner_duplicate_and_invalid() {
+        // 1. コーナーの色の組み合わせが不正: UFR [8, 9, 20] の F(20) を D にし、DFR の D(29) を F にする
+        // 全面9枚を維持したまま、存在しないコーナー (U, R, D) を作成
+        let mut f1 = SOLVED.as_bytes().to_vec();
+        f1[20] = b'D';
+        f1[29] = b'F';
+        let s1 = String::from_utf8(f1).unwrap();
+        let err1 = parse_state(&s1).unwrap_err();
+        assert!(err1.contains("色の組み合わせが不正"));
+
+        // 2. 重複コーナー: UFR [8, 9, 20] と同一配色を UFL [6, 18, 38] に配置し、
+        // DRB [35, 17, 51] の 17(R) を L にして全体の9枚カウントを保持
+        let mut f2 = SOLVED.as_bytes().to_vec();
+        f2[6] = b'U';
+        f2[18] = b'R';
+        f2[38] = b'F';
+        f2[17] = b'L';
+        let s2 = String::from_utf8(f2).unwrap();
+        let err2 = parse_state(&s2).unwrap_err();
+        assert_eq!(err2, "同じコーナーピースが複数あります。");
+    }
+
+    #[test]
+    fn test_parse_state_edge_duplicate_and_invalid() {
+        // 1. エッジの色の組み合わせが不正: UR [5, 10] の R(10) を D にし、DR [32, 16] の D(32) を R にする
+        // 全面9枚を維持したまま、存在しないエッジ (U, D) を作成
+        let mut f1 = SOLVED.as_bytes().to_vec();
+        f1[10] = b'D';
+        f1[32] = b'R';
+        let s1 = String::from_utf8(f1).unwrap();
+        let err1 = parse_state(&s1).unwrap_err();
+        assert!(err1.contains("色の組み合わせが不正"));
+
+        // 2. 重複エッジ: UR [5, 10] と同一配色を UF [7, 19] に配置し、
+        // FR [23, 12] の 12(R) を F にして全体の9枚カウントを保持
+        let mut f2 = SOLVED.as_bytes().to_vec();
+        f2[7] = b'U';
+        f2[19] = b'R';
+        f2[12] = b'F';
+        let s2 = String::from_utf8(f2).unwrap();
+        let err2 = parse_state(&s2).unwrap_err();
+        assert_eq!(err2, "同じエッジピースが複数あります。");
+    }
+
+    #[test]
+    fn test_scramble_and_notation() {
+        let sc = scramble(42);
+        assert_eq!(sc.len(), 25);
+        for &m in &sc {
+            let not = notation(m);
+            assert!(!not.is_empty());
+        }
+    }
+}

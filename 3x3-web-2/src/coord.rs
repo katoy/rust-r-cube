@@ -516,3 +516,57 @@ impl Default for RawCube {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_n_choose_k_boundaries() {
+        assert_eq!(n_choose_k(5, 0), 1);
+        assert_eq!(n_choose_k(5, 5), 1);
+        assert_eq!(n_choose_k(5, 2), 10);
+        assert_eq!(n_choose_k(5, 3), 10);
+        // 境界ケース: n < k または k < 0
+        assert_eq!(n_choose_k(3, 5), 0);
+        assert_eq!(n_choose_k(5, -1), 0);
+        assert_eq!(n_choose_k(0, 1), 0);
+    }
+
+    #[test]
+    fn test_factorial_and_combinations() {
+        assert_eq!(factorial(0), 1);
+        assert_eq!(factorial(1), 1);
+        assert_eq!(factorial(5), 120);
+        assert_eq!(factorial(8), 40320);
+    }
+
+    #[test]
+    fn test_raw_cube_coords() {
+        let mut cube = RawCube::default();
+        assert_eq!(cube.get_twist(), 0);
+        assert_eq!(cube.get_flip(), 0);
+        assert_eq!(cube.get_ud_slice(), 0);
+        assert_eq!(cube.get_cp(), 0);
+        assert_eq!(cube.get_ep8(), 0);
+        assert_eq!(cube.get_slice_p(), 0);
+
+        cube.set_twist(1234);
+        assert_eq!(cube.get_twist(), 1234);
+
+        cube.set_flip(567);
+        assert_eq!(cube.get_flip(), 567);
+
+        cube.set_ud_slice(234);
+        assert_eq!(cube.get_ud_slice(), 234);
+
+        cube.set_cp(12345);
+        assert_eq!(cube.get_cp(), 12345);
+
+        cube.set_ep8(23456);
+        assert_eq!(cube.get_ep8(), 23456);
+
+        cube.set_slice_p(15);
+        assert_eq!(cube.get_slice_p(), 15);
+    }
+}

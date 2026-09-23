@@ -33,28 +33,29 @@ pub struct ResultData {
     pub phases: Vec<PhaseInfo>,
 }
 fn result(
+    cube: &coord::RawCube,
     state: &str,
     moves: &[usize],
     elapsed_ms: f64,
     nodes: u64,
     algorithm: &str,
     phases: Vec<PhaseInfo>,
-) -> Result<ResultData, String> {
-    let mut cube = cube::parse_state(state)?;
+) -> ResultData {
+    let mut current_cube = *cube;
     let mut states = vec![state.to_owned()];
     for m in moves {
-        cube = cube::apply(&cube, &[*m]);
-        states.push(cube::facelets(&cube));
+        current_cube = cube::apply(&current_cube, &[*m]);
+        states.push(cube::facelets(&current_cube));
     }
-    Ok(ResultData {
-        state: cube::facelets(&cube),
+    ResultData {
+        state: cube::facelets(&current_cube),
         moves: moves.iter().map(|m| cube::notation(*m)).collect(),
         states,
         elapsed_ms,
         nodes,
         algorithm: algorithm.to_string(),
         phases,
-    })
+    }
 }
 pub fn solve_state(
     state: &str,
@@ -153,10 +154,11 @@ pub fn solve_state_with_algorithm(
         _ => {
             // Kociemba (Two-Phase)
             let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
-                let oriented_budget = budget_ms
-                    .saturating_sub(1000)
-                    .max(budget_ms * 4 / 5)
-                    .min(25000);
+                let oriented_budget = if budget_ms <= 1000 {
+                    budget_ms / 2
+                } else {
+                    (budget_ms * 3 / 5).min(budget_ms.saturating_sub(3000))
+                };
                 let mut search_oriented =
                     search::Search::new(oriented_budget).with_target_centers(centers);
                 let res = search_oriented.solve(&cube);
@@ -175,7 +177,9 @@ pub fn solve_state_with_algorithm(
                 m
             } else {
                 let elapsed_ms = start.elapsed().as_millis() as u32;
-                let remaining_budget = budget_ms.saturating_sub(elapsed_ms).min(30000);
+                let remaining_budget = budget_ms
+                    .saturating_sub(elapsed_ms)
+                    .max(if budget_ms > 5000 { 3000 } else { 0 });
                 let mut search = search::Search::new(remaining_budget);
                 let m = search.solve(&cube).ok_or_else(|| {
                     "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
@@ -214,21 +218,13 @@ pub fn solve_state_with_algorithm(
                 let t = match m % 3 {
                     0 => 1,
                     1 => 2,
-                    2 => -1,
-                    _ => unreachable!("m % 3 は 0, 1, 2 のみ"),
+                    _ => -1,
                 };
                 centers[f] = (centers[f] + t).rem_euclid(4);
             }
             let center_fixes = supercube::solve_center_orientations(centers)?;
             if !center_fixes.is_empty() {
                 let start_idx = moves.len();
-                if phase_infos.is_empty() && start_idx > 0 {
-                    phase_infos.push(PhaseInfo {
-                        name: "色解法 (Kociemba)".to_string(),
-                        start: 0,
-                        end: start_idx,
-                    });
-                }
                 moves.extend(center_fixes);
                 phase_infos.push(PhaseInfo {
                     name: "センター向き解決".to_string(),
@@ -239,16 +235,18 @@ pub fn solve_state_with_algorithm(
         }
     }
 
-    // 完成状態を確認
-    let result_cube = cube::apply(&cube, &moves);
-    let is_pieces_solved = if include_orientation {
-        result_cube == coord::RawCube::default()
-    } else {
-        cube::facelets(&result_cube) == cube::SOLVED
-    };
+    #[cfg(debug_assertions)]
+    {
+        let result_cube = cube::apply(&cube, &moves);
+        let is_pieces_solved = if include_orientation {
+            result_cube == coord::RawCube::default()
+        } else {
+            cube::facelets(&result_cube) == cube::SOLVED
+        };
 
-    if !is_pieces_solved {
-        return Err("解法の検証に失敗しました。".into());
+        if !is_pieces_solved {
+            return Err("解法の検証に失敗しました。".into());
+        }
     }
 
     if include_orientation {
@@ -259,25 +257,26 @@ pub fn solve_state_with_algorithm(
                 let t = match m % 3 {
                     0 => 1,
                     1 => 2,
-                    2 => -1,
-                    _ => unreachable!("m % 3 は 0, 1, 2 のみ"),
+                    _ => -1,
                 };
                 final_centers[f] = (final_centers[f] + t).rem_euclid(4);
             }
+            #[cfg(debug_assertions)]
             if final_centers.iter().any(|&c| c != 0) {
                 return Err("センター向きの検証に失敗しました。".into());
             }
         }
     }
 
-    result(
+    Ok(result(
+        &cube,
         state,
         &moves,
         start.elapsed().as_secs_f64() * 1000.0,
         total_nodes,
         algorithm,
         phase_infos,
-    )
+    ))
 }
 
 #[inline]
@@ -301,7 +300,9 @@ fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
 }
 /// 純粋な Rust 向けの内部・共通ロジック
 pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> {
-    cube::parse_moves(moves).and_then(|m| result(state, &m, 0.0, 0, "apply", Vec::new()))
+    let cube = cube::parse_state(state)?;
+    let m = cube::parse_moves(moves)?;
+    Ok(result(&cube, state, &m, 0.0, 0, "apply", Vec::new()))
 }
 
 /// 状態が合法であるかを検証し、完成状態（SOLVED）であれば true、

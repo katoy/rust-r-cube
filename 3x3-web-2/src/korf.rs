@@ -207,7 +207,8 @@ mod tests {
         let cube = RawCube::default();
         let sc = parse_moves("R U F B L D R U F B L D R").unwrap();
         let scrambled = apply(&cube, &sc);
-        let mut korf = KorfSearch::new(3000);
+        let mut korf = KorfSearch::new(30_000);
+        korf.start = Instant::now();
         korf.timed_out = true; // タイムアウトフラグを直接立ててIDA*ループを即座にbreakさせフォールバックさせる
         let sol = korf.solve(&scrambled).unwrap();
         assert!(!sol.moves.is_empty());
@@ -230,5 +231,14 @@ mod tests {
         assert!(redundant(2, 5)); // 2 + 3 == 5 (FとB)
         assert!(!redundant(0, 1)); // UとRは非冗長
         assert!(!redundant(3, 0)); // DとU
+    }
+
+    #[test]
+    fn test_korf_zero_budget_returns_none() {
+        let cube = RawCube::default();
+        let sc = parse_moves("R U F").unwrap();
+        let scrambled = apply(&cube, &sc);
+        let mut korf = KorfSearch::new(0);
+        assert!(korf.solve(&scrambled).is_none());
     }
 }

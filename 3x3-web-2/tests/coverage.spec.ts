@@ -23,8 +23,12 @@ test.describe("E2E Coverage with CDP", () => {
     await page.coverage.startJSCoverage({ resetOnNavigation: false });
 
     try {
-      // ページを開く
-      await page.goto("http://127.0.0.1:5173/");
+      // ページを開く（URLパラメータ復元ロジックも網羅）
+      await page.goto(
+        "http://127.0.0.1:5173/?solver=cfop&algorithm=cfop&moves=R%20U%20R'%20U'&state=" +
+          SOLVED +
+          "&centers=0,0,0,0,0,0&alg=R%20U%20R'%20U'",
+      );
       await expect(page.locator("#engine-status")).toContainText("READY", {
         timeout: 10000,
       });
@@ -81,6 +85,7 @@ test.describe("E2E Coverage with CDP", () => {
           B: "BBBBBBBBB",
         });
         sampler.buildState({ U: "UUUUUUUUU" });
+        sampler.buildState({});
 
         try {
           sampler.sampleFace({} as any, [{ x: 0, y: 0 }]);
@@ -276,8 +281,14 @@ test.describe("E2E Coverage with CDP", () => {
           (window as any).cube_studio.apply_moves(solved, "R"),
         ).state;
         store.replace(rState);
+        store.setSolution({
+          moves: ["R"],
+          states: [solved, rState],
+          elapsed_ms: 10,
+        } as any);
         store.undo();
         store.redo();
+        store.setModifier("'");
         store.setModifier("'");
         store.toggleModifier("'");
         store.toggleModifier("2");
@@ -331,7 +342,11 @@ test.describe("E2E Coverage with CDP", () => {
         // 2回目 (先行探索の即時キャンセル分岐の網羅)
         const p2 = client.solve(solved, 2, 1000);
         p2.catch(() => {});
+        // デフォルト引数での呼び出し
+        const pDef = client.solve(solved);
+        pDef.catch(() => {});
         // 準備完了前の呼び出しパス (!this.ready)
+
         // @ts-ignore
         client.ready = false;
         const p3 = client.solve(solved, 3, 1000);
@@ -414,9 +429,64 @@ test.describe("E2E Coverage with CDP", () => {
 
         const host = document.createElement("div");
         document.body.appendChild(host);
-        view.net(host, solved, true, () => {}, 1, [0, 1, 2, 3, 0, 1]);
+        view.net(
+          host,
+          solved,
+          true,
+          () => {},
+          1,
+          [0, 1, 2, 3, 0, 1],
+          [0, 1, 2],
+        );
         view.net(host, solved, false);
         document.body.removeChild(host);
+
+        // --- camera-results-ui.ts ---
+        const resultsUi = await import("/web/camera-results-ui.ts");
+        const resultsHost = document.createElement("div");
+        resultsUi.renderResultFaces({
+          host: resultsHost,
+          faces: {}, // 1回目: 新規生成で faces[face] ?? "??????????" の右側を通す
+          currentView: "A",
+          selectedColor: "U",
+          onUpdateSticker: () => {},
+        });
+        resultsUi.renderResultFaces({
+          host: resultsHost,
+          faces: { U: "UUUUUUUUU" }, // 2回目: 既存カード更新で未定義面を通す
+          currentView: "B",
+          selectedColor: "R",
+          onUpdateSticker: () => {},
+        });
+
+        // --- editor.ts ---
+        const editorModule = await import("/web/editor.ts");
+        const ed = new editorModule.ColorEditor(
+          () => {},
+          () => {},
+        );
+        ed.open(solved, [0, 0, 0, 0, 0, 0]);
+        (ed as any).paint(0, "editor-net");
+        try {
+          (ed as any).paint(4, "editor-net");
+        } catch {}
+        (document.getElementById("editor") as HTMLDialogElement)?.close();
+
+        // --- camera-geometry.ts ---
+        const cameraGeo = await import("/web/camera-geometry.ts");
+        const brokenCanvas = {
+          width: 100,
+          height: 100,
+          getContext: () => {
+            throw new Error("context error");
+          },
+        };
+        cameraGeo.detectCubeOutline(brokenCanvas as any);
+
+        // --- main.ts getScopedStorageKey ---
+        const mainModule = await import("/web/main.ts");
+        mainModule.getScopedStorageKey("/some/custom/path/");
+        mainModule.getScopedStorageKey("/");
 
         // --- scene.ts ---
         const sceneModule = await import("/web/scene.ts");
@@ -485,11 +555,36 @@ test.describe("E2E Coverage with CDP", () => {
         if (await btn.isVisible()) await btn.click();
       }
 
-      // 共有ボタン・ダウンロード保存
-      const shareBtn = page.locator("#share");
+      // 共有ボタン・ダウンロード保存・ファイル読み込み
+      const shareBtn = page.locator("#share-link");
       if (await shareBtn.isVisible()) await shareBtn.click();
-      const saveBtn = page.locator("#download");
+      const saveBtn = page.locator("#save");
       if (await saveBtn.isVisible()) await saveBtn.click();
+      const loadBtn = page.locator("#load");
+      if (await loadBtn.isVisible()) await loadBtn.click();
+
+      // ファイル読み込みテスト (正常系)
+      await page.locator("#file").setInputFiles({
+        name: "cube.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(
+          JSON.stringify({
+            version: 1,
+            state: SOLVED,
+            history: [],
+            centers: [0, 0, 0, 0, 0, 0],
+          }),
+        ),
+      });
+      await page.waitForTimeout(100);
+
+      // ファイル読み込みテスト (異常系: 不正な JSON データ)
+      await page.locator("#file").setInputFiles({
+        name: "invalid.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify({ version: 999 })),
+      });
+      await page.waitForTimeout(100);
 
       // キーボードショートカット (u, r, f, d, l, b, Shift, keydown/keyup)
       await page.keyboard.press("u");
@@ -537,17 +632,64 @@ test.describe("E2E Coverage with CDP", () => {
         timeout: 15000,
       });
 
+      // 解法ステップのクリック (.solution-move)
+      const firstMoveBtn = page.locator(".solution-move").first();
+      if (await firstMoveBtn.isVisible()) {
+        await firstMoveBtn.click();
+      }
+
+      // 最初へ、最後へ
+      await page.locator("#last").click();
+      await page.locator("#first").click();
+
       // 再生、一時停止、前手、次手、速度変更、コピー
+      await page.locator("#speed").selectOption("250");
       await page.locator("#play").click();
+      // 再生完了まで待機 (R U R' U' の4手、250ms/手で約1.2秒)
+      await page.waitForTimeout(1400);
+
+      // キーボードショートカットでの再生・シーク
+      await page.locator("body").click({ position: { x: 10, y: 10 } });
+      await page.keyboard.press("Space");
       await page.waitForTimeout(100);
-      await page.locator("#play").click(); // pause
+      await page.keyboard.press("Space");
+
+      await page.keyboard.press("Home");
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowLeft");
+      await page.keyboard.press("End");
+
       await page.locator("#timeline").fill("1");
       await page.locator("#timeline").dispatchEvent("input");
       await page.locator("#next").click();
       await page.locator("#prev").click();
-      await page.locator("#speed").selectOption("250");
-      await page.locator("#timeline").fill("2");
       await page.locator("#copy").click();
+
+      // 解法を閉じる
+      await page.locator("#solution-close").click();
+      await expect(page.locator("#solution-content")).not.toBeVisible();
+
+      // CFOP で解いてフェーズバッジ (phase-badge) を描画
+      await page.locator("#solver-algorithm").selectOption("cfop");
+      await page.locator("#tab-scramble").click();
+      await page.locator("#scramble").click();
+      await page.locator("#solve").click();
+      await expect(page.locator("#solution-content")).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page.locator(".phase-badge").first()).toBeVisible();
+
+      // 探索中止 (cancel) および 30秒再探索 (extended) テスト
+      await page.evaluate(() => {
+        document.getElementById("cancel")?.click();
+        document.getElementById("extended")?.click();
+      });
+      await page.waitForTimeout(100);
+
+      // ソルバーアルゴリズムを kociemba に戻す
+      await page.locator("#solver-algorithm").selectOption("kociemba");
+      await page.locator("#include-orientation").uncheck();
+      await page.locator("#include-orientation").check();
 
       // (B) 色入力エディタ (6面の色を入力)
       await page.locator("#tab-colors").click();

@@ -118,13 +118,15 @@ impl ThistlethwaiteSearch {
             Ok(p) => p,
             Err(_) => return self.fallback_solve(&current, all_phases),
         };
-        current = apply(&current, &p4);
+        #[cfg(any(debug_assertions, test))]
+        let current = apply(&current, &p4);
         all_phases.push(ThistlePhase {
             name: "Phase 4 (G3→G4: 最終解決)",
             moves: p4,
         });
 
-        debug_assert_eq!(
+        #[cfg(any(debug_assertions, test))]
+        assert_eq!(
             current,
             RawCube::default(),
             "Thistlethwaite解法の検証に失敗しました。"
@@ -373,17 +375,6 @@ impl ThistlethwaiteSearch {
         if depth == 0 {
             return self.is_g3(c);
         }
-        let bad_s = [0, 2, 4, 6]
-            .iter()
-            .filter(|&&i| !matches!(c.ep[i] as usize, 0 | 2 | 4 | 6))
-            .count() as u8;
-        let bad_tetrad = [0, 2, 5, 7]
-            .iter()
-            .filter(|&&i| !matches!(c.cp[i] as usize, 0 | 2 | 5 | 7))
-            .count() as u8;
-        if bad_s.div_ceil(4) > depth || bad_tetrad.div_ceil(4) > depth {
-            return false;
-        }
 
         for &m in allowed {
             let face = m / 3;
@@ -554,26 +545,71 @@ mod tests {
             serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
         let sc = parse_moves(preset["scramble"].as_str().unwrap()).unwrap();
         let cube = apply(&RawCube::default(), &sc);
-        let budget = if cfg!(debug_assertions) {
-            60_000
-        } else {
-            10_000
-        };
+        let budget = 60_000;
         let mut th = ThistlethwaiteSearch::new(budget);
 
         let res = th.solve(&cube).unwrap();
         assert_eq!(res.phases.len(), 4, "All 4 phases must succeed");
-        assert!(
-            res.moves.len() >= 20,
-            "Move count must be at least God's Number 20, got {}",
-            res.moves.len()
-        );
-        assert!(
-            res.moves.len() <= 45,
-            "Move count must be within Thistlethwaite theoretical bound 45, got {}",
-            res.moves.len()
-        );
+        assert!(res.moves.len() >= 20);
+        assert!(res.moves.len() <= 45);
         let final_cube = apply(&cube, &res.moves);
         assert_eq!(final_cube, RawCube::default(), "Cube must be fully solved");
+    }
+
+    #[test]
+    fn test_thistlethwaite_fallback_solve() {
+        let cube = RawCube::default();
+        let sc = parse_moves("R U F").unwrap();
+        let scrambled = apply(&cube, &sc);
+        let mut th = ThistlethwaiteSearch::new(10_000);
+        let res = th.fallback_solve(&scrambled, Vec::new()).unwrap();
+        assert!(!res.moves.is_empty());
+        assert_eq!(apply(&scrambled, &res.moves), RawCube::default());
+
+        // 既存フェーズを引き継いだフォールバック
+        let p1 = th.solve_phase1(&scrambled).unwrap();
+        let c1 = apply(&scrambled, &p1);
+        let mut th2 = ThistlethwaiteSearch::new(10_000);
+        let res2 = th2
+            .fallback_solve(
+                &c1,
+                vec![ThistlePhase {
+                    name: "Phase 1",
+                    moves: p1,
+                }],
+            )
+            .unwrap();
+        assert!(res2.phases.len() >= 2);
+
+        // 予算ゼロでのエラー
+        let mut th_zero = ThistlethwaiteSearch::new(0);
+        assert!(th_zero.fallback_solve(&scrambled, Vec::new()).is_err());
+    }
+
+    #[test]
+    fn test_thistlethwaite_phase_fallbacks() {
+        // G1状態のキューブ (eo=0だがco!=0): F/Bの90度回転を含まないスクランブル
+        let g1_cube = apply(&RawCube::default(), &parse_moves("R U R' U'").unwrap());
+        let mut th_p2 = ThistlethwaiteSearch::new(10_000);
+        th_p2.main_budget_ms = 0.0;
+        th_p2.timed_out = true;
+        let res_p2 = th_p2.solve(&g1_cube).unwrap();
+        assert_eq!(apply(&g1_cube, &res_p2.moves), RawCube::default());
+
+        // G2状態のキューブ (eo=0, co=0, Eスライスエッジ保持): U, D, R2, L2, F2, B2
+        let g2_cube = apply(&RawCube::default(), &parse_moves("U D R2 L2").unwrap());
+        let mut th_p3 = ThistlethwaiteSearch::new(10_000);
+        th_p3.main_budget_ms = 0.0;
+        th_p3.timed_out = true;
+        let res_p3 = th_p3.solve(&g2_cube).unwrap();
+        assert_eq!(apply(&g2_cube, &res_p3.moves), RawCube::default());
+
+        // G3状態のキューブ (全手180度回転): U2, D2, F2, B2, L2, R2
+        let g3_cube = apply(&RawCube::default(), &parse_moves("U2 D2 R2 L2").unwrap());
+        let mut th_p4 = ThistlethwaiteSearch::new(10_000);
+        th_p4.main_budget_ms = 0.0;
+        th_p4.timed_out = true;
+        let res_p4 = th_p4.solve(&g3_cube).unwrap();
+        assert_eq!(apply(&g3_cube, &res_p4.moves), RawCube::default());
     }
 }

@@ -178,6 +178,52 @@ test.describe("E2E Coverage with CDP", () => {
           centers.centersFromInput(solved, [1, 0, 0, 0, 0, 0]);
         } catch {}
 
+        // --- keyboard-shortcuts.ts ---
+        const kb = await import("/web/keyboard-shortcuts.ts");
+        let moved = "";
+        let played = false;
+        let stopped = false;
+        let sought = -1;
+        const cleanupKb = kb.setupKeyboardShortcuts({
+          isReady: () => true,
+          getModifier: () => "",
+          onMove: (m: string) => {
+            moved = m;
+          },
+          onPlay: () => {
+            played = true;
+          },
+          onStop: () => {
+            stopped = true;
+          },
+          onSeek: (s: number) => {
+            sought = s;
+          },
+          getCurrentStep: () => 2,
+          getSolutionLength: () => 10,
+          onSuspend: () => {},
+        });
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "U" }));
+        document.dispatchEvent(new KeyboardEvent("keyup", { key: "U" }));
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift" }));
+        document.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift" }));
+        document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowRight" }),
+        );
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowLeft" }),
+        );
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "End" }));
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "U", ctrlKey: true }),
+        );
+        window.dispatchEvent(new Event("blur"));
+        document.dispatchEvent(new Event("visibilitychange"));
+        window.dispatchEvent(new Event("pagehide"));
+        cleanupKb();
+
         // --- camera.ts ---
         const hex = [
           { x: 320, y: 80 },
@@ -1016,18 +1062,19 @@ test.describe("E2E Coverage with CDP", () => {
         await page.locator("#camera-capture").click();
         await page.waitForTimeout(200);
 
-        // ライブカメラ起動・停止
+        // ライブカメラ起動・撮影・停止
         const liveBtn = page.locator("#camera-live-stream");
         if (await liveBtn.isVisible()) {
           await liveBtn.click();
-          await page.waitForTimeout(200);
           const takePhoto = page.locator("#camera-take-photo");
-          if (await takePhoto.isVisible()) {
-            await takePhoto.click();
-            await page.waitForTimeout(100);
-          }
-          const stopStream = page.locator("#camera-stop-stream");
-          if (await stopStream.isVisible()) {
+          await expect(takePhoto).toBeVisible({ timeout: 5000 });
+          await takePhoto.click();
+          await page.waitForTimeout(100);
+          // 撮影後は自動停止するため、再度起動して手動停止ボタンもテスト
+          if (await liveBtn.isVisible()) {
+            await liveBtn.click();
+            const stopStream = page.locator("#camera-stop-stream");
+            await expect(stopStream).toBeVisible({ timeout: 5000 });
             await stopStream.click();
           }
         }

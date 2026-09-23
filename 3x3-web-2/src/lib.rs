@@ -329,6 +329,9 @@ pub fn center_parity_core(state: &str) -> Result<u8, String> {
 
 #[wasm_bindgen]
 pub fn initialize() {
+    #[cfg(feature = "console_error_panic_hook")]
+    console_error_panic_hook::set_once();
+
     let _ = tables::MoveTable::get();
     let _ = tables::PruningTable::get();
 }

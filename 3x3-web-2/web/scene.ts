@@ -47,6 +47,7 @@ function rotationMatrixForFaceAngle(
 }
 
 export class CubeScene {
+  private static tempVec = new THREE.Vector3();
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
@@ -474,9 +475,8 @@ export class CubeScene {
     // 回転する層に属する矢印（カラー矢印およびアウトライン）を layer に attach
     const movingArrows = (this.arrowGroup.children as THREE.Object3D[]).filter(
       (mesh) => {
-        const pos = new THREE.Vector3();
-        mesh.getWorldPosition(pos);
-        return pos.dot(axis) > 0.5;
+        mesh.getWorldPosition(CubeScene.tempVec);
+        return CubeScene.tempVec.dot(axis) > 0.5;
       },
     );
     movingArrows.forEach((mesh) => layer.attach(mesh));

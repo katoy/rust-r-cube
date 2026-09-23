@@ -21,7 +21,7 @@ fn moves(text: &str) -> Vec<usize> {
 
 struct SolverState {
     start: Instant,
-    budget_ms: f64,
+    budget_ms: u128,
     nodes: u64,
 }
 
@@ -29,16 +29,15 @@ impl SolverState {
     fn new(budget_ms: u32) -> Self {
         Self {
             start: Instant::now(),
-            budget_ms: f64::from(budget_ms),
+            budget_ms: budget_ms as u128,
             nodes: 0,
         }
     }
 
     fn check_timeout(&mut self) -> Result<(), String> {
         self.nodes += 1;
-        if self.budget_ms == 0.0
-            || (self.nodes & 511 == 0
-                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.budget_ms)
+        if self.budget_ms == 0
+            || (self.nodes & 511 == 0 && self.start.elapsed().as_millis() >= self.budget_ms)
         {
             Err("探索時間の上限に達しました。".to_owned())
         } else {

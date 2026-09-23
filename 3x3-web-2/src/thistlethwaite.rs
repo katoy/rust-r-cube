@@ -43,16 +43,16 @@ pub struct ThistleResult {
 
 pub struct ThistlethwaiteSearch {
     start: Instant,
-    budget_ms: f64,
-    main_budget_ms: f64,
+    budget_ms: u128,
+    main_budget_ms: u128,
     pub nodes: u64,
     pub timed_out: bool,
 }
 
 impl ThistlethwaiteSearch {
     pub fn new(budget_ms: u32) -> Self {
-        let b = f64::from(budget_ms);
-        let main_b = (b * 0.7).min((b - 50.0).max(0.0));
+        let b = budget_ms as u128;
+        let main_b = (b * 7 / 10).min(b.saturating_sub(50));
         Self {
             start: Instant::now(),
             budget_ms: b,
@@ -66,9 +66,8 @@ impl ThistlethwaiteSearch {
         if self.timed_out {
             return true;
         }
-        if self.budget_ms == 0.0
-            || (self.nodes & 4095 == 0
-                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.main_budget_ms)
+        if self.budget_ms == 0
+            || (self.nodes & 4095 == 0 && self.start.elapsed().as_millis() >= self.main_budget_ms)
         {
             self.timed_out = true;
             return true;
@@ -591,7 +590,7 @@ mod tests {
         // G1状態のキューブ (eo=0だがco!=0): F/Bの90度回転を含まないスクランブル
         let g1_cube = apply(&RawCube::default(), &parse_moves("R U R' U'").unwrap());
         let mut th_p2 = ThistlethwaiteSearch::new(10_000);
-        th_p2.main_budget_ms = 0.0;
+        th_p2.main_budget_ms = 0;
         th_p2.timed_out = true;
         let res_p2 = th_p2.solve(&g1_cube).unwrap();
         assert_eq!(apply(&g1_cube, &res_p2.moves), RawCube::default());
@@ -599,7 +598,7 @@ mod tests {
         // G2状態のキューブ (eo=0, co=0, Eスライスエッジ保持): U, D, R2, L2, F2, B2
         let g2_cube = apply(&RawCube::default(), &parse_moves("U D R2 L2").unwrap());
         let mut th_p3 = ThistlethwaiteSearch::new(10_000);
-        th_p3.main_budget_ms = 0.0;
+        th_p3.main_budget_ms = 0;
         th_p3.timed_out = true;
         let res_p3 = th_p3.solve(&g2_cube).unwrap();
         assert_eq!(apply(&g2_cube, &res_p3.moves), RawCube::default());
@@ -607,7 +606,7 @@ mod tests {
         // G3状態のキューブ (全手180度回転): U2, D2, F2, B2, L2, R2
         let g3_cube = apply(&RawCube::default(), &parse_moves("U2 D2 R2 L2").unwrap());
         let mut th_p4 = ThistlethwaiteSearch::new(10_000);
-        th_p4.main_budget_ms = 0.0;
+        th_p4.main_budget_ms = 0;
         th_p4.timed_out = true;
         let res_p4 = th_p4.solve(&g3_cube).unwrap();
         assert_eq!(apply(&g3_cube, &res_p4.moves), RawCube::default());

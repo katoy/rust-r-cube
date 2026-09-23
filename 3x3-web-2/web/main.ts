@@ -17,6 +17,7 @@ import {
 import { registerServiceWorker } from "./pwa";
 import { sound } from "./sound";
 import { analyzeMoves } from "./triggers";
+import { setupKeyboardShortcuts } from "./keyboard-shortcuts";
 
 declare global {
   interface Window {
@@ -736,87 +737,26 @@ $<HTMLInputElement>("file").onchange = async () => {
     if (requestId === fileLoadRequestId) $<HTMLInputElement>("file").value = "";
   }
 };
-document.addEventListener("keydown", (event) => {
-  if (
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey ||
-    document.querySelector("dialog[open]") ||
-    event.target instanceof HTMLInputElement ||
-    event.target instanceof HTMLTextAreaElement ||
-    event.target instanceof HTMLSelectElement
-  )
-    return;
-
-  const face = event.key.toUpperCase();
-  if (FACES.includes(face) && face.length === 1) {
-    const btn = document.querySelector(`button[data-move="${face}"]`);
-    btn?.classList.add("active-press");
-  } else if (event.key === "Shift") {
-    $("prime")?.classList.add("active-press");
-  }
-
-  if (!mainReady || event.defaultPrevented) return;
-  if (FACES.includes(face) && face.length === 1) {
-    event.preventDefault();
-    if (!event.repeat)
-      void applyAlgorithm(face + (event.shiftKey ? "'" : store.getModifier()));
-  } else if (
-    event.code === "Space" &&
-    !(event.target instanceof HTMLButtonElement)
-  ) {
-    event.preventDefault();
+setupKeyboardShortcuts({
+  isReady: () => mainReady,
+  getModifier: () => store.getModifier(),
+  onMove: (move) => {
+    void applyAlgorithm(move);
+  },
+  onPlay: () => {
     void play();
-  } else if (
-    (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
-    !(event.target instanceof HTMLButtonElement)
-  ) {
-    event.preventDefault();
-    stop();
-    void seek(store.getStep() + (event.key === "ArrowRight" ? 1 : -1));
-  } else if (event.key === "Home") {
-    const solution = store.getSolution();
-    if (solution) {
-      event.preventDefault();
-      stop();
-      void seek(0, false);
-    }
-  } else if (event.key === "End") {
-    const solution = store.getSolution();
-    if (solution) {
-      event.preventDefault();
-      stop();
-      void seek(solution.moves.length, false);
-    }
-  }
-});
-function clearActivePress() {
-  document.querySelectorAll(".active-press").forEach((el) => {
-    el.classList.remove("active-press");
-  });
-}
-document.addEventListener("keyup", (event) => {
-  const face = event.key.toUpperCase();
-  if (FACES.includes(face) && face.length === 1) {
-    const btn = document.querySelector(`button[data-move="${face}"]`);
-    btn?.classList.remove("active-press");
-  } else if (event.key === "Shift") {
-    $("prime")?.classList.remove("active-press");
-  }
-});
-window.addEventListener("blur", clearActivePress);
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    clearActivePress();
+  },
+  onStop: () => stop(),
+  onSeek: (step, animate) => {
+    void seek(step, animate);
+  },
+  getCurrentStep: () => store.getStep(),
+  getSolutionLength: () => store.getSolution()?.moves.length,
+  onSuspend: () => {
     stop();
     persist();
     refresh();
-  }
-});
-window.addEventListener("pagehide", () => {
-  clearActivePress();
-  stop();
-  persist();
+  },
 });
 refresh();
 async function start() {

@@ -11,8 +11,8 @@ pub struct KorfSolution {
 
 pub struct KorfSearch {
     start: Instant,
-    budget_ms: f64,
-    main_budget_ms: f64,
+    budget_ms: u128,
+    main_budget_ms: u128,
     pub nodes: u64,
     pub timed_out: bool,
     path: Vec<usize>,
@@ -20,8 +20,8 @@ pub struct KorfSearch {
 
 impl KorfSearch {
     pub fn new(budget_ms: u32) -> Self {
-        let b = f64::from(budget_ms);
-        let main_b = (b * 0.7).min((b - 50.0).max(0.0));
+        let b = budget_ms as u128;
+        let main_b = (b * 7 / 10).min(b.saturating_sub(50));
         Self {
             start: Instant::now(),
             budget_ms: b,
@@ -36,9 +36,8 @@ impl KorfSearch {
         if self.timed_out {
             return true;
         }
-        if self.budget_ms == 0.0
-            || (self.nodes & 4095 == 0
-                && self.start.elapsed().as_secs_f64() * 1000.0 >= self.main_budget_ms)
+        if self.budget_ms == 0
+            || (self.nodes & 4095 == 0 && self.start.elapsed().as_millis() >= self.main_budget_ms)
         {
             self.timed_out = true;
             return true;

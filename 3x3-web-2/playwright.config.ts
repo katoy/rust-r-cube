@@ -13,6 +13,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
+  outputDir: "test-results",
   projects: [
     {
       name: "chromium",

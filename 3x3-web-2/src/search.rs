@@ -6,7 +6,7 @@ pub struct Search {
     mt: &'static MoveTable,
     pt: &'static PruningTable,
     start: Instant,
-    budget_ms: f64,
+    budget_ms: u128,
     pub nodes: u64,
     pub timed_out: bool,
     pub path: Vec<usize>,
@@ -24,7 +24,7 @@ impl Search {
             mt: MoveTable::get(),
             pt: PruningTable::get(),
             start: Instant::now(),
-            budget_ms: f64::from(budget_ms),
+            budget_ms: budget_ms as u128,
             nodes: 0,
             timed_out: false,
             path: Vec::with_capacity(32),
@@ -147,7 +147,7 @@ impl Search {
     }
     fn exhausted(&mut self) -> bool {
         self.nodes += 1;
-        if self.nodes & 1023 == 0 && self.start.elapsed().as_secs_f64() * 1000.0 >= self.budget_ms {
+        if self.nodes & 1023 == 0 && self.start.elapsed().as_millis() >= self.budget_ms {
             self.timed_out = true;
         }
         self.timed_out

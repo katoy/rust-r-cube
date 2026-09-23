@@ -139,7 +139,9 @@ function refresh() {
     scene.centerRotations = [...centerRotations];
     if (!inMotion) scene.show(state, next);
   }
-  net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
+  if (!inMotion) {
+    net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
+  }
   $("cube-status").textContent =
     state === SOLVED
       ? store.getCenterTurns().some((t) => t !== 0)
@@ -788,6 +790,11 @@ document.addEventListener("keydown", (event) => {
     }
   }
 });
+function clearActivePress() {
+  document.querySelectorAll(".active-press").forEach((el) => {
+    el.classList.remove("active-press");
+  });
+}
 document.addEventListener("keyup", (event) => {
   const face = event.key.toUpperCase();
   if (FACES.includes(face) && face.length === 1) {
@@ -797,14 +804,17 @@ document.addEventListener("keyup", (event) => {
     $("prime")?.classList.remove("active-press");
   }
 });
+window.addEventListener("blur", clearActivePress);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    clearActivePress();
     stop();
     persist();
     refresh();
   }
 });
 window.addEventListener("pagehide", () => {
+  clearActivePress();
   stop();
   persist();
 });
@@ -854,8 +864,12 @@ async function start() {
         validate(stateParam);
         let restoredCenters: number[];
         if (centersParam) {
-          const parsed = centersParam.split(",").map((v) => Number(v));
-          restoredCenters = centersFromInput(stateParam, parsed);
+          try {
+            const parsed = centersParam.split(",").map((v) => Number(v));
+            restoredCenters = centersFromInput(stateParam, parsed);
+          } catch {
+            restoredCenters = automaticCenters(stateParam);
+          }
         } else {
           restoredCenters = automaticCenters(stateParam);
         }

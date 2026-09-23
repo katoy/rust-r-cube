@@ -286,6 +286,10 @@ export class CubeScene {
     const w = this.host.clientWidth,
       h = this.host.clientHeight;
     if (!w || !h) return;
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.renderer.getPixelRatio() !== pr) {
+      this.renderer.setPixelRatio(pr);
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);

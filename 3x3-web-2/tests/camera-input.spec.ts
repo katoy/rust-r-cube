@@ -741,4 +741,20 @@ test.describe("カメラ入力 - エンドツーエンドテスト（対角2方�
 
     await page.locator("#camera-close").click();
   });
+
+  test("非画像ファイルが選択された場合はエラーメッセージを表示して拒否する", async ({
+    page,
+  }) => {
+    await ready(page);
+    await openCameraEditor(page);
+
+    await page.locator("#camera-file-a").setInputFiles({
+      name: "invalid.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not an image"),
+    });
+
+    await expect(page.locator("#camera-error")).toContainText("画像ファイル");
+    await page.locator("#camera-close").click();
+  });
 });

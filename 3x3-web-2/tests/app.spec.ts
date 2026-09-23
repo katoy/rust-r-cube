@@ -1138,3 +1138,15 @@ test("solver algorithm selection, persistence, and phase badges", async ({
   await page.waitForSelector("#engine-status.ready");
   expect(await page.locator("#solver-algorithm").inputValue()).toBe("cfop");
 });
+
+test("clears active-press styles when window loses focus", async ({ page }) => {
+  await ready(page);
+  await page.keyboard.down("r");
+  const btn = page.locator('button[data-move="R"]');
+  await expect(btn).toHaveClass(/active-press/);
+
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(btn).not.toHaveClass(/active-press/);
+
+  await page.keyboard.up("r");
+});

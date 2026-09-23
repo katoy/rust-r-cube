@@ -357,6 +357,14 @@ export class TwoViewCamera {
     view: "A" | "B",
     existingGeneration?: number,
   ): Promise<void> {
+    if (file.type && !file.type.startsWith("image/")) {
+      this.error("画像ファイル（PNG、JPEG等）を選択してください。");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      this.error("画像ファイルは20MB以内にしてください。");
+      return;
+    }
     // File selection (including drops) replaces live mode, even while camera access is pending.
     if (existingGeneration === undefined) this.stopLiveStream();
     const generation =
@@ -364,8 +372,8 @@ export class TwoViewCamera {
       (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
     const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
-      const image = new Image();
-      image.onload = () => {
+      const rawImage = new Image();
+      rawImage.onload = () => {
         const currentGen =
           view === "A" ? this.loadGenerationA : this.loadGenerationB;
         if (generation !== currentGen) {
@@ -373,21 +381,80 @@ export class TwoViewCamera {
           resolve();
           return;
         }
+
+        const MAX_DIM = 1600;
+        const { naturalWidth: nw, naturalHeight: nh } = rawImage;
+        if (nw > MAX_DIM || nh > MAX_DIM) {
+          const scale = Math.min(MAX_DIM / nw, MAX_DIM / nh);
+          const w = Math.round(nw * scale);
+          const h = Math.round(nh * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(rawImage, 0, 0, w, h);
+            canvas.toBlob(
+              (blob) => {
+                const currentGenNow =
+                  view === "A" ? this.loadGenerationA : this.loadGenerationB;
+                URL.revokeObjectURL(url);
+                if (generation !== currentGenNow || !blob) {
+                  resolve();
+                  return;
+                }
+                const resizedUrl = URL.createObjectURL(blob);
+                const resizedImage = new Image();
+                resizedImage.onload = () => {
+                  const currentGenFinal =
+                    view === "A" ? this.loadGenerationA : this.loadGenerationB;
+                  if (generation !== currentGenFinal) {
+                    URL.revokeObjectURL(resizedUrl);
+                    resolve();
+                    return;
+                  }
+                  if (view === "A") {
+                    this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+                    this.sourceUrlA = resizedUrl;
+                    this.imageA = resizedImage;
+                  } else {
+                    this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+                    this.sourceUrlB = resizedUrl;
+                    this.imageB = resizedImage;
+                  }
+                  this.currentView = view;
+                  this.renderImage();
+                  this.autoDetectOutline();
+                  resolve();
+                };
+                resizedImage.onerror = () => {
+                  URL.revokeObjectURL(resizedUrl);
+                  resolve();
+                };
+                resizedImage.src = resizedUrl;
+              },
+              "image/jpeg",
+              0.92,
+            );
+            return;
+          }
+        }
+
         if (view === "A") {
           this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
           this.sourceUrlA = url;
-          this.imageA = image;
+          this.imageA = rawImage;
         } else {
           this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
           this.sourceUrlB = url;
-          this.imageB = image;
+          this.imageB = rawImage;
         }
         this.currentView = view;
         this.renderImage();
         this.autoDetectOutline();
         resolve();
       };
-      image.onerror = () => {
+      rawImage.onerror = () => {
         URL.revokeObjectURL(url);
         const currentGen =
           view === "A" ? this.loadGenerationA : this.loadGenerationB;
@@ -396,7 +463,7 @@ export class TwoViewCamera {
         }
         resolve();
       };
-      image.src = url;
+      rawImage.src = url;
     });
   }
 

@@ -75,4 +75,24 @@ test.describe("R06: URL ?alg= parameter idempotency", () => {
 
     expect(stateUnderScore).toBe(stateSpace);
   });
+
+  test("valid state parameter is restored with automatic centers when centers parameter is corrupted", async ({
+    page,
+  }) => {
+    // 1. 初回訪問: 有効な局面 R
+    await page.goto("/?alg=R");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    const rState = await page.locator("#scene").getAttribute("data-state");
+    expect(rState).not.toBeNull();
+
+    // 2. 不正な centers パラメータを含む URL
+    await page.goto(`/?state=${rState}&centers=invalid,corrupted,999`);
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    // state は破棄されず、rState のまま復元されること
+    const restoredState = await page
+      .locator("#scene")
+      .getAttribute("data-state");
+    expect(restoredState).toBe(rState);
+  });
 });

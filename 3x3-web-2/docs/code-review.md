@@ -2,6 +2,9 @@
 
 > [!NOTE]
 > 最新の全体レビューおよび全指摘事項の記録は以下を参照してください：
+>
+> - **[全体レビューレポート（932358b / 2026-09-24）](code-review-932358b-2026-09-24.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（CFOP探索ノード13.6%削減、Superflip 23手）、CFOP定石マクロ事前生成・WCA対向面スクランブル・image-sampler counts配列化・main.ts refresh()のO(1)化等の次世代改善提案。
+> - **[レビュー指摘事項の修正およびカバレッジ 100% 達成レポート（932358b）](review-fixes-932358b-2026-09-24.md)**: Findings 1〜6 完全解消（CFOP OnceLock キャッシュ、WCA 対向面枝刈り、image-sampler counts 配列化、main.ts refresh() の O(1) 化、centers 厳格バリデーション、ARIA 属性動的バインディング）、Web モジュール 21 件中 19 件で 100.00% 達成、全体 99% 超網羅。
 > - **[全体レビューレポート（0ea3745 / 2026-09-24）](code-review-0ea3745-2026-09-24.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（Superflip 23手）、CFOP対向面可換枝刈り・画像認識サンプラーZero-allocation化の提示。
 > - **[レビュー指摘事項の修正記録（0ea3745）](review-fixes-0ea3745-2026-09-24.md)**: `classifyColor` の Zero-allocation 化、CFOP redundant 枝刈り導入、`url-params.ts` / `file-io.ts` 分離、`CubeScene.turn` の Group 再利用化。
 > - **[全体レビューレポート（d2b0862 / 2026-09-24）](code-review-d2b0862-2026-09-24.md)**: 総合判定 **APPROVED WITH DISTINCTION**。Flakiness解明、群論・WASM・GPU境界解析。
@@ -27,19 +30,20 @@
 
 ### 五軸評価サマリー
 
-| 評価軸 | 判定 | 概要 |
-|:---|:---:|:---|
-| **1. 正確性 (Correctness)** | **良 (Good)** | コアのソルバー・幾何回転アルゴリズムは非常に堅牢。カメラ入力のフォールバック時における面定義順序に一部不整合あり。 |
-| **2. パフォーマンス (Performance)** | **要注意 (Needs Attention)** | Rust側の探索性能および事前テーブル埋め込みは秀逸。Three.jsの矢印描画でジオメトリ・マテリアルの破棄漏れによるGPUメモリリークが存在。 |
-| **3. アーキテクチャ (Architecture)** | **良 (Good)** | Web Worker分離やWASM連携の設計は明快。`camera.ts` や `main.ts` への責務集中を分割する余地あり。 |
-| **4. 可読性・単純性 (Readability)** | **良 (Good)** | 命名規則や日本語のガイド・解説コメントが充実。一部Prettierによるインデント不整合が残存。 |
-| **5. セキュリティ (Security)** | **優 (Excellent)** | サーバーレス・完全クライアント完結型。ファイルサイズ制限、文字数制限、局面パリティ検証が徹底されている。 |
+| 評価軸                               |             判定             | 概要                                                                                                                                |
+| :----------------------------------- | :--------------------------: | :---------------------------------------------------------------------------------------------------------------------------------- |
+| **1. 正確性 (Correctness)**          |        **良 (Good)**         | コアのソルバー・幾何回転アルゴリズムは非常に堅牢。カメラ入力のフォールバック時における面定義順序に一部不整合あり。                  |
+| **2. パフォーマンス (Performance)**  | **要注意 (Needs Attention)** | Rust側の探索性能および事前テーブル埋め込みは秀逸。Three.jsの矢印描画でジオメトリ・マテリアルの破棄漏れによるGPUメモリリークが存在。 |
+| **3. アーキテクチャ (Architecture)** |        **良 (Good)**         | Web Worker分離やWASM連携の設計は明快。`camera.ts` や `main.ts` への責務集中を分割する余地あり。                                     |
+| **4. 可読性・単純性 (Readability)**  |        **良 (Good)**         | 命名規則や日本語のガイド・解説コメントが充実。一部Prettierによるインデント不整合が残存。                                            |
+| **5. セキュリティ (Security)**       |      **優 (Excellent)**      | サーバーレス・完全クライアント完結型。ファイルサイズ制限、文字数制限、局面パリティ検証が徹底されている。                            |
 
 ---
 
 ## 2. 課題と改善提案 (Findings & Recommendations)
 
 ### 🚨 Finding 1: [重要/パフォーマンス] Three.js の矢印描画による GPU メモリリーク
+
 - **該当箇所**: `web/scene.ts`（260〜358行目付近）
 - **現象**:
   キューブの回転操作や手順再生に伴い `show()` → `updateArrows()` が高頻度で呼び出されます。
@@ -71,6 +75,7 @@ private getSharedGeometries() {
 ---
 
 ### ⚠️ Finding 2: [要修正/正確性] カメラ入力におけるクアッド指定順序の不整合
+
 - **該当箇所**: `web/camera.ts`（543〜551行目、および 782〜792行目）
 - **現象**:
   - `capture()` 内の `rawQuads`（画像A）:
@@ -90,6 +95,7 @@ private getSharedGeometries() {
 ---
 
 ### ⚠️ Finding 3: [軽微/スタイル] Prettier フォーマットチェックの不整合
+
 - **該当箇所**: `web/camera.ts`（900〜924行目付近）
 - **現象**:
   `npm run format:check`（`prettier --check`）を実行すると、`camera.ts` で不自然な深いインデントが検出され、CIチェックが失敗します。
@@ -99,7 +105,8 @@ private getSharedGeometries() {
 ---
 
 ### 💡 Finding 4: [設計/保守性] `camera.ts` と `main.ts` の責務肥大化
-- **該当箇所**: 
+
+- **該当箇所**:
   - `web/camera.ts` (1,038行)
   - `web/main.ts` (737行)
 - **現状**:

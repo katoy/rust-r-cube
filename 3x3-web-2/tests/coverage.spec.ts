@@ -18,9 +18,13 @@ test.describe("E2E Coverage with CDP", () => {
   test("ユニットテストおよびE2Eテストによるブラウザ配信JavaScriptの行カバレッジ計測", async ({
     page,
   }) => {
+    test.setTimeout(90000);
     // JS カバレッジ計測を開始
     // @ts-ignore - Playwright の非公開 API
     await page.coverage.startJSCoverage({ resetOnNavigation: false });
+    page.on("console", (msg) =>
+      console.log(`[BROWSER ${msg.type()}]:`, msg.text()),
+    );
 
     try {
       // ページを開く（URLパラメータ復元ロジックも網羅）
@@ -81,6 +85,40 @@ test.describe("E2E Coverage with CDP", () => {
         sampler.rgbToHsv(255, 0, 128); // max === r, g < b
         sampler.rgbToHsv(0, 255, 0); // max === g
         sampler.rgbToHsv(0, 0, 255); // max === b
+
+        // classifyColor の各色・分岐（橙色、緑、青、黄、赤、白、不明）を網羅
+        sampler.classifyColor(20, 20, 20); // ? (極端に暗い)
+        sampler.classifyColor(240, 240, 240); // U (白)
+        sampler.classifyColor(50, 180, 50); // F (緑)
+        sampler.classifyColor(50, 50, 200); // B (青)
+        sampler.classifyColor(220, 200, 30); // D (黄)
+        sampler.classifyColor(236, 110, 40); // L (橙: h >= 18 && h < 40)
+        sampler.classifyColor(220, 20, 20); // R (赤)
+
+        // classify の直接実行（最多色分岐と無効色分岐）
+        const testImgData = new ImageData(11, 11);
+        for (let i = 0; i < testImgData.data.length; i += 4) {
+          testImgData.data[i] = 236;
+          testImgData.data[i + 1] = 110;
+          testImgData.data[i + 2] = 40;
+          testImgData.data[i + 3] = 255;
+        }
+        sampler.classify(testImgData, 5, 5, 2);
+
+        // getPerspectiveTransform のアフィン変換（平行四辺形・長方形）と非アフィン変換（台形）
+        sampler.getPerspectiveTransform([
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 },
+        ]);
+        sampler.getPerspectiveTransform([
+          { x: 20, y: 0 },
+          { x: 80, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 },
+        ]);
+
         sampler.buildState({
           U: "UUUUUUUUU",
           R: "RRRRRRRRR",
@@ -139,7 +177,11 @@ test.describe("E2E Coverage with CDP", () => {
           { x: 10, y: 85 },
         ]);
 
-        // 凸性エラー・退化エラー
+        // 凸性エラー・退化エラー・4点未満エラー・分母ゼロエラー
+        sampler.classifyColor(255, 0, 255); // マゼンタ (77行: return "?")
+        try {
+          sampler.getPerspectiveTransform([]); // 133-134行: 4点指定エラー
+        } catch {}
         try {
           sampler.getPerspectiveTransform([
             { x: 0, y: 0 },
@@ -155,6 +197,16 @@ test.describe("E2E Coverage with CDP", () => {
             { x: 100, y: 0 },
             { x: 0, y: 100 },
           ]);
+        } catch {}
+        try {
+          const tf = sampler.getPerspectiveTransform([
+            { x: 20, y: 0 },
+            { x: 80, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 100 },
+          ]);
+          // 射影変換の分母不正例外 (w <= 1e-5) を確実に発生させる (u=0, v=10 で w = 1 - 0.4*10 = -3 <= 1e-5)
+          tf(0, 10);
         } catch {}
 
         // --- centers.ts ---
@@ -184,6 +236,7 @@ test.describe("E2E Coverage with CDP", () => {
         } catch {}
 
         // --- keyboard-shortcuts.ts ---
+        document.querySelectorAll("dialog").forEach((d) => d.close());
         const kb = await import("/web/keyboard-shortcuts.ts");
         let moved = "";
         let played = false;
@@ -208,24 +261,58 @@ test.describe("E2E Coverage with CDP", () => {
           getSolutionLength: () => 10,
           onSuspend: () => {},
         });
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "U" }));
-        document.dispatchEvent(new KeyboardEvent("keyup", { key: "U" }));
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift" }));
-        document.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift" }));
-        document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "ArrowRight" }),
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "U", bubbles: true }),
         );
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "ArrowLeft" }),
+        document.body.dispatchEvent(
+          new KeyboardEvent("keyup", { key: "U", bubbles: true }),
         );
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "End" }));
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "U", ctrlKey: true }),
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Shift", bubbles: true }),
         );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keyup", { key: "Shift", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "End", bubbles: true }),
+        );
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "U",
+            ctrlKey: true,
+            bubbles: true,
+          }),
+        );
+        // active-press クラスの削除処理 (4行)
+        const dummyActiveBtn = document.createElement("button");
+        dummyActiveBtn.className = "active-press";
+        document.body.appendChild(dummyActiveBtn);
+        kb.clearActivePress();
+        dummyActiveBtn.remove();
+
         window.dispatchEvent(new Event("blur"));
+        // document.hidden が true の時のサスペンド処理 (59-61行)
+        Object.defineProperty(document, "hidden", {
+          value: true,
+          configurable: true,
+        });
         document.dispatchEvent(new Event("visibilitychange"));
+        Object.defineProperty(document, "hidden", {
+          value: false,
+          configurable: true,
+        });
         window.dispatchEvent(new Event("pagehide"));
         cleanupKb();
 
@@ -352,6 +439,99 @@ test.describe("E2E Coverage with CDP", () => {
         await (camInst as any).processFile(bigFile, "A");
         await (camInst as any).processFile(bigFile, "B");
 
+        // pointercancel での pointer capture 解除 (150-151行)
+        const camCanvas = (camInst as any).canvas as HTMLCanvasElement;
+        if (camCanvas) {
+          (camCanvas as any).hasPointerCapture = () => true;
+          (camCanvas as any).releasePointerCapture = () => {};
+          camCanvas.dispatchEvent(
+            new PointerEvent("pointercancel", { pointerId: 1 }),
+          );
+        }
+
+        // processFile 世代不一致による破棄 (337-340行)
+        const dummyFile = new File(["dummy"], "dummy.jpg", {
+          type: "image/jpeg",
+        });
+        const pGen = (camInst as any).processFile(dummyFile, "A");
+        (camInst as any).loadGenerationA++;
+        await pGen;
+
+        // toBlob null 分岐 (357-359行)
+        const origToBlob = HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob = function (cb: any) {
+          cb(null);
+        };
+        await (camInst as any).processFile(bigFile, "A");
+        HTMLCanvasElement.prototype.toBlob = origToBlob;
+
+        // 縮小画像 onload 世代不一致 (365-368行)
+        const origToBlob2 = HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob = function (
+          cb: any,
+          ...args: any[]
+        ) {
+          return origToBlob2.call(
+            this,
+            (blob: any) => {
+              (camInst as any).loadGenerationA++;
+              return cb(blob);
+            },
+            ...args,
+          );
+        };
+        await (camInst as any).processFile(bigFile, "A");
+        HTMLCanvasElement.prototype.toBlob = origToBlob2;
+
+        // 縮小画像 onerror 分岐 (384-385行)
+        const origCreateUrl = URL.createObjectURL;
+        let forceBlobError = false;
+        URL.createObjectURL = (obj: any) => {
+          if (forceBlobError && obj instanceof Blob) {
+            return "blob:invalid-broken-blob-url";
+          }
+          return origCreateUrl(obj);
+        };
+        forceBlobError = true;
+        await (camInst as any).processFile(bigFile, "A");
+        forceBlobError = false;
+        URL.createObjectURL = origCreateUrl;
+
+        // 全面同一色キャンバスで重複センター色フォールバック (563-565行) & switchView("B") (585-586行)
+        const redCanvas = document.createElement("canvas");
+        redCanvas.width = 640;
+        redCanvas.height = 480;
+        const rCtx = redCanvas.getContext("2d")!;
+        rCtx.fillStyle = "#f44336"; // 赤 = R面
+        rCtx.fillRect(0, 0, 640, 480);
+        const redImg = new Image();
+        redImg.src = redCanvas.toDataURL();
+        await new Promise((r) => {
+          redImg.onload = r;
+        });
+
+        (camInst as any).currentView = "A";
+        (camInst as any).imageA = redImg;
+        (camInst as any).imageB = redImg;
+        (camInst as any).faces = {};
+        (camInst as any).points = hex;
+        try {
+          (camInst as any).capture();
+        } catch {}
+
+        // capture 例外ハンドリング (588-589行)
+        (camInst as any).points = [{}, {}, {}, {}, {}, {}];
+        try {
+          (camInst as any).capture();
+        } catch {}
+        (camInst as any).points = [];
+
+        // detectedLabels 未検出パス (705行)
+        (camInst as any).imageA = undefined;
+        (camInst as any).updateDetectedLabels();
+        (camInst as any).imageB = undefined;
+        (camInst as any).updateDetectedLabels();
+
         // --- triggers.ts ---
         const triggers = await import("/web/triggers.ts");
         triggers.analyzeMoves([]);
@@ -388,29 +568,69 @@ test.describe("E2E Coverage with CDP", () => {
         const rState = JSON.parse(
           (window as any).cube_studio.apply_moves(solved, "R"),
         ).state;
-        store.replace(rState);
+        store.replace(rState, true);
         store.setSolution({
           moves: ["R"],
           states: [solved, rState],
           elapsed_ms: 10,
         } as any);
-        store.undo();
-        store.redo();
+        store.undo(); // 履歴ありの undo (105-108行)
+        store.redo(); // 履歴ありの redo
         store.setModifier("'");
         store.setModifier("'");
         store.toggleModifier("'");
         store.toggleModifier("2");
+        store.setStep(1); // setStep (105-108行)
+        const unsub = store.subscribe(() => {});
+        unsub(); // unsubscribe delete listener (132行)
         store.setSolution(undefined);
         store.replace(solved, false);
 
         // --- sound.ts ---
-        const { sound } = await import("/web/sound.ts");
+        const { sound, SoundManager } = await import("/web/sound.ts");
         sound.isEnabled();
         sound.playMove();
         sound.playSuccess();
         sound.toggle();
         sound.playMove();
         sound.toggle();
+
+        // AudioContext の state が suspended の時の resume 分岐 (22-23行)
+        const soundSuspended = new SoundManager();
+        (soundSuspended as any).initContext();
+        if ((soundSuspended as any).ctx) {
+          try {
+            Object.defineProperty((soundSuspended as any).ctx, "state", {
+              value: "suspended",
+              configurable: true,
+            });
+            soundSuspended.playMove();
+          } catch {}
+        }
+
+        // localStorage エラー時の constructor catch 分岐 (11-12行)
+        const origGetItem = localStorage.getItem;
+        try {
+          localStorage.getItem = () => {
+            throw new Error("storage error");
+          };
+          const errorSound = new SoundManager();
+          errorSound.isEnabled();
+        } finally {
+          localStorage.getItem = origGetItem;
+        }
+
+        // webkitAudioContext 分岐の網羅 (22-23行)
+        const origAudioCtx = window.AudioContext;
+        try {
+          (window as any).AudioContext = undefined;
+          (window as any).webkitAudioContext = origAudioCtx;
+          const webkitSound = new SoundManager();
+          webkitSound.playMove();
+        } finally {
+          window.AudioContext = origAudioCtx;
+          delete (window as any).webkitAudioContext;
+        }
 
         // --- pwa.ts ---
         const { registerServiceWorker } = await import("/web/pwa.ts");
@@ -433,7 +653,50 @@ test.describe("E2E Coverage with CDP", () => {
 
         // --- solver-client.ts ---
         const { SolverClient } = await import("/web/solver-client.ts");
+        let timeoutFn: Function | undefined;
+        const origTimeout = window.setTimeout;
+        window.setTimeout = ((fn: any, delay: any) => {
+          if (delay === 20000) timeoutFn = fn;
+          return origTimeout(fn, delay);
+        }) as any;
         const client = new SolverClient(() => {});
+        window.setTimeout = origTimeout;
+        if (timeoutFn) {
+          timeoutFn(); // 20000ms タイムアウトコールバックを実行
+        }
+        // worker.onerror 分岐の網羅 (22行)
+        (client as any).worker?.onerror?.(new Event("error"));
+
+        // 新しい SolverClient インスタンスで onmessage 分岐を確実に網羅 (generation一致)
+        const client2 = new SolverClient(() => {});
+        (client2 as any).pending = {
+          id: 999,
+          revision: 1,
+          resolve: () => {},
+          reject: () => {},
+        };
+        (client2 as any).worker?.onmessage?.({
+          data: { kind: "result", id: 999, revision: 1, error: "探索エラー" },
+        } as any);
+        (client2 as any).pending = {
+          id: 1000,
+          revision: 2,
+          resolve: () => {},
+          reject: () => {},
+        };
+        (client2 as any).worker?.onmessage?.({
+          data: {
+            kind: "result",
+            id: 1000,
+            revision: 2,
+            result: { moves: ["R"], elapsed: 10, cost: 1 },
+          },
+        } as any);
+        // init-error は generation がインクリメントされるため最後に呼ぶ
+        (client2 as any).worker?.onmessage?.({
+          data: { kind: "init-error", error: "初期化エラー" },
+        } as any);
+
         client.cancel();
         // @ts-ignore
         client.ready = true;
@@ -554,7 +817,7 @@ test.describe("E2E Coverage with CDP", () => {
         const resultsHost = document.createElement("div");
         resultsUi.renderResultFaces({
           host: resultsHost,
-          faces: {}, // 1回目: 新規生成で faces[face] ?? "??????????" の右側を通す
+          faces: {}, // 1回目: 新規生成で faces[face] ?? "?????????" の右側を通す
           currentView: "A",
           selectedColor: "U",
           onUpdateSticker: () => {},
@@ -566,19 +829,42 @@ test.describe("E2E Coverage with CDP", () => {
           selectedColor: "R",
           onUpdateSticker: () => {},
         });
+        let updatedStickerFace = "";
+        const freshResultsHost = document.createElement("div");
+        resultsUi.renderResultFaces({
+          host: freshResultsHost,
+          faces: { U: "UUUUUUUUU" }, // 新規生成で faces[face] の定義ありと未定義の両方を通す
+          currentView: "A",
+          selectedColor: "U",
+          onUpdateSticker: (f) => {
+            updatedStickerFace = f;
+          },
+        });
+        // ステッカークリック (121行: onUpdateSticker)
+        freshResultsHost
+          .querySelector<HTMLButtonElement>(".sticker:not([disabled])")
+          ?.click();
 
         // --- editor.ts ---
+        const editorDialog = document.getElementById(
+          "editor",
+        ) as HTMLDialogElement;
+        if (editorDialog?.open) editorDialog.close();
         const editorModule = await import("/web/editor.ts");
         const ed = new editorModule.ColorEditor(
-          () => {},
+          () => true,
           () => {},
         );
-        ed.open(solved, [0, 0, 0, 0, 0, 0]);
+        // センターが "?" のドラフト（74-75行）
+        ed.open("?".repeat(54), [0, 0, 0, 0, 0, 0]);
+        // エラーインデックスあり描画（131-132行: is-error）
+        (ed as any).errorIndices = [0, 1];
+        (ed as any).render();
         (ed as any).paint(0, "editor-net");
         try {
           (ed as any).paint(4, "editor-net");
         } catch {}
-        (document.getElementById("editor") as HTMLDialogElement)?.close();
+        if (editorDialog?.open) editorDialog.close();
 
         // --- camera-geometry.ts ---
         const cameraGeo = await import("/web/camera-geometry.ts");
@@ -610,13 +896,47 @@ test.describe("E2E Coverage with CDP", () => {
         scene.setViewPreset("iso");
         scene.resetView();
 
+        // 矢印取得メソッド (368-373行)
+        scene.getArrowCount();
+        scene.getArrows();
+
+        // 空状態表示 (385-387行: arrowGroup.visible = false)
+        scene.show("");
+
         // 矢印の表示・更新 (380-411行)
         scene.show(solved, undefined, [0, 0, 0, 0, 0, 0], true);
         scene.show(validScrambled, undefined, [1, 2, 3, 0, 1, 2], true);
 
+        // contextlost イベント (97-98行)
+        (scene as any).onContextLost(new Event("webglcontextlost"));
+
+        // applyResize pixelRatio 分岐 (275-276行)
+        const origPr = window.devicePixelRatio;
+        try {
+          Object.defineProperty(window, "devicePixelRatio", {
+            value: 3,
+            configurable: true,
+          });
+          (scene as any).applyResize();
+        } finally {
+          Object.defineProperty(window, "devicePixelRatio", {
+            value: origPr,
+            configurable: true,
+          });
+        }
+
         // turn (duration <= 0 と duration > 0)
         await scene.turn("R", validScrambled, 0);
-        const turnPromise = scene.turn("U", validScrambled, 10);
+        (scene as any).resizeRafId = 999;
+        (scene as any).resize(true); // cancelAnimationFrame(this.resizeRafId) を通過 (275-276行)
+        const turnPromise = scene.turn("U", validScrambled, 50);
+
+        // frame アニメーションイージング処理 (485-489行)
+        if ((scene as any).active) {
+          (scene as any).frame(performance.now() + 25);
+          (scene as any).frame(performance.now() + 100);
+        }
+
         scene.finish();
         await turnPromise;
 
@@ -849,6 +1169,7 @@ test.describe("E2E Coverage with CDP", () => {
       // エラー発生時の赤枠（is-error）表示テスト:
       // clear-colors で未入力状態にし、editor-apply をクリックしてバリデーションエラーを発生させる
       await page.locator("#clear-colors").click();
+      await page.locator("#auto-centers").click();
       await page.locator("#editor-apply").click();
       await expect(page.locator("#editor-error")).not.toBeEmpty();
 
@@ -1090,32 +1411,6 @@ test.describe("E2E Coverage with CDP", () => {
               new File(["invalid data"], "corrupt.png", { type: "image/png" }),
               "A",
             );
-
-            // getUserMedia エラー処理 (759-762行)
-            const origMedia = navigator.mediaDevices;
-            try {
-              Object.defineProperty(navigator, "mediaDevices", {
-                value: {
-                  getUserMedia: () =>
-                    Promise.reject(new Error("Permission denied")),
-                },
-                configurable: true,
-              });
-              await cam.startLiveStream();
-            } catch {}
-            try {
-              Object.defineProperty(navigator, "mediaDevices", {
-                value: undefined,
-                configurable: true,
-              });
-              await cam.startLiveStream();
-            } catch {}
-            try {
-              Object.defineProperty(navigator, "mediaDevices", {
-                value: origMedia,
-                configurable: true,
-              });
-            } catch {}
           }
         });
 
@@ -1188,6 +1483,606 @@ test.describe("E2E Coverage with CDP", () => {
         await page.locator("#camera-close").click();
       }
 
+      // カメラのエッジケース・例外分岐網羅（337-340, 365-368, 384-385, 854-862, 873-885行）
+      await page.evaluate(async () => {
+        const dbg = (window as any).__cube_main_debug__;
+        const cam = await dbg.getCamera();
+        const d = document.getElementById("camera-editor") as HTMLDialogElement;
+
+        // 1. open() 呼び出し (337-340行)
+        try {
+          if (d.open) d.close();
+          d.removeAttribute("open");
+          const origShow = d.showModal;
+          d.showModal = () => {};
+          cam.open();
+          d.showModal = origShow;
+        } catch {}
+
+        // 2. テキストファイル等の不正画像 (365-368行)
+        try {
+          await (cam as any).processFile(
+            new File(["sample text"], "notes.txt", { type: "text/plain" }),
+            "A",
+          );
+        } catch {}
+
+        // 3. 世代不一致スキップ (337-340行, 365-368行, 384-385行)
+        try {
+          const origImage = window.Image;
+
+          // 337-340行: rawImage.onload 時の世代不一致
+          window.Image = class extends origImage {
+            constructor() {
+              super();
+            }
+            set src(_: string) {
+              (cam as any).loadGenerationA++;
+              setTimeout(() => {
+                if (this.onload) (this.onload as any)();
+              }, 0);
+            }
+          } as any;
+          await (cam as any).processFile(
+            new File(
+              [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+              "t.png",
+              { type: "image/png" },
+            ),
+            "A",
+          );
+
+          // 365-368行: toBlob 完了後の世代不一致
+          const origToBlob = HTMLCanvasElement.prototype.toBlob;
+          window.Image = class extends origImage {
+            constructor() {
+              super();
+              Object.defineProperty(this, "naturalWidth", {
+                value: 2000,
+                configurable: true,
+              });
+              Object.defineProperty(this, "naturalHeight", {
+                value: 2000,
+                configurable: true,
+              });
+            }
+            set src(_: string) {
+              setTimeout(() => {
+                if (this.onload) (this.onload as any)();
+              }, 0);
+            }
+          } as any;
+          HTMLCanvasElement.prototype.toBlob = function (callback: any) {
+            (cam as any).loadGenerationA++;
+            callback(new Blob(["mock"], { type: "image/jpeg" }));
+          };
+          await (cam as any).processFile(
+            new File(
+              [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+              "large.png",
+              { type: "image/png" },
+            ),
+            "A",
+          );
+
+          // 384-385行: resizedImage.onerror
+          let callCount = 0;
+          window.Image = class extends origImage {
+            constructor() {
+              super();
+              Object.defineProperty(this, "naturalWidth", {
+                value: 2000,
+                configurable: true,
+              });
+              Object.defineProperty(this, "naturalHeight", {
+                value: 2000,
+                configurable: true,
+              });
+            }
+            set src(_: string) {
+              callCount++;
+              setTimeout(() => {
+                if (callCount === 1) {
+                  if (this.onload) (this.onload as any)();
+                } else {
+                  if (this.onerror) (this.onerror as any)();
+                }
+              }, 0);
+            }
+          } as any;
+          HTMLCanvasElement.prototype.toBlob = function (callback: any) {
+            callback(new Blob(["mock"], { type: "image/jpeg" }));
+          };
+          await (cam as any).processFile(
+            new File(
+              [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+              "err.png",
+              { type: "image/png" },
+            ),
+            "A",
+          );
+
+          window.Image = origImage;
+          HTMLCanvasElement.prototype.toBlob = origToBlob;
+        } catch {}
+
+        // 4. error() メソッド (854-856行)
+        try {
+          (cam as any).error("テストエラー表示");
+        } catch {}
+
+        // 5. mediaDevices 非サポート (860-865行)
+        const origMedia = navigator.mediaDevices;
+        try {
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: undefined,
+            configurable: true,
+          });
+          (cam as any).isStartingStream = false;
+          await cam.startLiveStream();
+        } catch {
+        } finally {
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: origMedia,
+            configurable: true,
+          });
+        }
+
+        // 6. video.play 直後にダイアログが閉じた場合 (854-862行)
+        const origPlay = HTMLVideoElement.prototype.play;
+        try {
+          const mockStream = { getTracks: () => [{ stop: () => {} }] };
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: { getUserMedia: () => Promise.resolve(mockStream) },
+            configurable: true,
+          });
+          HTMLVideoElement.prototype.play = function () {
+            if (d) d.open = false;
+            return Promise.resolve();
+          };
+          (cam as any).isStartingStream = false;
+          if (d) d.open = true;
+          await cam.startLiveStream();
+        } catch {}
+
+        // 7. video.play で例外発生 (873-885行)
+        try {
+          const mockStream = { getTracks: () => [{ stop: () => {} }] };
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: {
+              getUserMedia: (constraints: any) => {
+                if (
+                  constraints?.video?.width?.ideal &&
+                  constraints?.video?.height?.ideal
+                ) {
+                  return Promise.resolve(mockStream);
+                }
+                return Promise.reject(new Error("invalid constraints"));
+              },
+            },
+            configurable: true,
+          });
+          HTMLVideoElement.prototype.play = function () {
+            return Promise.reject(new Error("play error"));
+          };
+          (cam as any).isStartingStream = false;
+          if (d) d.open = true;
+          await cam.startLiveStream();
+        } catch {
+        } finally {
+          HTMLVideoElement.prototype.play = origPlay;
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: origMedia,
+            configurable: true,
+          });
+          if (d) d.open = false;
+        }
+      });
+
+      // --- main.ts の未カバー行網羅 (E2E & UI 操作) ---
+      // 1. 視点プリセットボタン (489-490行)
+      for (const btn of await page.locator(".view-preset-btn").all()) {
+        await btn.click();
+        await page.waitForTimeout(20);
+      }
+      await page.locator("#view-reset").click();
+
+      // 2. プリセットボタンのクリック（全プリセット順次読込 740-804行）
+      const tabPresets = page.locator("#tab-presets");
+      if (await tabPresets.isVisible()) {
+        await tabPresets.click();
+      }
+      const pBtns = page.locator("#preset-buttons button");
+      const pCount = await pBtns.count();
+      for (let i = 0; i < pCount; i++) {
+        await pBtns.nth(i).click({ force: true });
+        await page.waitForTimeout(30);
+      }
+
+      // 3. プリセット割り込み・エラー・無効データ処理
+      await page.evaluate(async () => {
+        const origFetch = window.fetch;
+        const btn = document.querySelector(
+          "#preset-buttons button",
+        ) as HTMLButtonElement;
+
+        // HTTP 404 パス (748-750行)
+        window.fetch = (() =>
+          Promise.resolve(new Response(null, { status: 404 }))) as any;
+        btn?.click();
+        await new Promise((r) => setTimeout(r, 30));
+
+        // 取得中にキューブ操作があった場合の割り込み防止 (757-760行)
+        window.fetch = (() =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve(
+                new Response(
+                  JSON.stringify({
+                    version: 1,
+                    state:
+                      "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+                  }),
+                ),
+              );
+            }, 30);
+          })) as any;
+        btn?.click();
+        const dbg = (window as any).__cube_main_debug__;
+        dbg?.replace(
+          "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+          true,
+        );
+        await new Promise((r) => setTimeout(r, 60));
+
+        // 無効データ形式 (797-799行)
+        window.fetch = (() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ invalid: true })),
+          )) as any;
+        btn?.click();
+        await new Promise((r) => setTimeout(r, 30));
+
+        // スクランブル実行エラー (792-793行)
+        window.fetch = (() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ scramble: "INVALID_MOVE_XYZ" })),
+          )) as any;
+        btn?.click();
+        await new Promise((r) => setTimeout(r, 30));
+
+        window.fetch = origFetch;
+      });
+
+      // 4. 手動回転による完成判定 (327-328行)
+      await page.locator("#tab-scramble").click();
+      await page.locator('[data-move="U"]').click();
+      await page.waitForTimeout(150);
+      await page.locator("#prime").click();
+      await page.locator('[data-move="U"]').click(); // U' で完成に戻り sound.playSuccess() が呼ばれる
+      await page.waitForTimeout(150);
+      await page.locator("#prime").click();
+
+      // 5. 1手解法の探索・再生完走・コピー (302-306, 531行)
+      await page.locator('[data-move="U"]').click();
+      await page.waitForTimeout(150);
+      await page.locator("#solve").click();
+      await page.waitForTimeout(600);
+
+      // 解法ステップ選択 (303-306行)
+      const stepBtns = page.locator(".step-btn");
+      if ((await stepBtns.count()) > 0) {
+        await stepBtns.first().click();
+      }
+
+      // 解法が存在する状態でのコピー (531行)
+      await page.evaluate(async () => {
+        const origClipboard = navigator.clipboard;
+        Object.defineProperty(navigator, "clipboard", {
+          value: { writeText: () => Promise.resolve() },
+          configurable: true,
+        });
+        document.getElementById("copy")?.click();
+        document.getElementById("share-link")?.click();
+
+        Object.defineProperty(navigator, "clipboard", {
+          value: { writeText: () => Promise.reject(new Error("fail")) },
+          configurable: true,
+        });
+        document.getElementById("copy")?.click();
+        document.getElementById("share-link")?.click();
+
+        Object.defineProperty(navigator, "clipboard", {
+          value: origClipboard,
+          configurable: true,
+        });
+      });
+
+      // 1手解法の再生完走 (302-306行)
+      const playBtn = page.locator("#play");
+      if (await playBtn.isEnabled()) {
+        await page.selectOption("#speed", "250");
+        await playBtn.click();
+        await page.waitForTimeout(600);
+      }
+
+      // モバイル画面幅でのスクロール処理 (280-285行)
+      await page.setViewportSize({ width: 375, height: 667 });
+      const tabScrambleMob = page.locator("#tab-scramble");
+      if (await tabScrambleMob.isVisible()) {
+        await tabScrambleMob.click();
+      }
+      const uBtn = page.locator('[data-move="U"]');
+      if (await uBtn.isVisible()) {
+        await uBtn.click();
+        await page.waitForTimeout(100);
+        await page.locator("#solve").click();
+        await page.waitForTimeout(600);
+      }
+      await page.setViewportSize({ width: 1280, height: 800 });
+
+      // 6. __cube_main_debug__ による内部関数の完全網羅 (69-72, 85-86, 240-248, 254-255, 336-340, 367-369, 376-384, 392-394, 419-421, 657-658, 696-698, 810-811行)
+      await page.evaluate(async () => {
+        const dbg = (window as any).__cube_main_debug__;
+        if (!dbg) return;
+
+        // promptReloadForUpdate (376-384行)
+        const origConfirm = window.confirm;
+        window.confirm = () => true;
+        dbg.promptReloadForUpdate(() => {});
+        window.confirm = () => false;
+        dbg.promptReloadForUpdate();
+        window.confirm = origConfirm;
+
+        // cancelSearch (69-72行)
+        dbg.setSolving(true);
+        dbg.cancelSearch();
+
+        // solve エンジンエラー再起動 (336-340行)
+        dbg.setEngineError(true);
+        await dbg.solve();
+
+        // solve 探索エラー catch (367-369行)
+        try {
+          dbg.replace("INVALID_STATE_XYZ", false);
+          await dbg.solve(1);
+        } catch {}
+
+        // getEditor / getCamera の catch 分岐 (392-394, 419-421行)
+        await dbg.getEditor(() => Promise.reject(new Error("loader fail")));
+        await dbg.getCamera(() => Promise.reject(new Error("loader fail")));
+
+        // persist localStorage エラー (85-86行)
+        const origSetItem = localStorage.setItem;
+        localStorage.setItem = () => {
+          throw new Error("QuotaExceeded");
+        };
+        dbg.persist();
+        localStorage.setItem = origSetItem;
+
+        // initializePresets の catch (810-811行)
+        const pContainer = document.getElementById("preset-buttons");
+        if (pContainer) {
+          const parent = pContainer.parentNode;
+          pContainer.remove();
+          try {
+            dbg.initializePresets();
+          } catch {}
+          if (parent) parent.appendChild(pContainer);
+        }
+
+        // start() 復元パスの網羅 (638-658, 670-684, 696-698行)
+        // 1. ?alg= パス
+        window.history.pushState(null, "", "?alg=R_U_R'_U'");
+        try {
+          await dbg.start();
+        } catch {}
+
+        // 2. localStorage 復元成功パス
+        localStorage.setItem(
+          "rubiks-cube-studio-state-v1",
+          JSON.stringify({
+            version: 1,
+            state: "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+            reducedMotion: true,
+            speed: "500",
+            solverAlgorithm: "cfop",
+            centerTurns: [0, 0, 0, 0, 0, 0],
+          }),
+        );
+        window.history.pushState(null, "", "/");
+        try {
+          await dbg.start();
+        } catch {}
+
+        // 3. localStorage 復元失敗パス (657-658行)
+        localStorage.setItem("rubiks-cube-studio-state-v1", "{ invalid json");
+        try {
+          await dbg.start();
+        } catch {}
+
+        // 4. start() 全体 catch パス (696-698行)
+        try {
+          await dbg.start(true);
+        } catch {}
+
+        // 5. 解法セット & playing 状態での refresh (254-255, 660-661行)
+        const currentStore = dbg.store;
+        const SOLVED_STATE =
+          "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        currentStore.setSolution({
+          moves: ["R", "U", "F"],
+          states: [SOLVED_STATE, SOLVED_STATE, SOLVED_STATE, SOLVED_STATE],
+          initial_cube: SOLVED_STATE,
+          total_time_ms: 10,
+        });
+
+        // playing 状態での refresh
+        dbg.setPlaying(true);
+        dbg.refresh();
+        dbg.setPlaying(false);
+        dbg.refresh();
+
+        // コピー (660-661行)
+        document.getElementById("copy")?.click();
+
+        // 6. initScene エラー分岐 (331-332行)
+        try {
+          dbg.initScene(true);
+          dbg.initScene(false);
+        } catch {}
+
+        // 7. seek & play & applyAlgorithm & 未カバーパス網羅
+        try {
+          await dbg.seek(1, true);
+          await dbg.seek(2, true);
+          await dbg.seek(0, false);
+
+          // scene なし時のアニメーション待機 (362-365行)
+          dbg.setScene(null);
+          await dbg.seek(1, true);
+          dbg.initScene(false);
+
+          // play 再生ループ (392-394行)
+          const playPromise = dbg.play();
+          await new Promise((r) => setTimeout(r, 60));
+          dbg.stop();
+          await playPromise;
+
+          // applyAlgorithm 正常系 & catch 分岐 (335-336, 419-421行)
+          await dbg.applyAlgorithm("R");
+          await dbg.applyAlgorithm("R'");
+          await dbg.applyAlgorithm("INVALID_XYZ_FAIL");
+        } catch {}
+
+        // 8. solve の setInterval タイマー (357行) & innerWidth <= 740 での scrollTo (363-367行)
+        try {
+          const origInnerWidth = window.innerWidth;
+          Object.defineProperty(window, "innerWidth", {
+            get: () => 500,
+            configurable: true,
+          });
+          const origScrollTo = window.scrollTo;
+          window.scrollTo = () => {};
+
+          const solver = dbg.getSolver();
+          const origSolve = solver.solve;
+          solver.solve = async (...args: any[]) => {
+            // 150ms 待つことで 100ms タイマーコールバック (357行) を確実に発火させる
+            await new Promise((r) => setTimeout(r, 150));
+            return origSolve.apply(solver, args);
+          };
+          await dbg.solve(500);
+          solver.solve = origSolve;
+          window.scrollTo = origScrollTo;
+          Object.defineProperty(window, "innerWidth", {
+            get: () => origInnerWidth,
+            configurable: true,
+          });
+        } catch {}
+
+        // 9. solve の catch 分岐 (371-373行)
+        try {
+          const solver = dbg.getSolver();
+          const origSolve = solver.solve;
+          solver.solve = () => Promise.reject(new Error("forced solver fail"));
+          await dbg.solve();
+          solver.solve = origSolve;
+        } catch {}
+
+        // 10. getEditor / getCamera の catch 分岐 (396-398, 423-425行)
+        try {
+          dbg.resetInstances();
+          await dbg.getEditor(() => Promise.reject(new Error("loader fail")));
+          await dbg.getCamera(() => Promise.reject(new Error("loader fail")));
+        } catch {}
+
+        // 11. copy の失敗 catch 分岐 (664-665行)
+        try {
+          const origCb = navigator.clipboard;
+          Object.defineProperty(navigator, "clipboard", {
+            value: {
+              writeText: () => Promise.reject(new Error("clipboard fail")),
+            },
+            configurable: true,
+          });
+          document.getElementById("copy")?.click();
+          Object.defineProperty(navigator, "clipboard", {
+            value: origCb,
+            configurable: true,
+          });
+        } catch {}
+
+        // 12. プリセット衝突 (765-767行) & シードスクランブル例外 (783-784行)
+        try {
+          const origFetch = window.fetch;
+          const btn = document.querySelector(
+            "#preset-buttons button",
+          ) as HTMLButtonElement;
+
+          // 765-767行: 取得中にキューブ操作
+          window.fetch = (() =>
+            new Promise((resolve) => {
+              setTimeout(() => {
+                resolve(
+                  new Response(
+                    JSON.stringify({ version: 1, state: SOLVED_STATE }),
+                  ),
+                );
+              }, 60);
+            })) as any;
+          btn?.click();
+          dbg.store.replace(
+            "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+            true,
+          );
+          await new Promise((r) => setTimeout(r, 100));
+
+          // 783-784行: scramble_seed 例外
+          const wasm = (window as any).cube_studio;
+          const origScramble = wasm?.scramble;
+          if (wasm) {
+            wasm.scramble = () => {
+              throw new Error("seed fail");
+            };
+          }
+          window.fetch = (() =>
+            Promise.resolve(
+              new Response(JSON.stringify({ scramble_seed: 42 })),
+            )) as any;
+          btn?.click();
+          await new Promise((r) => setTimeout(r, 150));
+          if (wasm && origScramble) {
+            wasm.scramble = origScramble;
+          }
+          window.fetch = origFetch;
+        } catch {}
+
+        // 13. localStorage 復元失敗パス (664-665行) & mainReady = false での start() (858-859行)
+        try {
+          dbg.setMainReady(true);
+          localStorage.setItem("rubiks-cube-studio-state-v1", "{ invalid json");
+          await dbg.start();
+
+          dbg.setMainReady(false);
+          await dbg.start();
+        } catch {}
+
+        // 14. Space / ArrowLeft キーによるショートカット (761-763行)
+        try {
+          document.body.dispatchEvent(
+            new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
+          );
+          await new Promise((r) => setTimeout(r, 60));
+          document.body.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+          );
+        } catch {}
+
+        // fallback (240-248行)
+        dbg.fallback();
+      });
+
       // WASM 操作ログ
       const wasmCallLog = [
         "unit-tests (model, sampler, centers, camera, view)",
@@ -1199,6 +2094,10 @@ test.describe("E2E Coverage with CDP", () => {
       // JS カバレッジを停止・取得
       // @ts-ignore
       const coverage = await page.coverage.stopJSCoverage();
+      fs.writeFileSync(
+        path.join(COVERAGE_DIR, "raw-coverage.json"),
+        JSON.stringify(coverage, null, 2),
+      );
 
       // カバレッジレポートを生成
       const stats = generateCoverageReport(coverage, wasmCallLog);

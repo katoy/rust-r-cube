@@ -131,6 +131,7 @@ function replace(
 }
 let renderedSolution: ResultData | undefined = undefined;
 let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
+let lastRenderedStep: number | undefined = undefined;
 
 function refresh() {
   const state = store.getState();
@@ -177,7 +178,8 @@ function refresh() {
     $("solve-time").textContent =
       `${solution.elapsed_ms < 1000 ? `${Math.round(solution.elapsed_ms)} ms` : `${(solution.elapsed_ms / 1000).toFixed(2)} 秒`} · 検証済み`;
     const list = $("move-list");
-    if (renderedSolution !== solution) {
+    const solutionChanged = renderedSolution !== solution;
+    if (solutionChanged) {
       renderedSolution = solution;
       cachedAnalyzedMoves = analyzeMoves(solution.moves, solution.phases);
       list.replaceChildren();
@@ -212,16 +214,33 @@ function refresh() {
     }
 
     const buttons = list.querySelectorAll<HTMLButtonElement>(".solution-move");
-    buttons.forEach((button, i) => {
-      button.classList.toggle("done", i < step);
-      const isCurrent = i === step;
-      button.classList.toggle("current", isCurrent);
-      if (isCurrent) {
-        button.setAttribute("aria-current", "step");
-      } else {
-        button.removeAttribute("aria-current");
+    if (solutionChanged || lastRenderedStep === undefined) {
+      buttons.forEach((button, i) => {
+        button.classList.toggle("done", i < step);
+        const isCurrent = i === step;
+        button.classList.toggle("current", isCurrent);
+        if (isCurrent) {
+          button.setAttribute("aria-current", "step");
+        } else {
+          button.removeAttribute("aria-current");
+        }
+      });
+    } else if (lastRenderedStep !== step) {
+      const minStep = Math.min(lastRenderedStep, step);
+      const maxStep = Math.max(lastRenderedStep, step);
+      for (let i = minStep; i <= maxStep && i < buttons.length; i++) {
+        const button = buttons[i];
+        button.classList.toggle("done", i < step);
+        const isCurrent = i === step;
+        button.classList.toggle("current", isCurrent);
+        if (isCurrent) {
+          button.setAttribute("aria-current", "step");
+        } else {
+          button.removeAttribute("aria-current");
+        }
       }
-    });
+    }
+    lastRenderedStep = step;
 
     $("next-symbol").textContent = next || "✓";
     const currentMeta = cachedAnalyzedMoves[step];
@@ -239,8 +258,17 @@ function refresh() {
     $<HTMLButtonElement>("prev").disabled = step === 0;
     $<HTMLButtonElement>("next").disabled = step === solution.moves.length;
     $<HTMLButtonElement>("last").disabled = step === solution.moves.length;
-    $<HTMLInputElement>("timeline").max = String(solution.moves.length);
-    $<HTMLInputElement>("timeline").value = String(step);
+    const timeline = $<HTMLInputElement>("timeline");
+    timeline.max = String(solution.moves.length);
+    timeline.value = String(step);
+    timeline.setAttribute("aria-valuenow", String(step));
+    const valuetext =
+      step === 0
+        ? "開始状態"
+        : step === solution.moves.length
+          ? `完成 (${solution.moves.length}手)`
+          : `${step}手目: ${currentMeta?.move || ""} (${currentMeta?.phaseLabel || ""})`;
+    timeline.setAttribute("aria-valuetext", valuetext);
 
     if (step === 0) {
       list.scrollTop = 0;
@@ -260,6 +288,12 @@ function refresh() {
   } else {
     renderedSolution = undefined;
     cachedAnalyzedMoves = [];
+    lastRenderedStep = undefined;
+    const timeline = $<HTMLInputElement>("timeline");
+    timeline.max = "0";
+    timeline.value = "0";
+    timeline.setAttribute("aria-valuenow", "0");
+    timeline.removeAttribute("aria-valuetext");
   }
 }
 store.subscribe((_s, { type }) => {
@@ -290,13 +324,17 @@ function fallback() {
     ?.setAttribute("hidden", "");
   document.querySelector<HTMLElement>(".gesture")!.hidden = true;
 }
-try {
-  scene = new CubeScene($("scene"));
-  window.cube_scene = scene;
-  $("scene").addEventListener("render-failed", fallback);
-} catch {
-  fallback();
+function initScene(forceError = false) {
+  try {
+    if (forceError) throw new Error("forced scene error");
+    scene = new CubeScene($("scene"));
+    window.cube_scene = scene;
+    $("scene").addEventListener("render-failed", fallback);
+  } catch {
+    fallback();
+  }
 }
+initScene();
 async function seek(target: number, animate = true) {
   const solution = store.getSolution();
   if (!solution) return;
@@ -466,28 +504,28 @@ async function solve(budget = 5000) {
   }
 }
 
-function promptReloadForUpdate() {
+function promptReloadForUpdate(reloadFn = () => window.location.reload()) {
   persist();
   const reload = window.confirm(
     "アプリの新しいバージョンがあります。ページを再読み込みして更新しますか？\n（現在のキューブ配置は自動保存されています）",
   );
   if (reload) {
-    window.location.reload();
+    reloadFn();
   } else {
     message("アプリの更新があります。ページを再読み込みしてください。");
   }
 }
 
 let editorInstance: import("./editor").ColorEditor | undefined;
-async function getEditor(): Promise<
-  import("./editor").ColorEditor | undefined
-> {
+async function getEditor(
+  loader: () => Promise<any> = () => import("./editor"),
+): Promise<import("./editor").ColorEditor | undefined> {
   if (!editorInstance) {
     try {
-      const { ColorEditor } = await import("./editor");
+      const { ColorEditor } = await loader();
       editorInstance = new ColorEditor(
-        (s) => validate(s),
-        (s, centers) => replace(s, true, centers),
+        (s: string) => validate(s),
+        (s: string, centers: number[]) => replace(s, true, centers),
       );
     } catch {
       promptReloadForUpdate();
@@ -498,13 +536,13 @@ async function getEditor(): Promise<
 }
 
 let cameraInstance: import("./camera").TwoViewCamera | undefined;
-async function getCamera(): Promise<
-  import("./camera").TwoViewCamera | undefined
-> {
+async function getCamera(
+  loader: () => Promise<any> = () => import("./camera"),
+): Promise<import("./camera").TwoViewCamera | undefined> {
   if (!cameraInstance) {
     try {
-      const { TwoViewCamera } = await import("./camera");
-      cameraInstance = new TwoViewCamera(async (s) => {
+      const { TwoViewCamera } = await loader();
+      cameraInstance = new TwoViewCamera(async (s: string) => {
         let centers = [0, 0, 0, 0, 0, 0];
         try {
           centers = automaticCenters(s);
@@ -739,11 +777,14 @@ setupKeyboardShortcuts({
   },
 });
 refresh();
-async function start() {
+async function start(forceError = false) {
   try {
-    await init({ module_or_path: wasmUrl });
-    window.cube_studio = cubeStudio;
-    mainReady = true;
+    if (forceError) throw new Error("forced start error");
+    if (!mainReady) {
+      await init({ module_or_path: wasmUrl });
+      window.cube_studio = cubeStudio;
+      mainReady = true;
+    }
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
@@ -944,3 +985,45 @@ async function initializePresets() {
 initializePresets();
 
 void start();
+
+if (typeof window !== "undefined" && Boolean(navigator.webdriver)) {
+  (window as any).__cube_main_debug__ = {
+    promptReloadForUpdate,
+    cancelSearch,
+    fallback,
+    solve,
+    play,
+    stop,
+    seek,
+    applyAlgorithm,
+    refresh,
+    store,
+    persist,
+    replace,
+    getEditor,
+    getCamera,
+    initializePresets,
+    start,
+    setEngineError: (val: boolean) => {
+      engineError = val;
+    },
+    setSolving: (val: boolean) => {
+      solving = val;
+    },
+    setPlaying: (val: boolean) => {
+      playing = val;
+    },
+    setMainReady: (val: boolean) => {
+      mainReady = val;
+    },
+    setScene: (val: any) => {
+      scene = val;
+    },
+    resetInstances: () => {
+      editorInstance = undefined;
+      cameraInstance = undefined;
+    },
+    getSolver: () => solver,
+    initScene: (forceError = false) => initScene(forceError),
+  };
+}

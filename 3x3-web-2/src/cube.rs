@@ -156,15 +156,26 @@ pub fn apply(cube: &RawCube, moves: &[usize]) -> RawCube {
         .iter()
         .fold(*cube, |c, m| c.multiply(move_cube_18(*m)))
 }
+#[inline]
+fn is_opposite_face(f1: usize, f2: usize) -> bool {
+    (f1 < f2 && f1 + 3 == f2) || (f2 < f1 && f2 + 3 == f1)
+}
+
 pub fn scramble(seed: u32) -> Vec<usize> {
     let mut x = seed.max(1);
-    let mut moves = Vec::new();
+    let mut moves = Vec::with_capacity(25);
     while moves.len() < 25 {
         x ^= x << 13;
         x ^= x >> 17;
         x ^= x << 5;
         let m = x as usize % 18;
-        if moves.last().is_some_and(|last| last / 3 == m / 3) {
+        let face = m / 3;
+
+        let len = moves.len();
+        if len > 0 && moves[len - 1] / 3 == face {
+            continue;
+        }
+        if len > 1 && moves[len - 2] / 3 == face && is_opposite_face(moves[len - 1] / 3, face) {
             continue;
         }
         moves.push(m);

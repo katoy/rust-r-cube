@@ -3,7 +3,7 @@ const STORAGE_KEY =
     ? `cube_studio_sound_enabled:${window.location.pathname}`
     : "cube_studio_sound_enabled";
 
-class SoundManager {
+export class SoundManager {
   private ctx: AudioContext | null = null;
   private enabled: boolean = true;
 

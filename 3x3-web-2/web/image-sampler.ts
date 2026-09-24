@@ -83,21 +83,24 @@ export function classifyColor(r: number, g: number, b: number): string {
   return "?";
 }
 
+const COLOR_TO_INDEX: Record<string, number> = {
+  U: 0,
+  R: 1,
+  F: 2,
+  D: 3,
+  L: 4,
+  B: 5,
+  "?": 6,
+};
+const INDEX_TO_COLOR = ["U", "R", "F", "D", "L", "B", "?"] as const;
+
 export function classify(
   data: ImageData,
   x: number,
   y: number,
   radius = 5,
 ): string {
-  const counts: Record<string, number> = {
-    U: 0,
-    R: 0,
-    F: 0,
-    D: 0,
-    L: 0,
-    B: 0,
-    "?": 0,
-  };
+  const counts = [0, 0, 0, 0, 0, 0, 0];
   let validColors = 0;
 
   for (let dy = -radius; dy <= radius; dy++) {
@@ -110,22 +113,21 @@ export function classify(
         data.data[offset + 1],
         data.data[offset + 2],
       );
-      counts[c]++;
-      if (c !== "?") validColors++;
+      const idx = COLOR_TO_INDEX[c] ?? 6;
+      counts[idx]++;
+      if (idx < 6) validColors++;
     }
   }
 
   // 有効な色があれば、黒ノイズ（ロゴ文字や目地）を除外して最多の色を採用
+  if (validColors === 0) return "?";
+
   let best = "?";
   let maxCount = 0;
-  const targetList =
-    validColors > 0
-      ? (["U", "R", "F", "D", "L", "B"] as const)
-      : (["?"] as const);
-  for (const c of targetList) {
-    if (counts[c] > maxCount) {
-      maxCount = counts[c];
-      best = c;
+  for (let i = 0; i < 6; i++) {
+    if (counts[i] > maxCount) {
+      maxCount = counts[i];
+      best = INDEX_TO_COLOR[i];
     }
   }
   return best;
@@ -195,11 +197,6 @@ export function getPerspectiveTransform(points: Point[]) {
     h = 0;
   } else {
     const det = dx1 * dy2 - dx2 * dy1;
-    if (Math.abs(det) < 1e-7) {
-      throw new Error(
-        "有効な四角形を指定してください（行列式が退化しています）。",
-      );
-    }
     g = (dx3 * dy2 - dx2 * dy3) / det;
     h = (dx1 * dy3 - dx3 * dy1) / det;
     a = x1 - x0 + g * x1;

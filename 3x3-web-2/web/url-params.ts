@@ -26,7 +26,10 @@ export function parseUrlParams(search: string): ParsedUrlParams {
   if (centersParam) {
     try {
       const parsed = centersParam.split(",").map((v) => Number(v));
-      if (parsed.length === 6 && parsed.every((n) => !Number.isNaN(n))) {
+      if (
+        parsed.length === 6 &&
+        parsed.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)
+      ) {
         result.centers = parsed;
       }
     } catch {

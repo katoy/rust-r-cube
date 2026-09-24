@@ -1,5 +1,6 @@
 use crate::coord::{move_cube_18, RawCube};
 use crate::cube::{apply, parse_moves};
+use std::sync::OnceLock;
 use web_time::Instant;
 
 #[derive(Debug, Clone)]
@@ -304,29 +305,38 @@ fn is_first_layer_intact(c: &RawCube) -> bool {
 }
 
 // 中層インサートマクロ（標準CFOP: D面が第1層、U面がラストレイヤー）
-fn get_slot_macros(slot: usize) -> Vec<Vec<usize>> {
+fn get_slot_macros(slot: usize) -> &'static [Vec<usize>] {
+    static SLOT_8: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    static SLOT_9: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    static SLOT_10: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    static SLOT_11: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+
     match slot {
-        8 => vec![
-            // FRスロット
-            moves("U R U' R' U' F' U F"),
-            moves("U' F' U F U R U' R'"),
-        ],
-        9 => vec![
-            // FLスロット
-            moves("U' L' U L U F U' F'"),
-            moves("U F U' F' U' L' U L"),
-        ],
-        10 => vec![
-            // BLスロット
-            moves("U L U' L' U' B' U B"),
-            moves("U' B' U B U L U' L'"),
-        ],
-        11 => vec![
-            // BRスロット
-            moves("U' R' U R U B U' B'"),
-            moves("U B U' B' U' R' U R"),
-        ],
-        _ => vec![],
+        8 => SLOT_8.get_or_init(|| {
+            vec![
+                moves("U R U' R' U' F' U F"),
+                moves("U' F' U F U R U' R'"),
+            ]
+        }),
+        9 => SLOT_9.get_or_init(|| {
+            vec![
+                moves("U' L' U L U F U' F'"),
+                moves("U F U' F' U' L' U L"),
+            ]
+        }),
+        10 => SLOT_10.get_or_init(|| {
+            vec![
+                moves("U L U' L' U' B' U B"),
+                moves("U' B' U B U L U' L'"),
+            ]
+        }),
+        11 => SLOT_11.get_or_init(|| {
+            vec![
+                moves("U' R' U R U B U' B'"),
+                moves("U B U' B' U' R' U R"),
+            ]
+        }),
+        _ => &[],
     }
 }
 
@@ -375,7 +385,7 @@ fn solve_second_layer(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usi
             }
             let c_u = apply(&current, &prefix);
 
-            for mac in &slot_macs {
+            for mac in slot_macs {
                 let after = apply(&c_u, mac);
                 if is_first_layer_intact(&after)
                     && solved_slots
@@ -422,19 +432,39 @@ fn is_oll_solved(c: &RawCube) -> bool {
     is_f2l_intact(c) && is_oll_edges_solved(c) && (0..4).all(|i| c.co[i] == 0)
 }
 
+fn oll_edge_ops() -> &'static [Vec<usize>] {
+    static OPS: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    OPS.get_or_init(|| {
+        vec![
+            moves("F R U R' U' F'"),
+            moves("F U R U' R' F'"),
+            moves("U"),
+            moves("U2"),
+            moves("U'"),
+        ]
+    })
+}
+
+fn oll_corner_ops() -> &'static [Vec<usize>] {
+    static OPS: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    OPS.get_or_init(|| {
+        vec![
+            moves("R U R' U R U2 R'"),
+            moves("R U2 R' U' R U' R'"),
+            moves("U"),
+            moves("U2"),
+            moves("U'"),
+        ]
+    })
+}
+
 fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut total_moves = Vec::new();
 
     // 4.1 エッジの向きを揃える (黄十字)
     if !is_oll_edges_solved(&current) {
-        let edge_ops = vec![
-            moves("F R U R' U' F'"),
-            moves("F U R U' R' F'"),
-            moves("U"),
-            moves("U2"),
-            moves("U'"),
-        ];
+        let edge_ops = oll_edge_ops();
         let mut queue = std::collections::VecDeque::new();
         let mut seen = std::collections::HashSet::new();
         seen.insert(current);
@@ -448,12 +478,12 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
                 break;
             }
             if count < 3 {
-                for op in &edge_ops {
+                for op in edge_ops {
                     let next = apply(&c, op);
                     debug_assert!(is_f2l_intact(&next));
                     if seen.insert(next) {
                         let mut next_path = path.clone();
-                        next_path.extend(op.clone());
+                        next_path.extend(op);
                         queue.push_back((next, next_path, count + 1));
                     }
                 }
@@ -467,17 +497,11 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
 
     // 4.2 コーナーの向きを揃える (黄色全面)
     if !is_oll_solved(&current) {
-        let corner_ops = vec![
-            moves("R U R' U R U2 R'"),
-            moves("R U2 R' U' R U' R'"),
-            moves("U"),
-            moves("U2"),
-            moves("U'"),
-        ];
+        let corner_ops = oll_corner_ops();
         let mut queue = std::collections::VecDeque::new();
         let mut seen = std::collections::HashSet::new();
         seen.insert(current);
-        queue.push_back((current, Vec::new(), 0usize));
+        queue.push_back((current, Vec::<usize>::new(), 0usize));
         let mut found_path = None;
 
         while let Some((c, path, count)) = queue.pop_front() {
@@ -487,12 +511,12 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
                 break;
             }
             if count < 4 {
-                for op in &corner_ops {
+                for op in corner_ops {
                     let next = apply(&c, op);
                     debug_assert!(is_f2l_intact(&next) && is_oll_edges_solved(&next));
                     if seen.insert(next) {
                         let mut next_path = path.clone();
-                        next_path.extend(op.clone());
+                        next_path.extend(op);
                         queue.push_back((next, next_path, count + 1));
                     }
                 }
@@ -509,18 +533,45 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
 // -------------------------------------------------------------
 // Step 5: PLL (U面の配置)
 // -------------------------------------------------------------
+fn pll_corner_ops() -> &'static [Vec<usize>] {
+    static OPS: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    OPS.get_or_init(|| {
+        vec![
+            moves("R U R' U' R' F R2 U' R' U' R U R' F'"), // T-perm
+            moves("F R U' R' U' R U R' F' R U R' U' R' F R F'"), // Y-perm
+            moves("U"),
+            moves("U2"),
+            moves("U'"),
+        ]
+    })
+}
+
+fn pll_edge_ops() -> &'static [Vec<usize>] {
+    static OPS: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
+    OPS.get_or_init(|| {
+        vec![
+            // Ua-perm (4面)
+            moves("R U' R U R U R U' R' U' R2"),
+            moves("F U' F U F U F U' F' U' F2"),
+            moves("L U' L U L U L U' L' U' L2"),
+            moves("B U' B U B U B U' B' U' B2"),
+            // Ub-perm (4面)
+            moves("R2 U R U R' U' R' U' R' U R'"),
+            moves("F2 U F U F' U' F' U' F' U F'"),
+            moves("L2 U L U L' U' L' U' L' U L'"),
+            moves("B2 U B U B' U' B' U' B' U B'"),
+            // H-perm (対面エッジ交換)
+            moves("R2 U2 R U2 R2 U2 R2 U2 R U2 R2"),
+        ]
+    })
+}
+
 fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, String> {
     let mut current = *cube;
     let mut total_moves = Vec::new();
 
     // 5.1 コーナーの位置を揃える
-    let corner_ops = vec![
-        moves("R U R' U' R' F R2 U' R' U' R U R' F'"), // T-perm
-        moves("F R U' R' U' R U R' F' R U R' U' R' F R F'"), // Y-perm
-        moves("U"),
-        moves("U2"),
-        moves("U'"),
-    ];
+    let corner_ops = pll_corner_ops();
 
     let mut queue = std::collections::VecDeque::new();
     let mut seen = std::collections::HashSet::new();
@@ -554,12 +605,12 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
         if count >= 2 {
             continue;
         }
-        for op in &corner_ops {
+        for op in corner_ops {
             let next = apply(&c, op);
             debug_assert!(is_oll_solved(&next));
             if seen.insert(next) {
                 let mut next_path = path.clone();
-                next_path.extend(op.clone());
+                next_path.extend(op);
                 queue.push_back((next, next_path, count + 1));
             }
         }
@@ -571,20 +622,7 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
 
     // 5.2 エッジの位置を揃える (完成へ)
     // コーナーを固定したままエッジだけを交換するマクロ（4面展開およびZ-perm）
-    let edge_ops = vec![
-        // Ua-perm (4面)
-        moves("R U' R U R U R U' R' U' R2"),
-        moves("F U' F U F U F U' F' U' F2"),
-        moves("L U' L U L U L U' L' U' L2"),
-        moves("B U' B U B U B U' B' U' B2"),
-        // Ub-perm (4面)
-        moves("R2 U R U R' U' R' U' R' U R'"),
-        moves("F2 U F U F' U' F' U' F' U F'"),
-        moves("L2 U L U L' U' L' U' L' U L'"),
-        moves("B2 U B U B' U' B' U' B' U B'"),
-        // H-perm (対面エッジ交換)
-        moves("R2 U2 R U2 R2 U2 R2 U2 R U2 R2"),
-    ];
+    let edge_ops = pll_edge_ops();
 
     let mut queue = std::collections::VecDeque::new();
     let mut seen = std::collections::HashSet::new();
@@ -599,7 +637,7 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
             break;
         }
         if count < 2 {
-            for op in &edge_ops {
+            for op in edge_ops {
                 let next = apply(&c, op);
                 #[cfg(debug_assertions)]
                 debug_assert!(

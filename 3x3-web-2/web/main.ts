@@ -18,6 +18,8 @@ import { registerServiceWorker } from "./pwa";
 import { sound } from "./sound";
 import { analyzeMoves } from "./triggers";
 import { setupKeyboardShortcuts } from "./keyboard-shortcuts";
+import { parseUrlParams, buildShareUrl } from "./url-params";
+import { validateAndParseCubeJson, createCubeJsonBlob } from "./file-io";
 
 declare global {
   interface Window {
@@ -666,29 +668,21 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
   };
 });
 $("share-link").onclick = async () => {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("alg");
-  url.searchParams.set("state", store.getState());
   const snapshot = store.getSnapshot();
-  if (snapshot.centerTurns && snapshot.centerTurns.some((t) => t !== 0)) {
-    url.searchParams.set("centers", snapshot.centerTurns.join(","));
-  } else {
-    url.searchParams.delete("centers");
-  }
+  const shareUrl = buildShareUrl(
+    window.location.href,
+    store.getState(),
+    snapshot.centerTurns,
+  );
   try {
-    await navigator.clipboard.writeText(url.toString());
+    await navigator.clipboard.writeText(shareUrl);
     message("共有リンクをクリップボードにコピーしました。");
   } catch {
-    message(`共有リンク: ${url.toString()}`);
+    message(`共有リンク: ${shareUrl}`);
   }
 };
 $("save").onclick = () => {
-  const blob = new Blob(
-    [JSON.stringify({ version: 1, ...store.getSnapshot() }, null, 2)],
-    {
-      type: "application/json",
-    },
-  );
+  const blob = createCubeJsonBlob(store.getSnapshot());
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -704,32 +698,18 @@ $<HTMLInputElement>("file").onchange = async () => {
   const requestId = ++fileLoadRequestId;
   const at = store.getRevision();
   try {
-    if (file.size > 65536)
-      throw new Error("ファイルは64KB以内にしてください。");
     const content = await file.text();
     if (requestId !== fileLoadRequestId) return;
-    const data: unknown = JSON.parse(content);
-    if (
-      !data ||
-      typeof data !== "object" ||
-      !("version" in data) ||
-      data.version !== 1 ||
-      !("state" in data) ||
-      typeof data.state !== "string"
-    )
-      throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
-    validate(data.state);
+    const parsed = validateAndParseCubeJson(content, file.size);
+    validate(parsed.state);
     if (at !== store.getRevision())
       throw new Error(
         "読込中にキューブが変更されました。もう一度読み込んでください。",
       );
     replace(
-      data.state,
+      parsed.state,
       true,
-      centersFromInput(
-        data.state,
-        "centerTurns" in data ? data.centerTurns : undefined,
-      ),
+      centersFromInput(parsed.state, parsed.centerTurns),
     );
   } catch (error) {
     if (requestId === fileLoadRequestId) message(String(error));
@@ -788,38 +768,23 @@ async function start() {
       message("保存状態を復元できなかったため、完成状態から開始しました。");
     }
 
-    const params = new URLSearchParams(window.location.search);
-    const solverParam = params.get("solver") || params.get("algorithm");
-    if (
-      solverParam &&
-      ["kociemba", "cfop", "thistlethwaite", "korf"].includes(solverParam)
-    ) {
-      solverAlgo.value = solverParam;
+    const parsedParams = parseUrlParams(window.location.search);
+    if (parsedParams.solver) {
+      solverAlgo.value = parsedParams.solver;
     }
-    const stateParam = params.get("state");
-    const centersParam = params.get("centers");
-    const algParam = params.get("alg");
-    if (stateParam && stateParam.length === 54) {
+    if (parsedParams.state) {
       try {
-        validate(stateParam);
-        let restoredCenters: number[];
-        if (centersParam) {
-          try {
-            const parsed = centersParam.split(",").map((v) => Number(v));
-            restoredCenters = centersFromInput(stateParam, parsed);
-          } catch {
-            restoredCenters = automaticCenters(stateParam);
-          }
-        } else {
-          restoredCenters = automaticCenters(stateParam);
-        }
-        store.replace(stateParam, false, restoredCenters);
+        validate(parsedParams.state);
+        const restoredCenters = parsedParams.centers
+          ? centersFromInput(parsedParams.state, parsedParams.centers)
+          : automaticCenters(parsedParams.state);
+        store.replace(parsedParams.state, false, restoredCenters);
       } catch {
         // 不正な state は無視
       }
-    } else if (algParam) {
+    } else if (parsedParams.alg) {
       try {
-        const cleanAlg = algParam.replace(/[_+]/g, " ").trim();
+        const cleanAlg = parsedParams.alg.replace(/[_+]/g, " ").trim();
         const result: ResultData = JSON.parse(apply_moves(SOLVED, cleanAlg));
         validate(result.state);
         const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);

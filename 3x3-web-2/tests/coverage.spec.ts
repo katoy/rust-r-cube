@@ -76,6 +76,11 @@ test.describe("E2E Coverage with CDP", () => {
         model.getErrorIndices("エラー: コーナー 1 の色が不正です");
 
         // --- image-sampler.ts ---
+        sampler.rgbToHsv(0, 0, 0); // max === min
+        sampler.rgbToHsv(255, 128, 0); // max === r, g >= b
+        sampler.rgbToHsv(255, 0, 128); // max === r, g < b
+        sampler.rgbToHsv(0, 255, 0); // max === g
+        sampler.rgbToHsv(0, 0, 255); // max === b
         sampler.buildState({
           U: "UUUUUUUUU",
           R: "RRRRRRRRR",
@@ -223,6 +228,63 @@ test.describe("E2E Coverage with CDP", () => {
         document.dispatchEvent(new Event("visibilitychange"));
         window.dispatchEvent(new Event("pagehide"));
         cleanupKb();
+
+        // --- url-params.ts ---
+        const urlParams = await import("/web/url-params.ts");
+        urlParams.parseUrlParams(
+          "?solver=cfop&state=" + solved + "&centers=0,0,0,0,0,0&alg=R_U",
+        );
+        urlParams.parseUrlParams("?algorithm=korf");
+        urlParams.parseUrlParams("?centers=invalid");
+        urlParams.parseUrlParams("");
+        urlParams.buildShareUrl(
+          "http://localhost:5173/",
+          solved,
+          [0, 0, 0, 0, 0, 0],
+        );
+        urlParams.buildShareUrl(
+          "http://localhost:5173/",
+          solved,
+          [1, 0, 0, 0, 0, 0],
+        );
+        urlParams.buildShareUrl("http://localhost:5173/", solved);
+
+        // --- file-io.ts ---
+        const fileIo = await import("/web/file-io.ts");
+        try {
+          fileIo.validateAndParseCubeJson("{}", 70000);
+        } catch {}
+        try {
+          fileIo.validateAndParseCubeJson("null", 100);
+        } catch {}
+        try {
+          fileIo.validateAndParseCubeJson("{}", 100);
+        } catch {}
+        try {
+          fileIo.validateAndParseCubeJson(
+            '{"version":2,"state":"' + solved + '"}',
+            100,
+          );
+        } catch {}
+        try {
+          fileIo.validateAndParseCubeJson('{"version":1}', 100);
+        } catch {}
+        try {
+          fileIo.validateAndParseCubeJson('{"version":1,"state":123}', 100);
+        } catch {}
+        fileIo.validateAndParseCubeJson(
+          JSON.stringify({
+            version: 1,
+            state: solved,
+            centerTurns: [0, 0, 0, 0, 0, 0],
+          }),
+          100,
+        );
+        fileIo.validateAndParseCubeJson(
+          JSON.stringify({ version: 1, state: solved }),
+          100,
+        );
+        fileIo.createCubeJsonBlob({ version: 1, state: solved });
 
         // --- camera.ts ---
         const hex = [

@@ -159,6 +159,11 @@ fn solve_cross(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, St
     Ok(total_moves)
 }
 
+#[inline]
+fn redundant(face: usize, last: usize) -> bool {
+    face == last || ((3..6).contains(&last) && face + 3 == last)
+}
+
 fn search_cross_edge(
     c: &RawCube,
     depth: usize,
@@ -173,7 +178,7 @@ fn search_cross_edge(
     }
 
     for face in 0..6 {
-        if face == last_face {
+        if redundant(face, last_face) {
             continue;
         }
         for turn in 0..3 {
@@ -267,7 +272,7 @@ fn search_corner(
         //    broken_cross > depth による非アドミッシブルな誤枝刈りが発生する
         // 3. D面を除外することで各手番で動くクロスエッジは高々1個となり、
         //    broken_cross <= depth が数学的にアドミッシブルな許容下界として成立する
-        if face == 3 || face == last_face {
+        if face == 3 || redundant(face, last_face) {
             continue;
         }
         for turn in 0..3 {
@@ -786,5 +791,15 @@ mod tests {
         state_c1_timeout.start =
             web_time::Instant::now() - std::time::Duration::from_millis(10_000);
         assert!(solve_first_layer(&c1_scrambled, &mut state_c1_timeout).is_err());
+    }
+
+    #[test]
+    fn test_cfop_redundant() {
+        assert!(redundant(0, 0)); // face == last
+        assert!(redundant(0, 3)); // 0 + 3 == 3 (UとD)
+        assert!(redundant(1, 4)); // 1 + 3 == 4 (RとL)
+        assert!(redundant(2, 5)); // 2 + 3 == 5 (FとB)
+        assert!(!redundant(0, 1)); // UとRは非冗長
+        assert!(!redundant(3, 0)); // DとU (順序固定)
     }
 }

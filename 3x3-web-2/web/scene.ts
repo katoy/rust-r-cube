@@ -53,6 +53,7 @@ export class CubeScene {
   private camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
   private controls: OrbitControls;
   private root = new THREE.Group();
+  private turnLayer = new THREE.Group(); // 回転アニメーション用レイヤー（再利用でGCゼロ化）
   private stickers: THREE.Mesh<
     THREE.BufferGeometry,
     THREE.MeshStandardMaterial
@@ -104,6 +105,7 @@ export class CubeScene {
     this.renderer.domElement.setAttribute("role", "img");
     this.host.append(this.renderer.domElement);
     this.scene.add(this.root, new THREE.HemisphereLight(0xfdf5df, 0x506977, 3));
+    this.root.add(this.turnLayer);
     this.root.add(this.arrowGroup);
     const key = new THREE.DirectionalLight(0xfff3dc, 4);
     key.position.set(-3, 7, 5);
@@ -379,6 +381,7 @@ export class CubeScene {
     this.centerLabels = [];
     this.outlineMeshes = [];
     this.arrowMeshes = [];
+    this.turnLayer.clear();
   }
   show(state: string, next = "") {
     this.dirty = true;
@@ -466,8 +469,8 @@ export class CubeScene {
       return;
     }
     const axis = normal[FACES.indexOf(move[0])];
-    const layer = new THREE.Group();
-    this.root.add(layer);
+    const layer = this.turnLayer;
+    layer.quaternion.identity();
     this.pieces
       .filter((mesh) => mesh.position.dot(axis) > 0.5)
       .forEach((mesh) => layer.attach(mesh));
@@ -520,7 +523,8 @@ export class CubeScene {
         mesh.quaternion.copy(mesh.userData.rotation);
       }
     }
-    this.root.remove(active.layer);
+    this.turnLayer.quaternion.identity();
+    this.turnLayer.clear();
     active.finish();
   }
   private frame(time: number) {

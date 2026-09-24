@@ -31,7 +31,14 @@ export function rgbToHsv(r: number, g: number, b: number) {
 }
 
 export function classifyColor(r: number, g: number, b: number): string {
-  const { h, s, v } = rgbToHsv(r, g, b);
+  const rf = r / 255;
+  const gf = g / 255;
+  const bf = b / 255;
+  const max = Math.max(rf, gf, bf);
+  const min = Math.min(rf, gf, bf);
+  const d = max - min;
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
 
   // 1. 極端に暗いピクセル（黒プラスチック目地、完全な暗闇など）
   if (v < 0.18 || (s < 0.25 && v < 0.45)) {
@@ -41,6 +48,18 @@ export function classifyColor(r: number, g: number, b: number): string {
   // 2. 白（低彩度かつ十分な明度）
   if (s < 0.28 && v >= 0.45) {
     return "U";
+  }
+
+  let h = 0;
+  if (max !== min) {
+    if (max === rf) {
+      h = (gf - bf) / d + (gf < bf ? 6 : 0);
+    } else if (max === gf) {
+      h = (bf - rf) / d + 2;
+    } else {
+      h = (rf - gf) / d + 4;
+    }
+    h *= 60;
   }
 
   // 3. 有彩色（色相 H: 0〜360 による判定）

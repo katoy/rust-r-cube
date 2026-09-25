@@ -196,6 +196,10 @@ export function getPerspectiveTransform(points: Point[]) {
     g = 0;
     h = 0;
   } else {
+    // 幾何学的証明: det (= dx1 * dy2 - dx2 * dy1) はベクトル (p1 - p2) と (p3 - p2) の外積であり、
+    // ステップ1の cross[1] と恒等的に一致する (det === -cross[1])。
+    // ステップ1の凸性検証によりすべての頂点で |cross[i]| > 1e-5 が保証されているため、
+    // ここで |det| > 1e-5 が数学的に 100% 成立し、ゼロ除算（特異行列）は完全に排除されている。
     const det = dx1 * dy2 - dx2 * dy1;
     g = (dx3 * dy2 - dx2 * dy3) / det;
     h = (dx1 * dy3 - dx3 * dy1) / det;

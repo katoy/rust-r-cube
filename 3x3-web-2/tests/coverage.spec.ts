@@ -190,6 +190,7 @@ test.describe("E2E Coverage with CDP", () => {
             { x: 0, y: 100 },
           ]);
         } catch {}
+        let threwDegenerate = false;
         try {
           sampler.getPerspectiveTransform([
             { x: 0, y: 0 },
@@ -197,7 +198,14 @@ test.describe("E2E Coverage with CDP", () => {
             { x: 100, y: 0 },
             { x: 0, y: 100 },
           ]);
-        } catch {}
+        } catch (e: any) {
+          threwDegenerate =
+            typeof e?.message === "string" &&
+            e.message.includes("有効な四角形");
+        }
+        if (!threwDegenerate) {
+          throw new Error("退化四角形が正常に拒絶されませんでした。");
+        }
         try {
           const tf = sampler.getPerspectiveTransform([
             { x: 20, y: 0 },

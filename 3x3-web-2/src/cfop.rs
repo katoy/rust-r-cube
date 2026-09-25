@@ -312,30 +312,18 @@ fn get_slot_macros(slot: usize) -> &'static [Vec<usize>] {
     static SLOT_11: OnceLock<Vec<Vec<usize>>> = OnceLock::new();
 
     match slot {
-        8 => SLOT_8.get_or_init(|| {
-            vec![
-                moves("U R U' R' U' F' U F"),
-                moves("U' F' U F U R U' R'"),
-            ]
-        }),
-        9 => SLOT_9.get_or_init(|| {
-            vec![
-                moves("U' L' U L U F U' F'"),
-                moves("U F U' F' U' L' U L"),
-            ]
-        }),
-        10 => SLOT_10.get_or_init(|| {
-            vec![
-                moves("U L U' L' U' B' U B"),
-                moves("U' B' U B U L U' L'"),
-            ]
-        }),
-        11 => SLOT_11.get_or_init(|| {
-            vec![
-                moves("U' R' U R U B U' B'"),
-                moves("U B U' B' U' R' U R"),
-            ]
-        }),
+        8 => {
+            SLOT_8.get_or_init(|| vec![moves("U R U' R' U' F' U F"), moves("U' F' U F U R U' R'")])
+        }
+        9 => {
+            SLOT_9.get_or_init(|| vec![moves("U' L' U L U F U' F'"), moves("U F U' F' U' L' U L")])
+        }
+        10 => {
+            SLOT_10.get_or_init(|| vec![moves("U L U' L' U' B' U B"), moves("U' B' U B U L U' L'")])
+        }
+        11 => {
+            SLOT_11.get_or_init(|| vec![moves("U' R' U R U B U' B'"), moves("U B U' B' U' R' U R")])
+        }
         _ => &[],
     }
 }

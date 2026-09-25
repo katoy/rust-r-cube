@@ -1,6 +1,6 @@
 use crate::coord::{move_cube_18, RawCube};
 use crate::search::Search;
-use crate::tables::PruningTable;
+use crate::tables::{MoveTable, PruningTable};
 use web_time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +16,8 @@ pub struct KorfSearch {
     pub nodes: u64,
     pub timed_out: bool,
     path: Vec<usize>,
+    mt: &'static MoveTable,
+    pt: &'static PruningTable,
 }
 
 impl KorfSearch {
@@ -29,6 +31,8 @@ impl KorfSearch {
             nodes: 0,
             timed_out: false,
             path: Vec::with_capacity(32),
+            mt: MoveTable::get(),
+            pt: PruningTable::get(),
         }
     }
 
@@ -51,13 +55,10 @@ impl KorfSearch {
     /// 完成状態に至る任意の手順は G1 への到達を内包する。
     /// したがって、Twist/Slice および Flip/Slice 枝刈りテーブルによる下界値は、
     /// 完成状態までの最短手数の真の下界（アドミッシブル）として 100% 有効である。
-    fn heuristic(&self, cube: &RawCube, prun: &PruningTable) -> u8 {
-        let twist = cube.get_twist() as usize;
-        let flip = cube.get_flip() as usize;
-        let slice = cube.get_ud_slice() as usize;
-
-        let h_ts = prun.get_twist_slice(twist, slice);
-        let h_fs = prun.get_flip_slice(flip, slice);
+    #[inline]
+    fn heuristic(&self, cube: &RawCube, twist: usize, flip: usize, slice: usize) -> u8 {
+        let h_ts = self.pt.get_twist_slice(twist, slice);
+        let h_fs = self.pt.get_flip_slice(flip, slice);
 
         let bad_cp = (0..8).filter(|&i| cube.cp[i] as usize != i).count() as u8;
         let bad_ep = (0..12).filter(|&i| cube.ep[i] as usize != i).count() as u8;
@@ -76,13 +77,16 @@ impl KorfSearch {
             });
         }
 
-        let prun = PruningTable::get();
+        // 初期座標を1度だけ計算（以降は MoveTable により O(1) で遷移）
+        let init_twist = cube.get_twist() as usize;
+        let init_flip = cube.get_flip() as usize;
+        let init_slice = cube.get_ud_slice() as usize;
 
         // 深さ 1 から順に完全最短手を反復深化探索 (IDA*)
         let max_depth = 12; // ブラウザのレスポンス内で探索可能な深さ
         for depth in 1..=max_depth {
             self.path.clear();
-            if self.search(cube, depth, 99, prun) {
+            if self.search(cube, init_twist, init_flip, init_slice, depth, 99) {
                 return Some(KorfSolution {
                     moves: self.path.clone(),
                     is_optimal: true,
@@ -108,7 +112,15 @@ impl KorfSearch {
         })
     }
 
-    fn search(&mut self, cube: &RawCube, depth: u8, last_face: usize, prun: &PruningTable) -> bool {
+    fn search(
+        &mut self,
+        cube: &RawCube,
+        twist: usize,
+        flip: usize,
+        slice: usize,
+        depth: u8,
+        last_face: usize,
+    ) -> bool {
         self.nodes += 1;
         if self.exhausted() {
             return false;
@@ -118,7 +130,7 @@ impl KorfSearch {
             return *cube == RawCube::default();
         }
 
-        let h = self.heuristic(cube, prun);
+        let h = self.heuristic(cube, twist, flip, slice);
         if h > depth {
             return false;
         }
@@ -130,8 +142,19 @@ impl KorfSearch {
             for turn in 0..3 {
                 let m = face * 3 + turn;
                 let next_cube = cube.multiply(move_cube_18(m));
+                let next_twist = self.mt.twist[twist][m] as usize;
+                let next_flip = self.mt.flip[flip][m] as usize;
+                let next_slice = self.mt.ud_slice[slice][m] as usize;
+
                 self.path.push(m);
-                if self.search(&next_cube, depth - 1, face, prun) {
+                if self.search(
+                    &next_cube,
+                    next_twist,
+                    next_flip,
+                    next_slice,
+                    depth - 1,
+                    face,
+                ) {
                     return true;
                 }
                 self.path.pop();
@@ -144,6 +167,15 @@ impl KorfSearch {
     }
 }
 
+/// 群論的冗長手の判定（正規手順列 Canonical Move Sequence の強制）
+///
+/// 1. `face == last`: 同一面の連続回転（例: R R）を排除。
+/// 2. `(3..6).contains(&last) && face + 3 == last`:
+///    可換な対向面ペア（U↔D, R↔L, F↔B）について、インデックスが大きい面（D, L, B: 3..6）の直後に
+///    インデックスが小さい面（U, R, F: 0..3）が来る手順（例: D U, L R, B F）を排除し、
+///    順序を常に「小→大」（U D, R L, F B）に一意固定。
+///    この順序固定により、対向面ブロックは長さ最大2（小→大）に制限され、
+///    R L R や U D U のような対向面を挟んだ同面連続も自動的に100%遮断される。
 fn redundant(face: usize, last: usize) -> bool {
     face == last || ((3..6).contains(&last) && face + 3 == last)
 }
@@ -195,8 +227,10 @@ mod tests {
         let mut korf = KorfSearch::new(1);
         korf.nodes = 4094;
         korf.start = Instant::now() - std::time::Duration::from_secs(1);
-        let prun = PruningTable::get();
-        assert!(!korf.search(&cube, 2, 99, prun));
+        let twist = cube.get_twist() as usize;
+        let flip = cube.get_flip() as usize;
+        let slice = cube.get_ud_slice() as usize;
+        assert!(!korf.search(&cube, twist, flip, slice, 2, 99));
         assert!(korf.timed_out);
     }
 

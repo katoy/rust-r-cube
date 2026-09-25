@@ -986,7 +986,11 @@ initializePresets();
 
 void start();
 
-if (typeof window !== "undefined" && Boolean(navigator.webdriver)) {
+if (
+  import.meta.env.DEV &&
+  typeof window !== "undefined" &&
+  Boolean(navigator.webdriver)
+) {
   (window as any).__cube_main_debug__ = {
     promptReloadForUpdate,
     cancelSearch,

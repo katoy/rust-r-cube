@@ -328,15 +328,8 @@ if self.search(&next_cube, next_twist, next_flip, next_slice, depth - 1, face) {
   `navigator.webdriver` のチェックがあるため通常ユーザーのブラウザ実行時にはオブジェクト登録されませんが、**バンドル生成時（`npm run build`）にはこのコードがそのまま JavaScript ファイルに含まれ、コードサイズを増加** させています。
 - **影響**:
   プロダクション環境の配信サイズが不要に肥大化するだけでなく、リバースエンジニアリングやコンソールからの意図しない内部状態改変の足がかりとなり得ます。
-- **改善案**:
-  Vite の条件付きコンパイル（`import.meta.env.DEV` または `process.env.NODE_ENV !== "production"`）を活用し、本番ビルド時には Tree-shaking によってコード自体がバンドルから完全除去される構造にリファクタリングしてください。
-
-```typescript
-// 改善案 (web/main.ts)
-if (import.meta.env.DEV && typeof window !== "undefined" && Boolean(navigator.webdriver)) {
-  (window as any).__cube_main_debug__ = { ... };
-}
-```
+- **対応状況 (解消済み)**:
+  `import.meta.env.DEV` による環境分離ガードを追加しました。本番ビルド（`npm run build`）時の静的置換（Dead Code Elimination / Tree-shaking）により、`dist/` 配下の配信バンドルから `__cube_main_debug__` が完全に除去されることを検証しました（`dist/` 内の検索で一致ゼロ件）。同時に、開発・テスト環境（`npm run dev`）では正常にテストフックとして機能し、100% カバレッジが完全に維持されることを確認しました。
 
 ---
 

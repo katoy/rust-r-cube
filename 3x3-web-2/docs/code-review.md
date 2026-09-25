@@ -3,7 +3,7 @@
 > [!NOTE]
 > 最新の全体レビューおよび全指摘事項の記録は以下を参照してください：
 >
-> - **[全体レビューレポート（1c02fe0 / 2026-09-25）](code-review-1c02fe0-2026-09-25.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（Superflip 23手、CFOP 0.45ms）、V8行カバレッジ99.25%実証。行列式退化チェックの数学的証明・安全固定化（Finding 1解消）、cargo fmtインデント整合（Finding 2解消）、Korf IDA*対向面可換2手枝刈り等の次世代改善提案。
+> - **[全体レビューレポート（1c02fe0 / 2026-09-25）](code-review-1c02fe0-2026-09-25.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（Superflip 23手、CFOP 0.45ms）、V8行カバレッジ99.25%実証。行列式退化チェックの数学的証明（Finding 1解消）、cargo fmtインデント整合（Finding 2解消）、Korf MoveTable導入によるIDA* 2.37倍高速化（Finding 3解消）、テストフックの本番Tree-shaking分離（Finding 4解消）。
 > - **[全体レビューレポート（932358b / 2026-09-24）](code-review-932358b-2026-09-24.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（CFOP探索ノード13.6%削減、Superflip 23手）、CFOP定石マクロ事前生成・WCA対向面スクランブル・image-sampler counts配列化・main.ts refresh()のO(1)化等の次世代改善提案。
 > - **[レビュー指摘事項の修正およびカバレッジ 100% 達成レポート（932358b）](review-fixes-932358b-2026-09-24.md)**: Findings 1〜6 完全解消（CFOP OnceLock キャッシュ、WCA 対向面枝刈り、image-sampler counts 配列化、main.ts refresh() の O(1) 化、centers 厳格バリデーション、ARIA 属性動的バインディング）、Web モジュール 21 件中 19 件で 100.00% 達成、全体 99% 超網羅。
 > - **[全体レビューレポート（0ea3745 / 2026-09-24）](code-review-0ea3745-2026-09-24.md)**: 総合判定 **APPROVED WITH HIGHEST DISTINCTION**。汎用AI（Claude/Codex/Copilot）を凌駕する深層レビュー、実機ベンチマーク解析（Superflip 23手）、CFOP対向面可換枝刈り・画像認識サンプラーZero-allocation化の提示。

@@ -1040,6 +1040,32 @@ fn test_tables_encode_and_decode() {
     // エンコード結果は "CUBE0001" ヘッダと チェックサムを含む
     assert!(encoded.len() > 16);
     assert_eq!(&encoded[..8], b"CUBE0001");
+
+    // 正常データのチェックサム検証が成功すること
+    assert!(crate::tables::verify_table_data(&encoded).is_ok());
+
+    // ヘッダ破損時に拒絶されること
+    let mut corrupted_header = encoded.clone();
+    corrupted_header[0] = b'X';
+    assert_eq!(
+        crate::tables::verify_table_data(&corrupted_header),
+        Err("table version mismatch")
+    );
+
+    // データ破損時にチェックサム不一致で拒絶されること
+    let mut corrupted_data = encoded.clone();
+    let last = corrupted_data.len() - 1;
+    corrupted_data[last] ^= 0xFF;
+    assert_eq!(
+        crate::tables::verify_table_data(&corrupted_data),
+        Err("table checksum mismatch")
+    );
+
+    // 長さ不足時に拒絶されること
+    assert_eq!(
+        crate::tables::verify_table_data(&encoded[..10]),
+        Err("table data too short")
+    );
 }
 
 #[test]

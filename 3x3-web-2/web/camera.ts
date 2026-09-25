@@ -315,6 +315,7 @@ export class TwoViewCamera {
   }
 
   open() {
+    this.stopLiveStream();
     this.faces = {};
     this.detectedLabels = {};
     this.points = [];
@@ -995,7 +996,10 @@ export class TwoViewCamera {
       this.mediaStream = undefined;
     }
     const video = $("camera-video") as HTMLVideoElement | null;
-    if (video) video.srcObject = null;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
     const liveBtn = $("camera-live-stream");
     const takeBtn = $("camera-take-photo");
     const stopBtn = $("camera-stop-stream");

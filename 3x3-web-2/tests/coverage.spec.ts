@@ -410,9 +410,10 @@ test.describe("E2E Coverage with CDP", () => {
         cCtx.fillStyle = "#000000";
         cCtx.fillRect(200, 150, 240, 180);
         const cImg = new Image();
-        cImg.src = cCanvas.toDataURL();
         await new Promise((r) => {
           cImg.onload = r;
+          cImg.src = cCanvas.toDataURL();
+          if (cImg.complete) r(undefined);
         });
         camera.detectCubeOutline(cCanvas, cImg);
 
@@ -473,23 +474,21 @@ test.describe("E2E Coverage with CDP", () => {
         await (camInst as any).processFile(bigFile, "A");
         HTMLCanvasElement.prototype.toBlob = origToBlob;
 
-        // 縮小画像 onload 世代不一致 (365-368行)
-        const origToBlob2 = HTMLCanvasElement.prototype.toBlob;
-        HTMLCanvasElement.prototype.toBlob = function (
-          cb: any,
-          ...args: any[]
-        ) {
-          return origToBlob2.call(
-            this,
-            (blob: any) => {
+        // 縮小画像 onload 世代不一致 (417-421行)
+        const origCreateUrlForGen = URL.createObjectURL;
+        let blobCallCount = 0;
+        URL.createObjectURL = (obj: any) => {
+          const res = origCreateUrlForGen(obj);
+          if (obj instanceof Blob) {
+            blobCallCount++;
+            if (blobCallCount === 2) {
               (camInst as any).loadGenerationA++;
-              return cb(blob);
-            },
-            ...args,
-          );
+            }
+          }
+          return res;
         };
         await (camInst as any).processFile(bigFile, "A");
-        HTMLCanvasElement.prototype.toBlob = origToBlob2;
+        URL.createObjectURL = origCreateUrlForGen;
 
         // 縮小画像 onerror 分岐 (384-385行)
         const origCreateUrl = URL.createObjectURL;
@@ -513,9 +512,10 @@ test.describe("E2E Coverage with CDP", () => {
         rCtx.fillStyle = "#f44336"; // 赤 = R面
         rCtx.fillRect(0, 0, 640, 480);
         const redImg = new Image();
-        redImg.src = redCanvas.toDataURL();
         await new Promise((r) => {
           redImg.onload = r;
+          redImg.src = redCanvas.toDataURL();
+          if (redImg.complete) r(undefined);
         });
 
         (camInst as any).currentView = "A";
@@ -539,6 +539,93 @@ test.describe("E2E Coverage with CDP", () => {
         (camInst as any).updateDetectedLabels();
         (camInst as any).imageB = undefined;
         (camInst as any).updateDetectedLabels();
+
+        // 6角自動検出済み helpText 表示 (846-848行)
+        (camInst as any).currentView = "A";
+        (camInst as any).activeImage = redImg;
+        (camInst as any).points = [
+          { x: 100, y: 100 },
+          { x: 200, y: 100 },
+          { x: 250, y: 200 },
+          { x: 200, y: 300 },
+          { x: 100, y: 300 },
+          { x: 50, y: 200 },
+        ];
+        (camInst as any).update();
+        (camInst as any).points = [];
+
+        // error メソッド (854-856行)
+        (camInst as any).error("テストエラーメッセージ");
+
+        // getUserMedia 非対応エラー分岐 (860-864行)
+        const origMediaDevices = navigator.mediaDevices;
+        try {
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: undefined,
+            configurable: true,
+            writable: true,
+          });
+          await camInst.startLiveStream();
+        } catch {
+        } finally {
+          Object.defineProperty(navigator, "mediaDevices", {
+            value: origMediaDevices,
+            configurable: true,
+            writable: true,
+          });
+        }
+
+        // startLiveStream 正常起動・停止・中断・例外クリーンアップ (878-925行)
+        const camDialog = document.getElementById(
+          "camera-editor",
+        ) as HTMLDialogElement | null;
+        if (camDialog) {
+          camDialog.showModal();
+          try {
+            await camInst.startLiveStream();
+            camInst.stopLiveStream();
+          } catch {}
+
+          // startLiveStream getUserMedia 解決後の中断・クリーンアップ (846-849行)
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const origGUM = navigator.mediaDevices.getUserMedia;
+            navigator.mediaDevices.getUserMedia = async (constraints) => {
+              const s = await origGUM.call(navigator.mediaDevices, constraints);
+              (camInst as any).streamRequestId++;
+              return s;
+            };
+            try {
+              await camInst.startLiveStream();
+            } catch {}
+            navigator.mediaDevices.getUserMedia = origGUM;
+          }
+
+          // startLiveStream video.play 中の中断・クリーンアップ (895-904行)
+          const videoEl = document.getElementById(
+            "camera-video",
+          ) as HTMLVideoElement | null;
+          if (videoEl) {
+            const origPlayForCancel = videoEl.play;
+            videoEl.play = async function () {
+              const p = origPlayForCancel.call(this);
+              (camInst as any).streamRequestId++;
+              return p;
+            };
+            try {
+              await camInst.startLiveStream();
+            } catch {}
+            videoEl.play = origPlayForCancel;
+
+            // startLiveStream video.play 例外時クリーンアップ (923-925行)
+            const origPlayForError = videoEl.play;
+            videoEl.play = () => Promise.reject(new Error("forced play error"));
+            try {
+              await camInst.startLiveStream();
+            } catch {}
+            videoEl.play = origPlayForError;
+          }
+          camDialog.close();
+        }
 
         // --- triggers.ts ---
         const triggers = await import("/web/triggers.ts");
@@ -1220,6 +1307,16 @@ test.describe("E2E Coverage with CDP", () => {
           manifest.images.solved.viewB,
         );
 
+        // 非画像ファイル形式エラーハンドリング (365-368行)
+        await page.locator("#camera-file-a").setInputFiles({
+          name: "invalid.txt",
+          mimeType: "text/plain",
+          buffer: Buffer.from("not an image"),
+        });
+        await expect(page.locator("#camera-error")).toHaveText(
+          "画像ファイル（PNG、JPEG等）を選択してください。",
+        );
+
         await page.locator("#camera-file-a").setInputFiles(solvedA);
         await page.waitForTimeout(300);
 
@@ -1879,6 +1976,27 @@ test.describe("E2E Coverage with CDP", () => {
           if (parent) parent.appendChild(pContainer);
         }
 
+        // シードスクランブル正常系および例外パス (913-930行)
+        const allPresetBtns = Array.from(
+          document.querySelectorAll("#preset-buttons button"),
+        ) as HTMLButtonElement[];
+        const seedBtn = allPresetBtns.find((b) =>
+          b.textContent?.includes("seed=1"),
+        );
+        if (seedBtn) {
+          seedBtn.click();
+          await new Promise((r) => setTimeout(r, 400));
+
+          // scramble-text 要素を一時的に退避し、textContent 代入時に例外を発生させる
+          const scrambleTextEl = document.getElementById("scramble-text");
+          if (scrambleTextEl) {
+            scrambleTextEl.id = "scramble-text-temp";
+            seedBtn.click();
+            await new Promise((r) => setTimeout(r, 400));
+            scrambleTextEl.id = "scramble-text";
+          }
+        }
+
         // start() 復元パスの網羅 (638-658, 670-684, 696-698行)
         // 1. ?alg= パス
         window.history.pushState(null, "", "?alg=R_U_R'_U'");
@@ -1888,7 +2006,7 @@ test.describe("E2E Coverage with CDP", () => {
 
         // 2. localStorage 復元成功パス
         localStorage.setItem(
-          "rubiks-cube-studio-state-v1",
+          "cube-studio-v1",
           JSON.stringify({
             version: 1,
             state: "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
@@ -1903,8 +2021,8 @@ test.describe("E2E Coverage with CDP", () => {
           await dbg.start();
         } catch {}
 
-        // 3. localStorage 復元失敗パス (657-658行)
-        localStorage.setItem("rubiks-cube-studio-state-v1", "{ invalid json");
+        // 3. localStorage 復元失敗パス (664-665行)
+        localStorage.setItem("cube-studio-v1", "{ invalid json");
         try {
           await dbg.start();
         } catch {}
@@ -1931,8 +2049,16 @@ test.describe("E2E Coverage with CDP", () => {
         dbg.setPlaying(false);
         dbg.refresh();
 
-        // コピー (660-661行)
+        // コピー正常系 & 例外系 (664-669行)
         document.getElementById("copy")?.click();
+        try {
+          const origWriteText = navigator.clipboard.writeText;
+          navigator.clipboard.writeText = () =>
+            Promise.reject(new Error("clipboard denied"));
+          document.getElementById("copy")?.click();
+          await new Promise((r) => setTimeout(r, 20));
+          navigator.clipboard.writeText = origWriteText;
+        } catch {}
 
         // 6. initScene エラー分岐 (331-332行)
         try {
@@ -1942,11 +2068,15 @@ test.describe("E2E Coverage with CDP", () => {
 
         // 7. seek & play & applyAlgorithm & 未カバーパス網羅
         try {
+          const rm = document.getElementById(
+            "reduced-motion",
+          ) as HTMLInputElement | null;
+          if (rm) rm.checked = false;
           await dbg.seek(1, true);
           await dbg.seek(2, true);
           await dbg.seek(0, false);
 
-          // scene なし時のアニメーション待機 (362-365行)
+          // scene なし時のアニメーション待機 (366-369行)
           dbg.setScene(null);
           await dbg.seek(1, true);
           dbg.initScene(false);
@@ -2066,15 +2196,18 @@ test.describe("E2E Coverage with CDP", () => {
           window.fetch = origFetch;
         } catch {}
 
-        // 13. localStorage 復元失敗パス (664-665行) & mainReady = false での start() (858-859行)
+        // 13. localStorage 復元失敗パス (664-665行) & mainReady = false での start() (783-784行)
         try {
           dbg.setMainReady(true);
-          localStorage.setItem("rubiks-cube-studio-state-v1", "{ invalid json");
+          localStorage.setItem("cube-studio-v1", "{ invalid json");
           await dbg.start();
+        } catch {}
 
+        try {
           dbg.setMainReady(false);
           await dbg.start();
         } catch {}
+        dbg.setMainReady(true);
 
         // 14. Space / ArrowLeft キーによるショートカット (761-763行)
         try {

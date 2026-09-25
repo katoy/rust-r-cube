@@ -1,4 +1,14 @@
-use crate::cube::parse_moves;
+use std::sync::OnceLock;
+
+fn get_base_alg() -> &'static [usize] {
+    static BASE_ALG: OnceLock<Vec<usize>> = OnceLock::new();
+    BASE_ALG.get_or_init(|| {
+        crate::cube::parse_moves(
+            "R U R' U' R' F R2 U' R' U' R U R' F' R' L D R F' R' F R F R2 D' R F R F' R' L' R",
+        )
+        .unwrap()
+    })
+}
 
 pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec<usize> {
     assert_eq!(delta_a + delta_b, 0);
@@ -11,8 +21,6 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
         [-1, 0, 0], // L
         [0, 0, -1], // B
     ];
-    let base_alg =
-        "R U R' U' R' F R2 U' R' U' R U R' F' R' L D R F' R' F R F R2 D' R F R F' R' L' R";
 
     let is_adjacent = |f1: usize, f2: usize| {
         normals[f1][0] * normals[f2][0]
@@ -36,10 +44,9 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
         // Opposite faces in URFDLB order: U↔D, R↔L, F↔B.
         let opposite = [3, 4, 5, 0, 1, 2];
         let map = [u, r, f, opposite[u], opposite[r], opposite[f]];
-        let mv: Vec<usize> = parse_moves(base_alg)
-            .unwrap()
-            .into_iter()
-            .map(|m| map[m / 3] * 3 + m % 3)
+        let mv: Vec<usize> = get_base_alg()
+            .iter()
+            .map(|&m| map[m / 3] * 3 + m % 3)
             .collect();
         if invert {
             mv.iter().rev().map(|&m| m / 3 * 3 + (2 - m % 3)).collect()
@@ -58,14 +65,14 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
 }
 
 pub fn rotate_center_180(face: usize) -> Vec<usize> {
-    let names = ["U", "R", "F", "D", "L", "B"];
-    let (a, b) = match face {
-        0 | 3 => ("R", "L"),
-        _ => ("U", "D"),
+    let (a_face, b_face) = match face {
+        0 | 3 => (1, 4), // R, L
+        _ => (0, 3),     // U, D
     };
-    let x = names[face % 6];
-    let alg = format!("{x} {a} {b} {x}2 {a}' {b}' {x} {a} {b} {x}2 {a}' {b}'");
-    parse_moves(&alg).unwrap()
+    let x = face * 3;
+    let a = a_face * 3;
+    let b = b_face * 3;
+    vec![x, a, b, x + 1, a + 2, b + 2, x, a, b, x + 1, a + 2, b + 2]
 }
 
 fn is_opposite_face(f1: usize, f2: usize) -> bool {

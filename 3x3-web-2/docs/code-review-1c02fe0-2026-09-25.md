@@ -379,8 +379,11 @@ if self.search(&next_cube, next_twist, next_flip, next_slice, depth - 1, face) {
   this.renderer.domElement.setAttribute("role", "img");
   ```
   視覚的には非常に美しい 3D 表示が実現されていますが、キーボード操作ユーザーがキャンバス要素そのものにフォーカスを当てることができず（`tabindex="0"` がない）、またキューブの状態（「上面: 白、前面: 緑、未完成」や「残り 22 手」）といった現在の盤面サマリーがスクリーンリーダー向けに動的更新（`aria-live`）されていません。
-- **改善案**:
-  キャンバス要素に `tabindex="0"` を付与し、フォーカス時に現在のキューブ状態の要約（完成度やセンター向きの状態）をスクリーンリーダー向けにアナウンスする `aria-live="polite"` 領域を設けることで、WCAG 2.1 AA 準拠のアクセシビリティをさらに完璧なものに高めることができます。
+- **対応状況 (解消済み)**:
+  1. `web/scene.ts` において、`this.renderer.domElement.setAttribute("tabindex", "0")` を付与し、キーボード操作ユーザーがキャンバスへ直接フォーカス移動できる構造を実装しました。また `aria-label` にキーボードショートカットに関する案内を追加しました。
+  2. `web/style.css` に `#scene canvas:focus-visible` スタイル（高コントラストのアウトライン `var(--accent, #c4ed94)`）を追加し、キーボードフォーカス時の視覚的インジケータ（WCAG 2.1 Focus Visible 2.4.7）を保証しました。
+  3. `web/view.ts` において、`#cube-status` に `role="status"` および `aria-live="polite"` を付与し、キューブの状態変化（完成状態・スクランブル状態・手順進捗）がスクリーンリーダー等の支援技術へタイムリーに伝達される動的アナウンス領域を確立しました。
+  4. `tests/accessibility.spec.ts` にキーボードフォーカス可能性および ARIA ライブリージョン検証のアサーションを追加し、axe-core 監査を含め 5 件の E2E テスト全件合格を実証しました。
 
 ---
 

@@ -243,6 +243,10 @@ h1 {
   height: 100%;
   touch-action: none;
 }
+#scene canvas:focus-visible {
+  outline: 2px solid var(--accent, #c4ed94);
+  outline-offset: -4px;
+}
 .stage-bottom {
   padding: 0 26px 22px;
   display: flex;

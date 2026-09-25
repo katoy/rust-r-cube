@@ -36,7 +36,7 @@ export function mount() {
     <div class="page-heading"><div><p class="eyebrow">YOUR CUBE. YOUR NEXT MOVE.</p><h1>揃うまで、ひと回しずつ。</h1><p class="lead">混ざったキューブに、見える道筋を。</p></div><span class="edition">01 — SOLVER <span>3 × 3 × 3</span></span></div>
     <div class="workspace">
       <section class="stage" aria-label="キューブの操作">
-        <div class="stage-top"><span class="section-tag"><i></i> LIVE CUBE</span><span id="cube-status" class="status-pill">完成状態</span></div>
+        <div class="stage-top"><span class="section-tag"><i></i> LIVE CUBE</span><span id="cube-status" class="status-pill" role="status" aria-live="polite">完成状態</span></div>
         <div id="scene"></div>
         <div id="fallback" hidden><p>3D表示を利用できないため、展開図で表示しています。</p><div id="fallback-net" class="cube-net"></div></div>
         <div class="stage-bottom"><span class="gesture">${icon("eye")} ドラッグで視点回転 · スクロールでズーム</span><div class="view-presets" role="group" aria-label="視点プリセット"><button id="view-preset-iso" class="view-preset-btn active" type="button" title="斜め見下ろし（標準）">標準</button><button id="view-preset-front" class="view-preset-btn" type="button" title="前面（Front）">前</button><button id="view-preset-top" class="view-preset-btn" type="button" title="上面（Up）">上</button><button id="view-preset-right" class="view-preset-btn" type="button" title="右面（Right）">右</button></div><button id="view-reset" class="text-button">${icon("reset")} 視点を戻す</button></div>

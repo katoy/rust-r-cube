@@ -100,9 +100,10 @@ export class CubeScene {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.setAttribute(
       "aria-label",
-      "3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンを使ってください。",
+      "3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンまたはキーボードショートカットを使ってください。",
     );
     this.renderer.domElement.setAttribute("role", "img");
+    this.renderer.domElement.setAttribute("tabindex", "0");
     this.host.append(this.renderer.domElement);
     this.scene.add(this.root, new THREE.HemisphereLight(0xfdf5df, 0x506977, 3));
     this.root.add(this.turnLayer);

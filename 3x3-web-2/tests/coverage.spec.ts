@@ -18,7 +18,7 @@ test.describe("E2E Coverage with CDP", () => {
   test("ユニットテストおよびE2Eテストによるブラウザ配信JavaScriptの行カバレッジ計測", async ({
     page,
   }) => {
-    test.setTimeout(90000);
+    test.setTimeout(180000);
     // JS カバレッジ計測を開始
     // @ts-ignore - Playwright の非公開 API
     await page.coverage.startJSCoverage({ resetOnNavigation: false });

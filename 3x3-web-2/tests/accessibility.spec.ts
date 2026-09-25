@@ -51,4 +51,27 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
       .analyze();
     expect(results.violations).toEqual([]);
   });
+
+  test("3D canvas element is keyboard-focusable with accessible name and live region", async ({
+    page,
+  }) => {
+    const canvas = page.locator("#scene canvas");
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveAttribute("tabindex", "0");
+    await expect(canvas).toHaveAttribute("role", "img");
+    await expect(canvas).toHaveAttribute(
+      "aria-label",
+      /3Dキューブ。ドラッグで視点を回転できます。/,
+    );
+
+    // キーボードフォーカス可能であることを検証
+    await canvas.focus();
+    await expect(canvas).toBeFocused();
+
+    // cube-status が live region として構成されていることを検証
+    const status = page.locator("#cube-status");
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toHaveText("完成状態");
+  });
 });

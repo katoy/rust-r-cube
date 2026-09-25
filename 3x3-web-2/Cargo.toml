@@ -36,3 +36,7 @@ path = "src/bin/benchmark.rs"
 [[bin]]
 name = "superflip_bench"
 path = "src/bin/superflip_bench.rs"
+
+[[bin]]
+name = "serialization_bench"
+path = "src/bin/serialization_bench.rs"

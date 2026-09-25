@@ -42,13 +42,15 @@ fn result(
     phases: Vec<PhaseInfo>,
 ) -> ResultData {
     let mut current_cube = *cube;
-    let mut states = vec![state.to_owned()];
+    let mut states = Vec::with_capacity(moves.len() + 1);
+    states.push(state.to_owned());
     for m in moves {
         current_cube = cube::apply(&current_cube, &[*m]);
         states.push(cube::facelets(&current_cube));
     }
+    let final_state = states.last().cloned().unwrap_or_else(|| state.to_owned());
     ResultData {
-        state: cube::facelets(&current_cube),
+        state: final_state,
         moves: moves.iter().map(|m| cube::notation(*m)).collect(),
         states,
         elapsed_ms,

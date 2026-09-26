@@ -30,7 +30,17 @@ export function rgbToHsv(r: number, g: number, b: number) {
   return { h, s, v };
 }
 
-export function classifyColor(r: number, g: number, b: number): string {
+export interface ColorAdaptation {
+  whiteSaturationThreshold?: number;
+  darkValueThreshold?: number;
+}
+
+export function classifyColor(
+  r: number,
+  g: number,
+  b: number,
+  adaptation?: ColorAdaptation,
+): string {
   const rf = r / 255;
   const gf = g / 255;
   const bf = b / 255;
@@ -40,13 +50,16 @@ export function classifyColor(r: number, g: number, b: number): string {
   const s = max === 0 ? 0 : d / max;
   const v = max;
 
+  const darkV = adaptation?.darkValueThreshold ?? 0.18;
+  const whiteS = adaptation?.whiteSaturationThreshold ?? 0.28;
+
   // 1. 極端に暗いピクセル（黒プラスチック目地、完全な暗闇など）
-  if (v < 0.18 || (s < 0.25 && v < 0.45)) {
+  if (v < darkV || (s < 0.25 && v < 0.45)) {
     return "?";
   }
 
   // 2. 白（低彩度かつ十分な明度）
-  if (s < 0.28 && v >= 0.45) {
+  if (s < whiteS && v >= 0.45) {
     return "U";
   }
 
@@ -99,6 +112,7 @@ export function classify(
   x: number,
   y: number,
   radius = 5,
+  adaptation?: ColorAdaptation,
 ): string {
   const counts = [0, 0, 0, 0, 0, 0, 0];
   let validColors = 0;
@@ -112,6 +126,7 @@ export function classify(
         data.data[offset],
         data.data[offset + 1],
         data.data[offset + 2],
+        adaptation,
       );
       const idx = COLOR_TO_INDEX[c] ?? 6;
       counts[idx]++;
@@ -236,6 +251,7 @@ export function getImagePixels(image: HTMLImageElement): ImageData {
 export function sampleFaceFromPixels(
   pixels: ImageData,
   points: Point[],
+  adaptation?: ColorAdaptation,
 ): string {
   if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
   const transform = getPerspectiveTransform(points);
@@ -251,15 +267,19 @@ export function sampleFaceFromPixels(
       const u = (col + 0.5) / 3;
       const v = (row + 0.5) / 3;
       const pt = transform(u, v);
-      result += classify(pixels, pt.x, pt.y, radius);
+      result += classify(pixels, pt.x, pt.y, radius, adaptation);
     }
   }
   return result;
 }
 
-export function sampleFace(image: HTMLImageElement, points: Point[]): string {
+export function sampleFace(
+  image: HTMLImageElement,
+  points: Point[],
+  adaptation?: ColorAdaptation,
+): string {
   if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
-  return sampleFaceFromPixels(getImagePixels(image), points);
+  return sampleFaceFromPixels(getImagePixels(image), points, adaptation);
 }
 
 export function buildState(

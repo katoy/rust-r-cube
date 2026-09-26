@@ -98,10 +98,7 @@ export class CubeScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.domElement.setAttribute(
-      "aria-label",
-      "3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンまたはキーボードショートカットを使ってください。",
-    );
+    this.updateAriaLabel("完成状態");
     this.renderer.domElement.setAttribute("role", "img");
     this.renderer.domElement.setAttribute("tabindex", "0");
     this.host.append(this.renderer.domElement);
@@ -500,6 +497,12 @@ export class CubeScene {
         },
       };
     });
+  }
+  updateAriaLabel(statusText: string): void {
+    this.renderer.domElement.setAttribute(
+      "aria-label",
+      `3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンまたはキーボードショートカットを使ってください。状態: ${statusText}`,
+    );
   }
   finish() {
     const active = this.active;

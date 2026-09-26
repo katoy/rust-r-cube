@@ -82,8 +82,7 @@ fn is_opposite_face(f1: usize, f2: usize) -> bool {
     )
 }
 
-/// Cancel adjacent redundant moves and commutative opposite-face moves (e.g. R R' -> nothing, U D U' -> D)
-pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
+fn cancel_redundant_moves_single_pass(moves: &[usize]) -> Vec<usize> {
     let mut reduced: Vec<usize> = Vec::new();
     for &m in moves {
         let face = m / 3;
@@ -113,6 +112,20 @@ pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
         }
     }
     reduced
+}
+
+/// Cancel adjacent redundant moves and commutative opposite-face moves (e.g. R R' -> nothing, U D U' -> D).
+/// Uses fixed-point iteration to exhaustively resolve multi-nested cascading cancellations.
+pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
+    let mut current = moves.to_vec();
+    loop {
+        let prev_len = current.len();
+        current = cancel_redundant_moves_single_pass(&current);
+        if current.len() == prev_len {
+            break;
+        }
+    }
+    current
 }
 
 fn generate_perfect_matchings(faces: &[usize]) -> Vec<Vec<(usize, usize)>> {
@@ -238,5 +251,25 @@ mod tests {
             expected[f] = 2;
             assert_eq!(centers, expected, "対象面のみが180度回転すること");
         }
+    }
+
+    #[test]
+    fn test_cancel_redundant_moves_cascading() {
+        use crate::cube::parse_moves;
+
+        // ネストされた相殺: R U D D' U' R' -> 空
+        let moves = parse_moves("R U D D' U' R'").unwrap();
+        let canceled = cancel_redundant_moves(&moves);
+        assert!(canceled.is_empty(), "カスケード相殺で空配列になること");
+
+        // 対向面を跨いだ多重相殺: U R L L' R' U' -> 空
+        let moves2 = parse_moves("U R L L' R' U'").unwrap();
+        let canceled2 = cancel_redundant_moves(&moves2);
+        assert!(canceled2.is_empty(), "対向面を跨いだ多重相殺で空配列になること");
+
+        // 3面連鎖の相殺: F U R R' U' F' -> 空
+        let moves3 = parse_moves("F U R R' U' F'").unwrap();
+        let canceled3 = cancel_redundant_moves(&moves3);
+        assert!(canceled3.is_empty(), "3面連鎖の相殺で空配列になること");
     }
 }

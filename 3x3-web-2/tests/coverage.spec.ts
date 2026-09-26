@@ -94,6 +94,10 @@ test.describe("E2E Coverage with CDP", () => {
         sampler.classifyColor(220, 200, 30); // D (黄)
         sampler.classifyColor(236, 110, 40); // L (橙: h >= 18 && h < 40)
         sampler.classifyColor(220, 20, 20); // R (赤)
+        sampler.classifyColor(240, 200, 180, {
+          whiteSaturationThreshold: 0.35,
+          darkValueThreshold: 0.1,
+        });
 
         // classify の直接実行（最多色分岐と無効色分岐）
         const testImgData = new ImageData(11, 11);
@@ -104,6 +108,9 @@ test.describe("E2E Coverage with CDP", () => {
           testImgData.data[i + 3] = 255;
         }
         sampler.classify(testImgData, 5, 5, 2);
+        sampler.classify(testImgData, 5, 5, 2, {
+          whiteSaturationThreshold: 0.35,
+        });
 
         // getPerspectiveTransform のアフィン変換（平行四辺形・長方形）と非アフィン変換（台形）
         sampler.getPerspectiveTransform([
@@ -990,6 +997,7 @@ test.describe("E2E Coverage with CDP", () => {
         scene.setViewPreset("right");
         scene.setViewPreset("iso");
         scene.resetView();
+        scene.updateAriaLabel("テスト状態");
 
         // 矢印取得メソッド (368-373行)
         scene.getArrowCount();

@@ -235,6 +235,14 @@ test.describe("Web Modules Unit Tests", () => {
         { x: 0, y: 100 },
       ]);
 
+      // 7. ColorAdaptation による適応判定
+      const colorAdapted = sampler.classifyColor(240, 200, 180, {
+        whiteSaturationThreshold: 0.35,
+      });
+      const colorAdaptedDark = sampler.classifyColor(40, 40, 40, {
+        darkValueThreshold: 0.1,
+      });
+
       return {
         fullState,
         partialState,
@@ -256,6 +264,8 @@ test.describe("Web Modules Unit Tests", () => {
         colorRed,
         colorMagentaRed,
         darkSampled,
+        colorAdapted,
+        colorAdaptedDark,
       };
     });
 
@@ -275,6 +285,8 @@ test.describe("Web Modules Unit Tests", () => {
     expect(samplerResults.colorRed).toBe("R");
     expect(samplerResults.colorMagentaRed).toBe("R");
     expect(samplerResults.darkSampled).toBe("?????????");
+    expect(samplerResults.colorAdapted).toBe("U");
+    expect(samplerResults.colorAdaptedDark).not.toBe("");
   });
 
   test("centers.ts - centerTurns, rotateCenters, automaticCenters, centersFromInput", async ({

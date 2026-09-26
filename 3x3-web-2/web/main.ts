@@ -139,14 +139,7 @@ function refresh() {
   const step = store.getStep();
   const centerRotations = store.getCenterRotations();
   const next = solution?.moves[step] || "";
-  if (scene) {
-    scene.centerRotations = [...centerRotations];
-    if (!inMotion) scene.show(state, next);
-  }
-  if (!inMotion) {
-    net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
-  }
-  $("cube-status").textContent =
+  const statusText =
     state === SOLVED
       ? store.getCenterTurns().some((t) => t !== 0)
         ? "色は完成・センターの向きあり"
@@ -154,6 +147,15 @@ function refresh() {
       : solution
         ? `${step} / ${solution.moves.length} 手`
         : "スクランブル状態";
+  if (scene) {
+    scene.centerRotations = [...centerRotations];
+    if (!inMotion) scene.show(state, next);
+    scene.updateAriaLabel(statusText);
+  }
+  if (!inMotion) {
+    net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
+  }
+  $("cube-status").textContent = statusText;
   $("scene").dataset.state = state;
   $<HTMLButtonElement>("solve").disabled =
     !mainReady || (!solver?.ready && !engineError) || solving;

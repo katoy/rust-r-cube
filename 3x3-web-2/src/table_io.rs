@@ -46,13 +46,22 @@ pub fn verify_table_data(data: &[u8]) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn ensure_table_verified(data: &[u8]) {
+    static VERIFIED_PTR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let ptr = data.as_ptr() as usize;
+    if VERIFIED_PTR.load(std::sync::atomic::Ordering::Acquire) != ptr {
+        verify_table_data(data).expect("table validation failed");
+        VERIFIED_PTR.store(ptr, std::sync::atomic::Ordering::Release);
+    }
+}
+
 struct Reader<'a> {
     data: &'a [u8],
     at: usize,
 }
 impl<'a> Reader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        verify_table_data(data).expect("table validation failed");
+        ensure_table_verified(data);
         Self { data, at: 16 }
     }
     fn short(&mut self) -> u16 {

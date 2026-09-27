@@ -106,16 +106,19 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
+            const canonicalUrl = url.origin + url.pathname;
             const updatePromise = caches
               .open(CACHE_NAME)
-              .then((cache) => cache.put(request, clone));
+              .then((cache) => cache.put(canonicalUrl, clone));
             event.waitUntil(updatePromise);
           }
           return response;
         })
         .catch(async () => {
           const ownCache = await caches.open(CACHE_NAME);
+          const canonicalUrl = url.origin + url.pathname;
           const cached =
+            (await ownCache.match(canonicalUrl)) ||
             (await ownCache.match(request)) ||
             (await ownCache.match(request.url)) ||
             (await ownCache.match(request, { ignoreSearch: true }));

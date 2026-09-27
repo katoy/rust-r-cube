@@ -34,9 +34,18 @@ window.cube_store = store;
 
 mount();
 registerServiceWorker();
-export function getScopedStorageKey(baseKey: string): string {
-  const p = typeof window !== "undefined" ? window.location.pathname : "/";
-  const normalized = p.replace(/\/+$/, "") || "/";
+export function getScopedStorageKey(
+  baseKey: string,
+  customPath?: string,
+): string {
+  const p =
+    customPath !== undefined
+      ? customPath
+      : typeof window !== "undefined"
+        ? window.location.pathname
+        : "/";
+  const withoutIndex = p.replace(/\/index\.html$/i, "");
+  const normalized = withoutIndex.replace(/\/+$/, "") || "/";
   return normalized !== "/" ? `${baseKey}:${normalized}` : baseKey;
 }
 
@@ -738,6 +747,9 @@ $<HTMLInputElement>("file").onchange = async () => {
   const requestId = ++fileLoadRequestId;
   const at = store.getRevision();
   try {
+    if (file.size > 65536) {
+      throw new Error("ファイルは64KB以内にしてください。");
+    }
     const content = await file.text();
     if (requestId !== fileLoadRequestId) return;
     const parsed = validateAndParseCubeJson(content, file.size);

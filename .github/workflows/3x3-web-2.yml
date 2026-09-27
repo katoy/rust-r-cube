@@ -57,6 +57,9 @@ jobs:
       - name: Rust tests
         run: cargo test --release
 
+      - name: Run review guardrail checks
+        run: npm run check:guardrails
+
       - name: Web format check
         run: npm run format:check
 

@@ -914,6 +914,7 @@ test("superflip preset loads all twelve flipped edges and solves orientation wit
   // 1. 向きモードをONにし、reduced-motionを有効にする
   await page.locator("#reduced-motion").check();
   await page.locator("#include-orientation").check();
+  await page.locator("#solver-algorithm").selectOption("kociemba");
 
   // 2. プリセットタブを開き、スーパーフリップを選択
   await page.locator("#tab-presets").click();

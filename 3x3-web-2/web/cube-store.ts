@@ -33,6 +33,8 @@ export class CubeStore {
   private future: CubeSnapshot[] = [];
   private listeners: Set<StoreListener> = new Set();
 
+  private baseSnapshot?: CubeSnapshot = undefined;
+
   getState(): string {
     return this.state;
   }
@@ -61,8 +63,20 @@ export class CubeStore {
     return this.modifier;
   }
 
+  private isSameSnapshot(a: CubeSnapshot, b: CubeSnapshot): boolean {
+    return (
+      a.state === b.state &&
+      a.centerTurns.every((val, idx) => val === b.centerTurns[idx])
+    );
+  }
+
   canUndo(): boolean {
-    return this.history.length > 0;
+    if (this.solution && this.step > 0 && this.baseSnapshot) {
+      return !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot);
+    }
+    if (this.history.length === 0) return false;
+    const top = this.history[this.history.length - 1];
+    return !this.isSameSnapshot(this.getSnapshot(), top);
   }
 
   canRedo(): boolean {
@@ -91,11 +105,26 @@ export class CubeStore {
     this.centerRotations = [...centers];
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("replace");
   }
 
   undo(): boolean {
+    if (this.solution && this.step > 0 && this.baseSnapshot) {
+      if (this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)) {
+        return false;
+      }
+      this.future.push(this.getSnapshot());
+      this.state = this.baseSnapshot.state;
+      this.centerRotations = turnsToCenters(this.baseSnapshot.centerTurns);
+      this.revision++;
+      this.solution = undefined;
+      this.baseSnapshot = undefined;
+      this.step = 0;
+      this.notify("undo");
+      return true;
+    }
     const prev = this.history.pop();
     if (!prev) return false;
     this.future.push(this.getSnapshot());
@@ -103,6 +132,7 @@ export class CubeStore {
     this.centerRotations = turnsToCenters(prev.centerTurns);
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("undo");
     return true;
@@ -116,6 +146,7 @@ export class CubeStore {
     this.centerRotations = turnsToCenters(next.centerTurns);
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("redo");
     return true;
@@ -134,6 +165,7 @@ export class CubeStore {
 
   setSolution(solution: ResultData | undefined): void {
     this.solution = solution;
+    this.baseSnapshot = solution ? this.getSnapshot() : undefined;
     this.step = 0;
     this.notify("solution");
   }
@@ -173,6 +205,7 @@ export class CubeStore {
     this.centerRotations = [...nextCenters];
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("algorithm");
   }

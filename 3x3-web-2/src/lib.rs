@@ -159,7 +159,7 @@ pub fn solve_state_with_algorithm(
                 let oriented_budget = if budget_ms <= 1000 {
                     budget_ms / 2
                 } else {
-                    (budget_ms * 3 / 5).min(budget_ms.saturating_sub(3000))
+                    budget_ms.saturating_sub(1000).max(budget_ms * 4 / 5)
                 };
                 let mut search_oriented =
                     search::Search::new(oriented_budget).with_target_centers(centers);
@@ -237,18 +237,16 @@ pub fn solve_state_with_algorithm(
         }
     }
 
-    #[cfg(debug_assertions)]
-    {
-        let result_cube = cube::apply(&cube, &moves);
-        let is_pieces_solved = if include_orientation {
-            result_cube == coord::RawCube::default()
-        } else {
-            cube::facelets(&result_cube) == cube::SOLVED
-        };
+    // 解法適用後の完成状態を無条件に検証
+    let result_cube = cube::apply(&cube, &moves);
+    let is_pieces_solved = if include_orientation {
+        result_cube == coord::RawCube::default()
+    } else {
+        cube::facelets(&result_cube) == cube::SOLVED
+    };
 
-        if !is_pieces_solved {
-            return Err("解法の検証に失敗しました。".into());
-        }
+    if !is_pieces_solved {
+        return Err("解法の検証に失敗しました。".into());
     }
 
     if include_orientation {
@@ -263,7 +261,6 @@ pub fn solve_state_with_algorithm(
                 };
                 final_centers[f] = (final_centers[f] + t).rem_euclid(4);
             }
-            #[cfg(debug_assertions)]
             if final_centers.iter().any(|&c| c != 0) {
                 return Err("センター向きの検証に失敗しました。".into());
             }

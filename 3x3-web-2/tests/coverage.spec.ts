@@ -665,18 +665,22 @@ test.describe("E2E Coverage with CDP", () => {
         store.getSolution();
         store.getStep();
         store.getModifier();
-        store.canUndo();
+        store.canUndo(); // 履歴なしの canUndo
         store.canRedo();
         const rState = JSON.parse(
           (window as any).cube_studio.apply_moves(solved, "R"),
         ).state;
         store.replace(rState, true);
+        store.canUndo(); // 履歴ありの canUndo (78-80行)
         store.setSolution({
           moves: ["R"],
-          states: [solved, rState],
+          states: [rState, solved],
           elapsed_ms: 10,
         } as any);
-        store.undo(); // 履歴ありの undo (105-108行)
+        store.updateAfterSeek(solved, [0, 0, 0, 0, 0, 0], 1);
+        store.canUndo(); // 解法再生中の canUndo (74-76行)
+        store.undo(); // 解法再生中の undo (96-108行)
+        store.undo(); // 履歴ありの undo (110-120行)
         store.redo(); // 履歴ありの redo
         store.setModifier("'");
         store.setModifier("'");

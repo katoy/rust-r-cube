@@ -2183,3 +2183,25 @@ fn test_wasm_wrapper_functions() {
     // get_orientations の不正入力エラーハンドリング
     assert!(crate::get_orientations("INVALID").is_err());
 }
+
+#[test]
+fn test_f1_solution_verification_always_enforced() {
+    // F1 回帰テスト: Release/Debug 問わず、解法およびセンター向きの検証が無条件に機能することを保証
+    crate::initialize();
+
+    // 1. 正常な解法生成で検証がパスすることを確認
+    let sol = crate::solve_state_with_algorithm(SOLVED, 1000, false, None, "kociemba");
+    assert!(sol.is_ok());
+    assert_eq!(sol.unwrap().state, SOLVED);
+
+    // 2. センター向き指定ありで検証がパスすることを確認
+    let sol_centers =
+        crate::solve_state_with_algorithm(SOLVED, 1000, true, Some([0; 6]), "kociemba");
+    assert!(sol_centers.is_ok());
+    assert_eq!(sol_centers.unwrap().state, SOLVED);
+
+    // 3. 不正なセンター向きパリティ（奇数個の90度回転）が事前に弾かれることの確認
+    let bad_centers =
+        crate::solve_state_with_algorithm(SOLVED, 1000, true, Some([1, 0, 0, 0, 0, 0]), "kociemba");
+    assert!(bad_centers.is_err());
+}

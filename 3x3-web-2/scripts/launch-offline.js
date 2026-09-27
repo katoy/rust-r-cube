@@ -14,8 +14,30 @@ const distDir = path.join(rootDir, "dist");
 const PORT = 4173;
 const BASE_URL = `http://127.0.0.1:${PORT}/`;
 
-// 1. ビルド成果物の確認（存在しない場合は自動ビルド）
-async function ensureBuild() {
+// 1. ビルド成果物の確認（存在しない場合、またはソースが更新されている場合は自動ビルド）
+function getLatestMtime(dirPath) {
+  let latest = 0;
+  if (!fs.existsSync(dirPath)) return latest;
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      if (
+        entry.name !== "node_modules" &&
+        entry.name !== ".git" &&
+        entry.name !== "target" &&
+        entry.name !== "dist"
+      ) {
+        latest = Math.max(latest, getLatestMtime(fullPath));
+      }
+    } else {
+      latest = Math.max(latest, fs.statSync(fullPath).mtimeMs);
+    }
+  }
+  return latest;
+}
+
+async function ensureBuild(forceBuild = false) {
   const swPath = path.join(distDir, "sw.js");
   const indexPath = path.join(distDir, "index.html");
 
@@ -24,6 +46,35 @@ async function ensureBuild() {
       "📦 ビルド成果物が見つかりません。本番ビルドを実行しています...",
     );
     await runCommand("npm", ["run", "build"]);
+    return;
+  }
+
+  if (forceBuild) {
+    console.log("🔨 強制再ビルドを実行しています (--build / --fresh)...");
+    await runCommand("npm", ["run", "build"]);
+    return;
+  }
+
+  // 成果物とソースの鮮度（mtime）を比較
+  const distMtime = Math.min(
+    fs.statSync(swPath).mtimeMs,
+    fs.statSync(indexPath).mtimeMs,
+  );
+  const srcMtime = Math.max(
+    getLatestMtime(path.join(rootDir, "src")),
+    getLatestMtime(path.join(rootDir, "web")),
+    getLatestMtime(path.join(rootDir, "public")),
+  );
+
+  if (srcMtime > distMtime) {
+    console.log(
+      "🔄 ソースコードの変更を検知しました。最新の成果物をビルドしています...",
+    );
+    await runCommand("npm", ["run", "build"]);
+  } else {
+    console.log(
+      `⚡ 既存の最新ビルド成果物を使用します (${new Date(distMtime).toLocaleTimeString()})`,
+    );
   }
 }
 
@@ -110,6 +161,7 @@ async function startServer() {
 async function main() {
   const args = process.argv.slice(2);
   const isHeadless = args.includes("--headless");
+  const forceBuild = args.includes("--build") || args.includes("--fresh");
   const showHelp = args.includes("--help") || args.includes("-h");
 
   if (showHelp) {
@@ -117,12 +169,13 @@ async function main() {
 
 オプション:
   --headless    ブラウザを非表示（ヘッドレスモード）で実行してオフライン起動を検証
+  --fresh, --build 強制的にビルドを実行して最新状態を検証
   -h, --help    このヘルプを表示
 `);
     process.exit(0);
   }
 
-  await ensureBuild();
+  await ensureBuild(forceBuild);
 
   let serverProc = null;
   let browser = null;

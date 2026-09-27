@@ -164,6 +164,14 @@ export class CubeStore {
   }
 
   setSolution(solution: ResultData | undefined): void {
+    if (
+      this.baseSnapshot &&
+      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
+    ) {
+      this.history.push(this.baseSnapshot);
+      if (this.history.length > 200) this.history.shift();
+      this.future = [];
+    }
     this.solution = solution;
     this.baseSnapshot = solution ? this.getSnapshot() : undefined;
     this.step = 0;

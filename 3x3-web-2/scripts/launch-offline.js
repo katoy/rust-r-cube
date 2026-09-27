@@ -55,20 +55,40 @@ async function ensureBuild(forceBuild = false) {
     return;
   }
 
-  // 成果物とソースの鮮度（mtime）を比較
+  // 成果物とソース・設定ファイルの鮮度（mtime）を比較
   const distMtime = Math.min(
     fs.statSync(swPath).mtimeMs,
     fs.statSync(indexPath).mtimeMs,
   );
+
+  const configFiles = [
+    "vite.config.ts",
+    "Cargo.toml",
+    "Cargo.lock",
+    "build.rs",
+    "package.json",
+    "package-lock.json",
+    "index.html",
+    "scripts/generate-sw-precache.js",
+  ];
+  let configMtime = 0;
+  for (const rel of configFiles) {
+    const full = path.join(rootDir, rel);
+    if (fs.existsSync(full)) {
+      configMtime = Math.max(configMtime, fs.statSync(full).mtimeMs);
+    }
+  }
+
   const srcMtime = Math.max(
     getLatestMtime(path.join(rootDir, "src")),
     getLatestMtime(path.join(rootDir, "web")),
     getLatestMtime(path.join(rootDir, "public")),
+    configMtime,
   );
 
   if (srcMtime > distMtime) {
     console.log(
-      "🔄 ソースコードの変更を検知しました。最新の成果物をビルドしています...",
+      "🔄 ソースコードまたはビルド設定の変更を検知しました。最新の成果物をビルドしています...",
     );
     await runCommand("npm", ["run", "build"]);
   } else {
@@ -190,11 +210,19 @@ async function main() {
     if (serverProc) {
       serverProc.kill();
     }
-    process.exit(exitCode);
+    const numericCode =
+      typeof exitCode === "number"
+        ? exitCode
+        : exitCode === "SIGINT"
+          ? 130
+          : exitCode === "SIGTERM"
+            ? 143
+            : 0;
+    process.exit(numericCode);
   };
 
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  process.on("SIGINT", () => cleanup(130));
+  process.on("SIGTERM", () => cleanup(143));
 
   try {
     serverProc = await startServer();

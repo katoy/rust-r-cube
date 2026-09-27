@@ -15,12 +15,21 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, "..");
+const args = process.argv.slice(2);
+const warnOnly = args.includes("--warn-only");
+const dirArg = args.find((a) => !a.startsWith("--"));
+const rootDir = dirArg
+  ? path.resolve(process.cwd(), dirArg)
+  : path.resolve(__dirname, "..");
 
 let hasErrors = false;
 let hasWarnings = false;
 
 function reportError(rule, file, line, message) {
+  if (warnOnly) {
+    reportWarning(rule, file, line, message);
+    return;
+  }
   console.error(`❌ [ERROR][${rule}] ${file}:${line} - ${message}`);
   hasErrors = true;
 }
@@ -47,7 +56,7 @@ function checkRustDebugAssertions() {
         // 次の数行に return Err があるか走査
         const lookahead = lines.slice(i, i + 25).join("\n");
         if (lookahead.includes("return Err(")) {
-          reportWarning(
+          reportError(
             "F1-RELEASE-VERIFICATION",
             `src/${file}`,
             i + 1,
@@ -76,7 +85,7 @@ function checkFileReadOrder() {
         // 同じ関数の直前で .size チェックがあるか確認
         const lookbehind = lines.slice(Math.max(0, i - 15), i).join("\n");
         if (!lookbehind.includes(".size")) {
-          reportWarning(
+          reportError(
             "F3-FILE-SIZE-FIRST",
             `web/${file}`,
             i + 1,
@@ -106,7 +115,7 @@ function checkPathNormalization() {
         context.includes("pathname") &&
         !(context.includes("index") && context.includes("html"))
       ) {
-        reportWarning(
+        reportError(
           "F4-URL-NORMALIZATION",
           "web/main.ts",
           i + 1,
@@ -130,7 +139,7 @@ function checkServiceWorkerCache() {
       line.includes("cache.put(request,") &&
       !line.includes("// ignore-guardrail")
     ) {
-      reportWarning(
+      reportError(
         "F5-SW-QUERY-CACHE",
         "public/sw.js",
         i + 1,

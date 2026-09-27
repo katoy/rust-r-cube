@@ -125,4 +125,48 @@ test.describe("Playback Controls Enhancement", () => {
       .poll(async () => moveList.evaluate((el) => el.scrollTop))
       .toBe(0);
   });
+
+  test("closing solution after seek allows undoing back to pre-solution state and redoing to solved", async ({
+    page,
+  }) => {
+    // 1. R 回転を実行してスクランブル局面を作る
+    await page.locator('[data-move="R"]').click();
+    const scrambled = await page.locator("#scene").getAttribute("data-state");
+    expect(scrambled).not.toBe(SOLVED);
+
+    // 2. 解法を求める
+    await page.locator("#solve").click();
+    await expect(page.locator("#solution-content")).toBeVisible();
+
+    // 3. 「最後の手順へ」(#last) で完成局面へジャンプ
+    await page.locator("#last").click();
+    await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED);
+    await expect(page.locator("#undo")).toBeEnabled();
+
+    // 4. 解法を閉じる (#solution-close)
+    await page.locator("#solution-close").click();
+    await expect(page.locator("#solution-close")).toBeHidden();
+    await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED);
+
+    // 5. 閉じた後も Undo ボタンが有効であること
+    const undoBtn = page.locator("#undo");
+    const redoBtn = page.locator("#redo");
+    await expect(undoBtn).toBeEnabled();
+    await expect(redoBtn).toBeDisabled();
+
+    // 6. Undo を実行すると解法前の R 回転局面に戻る
+    await undoBtn.click();
+    await expect(page.locator("#scene")).toHaveAttribute(
+      "data-state",
+      scrambled!,
+    );
+    await expect(undoBtn).toBeEnabled();
+    await expect(redoBtn).toBeEnabled();
+
+    // 7. Redo を実行するとシークした完成局面に戻る
+    await redoBtn.click();
+    await expect(page.locator("#scene")).toHaveAttribute("data-state", SOLVED);
+    await expect(undoBtn).toBeEnabled();
+    await expect(redoBtn).toBeDisabled();
+  });
 });

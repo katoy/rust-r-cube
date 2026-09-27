@@ -371,7 +371,7 @@ export class TwoViewCamera {
       this.error("画像ファイルは20MB以内にしてください。");
       return;
     }
-    // File selection (including drops) replaces live mode, even while camera access is pending.
+    // ファイル選択（ドロップ含む）時は、カメラアクセス待機中であってもライブモードを解除
     if (existingGeneration === undefined) this.stopLiveStream();
     const generation =
       existingGeneration ??
@@ -482,7 +482,7 @@ export class TwoViewCamera {
       this.update();
       return;
     }
-    // Detect from the image alone: the visible canvas also contains editable guides.
+    // 編集用ガイドが描画されたCanvasを避け、画像本体のみから輪郭を検出
     const rawCanvas = document.createElement("canvas");
     rawCanvas.width = this.canvas.width;
     rawCanvas.height = this.canvas.height;

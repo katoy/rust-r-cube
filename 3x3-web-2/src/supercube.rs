@@ -30,8 +30,8 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
     };
 
     if is_adjacent(a, b) {
-        // Map (U, F) to (u, f)
-        // base_alg rotates u by -1, f by +1.
+        // (U, F) の関係を (u, f) へ写像
+        // base_alg は u を -90° (反時計回り)、f を +90° (時計回り) 回転させる基本手順
         let (u, f) = (a, b);
         let invert = delta_a == 1;
 
@@ -41,7 +41,7 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
             normals[u][0] * normals[f][1] - normals[u][1] * normals[f][0],
         ];
         let r = (0..6).find(|&i| normals[i] == r_vec).unwrap();
-        // Opposite faces in URFDLB order: U↔D, R↔L, F↔B.
+        // URFDLB 順の対向面マッピング: U↔D, R↔L, F↔B
         let opposite = [3, 4, 5, 0, 1, 2];
         let map = [u, r, f, opposite[u], opposite[r], opposite[f]];
         let mv: Vec<usize> = get_base_alg()
@@ -54,7 +54,7 @@ pub fn rotate_two_centers(a: usize, delta_a: i32, b: usize, delta_b: i32) -> Vec
             mv
         }
     } else {
-        // Opposite faces: find an intermediate face c adjacent to both a and b
+        // 対向面ペアの場合: a と b の両方に隣接する中間面 c を経由して合成
         let c = (0..6)
             .find(|&i| is_adjacent(a, i) && is_adjacent(b, i))
             .unwrap();
@@ -114,8 +114,8 @@ fn cancel_redundant_moves_single_pass(moves: &[usize]) -> Vec<usize> {
     reduced
 }
 
-/// Cancel adjacent redundant moves and commutative opposite-face moves (e.g. R R' -> nothing, U D U' -> D).
-/// Uses fixed-point iteration to exhaustively resolve multi-nested cascading cancellations.
+/// 隣接する冗長回転および可換な対向面の相殺（例: R R' -> 除去、U D U' -> D）。
+/// 固定点反復（fixed-point iteration）を用いて、多重にネストしたカスケード相殺を網羅的に解決します。
 pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
     let mut current = moves.to_vec();
     loop {
@@ -172,8 +172,8 @@ fn evaluate_matching(mut cur: [i32; 6], matching: &[(usize, usize)]) -> Vec<usiz
     cancel_redundant_moves(&moves)
 }
 
-/// Solves remaining center rotations so that all 6 centers have 0 rotation mod 4.
-/// `current_rotations`: current net rotation of each face center (0..6) in quarter turns (0..4).
+/// 6面すべてのセンター回転が mod 4 で 0 になるように残余センター向きを解決します。
+/// `current_rotations`: 各面センターの正味回転角（0..6面、90°単位 0..4）。
 pub fn solve_center_orientations(current_rotations: [i32; 6]) -> Result<Vec<usize>, String> {
     let mut needed = [0i32; 6];
     for f in 0..6 {
@@ -218,11 +218,17 @@ mod tests {
     fn test_odd_center_rotations_parity_rejected() {
         let single_odd = [1, 0, 0, 0, 0, 0];
         let res1 = solve_center_orientations(single_odd);
-        assert!(res1.is_err(), "Single odd center rotation must be rejected");
+        assert!(
+            res1.is_err(),
+            "奇数個の奇数回転センターはパリティ不正として拒否されること"
+        );
 
         let three_odds = [1, 1, 1, 0, 0, 0];
         let res3 = solve_center_orientations(three_odds);
-        assert!(res3.is_err(), "Three odd center rotations must be rejected");
+        assert!(
+            res3.is_err(),
+            "奇数個の奇数回転センターはパリティ不正として拒否されること"
+        );
     }
 
     #[test]
@@ -265,7 +271,10 @@ mod tests {
         // 対向面を跨いだ多重相殺: U R L L' R' U' -> 空
         let moves2 = parse_moves("U R L L' R' U'").unwrap();
         let canceled2 = cancel_redundant_moves(&moves2);
-        assert!(canceled2.is_empty(), "対向面を跨いだ多重相殺で空配列になること");
+        assert!(
+            canceled2.is_empty(),
+            "対向面を跨いだ多重相殺で空配列になること"
+        );
 
         // 3面連鎖の相殺: F U R R' U' F' -> 空
         let moves3 = parse_moves("F U R R' U' F'").unwrap();

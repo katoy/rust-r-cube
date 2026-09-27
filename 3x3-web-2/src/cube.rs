@@ -27,6 +27,9 @@ pub const EDGES: [[usize; 2]; 12] = [
     [48, 14],
 ];
 
+/// 54文字の展開図文字列（U, R, F, D, L, B）を解析し、合法な `RawCube` 構造体に変換します。
+/// 各面の枚数（各9枚）、センター色の一致、ピースの重複、コーナー・エッジの向きパリティ、
+/// およびピース置換全体の偶奇パリティを厳密に検証します。
 pub fn parse_state(text: &str) -> Result<RawCube, String> {
     let f = text.as_bytes();
     if f.len() != 54 {
@@ -104,12 +107,15 @@ pub fn parse_state(text: &str) -> Result<RawCube, String> {
     }
     Ok(cube)
 }
+
+/// 置換の転倒数を数え、パリティ（偶置換=0, 奇置換=1）を計算します。
 pub(crate) fn parity(p: &[u8]) -> usize {
     (0..p.len())
         .map(|i| (i + 1..p.len()).filter(|j| p[i] > p[*j]).count())
         .sum::<usize>()
         % 2
 }
+/// `RawCube` 構造体の内部状態から、54文字の展開図文字列（URFDLB）を生成します。
 pub fn facelets(cube: &RawCube) -> String {
     let mut f = <[u8; 54]>::try_from(SOLVED.as_bytes()).unwrap();
     for (slot, indices) in CORNERS.iter().enumerate() {
@@ -126,6 +132,8 @@ pub fn facelets(cube: &RawCube) -> String {
     }
     String::from_utf8(f.to_vec()).unwrap()
 }
+
+/// 空白区切りの回転記号文字列（例: "R U R' U'"）を解析し、回転インデックス列に変換します。
 pub fn parse_moves(text: &str) -> Result<Vec<usize>, String> {
     if text.len() > 4096 {
         return Err("手順は4096文字以内にしてください。".into());
@@ -148,19 +156,25 @@ pub fn parse_moves(text: &str) -> Result<Vec<usize>, String> {
         })
         .collect()
 }
+
+/// 単一の回転インデックス（0..18）を標準文字列表現（"R", "U2", "F'" など）に変換します。
 pub fn notation(m: usize) -> String {
     format!("{}{}", FACES[m / 3] as char, ["", "2", "'"][m % 3])
 }
+
+/// 指定したキューブ状態に一連の回転操作を順次適用した新しい状態を返します。
 pub fn apply(cube: &RawCube, moves: &[usize]) -> RawCube {
     moves
         .iter()
         .fold(*cube, |c, m| c.multiply(move_cube_18(*m)))
 }
+
 #[inline]
 fn is_opposite_face(f1: usize, f2: usize) -> bool {
     (f1 < f2 && f1 + 3 == f2) || (f2 < f1 && f2 + 3 == f1)
 }
 
+/// 指定した疑似乱数シードから、対向面や同一面の冗長回転を排除した25手のスクランブル手順を生成します。
 pub fn scramble(seed: u32) -> Vec<usize> {
     let mut x = seed.max(1);
     let mut moves = Vec::with_capacity(25);
@@ -183,7 +197,7 @@ pub fn scramble(seed: u32) -> Vec<usize> {
     moves
 }
 
-// Keep enum references explicit for stable serialization-free piece identities.
+// シリアライズに依存しないピース定義の明示的参照を維持
 const _: usize = Corner::UFR as usize + Edge::UR as usize;
 
 #[cfg(test)]

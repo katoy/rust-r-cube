@@ -89,7 +89,7 @@ export class ColorEditor {
       try {
         this.turns = centerTurns(automaticCenters(this.draft));
       } catch {
-        // Incomplete colors are validated when the user applies the draft.
+        // 編集中で色が未完成な段階のエラーは無視し、適用時に一括バリデーションを実施
       }
     }
     this.render();

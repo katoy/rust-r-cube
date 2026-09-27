@@ -324,11 +324,13 @@ pub fn is_solved_core(state: &str) -> Result<bool, String> {
     cube::parse_state(state).map(|c| c == coord::RawCube::default())
 }
 
-/// Required parity of the sum of center quarter turns.
+/// センタークォーターターンの総和パリティ（0 または 1）を返します。
+/// コーナー置換パリティとセンター回転総和パリティの偶奇は常に一致する必要があります。
 pub fn center_parity_core(state: &str) -> Result<u8, String> {
     cube::parse_state(state).map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
 }
 
+/// テーブルや各種パニックフックを初期化します。
 #[wasm_bindgen]
 pub fn initialize() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -358,16 +360,20 @@ pub fn is_solved(state: &str) -> Result<bool, JsValue> {
     is_solved_core(state).map_err(to_js_error)
 }
 
-/// Required parity of the sum of center quarter turns. Each face quarter turn
-/// changes both this sum's parity and the corner permutation's parity.
+/// センタークォーターターンの総和パリティ（0 または 1）を返します。
+/// 各面のクォーターターン（90°回転）は、この総和パリティとコーナー置換パリティの双方を反転させます。
 #[wasm_bindgen]
 pub fn center_parity(state: &str) -> Result<u8, JsValue> {
     center_parity_core(state).map_err(to_js_error)
 }
+
+/// 指定した局面に回転手順を適用し、結果の局面および遷移履歴を JSON で返します。
 #[wasm_bindgen]
 pub fn apply_moves(state: &str, moves: &str) -> Result<String, JsValue> {
     json(apply_moves_core(state, moves))
 }
+
+/// 指定した疑似乱数シードに基づき、冗長手を排除した25手のスクランブル文字列を生成します。
 #[wasm_bindgen]
 pub fn scramble(seed: u32) -> String {
     cube::scramble(seed)
@@ -376,11 +382,14 @@ pub fn scramble(seed: u32) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+/// 状態を解き、解法手順と各ステップの局面を含む JSON 文字列を返します。
 #[wasm_bindgen]
 pub fn solve(state: &str, budget_ms: u32) -> Result<String, JsValue> {
     json(solve_state(state, budget_ms, true))
 }
 
+/// センターの初期向きを考慮して解法を探索し、結果を JSON 文字列で返します。
 #[wasm_bindgen]
 pub fn solve_with_orientation(
     state: &str,
@@ -417,6 +426,7 @@ pub(crate) fn parse_initial_centers(centers_str: Option<&str>) -> Result<Option<
     }
 }
 
+/// 指定したアルゴリズム（kociemba, cfop, thistlethwaite, korf）を用いて解法を探索し、結果を JSON 文字列で返します。
 #[wasm_bindgen]
 pub fn solve_with_algorithm(
     state: &str,

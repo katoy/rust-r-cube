@@ -14,8 +14,8 @@ export function turnsToCenters(turns: number[]): number[] {
 }
 
 export function automaticCenters(state: string): number[] {
-  // Any legal quarter turn changes both corner permutation parity and the
-  // parity of the center-turn sum. This picks one compatible orientation.
+  // 面の90°回転はコーナー置換パリティとセンター回転総和パリティの双方を反転させるため、
+  // パリティ整合を満たす有効な向きの代表値（U面の回転）を選択
   return [center_parity(state) * quarterTurn, 0, 0, 0, 0, 0];
 }
 

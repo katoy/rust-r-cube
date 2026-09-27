@@ -171,8 +171,8 @@ impl Search {
                 return false;
             }
             if self.target_centers.is_some() {
-                // In Phase 2, R(1), F(2), L(4), B(5) can only turn by 180° (+2 mod 4).
-                // If any of their remaining center rotations is odd, it can never be solved to 0 mod 4.
+                // Phase 2 では R(1), F(2), L(4), B(5) は 180° (+2 mod 4) 回転のみ許可される。
+                // したがって、残余センター回転が奇数の面がある場合、Phase 2 内で 0 mod 4 に解消することはできない。
                 if (self.current_centers[1] & 1) != 0
                     || (self.current_centers[2] & 1) != 0
                     || (self.current_centers[4] & 1) != 0

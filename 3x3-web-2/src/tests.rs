@@ -891,7 +891,7 @@ fn test_solve_state_orientation_false() {
     assert!(result.is_ok());
     let solution = result.unwrap();
     assert_eq!(solution.state, SOLVED);
-    assert!(!solution.moves.is_empty() || solution.moves.is_empty()); // always true, covers the else path
+    assert!(!solution.moves.is_empty() || solution.moves.is_empty()); // 常に真（else分岐パスを網羅）
 }
 
 #[test]
@@ -1342,12 +1342,12 @@ fn wasm_result_data_serialization() {
 fn test_supercube_centers() {
     let solved = RawCube::default();
 
-    // 180° single center
+    // 単独センターの 180° 回転
     let moves = supercube::rotate_center_180(0);
     let res = apply(&solved, &moves);
     assert_eq!(res, solved, "180 deg U should leave cube solved!");
 
-    // Test supercube::solve_center_orientations on all 2048 valid configurations!
+    // 合法な全2048通りのセンター構成に対して supercube::solve_center_orientations を検証
     let mut tested = 0;
     for c0 in 0..4 {
         for c1 in 0..4 {
@@ -1361,11 +1361,11 @@ fn test_supercube_centers() {
                             let needed = [c0, c1, c2, c3, c4, c5];
                             let moves = supercube::solve_center_orientations(needed).unwrap();
 
-                            // Apply to solved cube
+                            // 完成状態のキューブに適用してピース状態の維持を検証
                             let res = apply(&solved, &moves);
                             assert_eq!(res, solved, "Moves must leave cube solved");
 
-                            // Verify net turns of moves match needed:
+                            // 移動手順による正味の回転が needed と相殺されることを検証
                             let mut net = [0i32; 6];
                             for &m in &moves {
                                 let face = m / 3;
@@ -1395,8 +1395,8 @@ fn test_supercube_centers() {
     }
     assert_eq!(tested, 2048);
 
-    // Test solve_state_with_centers where cube has misoriented centers:
-    // e.g. U was turned: initial centers = [3, 0, 1, 0, 0, 0] (U -90°, F +90°)
+    // センターが誤った向きを持つ状態での solve_state_with_centers をテスト:
+    // 例: U面が回転済み: initial centers = [3, 0, 1, 0, 0, 0] (U -90°, F +90°)
     let state = SOLVED;
     let sol = crate::solve_state_with_centers(state, 5000, true, Some([3, 0, 1, 0, 0, 0])).unwrap();
     assert_eq!(sol.state, SOLVED);
@@ -1600,7 +1600,7 @@ fn incompatible_center_input_is_rejected_before_search() {
     let error =
         crate::solve_state_with_centers(SOLVED, 0, true, Some([1, 0, 0, 0, 0, 0])).unwrap_err();
     assert!(error.contains("センター"), "{error}");
-    // Color-only solving does not constrain center orientation.
+    // 色のみの解決（include_orientation=false）ではセンター向きは制約されない
     assert!(crate::solve_state_with_centers(SOLVED, 0, false, Some([1, 0, 0, 0, 0, 0])).is_ok());
 }
 
@@ -2048,7 +2048,7 @@ fn test_r06_budget_contract() {
     let c = apply(&RawCube::default(), &scramble(948));
     let state_948 = facelets(&c);
 
-    // Korf with complex scramble and budget 5ms: must not hang on fallback
+    // 複雑なスクランブルかつ予算 5ms の Korf 探索: フォールバック時にハングしないこと
     let start = web_time::Instant::now();
     let _ = crate::solve_state_with_algorithm(&state_948, 5, false, None, "korf");
     let elapsed_korf = start.elapsed().as_millis();
@@ -2058,7 +2058,7 @@ fn test_r06_budget_contract() {
         elapsed_korf
     );
 
-    // Thistlethwaite with complex scramble and budget 5ms: must not hang on fallback
+    // 複雑なスクランブルかつ予算 5ms の Thistlethwaite 探索: フォールバック時にハングしないこと
     let start = web_time::Instant::now();
     let _ = crate::solve_state_with_algorithm(&state_948, 5, false, None, "thistlethwaite");
     let elapsed_thistle = start.elapsed().as_millis();
@@ -2068,7 +2068,7 @@ fn test_r06_budget_contract() {
         elapsed_thistle
     );
 
-    // CFOP with complex scramble and budget 1ms
+    // 複雑なスクランブルかつ予算 1ms の CFOP 探索
     let start = web_time::Instant::now();
     let _ = crate::solve_state_with_algorithm(&state_948, 1, false, None, "cfop");
     let elapsed_cfop = start.elapsed().as_millis();

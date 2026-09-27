@@ -249,7 +249,7 @@ impl RawCube {
         })[mv]
     }
 
-    // Coordinate encoders.
+    // --- 座標エンコーダ・デコーダ ---
 
     /// Twist (コーナーの向き) を取得 (0..2186)
     pub fn get_twist(&self) -> u16 {

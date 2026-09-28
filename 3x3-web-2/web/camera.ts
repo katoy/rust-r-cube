@@ -43,6 +43,8 @@ export class TwoViewCamera {
   private loadGenerationA = 0;
   private loadGenerationB = 0;
   private captureRequestId = 0;
+  private viewActionSequence = 0;
+  private latestViewActivationSeq = 0;
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -342,6 +344,7 @@ export class TwoViewCamera {
   }
 
   private switchView(view: "A" | "B") {
+    this.latestViewActivationSeq = ++this.viewActionSequence;
     if (this.currentView === view) return;
     this.currentView = view;
     this.points = [];
@@ -349,6 +352,33 @@ export class TwoViewCamera {
     this.renderImage();
     this.renderResults();
     this.autoDetectOutline();
+  }
+
+  private onImageLoaded(
+    view: "A" | "B",
+    requestSeq: number,
+    image: HTMLImageElement,
+    url: string,
+  ): void {
+    if (view === "A") {
+      this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+      this.sourceUrlA = url;
+      this.imageA = image;
+    } else {
+      this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+      this.sourceUrlB = url;
+      this.imageB = image;
+    }
+
+    if (requestSeq >= this.latestViewActivationSeq) {
+      this.latestViewActivationSeq = requestSeq;
+      this.currentView = view;
+      this.renderImage();
+      this.autoDetectOutline();
+    } else if (this.currentView === view) {
+      this.renderImage();
+      this.autoDetectOutline();
+    }
   }
 
   private async loadFile(input: HTMLInputElement, view: "A" | "B") {
@@ -376,6 +406,7 @@ export class TwoViewCamera {
     const generation =
       existingGeneration ??
       (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
+    const requestSeq = ++this.viewActionSequence;
     const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const rawImage = new Image();
@@ -419,18 +450,12 @@ export class TwoViewCamera {
                     resolve();
                     return;
                   }
-                  if (view === "A") {
-                    this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
-                    this.sourceUrlA = resizedUrl;
-                    this.imageA = resizedImage;
-                  } else {
-                    this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
-                    this.sourceUrlB = resizedUrl;
-                    this.imageB = resizedImage;
-                  }
-                  this.currentView = view;
-                  this.renderImage();
-                  this.autoDetectOutline();
+                  this.onImageLoaded(
+                    view,
+                    requestSeq,
+                    resizedImage,
+                    resizedUrl,
+                  );
                   resolve();
                 };
                 resizedImage.onerror = () => {
@@ -446,18 +471,7 @@ export class TwoViewCamera {
           }
         }
 
-        if (view === "A") {
-          this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
-          this.sourceUrlA = url;
-          this.imageA = rawImage;
-        } else {
-          this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
-          this.sourceUrlB = url;
-          this.imageB = rawImage;
-        }
-        this.currentView = view;
-        this.renderImage();
-        this.autoDetectOutline();
+        this.onImageLoaded(view, requestSeq, rawImage, url);
         resolve();
       };
       rawImage.onerror = () => {

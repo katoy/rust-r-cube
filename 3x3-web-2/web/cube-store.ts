@@ -90,16 +90,31 @@ export class CubeStore {
     };
   }
 
+  private pushHistory(snapshot: CubeSnapshot): void {
+    this.history.push(snapshot);
+    if (this.history.length > 200) this.history.shift();
+    this.future = [];
+  }
+
+  private commitBaseSnapshotIfPreviewing(): void {
+    if (
+      this.baseSnapshot &&
+      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
+    ) {
+      this.pushHistory(this.baseSnapshot);
+    }
+  }
+
   replace(next: string, record = true, centers = automaticCenters(next)): void {
     const nextTurns = centerTurns(centers);
-    if (
-      record &&
-      (this.state !== next ||
-        this.getCenterTurns().some((t, i) => t !== nextTurns[i]))
-    ) {
-      this.history.push(this.getSnapshot());
-      if (this.history.length > 200) this.history.shift();
-      this.future = [];
+    if (record) {
+      this.commitBaseSnapshotIfPreviewing();
+      if (
+        this.state !== next ||
+        this.getCenterTurns().some((t, i) => t !== nextTurns[i])
+      ) {
+        this.pushHistory(this.getSnapshot());
+      }
     }
     this.state = next;
     this.centerRotations = [...centers];
@@ -164,14 +179,7 @@ export class CubeStore {
   }
 
   setSolution(solution: ResultData | undefined): void {
-    if (
-      this.baseSnapshot &&
-      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
-    ) {
-      this.history.push(this.baseSnapshot);
-      if (this.history.length > 200) this.history.shift();
-      this.future = [];
-    }
+    this.commitBaseSnapshotIfPreviewing();
     this.solution = solution;
     this.baseSnapshot = solution ? this.getSnapshot() : undefined;
     this.step = 0;
@@ -200,14 +208,14 @@ export class CubeStore {
     nextCenters: number[],
     record = true,
   ): void {
-    if (
-      record &&
-      (this.state !== nextState ||
-        nextCenters.some((angle, i) => angle !== this.centerRotations[i]))
-    ) {
-      this.history.push(this.getSnapshot());
-      if (this.history.length > 200) this.history.shift();
-      this.future = [];
+    if (record) {
+      this.commitBaseSnapshotIfPreviewing();
+      if (
+        this.state !== nextState ||
+        nextCenters.some((angle, i) => angle !== this.centerRotations[i])
+      ) {
+        this.pushHistory(this.getSnapshot());
+      }
     }
     this.state = nextState;
     this.centerRotations = [...nextCenters];

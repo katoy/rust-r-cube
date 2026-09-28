@@ -3,8 +3,15 @@ import { spawn } from "child_process";
 import http from "http";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { chromium } from "@playwright/test";
+
+import {
+  collectInputFiles,
+  saveBuildManifest,
+  checkInputsFreshness,
+} from "./build-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,29 +21,7 @@ const distDir = path.join(rootDir, "dist");
 const PORT = 4173;
 const BASE_URL = `http://127.0.0.1:${PORT}/`;
 
-// 1. ビルド成果物の確認（存在しない場合、またはソースが更新されている場合は自動ビルド）
-function getLatestMtime(dirPath) {
-  let latest = 0;
-  if (!fs.existsSync(dirPath)) return latest;
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      if (
-        entry.name !== "node_modules" &&
-        entry.name !== ".git" &&
-        entry.name !== "target" &&
-        entry.name !== "dist"
-      ) {
-        latest = Math.max(latest, getLatestMtime(fullPath));
-      }
-    } else {
-      latest = Math.max(latest, fs.statSync(fullPath).mtimeMs);
-    }
-  }
-  return latest;
-}
-
+// 1. ビルド成果物の確認（存在しない場合、またはソースが更新・追加・削除されている場合は自動ビルド）
 async function ensureBuild(forceBuild = false) {
   const swPath = path.join(distDir, "sw.js");
   const indexPath = path.join(distDir, "index.html");
@@ -55,43 +40,19 @@ async function ensureBuild(forceBuild = false) {
     return;
   }
 
-  // 成果物とソース・設定ファイルの鮮度（mtime）を比較
-  const distMtime = Math.min(
-    fs.statSync(swPath).mtimeMs,
-    fs.statSync(indexPath).mtimeMs,
-  );
+  const currentInputs = collectInputFiles(rootDir);
+  const freshness = checkInputsFreshness(rootDir, distDir, currentInputs);
 
-  const configFiles = [
-    "vite.config.ts",
-    "Cargo.toml",
-    "Cargo.lock",
-    "build.rs",
-    "package.json",
-    "package-lock.json",
-    "index.html",
-    "scripts/generate-sw-precache.js",
-  ];
-  let configMtime = 0;
-  for (const rel of configFiles) {
-    const full = path.join(rootDir, rel);
-    if (fs.existsSync(full)) {
-      configMtime = Math.max(configMtime, fs.statSync(full).mtimeMs);
-    }
-  }
-
-  const srcMtime = Math.max(
-    getLatestMtime(path.join(rootDir, "src")),
-    getLatestMtime(path.join(rootDir, "web")),
-    getLatestMtime(path.join(rootDir, "public")),
-    configMtime,
-  );
-
-  if (srcMtime > distMtime) {
+  if (!freshness.fresh) {
     console.log(
-      "🔄 ソースコードまたはビルド設定の変更を検知しました。最新の成果物をビルドしています...",
+      `🔄 ソースコードまたは設定の変更を検知しました (${freshness.reason})。最新の成果物をビルドしています...`,
     );
     await runCommand("npm", ["run", "build"]);
   } else {
+    const distMtime = Math.min(
+      fs.statSync(swPath).mtimeMs,
+      fs.statSync(indexPath).mtimeMs,
+    );
     console.log(
       `⚡ 既存の最新ビルド成果物を使用します (${new Date(distMtime).toLocaleTimeString()})`,
     );

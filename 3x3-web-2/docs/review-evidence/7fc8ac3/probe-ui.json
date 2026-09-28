@@ -1,0 +1,34 @@
+{
+  "f1SaveDuringPreview": {
+    "scrambleState": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "stepState": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "isStepStateSolved": true,
+    "savedJsonState": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "savedContainsScrambleState": false,
+    "savedContainsStepState": true
+  },
+  "f2SolutionCloseCommitsPreviewState": {
+    "scrambleState": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "stateAfterClose": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "isRestoredToScramble": false,
+    "isCommittedToPreviewState": true,
+    "statusTextAfterClose": "完成状態",
+    "solveButtonText": "完成状態を確認"
+  },
+  "f3PresetRaceDuringSolve": {
+    "initialRev": 0,
+    "revDuringSolve": 0,
+    "revisionChangedOnSolveStart": false,
+    "presetStatus": "✓ スーパーフリップ を読み込みました"
+  },
+  "f4EmptyAlgorithmDestroysSolution": {
+    "solutionExistedBefore": true,
+    "solutionExistedAfter": false,
+    "solutionWasDestroyed": true
+  },
+  "f5ModifierAndActivePressDuringSolve": {
+    "primeDisabled": false,
+    "doubleDisabled": false,
+    "uBtnActivePressWhileDisabled": true
+  }
+}

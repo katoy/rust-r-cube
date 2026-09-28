@@ -162,13 +162,17 @@ function refresh() {
   $("cancel").hidden = !solving;
   $("solve").innerHTML =
     `<span>${engineError ? "エンジンを再試行" : state === SOLVED ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
-  $<HTMLButtonElement>("undo").disabled = !mainReady || !store.canUndo();
-  $<HTMLButtonElement>("redo").disabled = !mainReady || !store.canRedo();
+  $<HTMLButtonElement>("undo").disabled =
+    !mainReady || !store.canUndo() || solving;
+  $<HTMLButtonElement>("redo").disabled =
+    !mainReady || !store.canRedo() || solving;
   document
     .querySelectorAll<HTMLButtonElement>(
       "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#preset-buttons button",
     )
-    .forEach((b) => (b.disabled = !mainReady));
+    .forEach((b) => (b.disabled = !mainReady || solving));
+  solverAlgo.disabled = solving;
+  includeOrientation.disabled = solving;
   $("solution-empty").hidden = !!solution;
   $("solution-content").hidden = !solution;
   document.body.classList.toggle("has-solution", !!solution);
@@ -403,28 +407,31 @@ async function play() {
   refresh();
   const data = solution;
   const run = playbackRun;
-  while (
-    playing &&
-    run === playbackRun &&
-    store.getSolution() === data &&
-    store.getStep() < data.moves.length
-  ) {
-    await seek(store.getStep() + 1);
-    if (reduced.checked)
-      await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          Math.max(
-            30,
-            Math.round(Number($<HTMLSelectElement>("speed").value) / 10),
+  try {
+    while (
+      playing &&
+      run === playbackRun &&
+      store.getSolution() === data &&
+      store.getStep() < data.moves.length
+    ) {
+      await seek(store.getStep() + 1);
+      if (reduced.checked)
+        await new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            Math.max(
+              30,
+              Math.round(Number($<HTMLSelectElement>("speed").value) / 10),
+            ),
           ),
-        ),
-      );
-  }
-  if (store.getSolution() === data && run === playbackRun) {
-    playing = false;
-    persist();
-    refresh();
+        );
+    }
+  } finally {
+    if (run === playbackRun) {
+      playing = false;
+      persist();
+      refresh();
+    }
   }
 }
 async function applyAlgorithm(algorithm: string, animate = true) {
@@ -475,6 +482,7 @@ async function solve(budget = 5000) {
   stop();
   message();
   $("extended").hidden = true;
+  store.restoreBaseSnapshot();
   store.setSolution(undefined);
   try {
     const currentState = store.getState();
@@ -571,6 +579,7 @@ async function getCamera(
 
 $("edit-colors").onclick = async () => {
   stop();
+  cancelSearch();
   refresh();
   const ed = await getEditor();
   if (ed) {
@@ -578,6 +587,9 @@ $("edit-colors").onclick = async () => {
   }
 };
 $("camera-colors").onclick = async () => {
+  stop();
+  cancelSearch();
+  refresh();
   const cam = await getCamera();
   if (cam) {
     cam.open();
@@ -617,9 +629,13 @@ function setModifier(value: "'" | "2") {
 $("prime").onclick = () => setModifier("'");
 $("double").onclick = () => setModifier("2");
 $("undo").onclick = () => {
+  stop();
+  cancelSearch();
   if (store.undo()) message();
 };
 $("redo").onclick = () => {
+  stop();
+  cancelSearch();
   if (store.redo()) message();
 };
 $("reset").onclick = () => replace(SOLVED);
@@ -684,6 +700,10 @@ $("solution-close").onclick = () => {
   store.setSolution(undefined);
   persist();
   refresh();
+  const solveBtn = $<HTMLButtonElement>("solve");
+  if (solveBtn && !solveBtn.hidden && !solveBtn.disabled) {
+    solveBtn.focus();
+  }
 };
 $("help").onclick = () => {
   stop();

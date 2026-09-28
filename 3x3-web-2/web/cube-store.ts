@@ -178,6 +178,20 @@ export class CubeStore {
     this.notify("modifier");
   }
 
+  restoreBaseSnapshot(): boolean {
+    if (this.baseSnapshot && this.solution) {
+      this.state = this.baseSnapshot.state;
+      this.centerRotations = turnsToCenters(this.baseSnapshot.centerTurns);
+      this.step = 0;
+      this.solution = undefined;
+      this.baseSnapshot = undefined;
+      this.revision++;
+      this.notify("solution");
+      return true;
+    }
+    return false;
+  }
+
   setSolution(solution: ResultData | undefined): void {
     this.commitBaseSnapshotIfPreviewing();
     this.solution = solution;

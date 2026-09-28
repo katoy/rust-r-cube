@@ -39,6 +39,7 @@ export function collectInputFiles(rootDir) {
 
   const configFiles = [
     "vite.config.ts",
+    "tsconfig.json",
     "Cargo.toml",
     "Cargo.lock",
     "build.rs",
@@ -46,6 +47,7 @@ export function collectInputFiles(rootDir) {
     "package-lock.json",
     "index.html",
     "scripts/generate-sw-precache.js",
+    "scripts/build-manifest.js",
   ];
   for (const rel of configFiles) {
     const full = path.join(rootDir, rel);

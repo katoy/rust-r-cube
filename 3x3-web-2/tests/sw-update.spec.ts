@@ -46,12 +46,20 @@ const test = base.extend<{
         path.join(distDir, "index.html"),
         "<!doctype html><title>Service Worker regression test</title>",
       );
+      fs.writeFileSync(
+        path.join(tempDir, "package.json"),
+        JSON.stringify({ type: "module" }),
+      );
       fs.copyFileSync(
         path.join(projectDir, "public/sw.js"),
         path.join(distDir, "sw.js"),
       );
-      // 実スクリプトを相対パス構造ごと隔離し、作業中の dist は変更しない。
-      const scriptPath = path.join(scriptsDir, "generate-sw-precache.mjs");
+      // 実スクリプトとその依存を相対パス構造ごと隔離し、作業中の dist は変更しない。
+      fs.copyFileSync(
+        path.join(projectDir, "scripts/build-manifest.js"),
+        path.join(scriptsDir, "build-manifest.js"),
+      );
+      const scriptPath = path.join(scriptsDir, "generate-sw-precache.js");
       fs.copyFileSync(
         path.join(projectDir, "scripts/generate-sw-precache.js"),
         scriptPath,

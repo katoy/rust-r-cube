@@ -1,0 +1,20 @@
+{
+  "head": "9fb1ebcb304a096db7bc84a895778eacd9c914d9",
+  "manifest": {
+    "tsconfigTracked": false,
+    "manifestScriptTracked": false,
+    "freshAfterChangingBoth": {
+      "fresh": true
+    }
+  },
+  "guardrailWithBrokenPathNormalizer": {
+    "exitCode": 0,
+    "output": "🔍 コードレビュー・ガードレール静的検証を実行中...\n\n✅ レビュー・ガードレール検査をパスしました。"
+  },
+  "inactiveImage": {
+    "storedImage": true,
+    "statusBeforeReturn": "未選択（クリックまたはドロップ）",
+    "cardClassBeforeReturn": "camera-file-card",
+    "statusAfterReturn": "読込完了 (20×20)"
+  }
+}

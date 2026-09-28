@@ -354,6 +354,25 @@ export class TwoViewCamera {
     this.autoDetectOutline();
   }
 
+  private updateCardStatus(view: "A" | "B") {
+    const isA = view === "A";
+    const image = isA ? this.imageA : this.imageB;
+    const status = $(isA ? "camera-status-a" : "camera-status-b");
+    if (status) {
+      status.textContent = image
+        ? `読込完了 (${image.naturalWidth}×${image.naturalHeight})`
+        : "未選択（クリックまたはドロップ）";
+    }
+    const card = $(isA ? "camera-drop-a" : "camera-drop-b");
+    if (card) {
+      card.classList.toggle("has-file", !!image);
+      const title = card.querySelector(".file-card-title");
+      if (title) {
+        title.textContent = `画像${view}（${this.getViewFacesLabel(view)}）`;
+      }
+    }
+  }
+
   private onImageLoaded(
     view: "A" | "B",
     requestSeq: number,
@@ -369,6 +388,8 @@ export class TwoViewCamera {
       this.sourceUrlB = url;
       this.imageB = image;
     }
+
+    this.updateCardStatus(view);
 
     if (requestSeq >= this.latestViewActivationSeq) {
       this.latestViewActivationSeq = requestSeq;
@@ -817,35 +838,8 @@ export class TwoViewCamera {
     if (tabB)
       tabB.setAttribute("aria-selected", String(this.currentView === "B"));
 
-    const statusA = $("camera-status-a");
-    const statusB = $("camera-status-b");
-    if (statusA) {
-      statusA.textContent = this.imageA
-        ? `読込完了 (${this.imageA.naturalWidth}×${this.imageA.naturalHeight})`
-        : "未選択（クリックまたはドロップ）";
-    }
-    if (statusB) {
-      statusB.textContent = this.imageB
-        ? `読込完了 (${this.imageB.naturalWidth}×${this.imageB.naturalHeight})`
-        : "未選択（クリックまたはドロップ）";
-    }
-
-    const cardA = $("camera-drop-a");
-    const cardB = $("camera-drop-b");
-    if (cardA) {
-      cardA.classList.toggle("has-file", !!this.imageA);
-      const titleA = cardA.querySelector(".file-card-title");
-      if (titleA) {
-        titleA.textContent = `画像A（${this.getViewFacesLabel("A")}）`;
-      }
-    }
-    if (cardB) {
-      cardB.classList.toggle("has-file", !!this.imageB);
-      const titleB = cardB.querySelector(".file-card-title");
-      if (titleB) {
-        titleB.textContent = `画像B（${this.getViewFacesLabel("B")}）`;
-      }
-    }
+    this.updateCardStatus("A");
+    this.updateCardStatus("B");
 
     const rotateBtn = $("camera-rotate-points") as HTMLButtonElement | null;
     if (rotateBtn) {

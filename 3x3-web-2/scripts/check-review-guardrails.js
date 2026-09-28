@@ -99,28 +99,31 @@ function checkFileReadOrder() {
 
 // 3. パス正規化の index.html 考慮 [F4]
 function checkPathNormalization() {
-  const mainPath = path.join(rootDir, "web/main.ts");
-  if (!fs.existsSync(mainPath)) return;
-  const content = fs.readFileSync(mainPath, "utf-8");
-  const lines = content.split("\n");
+  const targetFiles = ["web/main.ts", "web/storage-key.ts"];
+  for (const relPath of targetFiles) {
+    const fullPath = path.join(rootDir, relPath);
+    if (!fs.existsSync(fullPath)) continue;
+    const content = fs.readFileSync(fullPath, "utf-8");
+    const lines = content.split("\n");
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (
-      line.includes("getScopedStorageKey") ||
-      (line.includes("pathname") && line.includes("replace"))
-    ) {
-      const context = lines.slice(i, i + 15).join("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       if (
-        context.includes("pathname") &&
-        !(context.includes("index") && context.includes("html"))
+        line.includes("getScopedStorageKey") ||
+        (line.includes("pathname") && line.includes("replace"))
       ) {
-        reportError(
-          "F4-URL-NORMALIZATION",
-          "web/main.ts",
-          i + 1,
-          "URL/pathname 正規化で index.html が考慮されていない可能性があります（'/' と '/index.html' でストレージが分離するリスク）。",
-        );
+        const context = lines.slice(i, i + 15).join("\n");
+        if (
+          context.includes("pathname") &&
+          !(context.includes("index") && context.includes("html"))
+        ) {
+          reportError(
+            "F4-URL-NORMALIZATION",
+            relPath,
+            i + 1,
+            "URL/pathname 正規化で index.html が考慮されていない可能性があります（'/' と '/index.html' でストレージが分離するリスク）。",
+          );
+        }
       }
     }
   }

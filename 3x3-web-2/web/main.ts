@@ -168,7 +168,7 @@ function refresh() {
     !mainReady || !store.canRedo() || solving;
   document
     .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#preset-buttons button",
+      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button",
     )
     .forEach((b) => (b.disabled = !mainReady || solving));
   solverAlgo.disabled = solving;
@@ -482,8 +482,9 @@ async function solve(budget = 5000) {
   stop();
   message();
   $("extended").hidden = true;
-  store.restoreBaseSnapshot();
-  store.setSolution(undefined);
+  if (!store.restoreBaseSnapshot()) {
+    store.setSolution(undefined);
+  }
   try {
     const currentState = store.getState();
     validate(currentState);
@@ -516,6 +517,7 @@ async function solve(budget = 5000) {
     if (String(error).includes("cancelled")) return;
     message(error instanceof Error ? error.message : String(error));
     $("extended").hidden = false;
+    $("solver-note").textContent = "探索時間の上限に達しました";
   } finally {
     solving = false;
     clearInterval(interval);
@@ -737,10 +739,10 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
   };
 });
 $("share-link").onclick = async () => {
-  const snapshot = store.getSnapshot();
+  const snapshot = store.getBaseSnapshot() ?? store.getSnapshot();
   const shareUrl = buildShareUrl(
     window.location.href,
-    store.getState(),
+    snapshot.state,
     snapshot.centerTurns,
   );
   try {
@@ -793,6 +795,7 @@ setupKeyboardShortcuts({
   isReady: () => mainReady,
   getModifier: () => store.getModifier(),
   onMove: (move) => {
+    if (solving) return;
     void applyAlgorithm(move);
   },
   onPlay: () => {

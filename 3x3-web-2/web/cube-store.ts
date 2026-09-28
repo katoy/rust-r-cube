@@ -178,6 +178,10 @@ export class CubeStore {
     this.notify("modifier");
   }
 
+  getBaseSnapshot(): CubeSnapshot | undefined {
+    return this.baseSnapshot ? { ...this.baseSnapshot } : undefined;
+  }
+
   restoreBaseSnapshot(): boolean {
     if (this.baseSnapshot && this.solution) {
       this.state = this.baseSnapshot.state;
@@ -185,6 +189,7 @@ export class CubeStore {
       this.step = 0;
       this.solution = undefined;
       this.baseSnapshot = undefined;
+      this.future = [];
       this.revision++;
       this.notify("solution");
       return true;

@@ -1,0 +1,14 @@
+{
+  "malformed_json": {
+    "fresh": false,
+    "reason": "ビルドマニフェストが破損しています"
+  },
+  "valid_json_null": {
+    "fresh": false,
+    "reason": "ビルドマニフェストが破損しています"
+  },
+  "valid_json_null_entry": {
+    "fresh": false,
+    "reason": "ビルドマニフェストが破損しています"
+  }
+}

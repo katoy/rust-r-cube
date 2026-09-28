@@ -92,7 +92,22 @@ export function checkInputsFreshness(rootDir, distDir, currentInputs) {
     return { fresh: false, reason: "ビルドマニフェストが破損しています" };
   }
 
+  if (
+    !savedManifest ||
+    typeof savedManifest !== "object" ||
+    Array.isArray(savedManifest)
+  ) {
+    return { fresh: false, reason: "ビルドマニフェストが破損しています" };
+  }
+
   const savedKeys = Object.keys(savedManifest);
+  for (const key of savedKeys) {
+    const entry = savedManifest[key];
+    if (!entry || typeof entry !== "object" || typeof entry.hash !== "string") {
+      return { fresh: false, reason: "ビルドマニフェストが破損しています" };
+    }
+  }
+
   const currentKeys = Array.from(currentInputs.keys());
 
   // 1. ファイル削除の検知

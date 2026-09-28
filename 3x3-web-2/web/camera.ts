@@ -373,6 +373,15 @@ export class TwoViewCamera {
     }
   }
 
+  private clearViewResults(view: "A" | "B"): void {
+    const keys =
+      view === "A" ? (["U", "R", "F"] as const) : (["D", "L", "B"] as const);
+    for (const key of keys) {
+      delete this.faces[key];
+    }
+    this.detectedLabels[view] = undefined;
+  }
+
   private onImageLoaded(
     view: "A" | "B",
     requestSeq: number,
@@ -389,7 +398,9 @@ export class TwoViewCamera {
       this.imageB = image;
     }
 
+    this.clearViewResults(view);
     this.updateCardStatus(view);
+    this.renderResults();
 
     if (requestSeq >= this.latestViewActivationSeq) {
       this.latestViewActivationSeq = requestSeq;
@@ -428,6 +439,12 @@ export class TwoViewCamera {
       existingGeneration ??
       (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
     const requestSeq = ++this.viewActionSequence;
+
+    // 新画像の選択・読込を開始した時点で該当ビューの旧結果を失効させて再読取待ちにする
+    this.clearViewResults(view);
+    this.renderResults();
+    this.update();
+
     const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const rawImage = new Image();
@@ -481,6 +498,29 @@ export class TwoViewCamera {
                 };
                 resizedImage.onerror = () => {
                   URL.revokeObjectURL(resizedUrl);
+                  const currentGenFinal =
+                    view === "A" ? this.loadGenerationA : this.loadGenerationB;
+                  if (generation === currentGenFinal) {
+                    if (view === "A") {
+                      this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+                      this.sourceUrlA = undefined;
+                      this.imageA = undefined;
+                    } else {
+                      this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+                      this.sourceUrlB = undefined;
+                      this.imageB = undefined;
+                    }
+                    this.clearViewResults(view);
+                    this.updateCardStatus(view);
+                    this.error(`画像${view}を読み込めませんでした。`);
+                    if (this.currentView === view) {
+                      this.points = [];
+                      this.centerPoint = undefined;
+                      this.renderImage();
+                      this.renderResults();
+                      this.update();
+                    }
+                  }
                   resolve();
                 };
                 resizedImage.src = resizedUrl;
@@ -500,7 +540,25 @@ export class TwoViewCamera {
         const currentGen =
           view === "A" ? this.loadGenerationA : this.loadGenerationB;
         if (generation === currentGen) {
+          if (view === "A") {
+            this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+            this.sourceUrlA = undefined;
+            this.imageA = undefined;
+          } else {
+            this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+            this.sourceUrlB = undefined;
+            this.imageB = undefined;
+          }
+          this.clearViewResults(view);
+          this.updateCardStatus(view);
           this.error(`画像${view}を読み込めませんでした。`);
+          if (this.currentView === view) {
+            this.points = [];
+            this.centerPoint = undefined;
+            this.renderImage();
+            this.renderResults();
+            this.update();
+          }
         }
         resolve();
       };

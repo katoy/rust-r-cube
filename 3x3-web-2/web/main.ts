@@ -261,12 +261,15 @@ function refresh() {
     timeline.max = String(solution.moves.length);
     timeline.value = String(step);
     timeline.setAttribute("aria-valuenow", String(step));
+    const nextMeta = cachedAnalyzedMoves[step];
     const valuetext =
       step === 0
-        ? "開始状態"
+        ? nextMeta
+          ? `開始状態。次は1手目 ${nextMeta.move} (${nextMeta.phaseLabel})`
+          : "開始状態"
         : step === solution.moves.length
           ? `完成 (${solution.moves.length}手)`
-          : `${step}手目: ${currentMeta?.move || ""} (${currentMeta?.phaseLabel || ""})`;
+          : `${step}手完了。次は${step + 1}手目 ${nextMeta?.move || ""} (${nextMeta?.phaseLabel || ""})`;
     timeline.setAttribute("aria-valuetext", valuetext);
 
     if (step === 0) {
@@ -969,6 +972,10 @@ async function initializePresets() {
 
           presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
         } catch (error) {
+          // 後から別のプリセットリクエストが発行されていた場合は破棄
+          if (requestId !== presetRequestId) {
+            return;
+          }
           const errorMsg =
             error instanceof Error ? error.message : String(error);
           presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;

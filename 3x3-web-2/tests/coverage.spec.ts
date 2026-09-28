@@ -1531,6 +1531,11 @@ test.describe("E2E Coverage with CDP", () => {
           }
         });
 
+        await page.locator("#camera-file-a").setInputFiles(solvedA);
+        await expect(page.locator("#camera-capture")).toBeEnabled();
+        await page.locator("#camera-capture").click();
+        await page.waitForTimeout(200);
+
         await page.locator("#camera-file-b").setInputFiles(solvedB);
         await expect(page.locator("#camera-capture")).toBeEnabled();
         await page.locator("#camera-capture").click();
@@ -1551,6 +1556,11 @@ test.describe("E2E Coverage with CDP", () => {
             await expect(stopStream).toBeVisible({ timeout: 5000 });
             await stopStream.click();
           }
+          // ライブ撮影によりビューBが再読取待ちとなったため、solvedB を再キャプチャして6面揃える
+          await page.locator("#camera-file-b").setInputFiles(solvedB);
+          await expect(page.locator("#camera-capture")).toBeEnabled();
+          await page.locator("#camera-capture").click();
+          await page.waitForTimeout(200);
         }
 
         // 色入力へ反映

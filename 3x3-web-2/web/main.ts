@@ -95,6 +95,7 @@ function cancelSearch() {
     solving = false;
     clearInterval(interval);
     solver?.cancel();
+    $("solver-note").textContent = "探索を中止しました";
   }
 }
 function persist() {
@@ -124,6 +125,7 @@ function replace(
   stop();
   cancelSearch();
   message();
+  $("solver-note").textContent = "ブラウザ内で計算 · 通常5秒以内";
   store.replace(next, record, centers);
 }
 let renderedSolution: ResultData | undefined = undefined;
@@ -252,24 +254,30 @@ function refresh() {
     $("step-count").textContent = `${step} / ${solution.moves.length}`;
     $("play").innerHTML = icon(playing ? "pause" : "play");
     $("play").setAttribute("aria-label", playing ? "一時停止" : "自動再生");
-    $<HTMLButtonElement>("play").disabled = solution.moves.length === 0;
-    $<HTMLButtonElement>("first").disabled = step === 0;
-    $<HTMLButtonElement>("prev").disabled = step === 0;
-    $<HTMLButtonElement>("next").disabled = step === solution.moves.length;
-    $<HTMLButtonElement>("last").disabled = step === solution.moves.length;
+    $<HTMLButtonElement>("play").disabled =
+      solution.moves.length === 0 || solving;
+    $<HTMLButtonElement>("first").disabled = step === 0 || solving;
+    $<HTMLButtonElement>("prev").disabled = step === 0 || solving;
+    $<HTMLButtonElement>("next").disabled =
+      step === solution.moves.length || solving;
+    $<HTMLButtonElement>("last").disabled =
+      step === solution.moves.length || solving;
     const timeline = $<HTMLInputElement>("timeline");
+    timeline.disabled = solving;
     timeline.max = String(solution.moves.length);
     timeline.value = String(step);
     timeline.setAttribute("aria-valuenow", String(step));
     const nextMeta = cachedAnalyzedMoves[step];
     const valuetext =
-      step === 0
-        ? nextMeta
-          ? `開始状態。次は1手目 ${nextMeta.move} (${nextMeta.phaseLabel})`
-          : "開始状態"
-        : step === solution.moves.length
-          ? `完成 (${solution.moves.length}手)`
-          : `${step}手完了。次は${step + 1}手目 ${nextMeta?.move || ""} (${nextMeta?.phaseLabel || ""})`;
+      solution.moves.length === 0
+        ? "完成 (0手)"
+        : step === 0
+          ? nextMeta
+            ? `開始状態。次は1手目 ${nextMeta.move} (${nextMeta.phaseLabel})`
+            : "開始状態"
+          : step === solution.moves.length
+            ? `完成 (${solution.moves.length}手)`
+            : `${step}手完了。次は${step + 1}手目 ${nextMeta?.move || ""} (${nextMeta?.phaseLabel || ""})`;
     timeline.setAttribute("aria-valuetext", valuetext);
 
     if (step === 0) {
@@ -467,6 +475,7 @@ async function solve(budget = 5000) {
   stop();
   message();
   $("extended").hidden = true;
+  store.setSolution(undefined);
   try {
     const currentState = store.getState();
     validate(currentState);
@@ -487,7 +496,7 @@ async function solve(budget = 5000) {
       solverAlgo.value as import("./model").SolverAlgorithm,
     );
 
-    if (store.getRevision() !== at) return;
+    if (!solving || store.getRevision() !== at) return;
     store.setSolution(result);
     if (window.innerWidth <= 740) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -767,10 +776,12 @@ setupKeyboardShortcuts({
     void applyAlgorithm(move);
   },
   onPlay: () => {
+    if (solving) return;
     void play();
   },
   onStop: () => stop(),
   onSeek: (step, animate) => {
+    if (solving) return;
     void seek(step, animate);
   },
   getCurrentStep: () => store.getStep(),
@@ -889,6 +900,7 @@ async function initializePresets() {
       button.onclick = async () => {
         if (!mainReady) return;
         stop();
+        cancelSearch();
         const requestId = ++presetRequestId;
         const initialRevision = store.getRevision();
         try {

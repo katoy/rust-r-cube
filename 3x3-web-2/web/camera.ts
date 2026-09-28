@@ -1086,6 +1086,18 @@ export class TwoViewCamera {
     this.sourceUrlB = undefined;
     this.imageA = undefined;
     this.imageB = undefined;
+    this.clearViewResults("A");
+    this.clearViewResults("B");
+    this.points = [];
+    this.centerPoint = undefined;
+    const inputA = $("camera-file-a") as HTMLInputElement | null;
+    const inputB = $("camera-file-b") as HTMLInputElement | null;
+    if (inputA) inputA.value = "";
+    if (inputB) inputB.value = "";
+    this.updateCardStatus("A");
+    this.updateCardStatus("B");
+    this.renderResults();
+    this.update();
   }
 
   private close() {

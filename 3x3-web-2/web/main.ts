@@ -168,7 +168,7 @@ function refresh() {
     !mainReady || !store.canRedo() || solving;
   document
     .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button",
+      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
     )
     .forEach((b) => (b.disabled = !mainReady || solving));
   solverAlgo.disabled = solving;
@@ -436,9 +436,11 @@ async function play() {
 }
 async function applyAlgorithm(algorithm: string, animate = true) {
   if (!mainReady) return;
+  const trimmed = algorithm.trim();
+  if (!trimmed) return;
   try {
     const result: ResultData = JSON.parse(
-      apply_moves(store.getState(), algorithm),
+      apply_moves(store.getState(), trimmed),
     );
     stop();
     cancelSearch();
@@ -699,6 +701,7 @@ $("copy").onclick = async () => {
 };
 $("solution-close").onclick = () => {
   stop();
+  store.restoreBaseSnapshot();
   store.setSolution(undefined);
   persist();
   refresh();
@@ -753,7 +756,8 @@ $("share-link").onclick = async () => {
   }
 };
 $("save").onclick = () => {
-  const blob = createCubeJsonBlob(store.getSnapshot());
+  const snapshot = store.getBaseSnapshot() ?? store.getSnapshot();
+  const blob = createCubeJsonBlob(snapshot);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -793,6 +797,7 @@ $<HTMLInputElement>("file").onchange = async () => {
 };
 setupKeyboardShortcuts({
   isReady: () => mainReady,
+  isSolving: () => solving,
   getModifier: () => store.getModifier(),
   onMove: (move) => {
     if (solving) return;
@@ -921,7 +926,7 @@ async function initializePresets() {
       button.textContent = `${preset.emoji} ${preset.label}`;
       button.disabled = !mainReady;
       button.onclick = async () => {
-        if (!mainReady) return;
+        if (!mainReady || solving) return;
         stop();
         cancelSearch();
         const requestId = ++presetRequestId;
@@ -944,8 +949,8 @@ async function initializePresets() {
             return;
           }
 
-          // 取得中にユーザーが手動でキューブを操作していた場合は上書きを防止
-          if (store.getRevision() !== initialRevision) {
+          // 取得中にユーザーが手動でキューブを操作していた、または探索を開始していた場合は上書きを防止
+          if (solving || store.getRevision() !== initialRevision) {
             presetStatus.textContent = `⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました`;
             return;
           }

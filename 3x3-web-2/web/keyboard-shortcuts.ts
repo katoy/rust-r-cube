@@ -2,6 +2,7 @@ import { FACES } from "./model";
 
 export interface KeyboardShortcutsOptions {
   isReady: () => boolean;
+  isSolving?: () => boolean;
   getModifier: () => string;
   onMove: (move: string) => void | Promise<void>;
   onPlay: () => void | Promise<void>;
@@ -34,6 +35,10 @@ export function setupKeyboardShortcuts(
       return;
     }
 
+    if (!options.isReady() || event.defaultPrevented || options.isSolving?.()) {
+      return;
+    }
+
     const face = event.key.toUpperCase();
     if (FACES.includes(face) && face.length === 1) {
       const btn = document.querySelector(`button[data-move="${face}"]`);
@@ -41,8 +46,6 @@ export function setupKeyboardShortcuts(
     } else if (event.key === "Shift") {
       document.getElementById("prime")?.classList.add("active-press");
     }
-
-    if (!options.isReady() || event.defaultPrevented) return;
 
     if (FACES.includes(face) && face.length === 1) {
       event.preventDefault();

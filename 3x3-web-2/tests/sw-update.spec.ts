@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const projectDir = fileURLToPath(new URL("..", import.meta.url));
@@ -36,7 +35,7 @@ const test = base.extend<{
   deployment: { origin: string; holdPresetResponses: () => () => void };
 }>({
   build: async ({}, use) => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sw-regression-"));
+    const tempDir = fs.mkdtempSync(path.join(projectDir, ".sw-regression-"));
     const distDir = path.join(tempDir, "dist");
     const scriptsDir = path.join(tempDir, "scripts");
     try {
@@ -274,7 +273,10 @@ test("R14: cached preset returns before revalidation finishes and the updated va
   build,
   deployment,
 }) => {
+  // Runtime-only resources may revalidate; versioned precache entries may not.
+  fs.unlinkSync(path.join(build.distDir, presetFile));
   const { version } = build.generate();
+  build.writePreset(firstPreset);
   await page.goto(`${deployment.origin}/nested/cube/`);
   await registerWorker(page);
 

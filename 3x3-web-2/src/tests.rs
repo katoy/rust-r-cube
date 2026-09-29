@@ -1349,6 +1349,7 @@ fn test_supercube_centers() {
 
     // 合法な全2048通りのセンター構成に対して supercube::solve_center_orientations を検証
     let mut tested = 0;
+    let mut max_correction_length = 0;
     for c0 in 0..4 {
         for c1 in 0..4 {
             for c2 in 0..4 {
@@ -1360,6 +1361,8 @@ fn test_supercube_centers() {
                             }
                             let needed = [c0, c1, c2, c3, c4, c5];
                             let moves = supercube::solve_center_orientations(needed).unwrap();
+                            max_correction_length = max_correction_length.max(moves.len());
+                            assert!(moves.len() <= 124, "needed={needed:?}");
 
                             // 完成状態のキューブに適用してピース状態の維持を検証
                             let res = apply(&solved, &moves);
@@ -1394,6 +1397,22 @@ fn test_supercube_centers() {
         }
     }
     assert_eq!(tested, 2048);
+    assert_eq!(max_correction_length, 124);
+    assert_eq!(
+        supercube::solve_center_orientations([1; 6]).unwrap().len(),
+        124
+    );
+    let max_solution =
+        crate::solve_state_with_algorithm(SOLVED, 5000, true, Some([1; 6]), "cfop").unwrap();
+    assert_eq!(max_solution.moves.len(), 124);
+    assert_eq!(max_solution.state, SOLVED);
+    assert_eq!(
+        apply(
+            &solved,
+            &parse_moves(&max_solution.moves.join(" ")).unwrap()
+        ),
+        solved
+    );
 
     // センターが誤った向きを持つ状態での solve_state_with_centers をテスト:
     // 例: U面が回転済み: initial centers = [3, 0, 1, 0, 0, 0] (U -90°, F +90°)

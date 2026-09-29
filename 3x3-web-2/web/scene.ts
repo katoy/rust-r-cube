@@ -348,6 +348,13 @@ export class CubeScene {
     const materials = new Set<THREE.Material>();
 
     this.scene.traverse((object) => {
+      if (
+        object instanceof THREE.DirectionalLight ||
+        object instanceof THREE.SpotLight ||
+        object instanceof THREE.PointLight
+      ) {
+        object.shadow.dispose();
+      }
       if (object instanceof THREE.Mesh) {
         if (object.geometry) geometries.add(object.geometry);
         const mats = Array.isArray(object.material)
@@ -380,6 +387,7 @@ export class CubeScene {
     this.outlineMeshes = [];
     this.arrowMeshes = [];
     this.turnLayer.clear();
+    this.scene.clear();
   }
   show(state: string, next = "") {
     this.dirty = true;

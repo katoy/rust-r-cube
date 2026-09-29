@@ -223,7 +223,7 @@ export class AppStateMachine {
   /**
    * キューブ盤面変更操作の型安全な一括遮断・実行ラッパー
    *
-   * @param action 実行する操作
+   * @param action 同期操作。false を返す未変更操作や例外では状態を遷移しない
    * @param onExitPreview プレビュー状態から抜ける際の追加処理（例: stop() や 解法のクリア等）
    * @returns 操作結果。Solving 中など不許可時は undefined
    */
@@ -231,18 +231,21 @@ export class AppStateMachine {
     action: () => T,
     onExitPreview?: () => void,
   ): T | undefined {
-    const nextState = this.currentState.beforeModifyCube();
+    const previousState = this.currentState;
+    const nextState = previousState.beforeModifyCube();
     if (!nextState) {
       // 遮断された
       return undefined;
     }
-    if (nextState !== this.currentState) {
-      if (this.isPreviewing() && onExitPreview) {
+    const result = action();
+    if (result === false) return result;
+    if (nextState !== previousState && this.currentState === previousState) {
+      if (previousState.kind === "previewing" && onExitPreview) {
         onExitPreview();
       }
       this.transitionTo(nextState);
     }
-    return action();
+    return result;
   }
 
   /**

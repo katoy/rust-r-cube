@@ -2,6 +2,7 @@
 name = "cube-studio"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.87"
 license = "MIT"
 description = "Browser-native Rubik's cube studio powered by Rust"
 build = "build.rs"

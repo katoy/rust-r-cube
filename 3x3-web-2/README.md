@@ -7,7 +7,7 @@ Rust で実装された Kociemba 2段階探索エンジンを WebAssembly (WASM)
 [![CI](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml/badge.svg)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r186-black)](https://threejs.org/)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-orange)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.87+-orange)](https://www.rust-lang.org/)
 
 ---
 
@@ -113,7 +113,7 @@ Rust で実装された Kociemba 2段階探索エンジンを WebAssembly (WASM)
 
 #### 🔄 色のみ解決した後、セルの向きを揃えるのには何手が必要か？
 
-外周（エッジ・コーナー）の色を完成させた状態から、外周の配置を一切崩さずに**後からセルの向き（センターパーツの向き）だけを揃える**場合、群論のパリティ制約により **12手〜最大60手程度** が追加で必要になります。
+外周（エッジ・コーナー）の色を完成させた状態から、外周の配置を一切崩さずに**後からセルの向き（センターパーツの向き）だけを揃える**場合、現在の定石合成生成器は **0〜124手 (HTM)** の補正手順を返します。合法なセンター構成全2048通り（各面0〜3四半回転、総和偶数）を走査した実装上の最大は **124手**（例: 全6面が +90° の `[1; 6]`）です。これは理論最短手数の上限ではありません。下表の12〜60手は代表的な1面・2面の構成であり、全6面の最大ではありません。
 
 ##### 1. ズレのパターン別・後付け必要手数 (HTM)
 ルービックキューブの力学上、**「単独の 1 つのセンターだけを 90° 回す」ことは数学的に不可能**です（全センターの四半回転の総和は偶数でなければならない）。そのため、以下の定石手順を適用して解消します。
@@ -128,7 +128,7 @@ Rust で実装された Kociemba 2段階探索エンジンを WebAssembly (WASM)
 ##### 2. 「後付け補正方式」vs「同時最適化方式 (Cube Studio)」
 | アプローチ | 解決の流れ | 解法全体の総手数 | 特徴 |
 | :--- | :--- | :---: | :--- |
-| **後付け補正方式**<br>*(逐次解決: CFOP / Thistlethwaite / Korf)* | ① 通常通り色だけを解く<br>② 後からセンター回転定石を適用（**+12〜50手以上**） | **約 32〜80手以上** | 各ステップの意図は把握しやすいが、総手数が大幅に長くなる。 |
+| **後付け補正方式**<br>*(逐次解決: CFOP / Thistlethwaite / Korf)* | ① 通常通り色だけを解く<br>② 後からセンター回転定石を適用（**+0〜124手**） | **色の解法手数 + 補正手数** | 各ステップの意図は把握しやすいが、総手数が大幅に長くなる。 |
 | **同時最適化方式**<br>*(Cube Studio の Kociemba)* | 探索時に「色完成かつセンター累積回転が0」となる解を IDA* で直接探索 | **約 22〜28手**<br>*(増加わずか **+2〜6手**)* | 最短に近い手数を瞬時に導出。最も効率的。 |
 
 > [!NOTE]
@@ -188,7 +188,7 @@ flowchart TD
 ### 前提環境
 
 - **Node.js**: `^20.19.0 || >=22.12.0`（Vite 8 / TypeScript 7 / 依存ツールの要求バージョン）
-- **Rust**: 1.80 以上 (`wasm32-unknown-unknown` ターゲット)
+- **Rust**: 1.87 以上 (`wasm32-unknown-unknown` ターゲット)。`Cargo.toml` の `rust-version` と一致し、CI で Rust 1.87.0 / ロック済み依存関係の native・WASM コンパイルを検証します。
 - **wasm-pack**: 最新版 (`cargo install wasm-pack` または `npm install -g wasm-pack`)
 - **npm**: v10 以上
 
@@ -262,6 +262,8 @@ npm run benchmark:web
 npm run check
 ```
 
+オフライン検証の鮮度保証、配信物の同一性確認、タイムアウトとポート指定については [Offline verification](docs/offline-verification.md) を参照してください。
+
 ---
 
 ## テスト & 品質管理
@@ -283,6 +285,10 @@ npm run check
   - URL パラメータによる状態復元（`?state=`, `?alg=`, `?centers=`, `?solver=`）。
   - 設定の localStorage 永続化とストレージ無効化環境でのフォールバック。
   - PWA インストール、オフラインキャッシュ、Service Worker 更新検知。
+- **CDP 行カバレッジ (`npm run test:coverage`)**:
+  - `web/*.ts` の期待モジュール棚卸しを照合し、空測定・欠落・重複を拒否します。配信された変換後 JavaScript の行を計測し、既存の各モジュール閾値を適用します（元 TypeScript の分岐カバレッジではありません）。
+  - `solver.worker.ts` は別 Worker isolate のため page CDP の対象外です。`app.spec.ts` の探索・再生と `code-review-b605038-regression.spec.ts` のキャンセルが Worker を独立に検証します。
+  - CSS と Rust/WASM 内部はこの計測の対象外です。WASM import ラッパーの JavaScript カバレッジは Rust/WASM 内部のカバレッジを意味しません。
 - **アクセシビリティ (a11y) 監査**:
   - `@axe-core/playwright` を使用し、主要画面で WCAG 2.1 AA レベルへの適合を自動検証。
 

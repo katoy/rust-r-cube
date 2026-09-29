@@ -57,6 +57,14 @@ const PRECACHE_ASSETS = [
   "./icon-512.png",
 ];
 
+// A version's document and assets are committed together by addAll(), never
+// replaced by responses from a deployment whose installation may have failed.
+const PRECACHE_URLS = new Set(
+  PRECACHE_ASSETS.map((asset) =>
+    new URL(asset, self.registration.scope).toString(),
+  ),
+);
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -102,39 +110,27 @@ self.addEventListener("fetch", (event) => {
   // ナビゲーションリクエスト（HTML ドキュメント）
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            const canonicalUrl = url.origin + url.pathname;
-            const updatePromise = caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(canonicalUrl, clone));
-            event.waitUntil(updatePromise);
-          }
-          return response;
-        })
-        .catch(async () => {
-          const ownCache = await caches.open(CACHE_NAME);
-          const canonicalUrl = url.origin + url.pathname;
-          const cached =
-            (await ownCache.match(canonicalUrl)) ||
-            (await ownCache.match(request)) ||
-            (await ownCache.match(request.url)) ||
-            (await ownCache.match(request, { ignoreSearch: true }));
-          if (cached) return cached;
-          const scope = self.registration ? self.registration.scope : "./";
-          const indexUrl = new URL("./index.html", scope).toString();
-          const scopeUrl = new URL("./", scope).toString();
-          const rootCached =
-            (await ownCache.match(indexUrl)) ||
-            (await ownCache.match(scopeUrl)) ||
-            (await ownCache.match(scope)) ||
-            (await ownCache.match("./index.html")) ||
-            (await ownCache.match("./"));
-          if (rootCached) return rootCached;
-          return ownCache.match("/");
-        }),
+      fetch(request).catch(async () => {
+        const ownCache = await caches.open(CACHE_NAME);
+        const canonicalUrl = url.origin + url.pathname;
+        const cached =
+          (await ownCache.match(canonicalUrl)) ||
+          (await ownCache.match(request)) ||
+          (await ownCache.match(request.url)) ||
+          (await ownCache.match(request, { ignoreSearch: true }));
+        if (cached) return cached;
+        const scope = self.registration ? self.registration.scope : "./";
+        const indexUrl = new URL("./index.html", scope).toString();
+        const scopeUrl = new URL("./", scope).toString();
+        const rootCached =
+          (await ownCache.match(indexUrl)) ||
+          (await ownCache.match(scopeUrl)) ||
+          (await ownCache.match(scope)) ||
+          (await ownCache.match("./index.html")) ||
+          (await ownCache.match("./"));
+        if (rootCached) return rootCached;
+        return Response.error();
+      }),
     );
     return;
   }
@@ -150,9 +146,19 @@ self.addEventListener("fetch", (event) => {
 
       const updatePromise = fetch(request)
         .then(async (networkResponse) => {
-          if (networkResponse.ok) {
+          if (
+            networkResponse.ok &&
+            !PRECACHE_URLS.has(url.origin + url.pathname)
+          ) {
             const clone = networkResponse.clone();
-            await ownCache.put(request, clone);
+            try {
+              await ownCache.put(request, clone);
+            } catch (error) {
+              console.warn(
+                "[Service Worker] Runtime cache write failed:",
+                error,
+              );
+            }
           }
           return networkResponse;
         })

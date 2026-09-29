@@ -1,0 +1,14 @@
+
+Running 9 tests using 1 worker
+
+  ✓  1 [chromium] › tests/code-review-421345a-regression.spec.ts:25:1 › F01: Redo during preview preserves both preview and base in Undo history (3.4s)
+  ✓  2 [chromium] › tests/cube-store.spec.ts:4:3 › CubeStore Unit Tests › initial state and properties (1.3s)
+  ✓  3 [chromium] › tests/cube-store.spec.ts:36:3 › CubeStore Unit Tests › replace updates state, records history, and increments revision (1.5s)
+  ✓  4 [chromium] › tests/cube-store.spec.ts:65:3 › CubeStore Unit Tests › undo and redo restore states and center turns (1.5s)
+  ✓  5 [chromium] › tests/cube-store.spec.ts:109:3 › CubeStore Unit Tests › modifier toggle and set (1.4s)
+  ✓  6 [chromium] › tests/cube-store.spec.ts:136:3 › CubeStore Unit Tests › solution and step tracking (1.5s)
+  ✓  7 [chromium] › tests/cube-store.spec.ts:170:3 › CubeStore Unit Tests › subscribe triggers listener on store changes (1.5s)
+  ✓  8 [chromium] › tests/cube-store.spec.ts:199:3 › CubeStore Unit Tests › subscribe passes event type for distinct store mutations (1.5s)
+  ✓  9 [chromium] › tests/cube-store.spec.ts:247:3 › CubeStore Unit Tests › closing solution after seek preserves undo history to base snapshot and supports redo (1.5s)
+
+  9 passed (15.9s)

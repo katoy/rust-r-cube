@@ -1,6 +1,6 @@
 export interface ParsedCubeFile {
   state: string;
-  centerTurns?: number[];
+  centerTurns?: unknown;
 }
 
 export function validateAndParseCubeJson(
@@ -22,14 +22,9 @@ export function validateAndParseCubeJson(
     throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
   }
 
-  const centerTurns =
-    "centerTurns" in data && Array.isArray(data.centerTurns)
-      ? (data.centerTurns as number[])
-      : undefined;
-
   return {
     state: data.state,
-    centerTurns,
+    centerTurns: "centerTurns" in data ? data.centerTurns : undefined,
   };
 }
 

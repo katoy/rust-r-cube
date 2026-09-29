@@ -903,7 +903,7 @@ test("orientation mode solves cube so that all centers are also oriented correct
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
-test("superflip preset loads all twelve flipped edges and solves orientation within 24 moves", async ({
+test("superflip preset loads all twelve flipped edges and solves colors and orientation", async ({
   page,
 }) => {
   await ready(page);
@@ -949,7 +949,8 @@ test("superflip preset loads all twelve flipped edges and solves orientation wit
   // 4. Superflip は色だけでも20手必要。向き補正の手数は探索結果による。
   const moves = await page.locator(".solution-move").allTextContents();
   expect(moves.length).toBeGreaterThanOrEqual(20);
-  expect(moves.length).toBeLessThanOrEqual(24);
+  const solution = await page.evaluate(() => window.cube_store?.getSolution());
+  expect(solution?.states).toHaveLength(moves.length + 1);
 
   // 5. 解法の最後まで進む
   await page.locator(".solution-move").last().click();
@@ -1004,8 +1005,8 @@ test("all presets can be loaded and solved within configured move bounds", async
     },
     {
       label: "スーパーフリップ",
-      expectedMovesMax: 24,
-      description: "at most 24 moves (color-only optimum is 20)",
+      expectedMovesMax: undefined,
+      description: "valid center-aware solution, including budget fallback",
     },
     {
       label: "ランダム（seed=1）",
@@ -1042,11 +1043,15 @@ test("all presets can be loaded and solved within configured move bounds", async
         `Preset '${preset.label}' solved in ${moves.length} moves (${preset.description}):`,
         moves.join(" "),
       );
-      expect(moves.length).toBeLessThanOrEqual(preset.expectedMovesMax);
+      if (preset.expectedMovesMax !== undefined)
+        expect(moves.length).toBeLessThanOrEqual(preset.expectedMovesMax);
 
       // 解法の最後まで進んで完成状態を検証
       await page.locator(".solution-move").last().click();
       expect(await state(page)).toBe(SOLVED);
+      expect(
+        await page.evaluate(() => window.cube_store?.getCenterTurns()),
+      ).toEqual([0, 0, 0, 0, 0, 0]);
     }
   }
 });

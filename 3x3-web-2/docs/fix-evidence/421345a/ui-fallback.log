@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › tests/code-review-421345a-regression.spec.ts:205:1 › F09: a valid 72-move fallback replays color and center phases and restores its base (3.1s)
+
+  1 passed (4.2s)

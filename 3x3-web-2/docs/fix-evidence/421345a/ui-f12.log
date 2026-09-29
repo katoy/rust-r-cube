@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › tests/code-review-421345a-regression.spec.ts:148:1 › F12: empty and invalid algorithms keep preview; valid input commits it (3.1s)
+
+  1 passed (4.6s)

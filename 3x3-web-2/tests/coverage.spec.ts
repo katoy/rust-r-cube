@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
+  assertCoverageInventory,
   computeLineCoverage,
   computeMergedLineCoverage,
 } from "./coverage-calc";
@@ -11,6 +12,15 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const COVERAGE_DIR = path.join(__dirname, "../coverage-e2e");
+const COVERAGE_EXCLUSIONS = {
+  "solver.worker.ts":
+    "Runs in a separate Worker isolate, not page CDP coverage; solve/playback in app.spec.ts and cancellation in code-review-b605038-regression.spec.ts independently exercise the Worker.",
+};
+const EXPECTED_WEB_MODULES = fs
+  .readdirSync(path.join(__dirname, "../web"))
+  .filter((name) => name.endsWith(".ts") && !(name in COVERAGE_EXCLUSIONS))
+  .sort()
+  .map((name) => `/web/${name}`);
 
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 
@@ -631,7 +641,18 @@ test.describe("E2E Coverage with CDP", () => {
 
         // 6角自動検出済み helpText 表示 (846-848行)
         (camInst as any).currentView = "A";
-        (camInst as any).activeImage = redImg;
+        const redBlob = await new Promise<Blob>((resolve) =>
+          redCanvas.toBlob((blob) => resolve(blob!), "image/png"),
+        );
+        await (camInst as any).processFile(
+          new File([redBlob], "red.png", { type: "image/png" }),
+          "A",
+        );
+        if ((camInst as any).activeImage?.naturalWidth !== 640) {
+          throw new Error(
+            "Camera help coverage requires a loaded static image",
+          );
+        }
         (camInst as any).points = [
           { x: 100, y: 100 },
           { x: 200, y: 100 },
@@ -1307,6 +1328,16 @@ test.describe("E2E Coverage with CDP", () => {
       await page.locator("#solver-algorithm").selectOption("kociemba");
       await page.locator("#include-orientation").uncheck();
       await page.locator("#include-orientation").check();
+
+      await page.evaluate(() => {
+        const dbg = (window as any).__cube_main_debug__;
+        dbg.cancelSearch();
+        document.getElementById("solution-close")?.click();
+        dbg.refresh();
+        if (!dbg.appState.isIdle()) {
+          throw new Error("Modal coverage requires an idle application");
+        }
+      });
 
       // (B) 色入力エディタ (6面の色を入力)
       await page.locator("#tab-colors").click();
@@ -2348,12 +2379,13 @@ test.describe("E2E Coverage with CDP", () => {
       const stats = generateCoverageReport(coverage, wasmCallLog);
 
       console.log(`✓ 総合テスト実行完了: ユニット＆E2E統合`);
-      console.log(`✓ JS カバレッジ対象: ${coverage.length} ファイル`);
+      console.log(`✓ JS カバレッジ取得: ${coverage.length} エントリ`);
 
       // web/ 配下のファイルについて各目標カバレッジ閾値を検証
-      const webStats = stats.filter(
-        (s) => s.url.includes("/web/") && !s.url.includes("node_modules"),
+      const webStats = stats.filter((s) =>
+        /^\/web\/[^/]+\.ts$/.test(new URL(s.url).pathname),
       );
+      assertCoverageInventory(webStats, EXPECTED_WEB_MODULES);
       console.log(
         `\n📊 Web モジュールカバレッジ (${webStats.length} ファイル):`,
       );
@@ -2389,7 +2421,11 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
 
   // ファイル別統計（クエリパラメータを除いたベースURLごとにエントリを統合）
   const validEntries = coverage.filter(
-    (entry) => entry && entry.url && (entry.text || entry.source),
+    (entry) =>
+      entry &&
+      entry.url &&
+      (entry.text || entry.source) &&
+      !new URL(entry.url).pathname.endsWith(".css"),
   );
   const grouped = new Map<string, any[]>();
   for (const entry of validEntries) {
@@ -2400,6 +2436,16 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
   }
 
   const stats = Array.from(grouped.entries()).map(([url, entries]) => {
+    if (
+      /^\/web\/[^/]+\.ts$/.test(new URL(url).pathname) &&
+      !entries.some(
+        (entry) =>
+          entry.functions?.some((fn: any) => fn.ranges?.length > 0) ||
+          entry.ranges?.length > 0,
+      )
+    ) {
+      throw new Error(`Missing V8 coverage ranges: ${url}`);
+    }
     const { covered, total, percentage, uncoveredLines } =
       computeMergedLineCoverage(entries);
     return {
@@ -2410,6 +2456,10 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
       uncoveredLines,
     };
   });
+  assertCoverageInventory(
+    stats.filter((s) => /^\/web\/[^/]+\.ts$/.test(new URL(s.url).pathname)),
+    EXPECTED_WEB_MODULES,
+  );
 
   // HTML レポート生成
   const html = `
@@ -2439,7 +2489,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
   <div class="summary">
     <h2>📊 概要</h2>
     <p><strong>テスト日時:</strong> ${new Date().toLocaleString("ja-JP")}</p>
-    <p><strong>対象ファイル:</strong> ${coverage.length} ファイル</p>
+    <p><strong>CDP 取得エントリ:</strong> ${coverage.length}</p>
+    <p><strong>対象 TS モジュール:</strong> ${EXPECTED_WEB_MODULES.length}</p>
     <p><strong>計測方法:</strong> Browser DevTools Protocol (CDP) - Chrome V8 Coverage</p>
   </div>
 
@@ -2488,7 +2539,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
     <h2>📝 注釈</h2>
     <ul>
       <li><strong>測定対象:</strong> ブラウザに配信された変換後JavaScriptの行カバレッジ（ソースマップ逆変換なしの実測行ベース）</li>
-      <li><strong>WASM コード:</strong> JIT コンパイルされるため、行単位の詳細カバレッジはブラウザ側では不完全（Rust側の完全なカバレッジは <code>cargo llvm-cov</code> で計測）</li>
+      <li><strong>対象棚卸し:</strong> web/*.ts の全モジュールを照合。solver.worker.ts は別 Worker isolate のため対象外（独立 Worker E2E で検証）。CSS は V8 JavaScript 行カバレッジ対象外。</li>
+      <li><strong>WASM コード:</strong> CDP に現れる import ラッパーは JavaScript のみ。Rust/WASM 内部の行・分岐カバレッジは計測していません。別途 <code>cargo llvm-cov</code> 等が必要です。</li>
     </ul>
   </div>
 </body>
@@ -2507,6 +2559,8 @@ function generateCoverageReport(coverage: any[], wasmCallLog: string[]) {
         timestamp: new Date().toISOString(),
         method: "Browser DevTools Protocol (CDP)",
         files: stats,
+        expectedWebModules: EXPECTED_WEB_MODULES,
+        exclusions: COVERAGE_EXCLUSIONS,
         wasmCallLog,
       },
       null,

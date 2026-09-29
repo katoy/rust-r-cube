@@ -90,9 +90,15 @@ export class CubeStore {
     };
   }
 
-  private pushHistory(snapshot: CubeSnapshot): void {
+  private appendHistory(snapshot: CubeSnapshot): void {
+    const previous = this.history[this.history.length - 1];
+    if (previous && this.isSameSnapshot(previous, snapshot)) return;
     this.history.push(snapshot);
     if (this.history.length > 200) this.history.shift();
+  }
+
+  private pushHistory(snapshot: CubeSnapshot): void {
+    this.appendHistory(snapshot);
     this.future = [];
   }
 
@@ -156,7 +162,15 @@ export class CubeStore {
   redo(): boolean {
     const next = this.future.pop();
     if (!next) return false;
-    this.history.push(this.getSnapshot());
+    if (
+      this.baseSnapshot &&
+      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
+    ) {
+      this.appendHistory(this.baseSnapshot);
+    }
+    if (!this.isSameSnapshot(this.getSnapshot(), next)) {
+      this.appendHistory(this.getSnapshot());
+    }
     this.state = next.state;
     this.centerRotations = turnsToCenters(next.centerTurns);
     this.revision++;

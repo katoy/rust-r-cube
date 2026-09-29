@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
+import { holdSolverResults, releaseSolverResults } from "./solver-barrier";
 
 const getTestImagePath = (name: string, view: "A" | "B") =>
   path.resolve(
@@ -23,6 +24,7 @@ test.describe("63bce97 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
 
     // ソルバーアルゴリズムを CFOP に切り替え
     await page.locator("#solver-algorithm").selectOption("cfop");
+    await holdSolverResults(page);
 
     // 2回目の探索を開始
     await page.locator("#solve").click();
@@ -34,6 +36,9 @@ test.describe("63bce97 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
     // 探索中にキーボードの左右キー（シーク）やスペースキー（再生）を押しても無効であること
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("Space");
+    await expect(page.locator("#cancel")).toBeVisible();
+    await expect(page.locator("#solution-content")).toBeHidden();
+    await releaseSolverResults(page);
 
     // 探索完了を待つ
     await page.locator("#solve").waitFor({ state: "visible" });
@@ -186,7 +191,7 @@ test.describe("63bce97 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
   });
 
   // F4: 探索中にプリセットを選択した際、即座に探索が中断されステータス表示が競合しない
-  test("F4: 探索中にプリセットを選択した際、即座に探索が中止され、プリセット完了後に旧探索のノード数が上書きされない", async ({
+  test("F4: 探索中はプリセット変更が遮断され、キャンセル後に読み込める", async ({
     page,
   }) => {
     // 探索に時間のかかる複雑な局面 (12手スクランブル)
@@ -199,12 +204,28 @@ test.describe("63bce97 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
 
     // Korf 最短探索を開始（IDA* により確実に数秒以上探索が走る）
     await page.locator("#solver-algorithm").selectOption("korf");
+    await holdSolverResults(page);
     await page.locator("#solve").click();
 
     // 探索中であることを確認
     await expect(page.locator("#cancel")).toBeVisible();
 
-    // 探索がアクティブな状態のまま即座にプリセット「簡単（3手）」をクリック
+    const preset = page
+      .locator("#preset-buttons button")
+      .filter({ hasText: "簡単（3手）" });
+    await expect(preset).toBeDisabled();
+    const before = await page.locator("#scene").getAttribute("data-state");
+    await preset.evaluate((button: HTMLButtonElement) =>
+      button.onclick?.call(button, new MouseEvent("click")),
+    );
+    expect(await page.locator("#scene").getAttribute("data-state")).toBe(
+      before,
+    );
+    await expect(page.locator("#cancel")).toBeVisible();
+    await page.locator("#cancel").click();
+    await releaseSolverResults(page);
+
+    // キャンセル後の明示操作だけがプリセットを適用する
     await page
       .locator("#preset-buttons button")
       .filter({ hasText: "簡単（3手）" })

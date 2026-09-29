@@ -137,6 +137,34 @@ test.describe("AppStateMachine / AppState (State パターン検証)", () => {
     expect(fsm.closeSolution()).toBe(false);
   });
 
+  test("未変更・例外ではプレビューと終了フックを保持する", () => {
+    const fsm = new AppStateMachine(new PreviewingState());
+    let exits = 0;
+    expect(
+      fsm.runCubeMutation(
+        () => false,
+        () => exits++,
+      ),
+    ).toBe(false);
+    expect(fsm.kind).toBe("previewing");
+    expect(() =>
+      fsm.runCubeMutation(
+        () => {
+          throw new Error("invalid mutation");
+        },
+        () => exits++,
+      ),
+    ).toThrow("invalid mutation");
+    expect(fsm.kind).toBe("previewing");
+    expect(exits).toBe(0);
+    fsm.runCubeMutation(
+      () => true,
+      () => exits++,
+    );
+    expect(fsm.kind).toBe("idle");
+    expect(exits).toBe(1);
+  });
+
   test("Previewing 中に再探索（startSolving）を開始すると Solving へ直接遷移可能", () => {
     const fsm = new AppStateMachine();
     fsm.startSolving();

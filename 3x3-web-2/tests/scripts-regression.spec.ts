@@ -3,6 +3,7 @@ import { exec, spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import { createServer } from "node:http";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -55,17 +56,7 @@ test.describe("R14 & R16: Script Exit Codes and Symlink Resolution", () => {
       (resolve) => {
         const proc = spawn(
           "node",
-          [
-            "-e",
-            `
-          // chromium.launch をモックして強制エラーを起こす
-          const pw = require("@playwright/test");
-          if (pw.chromium) {
-            pw.chromium.launch = async () => { throw new Error("Launch failed"); };
-          }
-          require(${JSON.stringify(scriptPath)});
-        `,
-          ],
+          [scriptPath, "--headless", "--port=invalid"],
           { cwd: projectRoot },
         );
 
@@ -81,6 +72,7 @@ test.describe("R14 & R16: Script Exit Codes and Symlink Resolution", () => {
 
     // 失敗時に exit code 1 で終了すること
     expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Invalid --port");
   });
 
   test("R16: scripts/start.sh resolves symlink and sets working directory to project root", async () => {
@@ -197,26 +189,46 @@ fn bad_fn() -> Result<(), ()> {
 
   test("F5: launch-offline.js terminates cleanly with numeric exit code on SIGINT", async () => {
     const scriptPath = path.join(projectRoot, "scripts/launch-offline.js");
+    // The suite's port 4173 preview has a nested base, not the launcher's root.
+    const reservation = createServer();
+    await new Promise<void>((resolve, reject) => {
+      reservation.once("error", reject);
+      reservation.listen(0, "127.0.0.1", resolve);
+    });
+    const port = (reservation.address() as { port: number }).port;
+    await new Promise<void>((resolve, reject) =>
+      reservation.close((error) => (error ? reject(error) : resolve())),
+    );
 
     const result = await new Promise<{
       code: number | null;
       stdout: string;
       stderr: string;
-    }>((resolve) => {
-      const proc = spawn("node", [scriptPath, "--headless"], {
-        cwd: projectRoot,
-      });
+      signalSent: boolean;
+      watchdogExpired: boolean;
+    }>((resolve, reject) => {
+      const proc = spawn(
+        process.execPath,
+        [scriptPath, "--headless", `--port=${port}`],
+        { cwd: projectRoot },
+      );
 
       let stdout = "";
       let stderr = "";
+      let signalSent = false;
+      let watchdogExpired = false;
+      const watchdog = setTimeout(() => {
+        watchdogExpired = true;
+        proc.kill("SIGTERM");
+      }, 15000);
 
       proc.stdout.on("data", (d) => {
         stdout += d.toString();
-        // サーバー起動中またはブラウザ起動中に SIGINT を送る
         if (
-          stdout.includes("ブラウザ (Chromium) を起動") ||
-          stdout.includes("プレビューサーバー")
+          !signalSent &&
+          stdout.includes("プレビューサーバーが起動しました")
         ) {
+          signalSent = true;
           proc.kill("SIGINT");
         }
       });
@@ -225,20 +237,33 @@ fn bad_fn() -> Result<(), ()> {
         stderr += d.toString();
       });
 
-      proc.on("close", (code) => {
-        resolve({ code, stdout, stderr });
+      proc.on("error", (error) => {
+        clearTimeout(watchdog);
+        reject(error);
       });
-
-      // 万一のタイムアウト防止
-      setTimeout(() => {
-        proc.kill("SIGINT");
-      }, 5000);
+      proc.on("close", (code) => {
+        clearTimeout(watchdog);
+        resolve({ code, stdout, stderr, signalSent, watchdogExpired });
+      });
     });
 
-    // ERR_INVALID_ARG_TYPE の例外が発生していないこと
+    expect(result.watchdogExpired, result.stdout + result.stderr).toBe(false);
+    expect(result.signalSent, result.stdout + result.stderr).toBe(true);
     expect(result.stderr).not.toContain("ERR_INVALID_ARG_TYPE");
     expect(result.stderr).not.toContain("TypeError");
-    // 終了コードは 130 または 0 であること
-    expect([0, 130]).toContain(result.code);
+    expect(result.code, result.stdout + result.stderr).toBe(130);
+    expect(result.stdout).toContain("終了処理を実行中");
+    await expect
+      .poll(async () => {
+        try {
+          await fetch(`http://127.0.0.1:${port}/`, {
+            signal: AbortSignal.timeout(1000),
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .toBe(false);
   });
 });

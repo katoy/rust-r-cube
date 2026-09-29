@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { holdSolverResults, releaseSolverResults } from "./solver-barrier";
 
 test.describe("b605038 レビュー指摘点 (F1〜F5) 回帰テスト", () => {
   // F1: 解法プレビューシーク後（または再生完了後）の再探索時の状態復元
@@ -106,20 +107,13 @@ test.describe("b605038 レビュー指摘点 (F1〜F5) 回帰テスト", () => {
   });
 
   // F3: 探索中のエディタ・カメラボタン無効化および非同期レース防止
-  test("F3: 探索中に「色を入力」「カメラで読み取り」ボタンが無効化され、ダイアログ起動時に探索が安全に中断される", async ({
+  test("F3: 探索中の色・カメラ入力は直接ハンドラを呼んでも拒否される", async ({
     page,
   }) => {
-    await page.goto("/?no-sw");
+    await page.goto("/?no-sw&alg=R");
     await page.locator("#engine-status").filter({ hasText: "READY" }).waitFor();
 
-    // スーパーフリップで時間のかかる探索を開始
-    await page.getByRole("tab", { name: "プリセット" }).click();
-    await page.getByRole("button", { name: "スーパーフリップ" }).click();
-    await page
-      .locator("#preset-status")
-      .filter({ hasText: "読み込みました" })
-      .waitFor();
-
+    await holdSolverResults(page);
     await page.locator("#solver-algorithm").selectOption("korf");
     await page.locator("#solve").click();
     await expect(page.locator("#cancel")).toBeVisible();
@@ -131,22 +125,19 @@ test.describe("b605038 レビュー指摘点 (F1〜F5) 回帰テスト", () => {
     expect(await page.locator("#edit-colors").isDisabled()).toBe(true);
     expect(await page.locator("#camera-colors").isDisabled()).toBe(true);
 
-    // 万が一コード経由で edit-colors が発火されても即座に cancelSearch が走ること
-    await page.evaluate(() => {
-      const btn = document.querySelector(
-        "#edit-colors",
-      ) as HTMLButtonElement | null;
-      btn?.onclick?.(new MouseEvent("click") as any);
-    });
-    await page.locator("#editor").waitFor({ state: "visible" });
-
-    // 探索が即時停止していること
-    const solverClient = await page.evaluate(
-      () => (window.__cube_main_debug__?.getSolver() as any)?.pending,
-    );
-    expect(solverClient).toBeUndefined();
-
-    await page.locator("#editor-close").click();
+    for (const id of ["edit-colors", "camera-colors"]) {
+      await page
+        .locator(`#${id}`)
+        .evaluate((button: HTMLButtonElement) =>
+          button.onclick?.call(button, new MouseEvent("click")),
+        );
+      await expect(page.locator("#message")).toContainText("探索中");
+      await expect(page.locator("#editor")).toBeHidden();
+      await expect(page.locator("#camera-editor")).toBeHidden();
+      await expect(page.locator("#cancel")).toBeVisible();
+    }
+    await releaseSolverResults(page);
+    await expect(page.locator("#solution-content")).toBeVisible();
   });
 
   // F4: 解法自動再生中に Undo を呼んだ際、playing フラグが確実に false にリセットされる

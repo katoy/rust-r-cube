@@ -340,6 +340,7 @@ store.subscribe((_s, { type }) => {
 function fallback() {
   scene?.dispose();
   scene = undefined;
+  delete window.cube_scene;
   $("scene").hidden = true;
   $("fallback").hidden = false;
   $("view-reset").hidden = true;
@@ -349,6 +350,9 @@ function fallback() {
   document.querySelector<HTMLElement>(".gesture")!.hidden = true;
 }
 function initScene(forceError = false) {
+  scene?.dispose();
+  scene = undefined;
+  delete window.cube_scene;
   try {
     if (forceError) throw new Error("forced scene error");
     scene = new CubeScene($("scene"));
@@ -455,7 +459,6 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     );
     stop();
     cancelSearch();
-    appState.runCubeMutation(() => {});
     message();
     const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
     const token = ++motion;
@@ -465,7 +468,9 @@ async function applyAlgorithm(algorithm: string, animate = true) {
       scene &&
       !reduced.checked
     );
-    store.applyAlgorithmResult(result.state, nextCenters);
+    appState.runCubeMutation(() => {
+      store.applyAlgorithmResult(result.state, nextCenters);
+    });
     sound.playMove();
     if (inMotion) {
       await scene!.turn(
@@ -568,16 +573,49 @@ function promptReloadForUpdate(reloadFn = () => window.location.reload()) {
   }
 }
 
+let modalRequestId = 0;
+async function openModal<T>(
+  load: () => Promise<T | undefined>,
+  open: (modal: T) => void,
+) {
+  if (!appState.getState().canModifyCube()) {
+    message("探索中は色入力を開けません。探索を中止してから操作してください。");
+    return;
+  }
+  const requestId = ++modalRequestId;
+  const at = store.getRevision();
+  const state = appState.getState();
+  stop();
+  refresh();
+  const modal = await load();
+  if (!modal || requestId !== modalRequestId) return;
+  if (
+    state !== appState.getState() ||
+    at !== store.getRevision() ||
+    !appState.getState().canModifyCube()
+  ) {
+    message("読込中に状態が変わったため、色入力の起動を中断しました。");
+    return;
+  }
+  open(modal);
+}
+
 let editorInstance: import("./editor").ColorEditor | undefined;
 async function getEditor(
-  loader: () => Promise<any> = () => import("./editor"),
+  loader: () => Promise<typeof import("./editor")> = () => import("./editor"),
 ): Promise<import("./editor").ColorEditor | undefined> {
   if (!editorInstance) {
     try {
       const { ColorEditor } = await loader();
       editorInstance = new ColorEditor(
         (s: string) => validate(s),
-        (s: string, centers: number[]) => replace(s, true, centers),
+        (s: string, centers: number[]) => {
+          if (!appState.getState().canModifyCube())
+            throw new Error(
+              "探索中は配色を適用できません。探索を中止してください。",
+            );
+          appState.runCubeMutation(() => replace(s, true, centers));
+        },
       );
     } catch {
       promptReloadForUpdate();
@@ -589,7 +627,7 @@ async function getEditor(
 
 let cameraInstance: import("./camera").TwoViewCamera | undefined;
 async function getCamera(
-  loader: () => Promise<any> = () => import("./camera"),
+  loader: () => Promise<typeof import("./camera")> = () => import("./camera"),
 ): Promise<import("./camera").TwoViewCamera | undefined> {
   if (!cameraInstance) {
     try {
@@ -599,8 +637,7 @@ async function getCamera(
         try {
           centers = automaticCenters(s);
         } catch {}
-        const ed = await getEditor();
-        if (ed) ed.open(s, centers);
+        await openModal(getEditor, (ed) => ed.open(s, centers));
       });
     } catch {
       promptReloadForUpdate();
@@ -611,24 +648,12 @@ async function getCamera(
 }
 
 $("edit-colors").onclick = async () => {
-  if (!appState.getState().canModifyCube()) return;
-  stop();
-  cancelSearch();
-  refresh();
-  const ed = await getEditor();
-  if (ed) {
-    ed.open(store.getState(), store.getCenterRotations());
-  }
+  await openModal(getEditor, (ed) =>
+    ed.open(store.getState(), store.getCenterRotations()),
+  );
 };
 $("camera-colors").onclick = async () => {
-  if (!appState.getState().canModifyCube()) return;
-  stop();
-  cancelSearch();
-  refresh();
-  const cam = await getCamera();
-  if (cam) {
-    cam.open();
-  }
+  await openModal(getCamera, (cam) => cam.open());
 };
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);
@@ -653,20 +678,15 @@ $("scramble").onclick = () => {
   });
 };
 $("apply-algorithm").onclick = () =>
-  appState.runCubeMutation(
-    () => void applyAlgorithm($<HTMLTextAreaElement>("algorithm").value),
-  );
+  void applyAlgorithm($<HTMLTextAreaElement>("algorithm").value);
 document
   .querySelectorAll<HTMLButtonElement>("[data-move]")
   .forEach(
     (button) =>
       (button.onclick = (event) =>
-        appState.runCubeMutation(
-          () =>
-            void applyAlgorithm(
-              button.dataset.move! +
-                ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
-            ),
+        void applyAlgorithm(
+          button.dataset.move! +
+            ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
         )),
   );
 function setModifier(value: "'" | "2") {
@@ -679,14 +699,18 @@ $("undo").onclick = () => {
   appState.runCubeMutation(() => {
     stop();
     cancelSearch();
-    if (store.undo()) message();
+    const changed = store.undo();
+    if (changed) message();
+    return changed;
   });
 };
 $("redo").onclick = () => {
   appState.runCubeMutation(() => {
     stop();
     cancelSearch();
-    if (store.redo()) message();
+    const changed = store.redo();
+    if (changed) message();
+    return changed;
   });
 };
 $("reset").onclick = () =>
@@ -858,9 +882,7 @@ setupKeyboardShortcuts({
   isSolving: () => appState.isSolving(),
   getModifier: () => store.getModifier(),
   onMove: (move) => {
-    appState.runCubeMutation(() => {
-      void applyAlgorithm(move);
-    });
+    void applyAlgorithm(move);
   },
   onPlay: () => {
     if (appState.isSolving()) return;

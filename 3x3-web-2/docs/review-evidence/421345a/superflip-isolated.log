@@ -1,0 +1,38 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves orientation within 24 moves (11.3s)
+
+
+  1) [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves orientation within 24 moves 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 24
+    Received:    72
+
+      950 |   const moves = await page.locator(".solution-move").allTextContents();
+      951 |   expect(moves.length).toBeGreaterThanOrEqual(20);
+    > 952 |   expect(moves.length).toBeLessThanOrEqual(24);
+          |                        ^
+      953 |
+      954 |   // 5. 解法の最後まで進む
+      955 |   await page.locator(".solution-move").last().click();
+        at /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/tests/app.spec.ts:952:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/superflip-isolated/app-superflip-preset-loads-49bf9-orientation-within-24-moves-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/superflip-isolated/app-superflip-preset-loads-49bf9-orientation-within-24-moves-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/superflip-isolated/app-superflip-preset-loads-49bf9-orientation-within-24-moves-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/superflip-isolated/app-superflip-preset-loads-49bf9-orientation-within-24-moves-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves orientation within 24 moves 

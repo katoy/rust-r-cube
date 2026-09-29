@@ -1,0 +1,9 @@
+SOLVED validate=true typeof=boolean
+SOLVED is_valid=true typeof=boolean
+SOLVED is_solved=true typeof=boolean
+R validate=false typeof=boolean
+R is_valid=true typeof=boolean
+R is_solved=false typeof=boolean
+INVALID validate=THROW 54マスすべての色を入力してください。
+INVALID is_valid=THROW 54マスすべての色を入力してください。
+INVALID is_solved=THROW 54マスすべての色を入力してください。

@@ -1,0 +1,72 @@
+{
+  "liveSamplesOldPhoto": {
+    "before": {
+      "faces": {},
+      "enabled": true
+    },
+    "live": {
+      "streaming": true,
+      "points": 6,
+      "enabled": true,
+      "livePixel": [0, 135, 0, 255]
+    },
+    "after": {
+      "faces": {
+        "U": "UUUUUUUUU",
+        "R": "RRRRRRRRR",
+        "F": "FFFFFFFFF"
+      },
+      "streaming": true
+    }
+  },
+  "pendingDecodeCanApplyOldPhoto": {
+    "pending": {
+      "progress": "3 / 6 面",
+      "captureEnabled": true,
+      "applyEnabled": false,
+      "points": 6,
+      "oldImageStillActive": true
+    },
+    "recaptured": {
+      "progress": "6 / 6 面",
+      "applyEnabled": true,
+      "faces": {
+        "D": "DDDDDDDDD",
+        "L": "LLLLLLLLL",
+        "B": "BBBBBBBBB",
+        "U": "UUUUUUUUU",
+        "R": "RRRRRRRRR",
+        "F": "FFFFFFFFF"
+      }
+    },
+    "applied": {
+      "editorOpen": true,
+      "editorColors": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
+    }
+  },
+  "delayedCaptureReactivatesA": {
+    "before": {
+      "view": "B",
+      "seq": 1
+    },
+    "after": {
+      "view": "A",
+      "imageA": true,
+      "imageB": false,
+      "seq": 2
+    }
+  },
+  "decodeErrorInvisible": {
+    "imageA": false,
+    "error": "",
+    "status": "未選択（クリックまたはドロップ）"
+  },
+  "resizeThinImage": {
+    "selectedDimensions": [4000, 1],
+    "fileBytes": 188,
+    "oldImageRetained": true,
+    "dimensions": [640, 480],
+    "error": "",
+    "captureEnabled": true
+  }
+}

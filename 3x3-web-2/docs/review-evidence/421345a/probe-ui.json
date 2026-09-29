@@ -1,0 +1,112 @@
+{
+  "validateContract": {
+    "returned": true,
+    "negatedByCompleteCoverageTest": false
+  },
+  "redoDuringPreview": {
+    "original": {
+      "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+      "centers": [0, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    },
+    "future": {
+      "state": "UUUUUUFFFUBBRRRRRRRRRFFDFFDDDBDDBDDBFFDLLLLLLLLLUBBUBB",
+      "centers": [1, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    },
+    "preview": {
+      "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": true,
+      "hasSolution": true,
+      "fsm": "previewing"
+    },
+    "afterRedo": {
+      "state": "UUUUUUFFFUBBRRRRRRRRRFFDFFDDDBDDBDDBFFDLLLLLLLLLUBBUBB",
+      "centers": [1, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    },
+    "afterUndo": {
+      "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": false,
+      "canRedo": true,
+      "hasSolution": false,
+      "fsm": "idle"
+    }
+  },
+  "delayedEditorDuringSolve": {
+    "whileSolving": {
+      "state": "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": false,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "solving"
+    },
+    "modalOpenedWhileSolving": {
+      "state": "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": false,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "solving"
+    },
+    "afterApply": {
+      "state": "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": false,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    }
+  },
+  "invalidCenterTypeAccepted": {
+    "before": {
+      "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+      "centers": [0, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    },
+    "after": {
+      "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+      "centers": [0, 0, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": false,
+      "fsm": "idle"
+    },
+    "message": ""
+  },
+  "failedMutationChangesFsm": {
+    "before": {
+      "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+      "centers": [0, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": true,
+      "fsm": "previewing"
+    },
+    "after": {
+      "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+      "centers": [0, 1, 0, 0, 0, 0],
+      "canUndo": true,
+      "canRedo": false,
+      "hasSolution": true,
+      "fsm": "idle"
+    },
+    "message": "「not-a-move」は未対応です。U R F D L B と '・2 を使い、空白で区切ってください。"
+  }
+}

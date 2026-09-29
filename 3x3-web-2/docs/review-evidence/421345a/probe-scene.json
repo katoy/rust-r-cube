@@ -1,0 +1,15 @@
+{
+  "before": {
+    "geometries": 11,
+    "textures": 9
+  },
+  "after": {
+    "geometries": 0,
+    "textures": 3
+  },
+  "renderTargetDisposals": 0,
+  "shadowMapSize": [1024, 1024],
+  "shadowColorTextureCount": 1,
+  "shadowHasDepthTexture": true,
+  "retainedByWindow": true
+}

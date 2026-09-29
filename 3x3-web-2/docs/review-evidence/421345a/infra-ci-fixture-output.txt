@@ -1,0 +1,25 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 docs/review-evidence/421345a/infra-ci-fixture.spec.mjs:2:1 › intentional reporter failure fixture without browser (17ms)
+
+
+  1) docs/review-evidence/421345a/infra-ci-fixture.spec.mjs:2:1 › intentional reporter failure fixture without browser 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+      1 | import { test, expect } from "@playwright/test";
+      2 | test("intentional reporter failure fixture without browser", () => {
+    > 3 |   expect(1).toBe(2);
+        |             ^
+      4 | });
+      5 |
+        at /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/docs/review-evidence/421345a/infra-ci-fixture.spec.mjs:3:13
+
+    Error Context: docs/review-evidence/421345a/infra-ci-test-results/infra-ci-fixture-intention-5e337-ure-fixture-without-browser/error-context.md
+
+  1 failed
+    docs/review-evidence/421345a/infra-ci-fixture.spec.mjs:2:1 › intentional reporter failure fixture without browser 

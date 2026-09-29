@@ -1,0 +1,10 @@
+CFOP last-layer orientation samples passed=216
+Center configurations checked=2048 max_correction_moves=124 centers=[1, 1, 1, 1, 1, 1]
+Public API SOLVED + centers=[1;6] cfop returned_moves=124 final_state_solved=true
+CFOP scramble samples passed=100
+Short-scramble correctness and phase continuity: kociemba=20 korf=20 thistlethwaite=20
+All coordinate encode/decode values passed: 2187+2048+495+40320+40320+24
+Zero budget alg=kociemba ok=false elapsed_ms=0.027
+Zero budget alg=cfop ok=false elapsed_ms=0.003
+Zero budget alg=thistlethwaite ok=false elapsed_ms=0.003
+Zero budget alg=korf ok=false elapsed_ms=0.002

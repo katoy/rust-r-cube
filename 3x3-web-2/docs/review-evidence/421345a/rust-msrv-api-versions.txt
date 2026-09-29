@@ -1,0 +1,8 @@
+Installed Rust standard-library HTML documentation identifies:
+is_multiple_of ['1.87.0, const since 1.87.0']
+is_none_or ['1.82.0, const unstable']
+
+Compiler available during review: rustc 1.98.1 (48a229cea 2026-09-01).
+Rust 1.80 was not installed and its full build was not executed.
+README.md:10,191 promise Rust 1.80+.
+src/supercube.rs:189 uses is_multiple_of; :198 uses is_none_or.

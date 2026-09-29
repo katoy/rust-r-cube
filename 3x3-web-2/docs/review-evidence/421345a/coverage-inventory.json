@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-09-29T21:20:39.862Z",
+  "method": "Browser DevTools Protocol (CDP)",
+  "expected": [
+    "web/app-state.ts",
+    "web/camera-canvas-renderer.ts",
+    "web/camera-geometry.ts",
+    "web/camera-results-ui.ts",
+    "web/camera-ui-helper.ts",
+    "web/camera.ts",
+    "web/centers.ts",
+    "web/cube-store.ts",
+    "web/editor.ts",
+    "web/file-io.ts",
+    "web/image-sampler.ts",
+    "web/keyboard-shortcuts.ts",
+    "web/main.ts",
+    "web/model.ts",
+    "web/pwa.ts",
+    "web/scene.ts",
+    "web/solver-client.ts",
+    "web/solver.worker.ts",
+    "web/sound.ts",
+    "web/storage-key.ts",
+    "web/style.css",
+    "web/triggers.ts",
+    "web/url-params.ts",
+    "web/view.ts"
+  ],
+  "missing": ["web/solver.worker.ts"],
+  "note": "Module capture inventory only; not a Rust/WASM semantic coverage measurement."
+}

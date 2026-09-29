@@ -1,0 +1,44 @@
+
+Running 3 tests using 1 worker
+
+  ✓  1 [chromium] › tests/code-review-63bce97-regression.spec.ts:12:3 › 63bce97 レビュー指摘点 (F1〜F4) 回帰テスト › F1: 解法表示中に再探索を開始した際、古い解法が失効し、再生・シーク操作が無効化されて探索完了後に新解法が確実に反映される (2.5s)
+  ✓  2 [chromium] › tests/code-review-63bce97-regression.spec.ts:189:3 › 63bce97 レビュー指摘点 (F1〜F4) 回帰テスト › F4: 探索中にプリセットを選択した際、即座に探索が中止され、プリセット完了後に旧探索のノード数が上書きされない (2.3s)
+  ✘  3 [chromium] › tests/code-review-b605038-regression.spec.ts:109:3 › b605038 レビュー指摘点 (F1〜F5) 回帰テスト › F3: 探索中に「色を入力」「カメラで読み取り」ボタンが無効化され、ダイアログ起動時に探索が安全に中断される (45.6s)
+
+
+  1) [chromium] › tests/code-review-b605038-regression.spec.ts:109:3 › b605038 レビュー指摘点 (F1〜F5) 回帰テスト › F3: 探索中に「色を入力」「カメラで読み取り」ボタンが無効化され、ダイアログ起動時に探索が安全に中断される 
+
+    Test timeout of 45000ms exceeded.
+
+    Error: locator.waitFor: Test timeout of 45000ms exceeded.
+    Call log:
+      - waiting for locator('#editor') to be visible
+        90 × locator resolved to hidden <dialog id="editor">…</dialog>
+
+
+      139 |       btn?.onclick?.(new MouseEvent("click") as any);
+      140 |     });
+    > 141 |     await page.locator("#editor").waitFor({ state: "visible" });
+          |                                   ^
+      142 |
+      143 |     // 探索が即時停止していること
+      144 |     const solverClient = await page.evaluate(
+        at /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/tests/code-review-b605038-regression.spec.ts:141:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/lifecycle-regressions/code-review-b605038-regres-4e816-が無効化され、ダイアログ起動時に探索が安全に中断される-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/lifecycle-regressions/code-review-b605038-regres-4e816-が無効化され、ダイアログ起動時に探索が安全に中断される-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/lifecycle-regressions/code-review-b605038-regres-4e816-が無効化され、ダイアログ起動時に探索が安全に中断される-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../.copilot/session-state/f99941f1-bc62-48e8-a062-1daa115ddb6c/files/lifecycle-regressions/code-review-b605038-regres-4e816-が無効化され、ダイアログ起動時に探索が安全に中断される-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/code-review-b605038-regression.spec.ts:109:3 › b605038 レビュー指摘点 (F1〜F5) 回帰テスト › F3: 探索中に「色を入力」「カメラで読み取り」ボタンが無効化され、ダイアログ起動時に探索が安全に中断される 
+  2 passed (52.2s)

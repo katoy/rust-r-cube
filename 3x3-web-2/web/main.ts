@@ -12,6 +12,7 @@ import {
   centerTurns,
   centersFromInput,
   rotateCenters,
+  turnsToCenters,
 } from "./centers";
 
 import { registerServiceWorker } from "./pwa";
@@ -20,6 +21,7 @@ import { analyzeMoves } from "./triggers";
 import { setupKeyboardShortcuts } from "./keyboard-shortcuts";
 import { parseUrlParams, buildShareUrl } from "./url-params";
 import { validateAndParseCubeJson, createCubeJsonBlob } from "./file-io";
+import { AppStateMachine } from "./app-state";
 
 declare global {
   interface Window {
@@ -32,6 +34,8 @@ declare global {
 const store = new CubeStore();
 window.cube_store = store;
 
+const appState = new AppStateMachine();
+
 mount();
 registerServiceWorker();
 export { getScopedStorageKey } from "./storage-key";
@@ -41,8 +45,8 @@ const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const storageKey = getScopedStorageKey("cube-studio-v1");
 let mainReady = false,
-  engineError = false,
-  solving = false;
+  engineError = false;
+let solving = false; // synced with appState.isSolving()
 let playing = false,
   motion = 0,
   inMotion = false,
@@ -91,7 +95,8 @@ function stop() {
   }
 }
 function cancelSearch() {
-  if (solving) {
+  if (appState.isSolving() || solving) {
+    appState.cancelSolving();
     solving = false;
     clearInterval(interval);
     solver?.cancel();
@@ -127,6 +132,7 @@ function replace(
   message();
   $("solver-note").textContent = "ブラウザ内で計算 · 通常5秒以内";
   store.replace(next, record, centers);
+  appState.resetToIdle();
 }
 let renderedSolution: ResultData | undefined = undefined;
 let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
@@ -156,21 +162,25 @@ function refresh() {
   }
   $("cube-status").textContent = statusText;
   $("scene").dataset.state = state;
+  const canModify = appState.getState().canModifyCube();
+  const canSolve = appState.getState().canStartSolve();
+  solving = appState.isSolving();
+
   $<HTMLButtonElement>("solve").disabled =
-    !mainReady || (!solver?.ready && !engineError) || solving;
+    !mainReady || (!solver?.ready && !engineError) || !canSolve;
   $("solve").hidden = solving;
   $("cancel").hidden = !solving;
   $("solve").innerHTML =
     `<span>${engineError ? "エンジンを再試行" : state === SOLVED ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
   $<HTMLButtonElement>("undo").disabled =
-    !mainReady || !store.canUndo() || solving;
+    !mainReady || !store.canUndo() || !canModify;
   $<HTMLButtonElement>("redo").disabled =
-    !mainReady || !store.canRedo() || solving;
+    !mainReady || !store.canRedo() || !canModify;
   document
     .querySelectorAll<HTMLButtonElement>(
       "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
     )
-    .forEach((b) => (b.disabled = !mainReady || solving));
+    .forEach((b) => (b.disabled = !mainReady || !canModify));
   solverAlgo.disabled = solving;
   includeOrientation.disabled = solving;
   $("solution-empty").hidden = !!solution;
@@ -438,12 +448,14 @@ async function applyAlgorithm(algorithm: string, animate = true) {
   if (!mainReady) return;
   const trimmed = algorithm.trim();
   if (!trimmed) return;
+  if (!appState.getState().canModifyCube()) return;
   try {
     const result: ResultData = JSON.parse(
       apply_moves(store.getState(), trimmed),
     );
     stop();
     cancelSearch();
+    appState.runCubeMutation(() => {});
     message();
     const nextCenters = rotateCenters(store.getCenterRotations(), result.moves);
     const token = ++motion;
@@ -480,7 +492,9 @@ async function solve(budget = 5000) {
     refresh();
     return;
   }
-  if (!solver?.ready || solving) return;
+  if (!solver?.ready) return;
+  if (!appState.startSolving()) return;
+  solving = true;
   stop();
   message();
   $("extended").hidden = true;
@@ -490,7 +504,6 @@ async function solve(budget = 5000) {
   try {
     const currentState = store.getState();
     validate(currentState);
-    solving = true;
     const at = store.getRevision();
     const start = performance.now();
     refresh();
@@ -507,8 +520,9 @@ async function solve(budget = 5000) {
       solverAlgo.value as import("./model").SolverAlgorithm,
     );
 
-    if (!solving || store.getRevision() !== at) return;
+    if (!appState.isSolving() || store.getRevision() !== at) return;
     store.setSolution(result);
+    appState.finishSolving(true);
     if (window.innerWidth <= 740) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -516,11 +530,26 @@ async function solve(budget = 5000) {
       `${result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
     if (result.moves.length === 0) message("すでに6面が揃っています。");
   } catch (error) {
-    if (String(error).includes("cancelled")) return;
+    if (String(error).includes("cancelled")) {
+      appState.cancelSolving();
+      return;
+    }
+    appState.finishSolving(false);
     message(error instanceof Error ? error.message : String(error));
-    $("extended").hidden = false;
-    $("solver-note").textContent = "探索時間の上限に達しました";
+    const isTimeout =
+      String(error).includes("探索時間の上限") ||
+      String(error).includes("timeout");
+    if (isTimeout) {
+      $("extended").hidden = false;
+      $("solver-note").textContent = "探索時間の上限に達しました";
+    } else {
+      $("extended").hidden = true;
+      $("solver-note").textContent = "探索できませんでした";
+    }
   } finally {
+    if (appState.isSolving()) {
+      appState.cancelSolving();
+    }
     solving = false;
     clearInterval(interval);
     refresh();
@@ -582,6 +611,7 @@ async function getCamera(
 }
 
 $("edit-colors").onclick = async () => {
+  if (!appState.getState().canModifyCube()) return;
   stop();
   cancelSearch();
   refresh();
@@ -591,6 +621,7 @@ $("edit-colors").onclick = async () => {
   }
 };
 $("camera-colors").onclick = async () => {
+  if (!appState.getState().canModifyCube()) return;
   stop();
   cancelSearch();
   refresh();
@@ -609,40 +640,59 @@ $("cancel").onclick = () => {
 };
 $("scramble").onclick = () => {
   if (!mainReady) return;
-  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  const algorithm = scramble(seed);
-  const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
-  replace(result.state, true, rotateCenters([0, 0, 0, 0, 0, 0], result.moves));
-  $("scramble-text").textContent = algorithm;
+  appState.runCubeMutation(() => {
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    const algorithm = scramble(seed);
+    const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
+    replace(
+      result.state,
+      true,
+      rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+    );
+    $("scramble-text").textContent = algorithm;
+  });
 };
 $("apply-algorithm").onclick = () =>
-  void applyAlgorithm($<HTMLTextAreaElement>("algorithm").value);
+  appState.runCubeMutation(
+    () => void applyAlgorithm($<HTMLTextAreaElement>("algorithm").value),
+  );
 document
   .querySelectorAll<HTMLButtonElement>("[data-move]")
   .forEach(
     (button) =>
       (button.onclick = (event) =>
-        void applyAlgorithm(
-          button.dataset.move! +
-            ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
+        appState.runCubeMutation(
+          () =>
+            void applyAlgorithm(
+              button.dataset.move! +
+                ((event as MouseEvent).shiftKey ? "'" : store.getModifier()),
+            ),
         )),
   );
 function setModifier(value: "'" | "2") {
+  if (appState.isSolving()) return;
   store.toggleModifier(value);
 }
 $("prime").onclick = () => setModifier("'");
 $("double").onclick = () => setModifier("2");
 $("undo").onclick = () => {
-  stop();
-  cancelSearch();
-  if (store.undo()) message();
+  appState.runCubeMutation(() => {
+    stop();
+    cancelSearch();
+    if (store.undo()) message();
+  });
 };
 $("redo").onclick = () => {
-  stop();
-  cancelSearch();
-  if (store.redo()) message();
+  appState.runCubeMutation(() => {
+    stop();
+    cancelSearch();
+    if (store.redo()) message();
+  });
 };
-$("reset").onclick = () => replace(SOLVED);
+$("reset").onclick = () =>
+  appState.runCubeMutation(() => {
+    replace(SOLVED);
+  });
 const viewPresets = ["iso", "front", "top", "right"] as const;
 function updateActivePreset(presetName: (typeof viewPresets)[number]) {
   viewPresets.forEach((name) => {
@@ -701,8 +751,8 @@ $("copy").onclick = async () => {
 };
 $("solution-close").onclick = () => {
   stop();
-  store.restoreBaseSnapshot();
   store.setSolution(undefined);
+  appState.closeSolution();
   persist();
   refresh();
   const solveBtn = $<HTMLButtonElement>("solve");
@@ -770,6 +820,10 @@ let fileLoadRequestId = 0;
 $<HTMLInputElement>("file").onchange = async () => {
   const file = $<HTMLInputElement>("file").files?.[0];
   if (!file) return;
+  if (!appState.getState().canModifyCube()) {
+    $<HTMLInputElement>("file").value = "";
+    return;
+  }
   const requestId = ++fileLoadRequestId;
   const at = store.getRevision();
   try {
@@ -784,11 +838,15 @@ $<HTMLInputElement>("file").onchange = async () => {
       throw new Error(
         "読込中にキューブが変更されました。もう一度読み込んでください。",
       );
-    replace(
-      parsed.state,
-      true,
-      centersFromInput(parsed.state, parsed.centerTurns),
-    );
+    if (!appState.getState().canModifyCube())
+      throw new Error("探索が開始されたため、ファイル読み込みを中断しました。");
+    appState.runCubeMutation(() => {
+      replace(
+        parsed.state,
+        true,
+        centersFromInput(parsed.state, parsed.centerTurns),
+      );
+    });
   } catch (error) {
     if (requestId === fileLoadRequestId) message(String(error));
   } finally {
@@ -797,19 +855,20 @@ $<HTMLInputElement>("file").onchange = async () => {
 };
 setupKeyboardShortcuts({
   isReady: () => mainReady,
-  isSolving: () => solving,
+  isSolving: () => appState.isSolving(),
   getModifier: () => store.getModifier(),
   onMove: (move) => {
-    if (solving) return;
-    void applyAlgorithm(move);
+    appState.runCubeMutation(() => {
+      void applyAlgorithm(move);
+    });
   },
   onPlay: () => {
-    if (solving) return;
+    if (appState.isSolving()) return;
     void play();
   },
   onStop: () => stop(),
   onSeek: (step, animate) => {
-    if (solving) return;
+    if (appState.isSolving()) return;
     void seek(step, animate);
   },
   getCurrentStep: () => store.getStep(),
@@ -926,7 +985,7 @@ async function initializePresets() {
       button.textContent = `${preset.emoji} ${preset.label}`;
       button.disabled = !mainReady;
       button.onclick = async () => {
-        if (!mainReady || solving) return;
+        if (!mainReady || !appState.getState().canModifyCube()) return;
         stop();
         cancelSearch();
         const requestId = ++presetRequestId;
@@ -950,65 +1009,73 @@ async function initializePresets() {
           }
 
           // 取得中にユーザーが手動でキューブを操作していた、または探索を開始していた場合は上書きを防止
-          if (solving || store.getRevision() !== initialRevision) {
+          if (
+            !appState.getState().canModifyCube() ||
+            store.getRevision() !== initialRevision
+          ) {
             presetStatus.textContent = `⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました`;
             return;
           }
 
-          // scramble_seed がある場合は WASM の scramble() で生成
-          if (typeof data.scramble_seed === "number") {
-            try {
-              const algorithm = scramble(data.scramble_seed);
-              const result: ResultData = JSON.parse(
-                apply_moves(SOLVED, algorithm),
-              );
+          appState.runCubeMutation(() => {
+            // scramble_seed がある場合は WASM の scramble() で生成
+            if (typeof data.scramble_seed === "number") {
+              try {
+                const algorithm = scramble(data.scramble_seed);
+                const result: ResultData = JSON.parse(
+                  apply_moves(SOLVED, algorithm),
+                );
+                replace(
+                  result.state,
+                  true,
+                  rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+                );
+                $("scramble-text").textContent = algorithm;
+              } catch (scrambleError) {
+                throw new Error(
+                  `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+                );
+              }
+            }
+            // scramble 文字列がある場合
+            else if (
+              typeof data.scramble === "string" &&
+              data.scramble.trim()
+            ) {
+              try {
+                const cleanedScramble = data.scramble.replace(
+                  /(\b[URFDLB])\s+(\d|')/g,
+                  "$1$2",
+                );
+                const result: ResultData = JSON.parse(
+                  apply_moves(SOLVED, cleanedScramble),
+                );
+                replace(
+                  result.state,
+                  true,
+                  rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+                );
+                $("scramble-text").textContent = cleanedScramble;
+              } catch (scrambleError) {
+                throw new Error(
+                  `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+                );
+              }
+            }
+            // state 文字列がある場合
+            else if (typeof data.state === "string" && data.state.trim()) {
+              validate(data.state);
               replace(
-                result.state,
+                data.state,
                 true,
-                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+                centersFromInput(data.state, data.centerTurns),
               );
-              $("scramble-text").textContent = algorithm;
-            } catch (scrambleError) {
+            } else {
               throw new Error(
-                `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
+                `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
               );
             }
-          }
-          // scramble 文字列がある場合
-          else if (typeof data.scramble === "string" && data.scramble.trim()) {
-            try {
-              const cleanedScramble = data.scramble.replace(
-                /(\b[URFDLB])\s+(\d|')/g,
-                "$1$2",
-              );
-              const result: ResultData = JSON.parse(
-                apply_moves(SOLVED, cleanedScramble),
-              );
-              replace(
-                result.state,
-                true,
-                rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
-              );
-              $("scramble-text").textContent = cleanedScramble;
-            } catch (scrambleError) {
-              throw new Error(
-                `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
-              );
-            }
-          }
-          // state 文字列がある場合
-          else if (typeof data.state === "string" && data.state.trim()) {
-            validate(data.state);
-            replace(
-              data.state,
-              true,
-              centersFromInput(data.state, data.centerTurns),
-            );
-          } else {
-            throw new Error(
-              `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
-            );
-          }
+          });
 
           presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
         } catch (error) {
@@ -1057,10 +1124,16 @@ if (
     getCamera,
     initializePresets,
     start,
+    appState,
     setEngineError: (val: boolean) => {
       engineError = val;
     },
     setSolving: (val: boolean) => {
+      if (val) {
+        appState.startSolving();
+      } else {
+        appState.cancelSolving();
+      }
       solving = val;
     },
     setPlaying: (val: boolean) => {

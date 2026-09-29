@@ -51,8 +51,8 @@ test.describe("7fc8ac3 レビュー指摘点 (F1〜F5) 回帰テスト", () => {
     );
   });
 
-  // F2: 解法パネル「閉じる」押下時の元のスクランブル局面への復元
-  test("F2: 解法プレビューシーク後に解法カードの『×』を押した際、プレビュー局面がコミットされず元のスクランブル局面に復元される", async ({
+  // F2: 解法パネル「閉じる」押下時の局面確定と Undo による復元性（R02 準拠）
+  test("F2: 解法プレビューシーク後に解法カードの『×』を押した際、完成局面が維持され Undo で元のスクランブル局面に復元できる", async ({
     page,
   }) => {
     await page.goto("/?no-sw");
@@ -84,10 +84,19 @@ test.describe("7fc8ac3 レビュー指摘点 (F1〜F5) 回帰テスト", () => {
       .textContent();
     const solveButtonText = await page.locator("#solve").textContent();
 
-    // プレビュー途中の完成状態ではなく、元のスクランブル状態に復元されていることを検証
-    expect(stateAfterClose).toBe(scrambleState);
-    expect(statusTextAfterClose).toBe("スクランブル状態");
-    expect(solveButtonText).toContain("解法を探す");
+    // 閉じた後は完成状態が維持されていること（R02 仕様）
+    expect(stateAfterClose).toBe(
+      "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    );
+    expect(statusTextAfterClose).toBe("完成状態");
+    expect(solveButtonText).toContain("完成状態を確認");
+
+    // Undo を押すと元のスクランブル状態に復元されること
+    await page.locator("#undo").click();
+    const stateAfterUndo = await page.evaluate(() =>
+      window.__cube_main_debug__?.store?.getState(),
+    );
+    expect(stateAfterUndo).toBe(scrambleState);
   });
 
   // F3: プリセット非同期通信待機中の solve() 開始によるレースコンディション保護

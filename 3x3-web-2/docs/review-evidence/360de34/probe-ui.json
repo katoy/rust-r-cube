@@ -1,0 +1,35 @@
+{
+  "f1CloseDestroysSolvedState": {
+    "scrambleState": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "stateAtLast": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "stateAfterClose": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "isRestoredToScramble": true,
+    "isCommittedSolvedState": false,
+    "savedStateInStorage": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "savedIsSolved": false,
+    "savedIsScramble": true
+  },
+  "f2InvalidStateShowsExtendedAndTimeout": {
+    "errorMessage": "センターの向きと配色が整合しません。向きを確認するか、自動設定してください。",
+    "solverNote": "探索時間の上限に達しました",
+    "extendedVisible": true,
+    "isTimeoutNoteShown": true,
+    "isExtendedButtonShown": true
+  },
+  "f3EditColorsDuringPreview": {
+    "scrambleState": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "editorInitialState": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "isEditorDraftSolved": true,
+    "isEditorDraftScramble": false
+  },
+  "f4FileLoadRaceDuringSolve": {
+    "initialRev": 1,
+    "stateAfterLoad": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "isSearchCancelled": true,
+    "stateWasReplacedWithFile": true
+  },
+  "f5SolutionCloseDuplicateNotify": {
+    "solutionEventCount": 2,
+    "hasDuplicateNotification": true
+  }
+}

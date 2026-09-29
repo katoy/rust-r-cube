@@ -46,6 +46,88 @@ test.describe("E2E Coverage with CDP", () => {
         const centers = await import("/web/centers.ts");
         const camera = await import("/web/camera.ts");
         const view = await import("/web/view.ts");
+        const appStateModule = await import("/web/app-state.ts");
+
+        // --- app-state.ts ---
+        const idle = new appStateModule.IdleState();
+        idle.canModifyCube();
+        idle.canStartSolve();
+        idle.canCancelSolve();
+        idle.canUndoRedo();
+        idle.canSeekSolution();
+        idle.startSolve();
+        idle.finishSolve(true);
+        idle.finishSolve(false);
+        idle.cancelSolve();
+        idle.closeSolution();
+        idle.beforeModifyCube();
+
+        const solving = new appStateModule.SolvingState();
+        solving.canModifyCube();
+        solving.canStartSolve();
+        solving.canCancelSolve();
+        solving.canUndoRedo();
+        solving.canSeekSolution();
+        solving.startSolve();
+        solving.finishSolve(true);
+        solving.finishSolve(false);
+        solving.cancelSolve();
+        solving.closeSolution();
+        solving.beforeModifyCube();
+
+        const previewing = new appStateModule.PreviewingState();
+        previewing.canModifyCube();
+        previewing.canStartSolve();
+        previewing.canCancelSolve();
+        previewing.canUndoRedo();
+        previewing.canSeekSolution();
+        previewing.startSolve();
+        previewing.finishSolve(true);
+        previewing.finishSolve(false);
+        previewing.cancelSolve();
+        previewing.closeSolution();
+        previewing.beforeModifyCube();
+
+        const fsm = new appStateModule.AppStateMachine();
+        fsm.getState();
+        const _k = fsm.kind;
+        fsm.isIdle();
+        fsm.isSolving();
+        fsm.isPreviewing();
+        let listenerCalls = 0;
+        const unsubFsm = fsm.subscribe(() => {
+          listenerCalls++;
+        });
+
+        // 状態遷移と runCubeMutation 分岐の網羅
+        fsm.runCubeMutation(() => 1);
+        fsm.startSolving(); // リスナーが実行される (138, 139行目)
+        unsubFsm(); // 実行後に購読解除
+
+        fsm.startSolving(); // 遮断
+        fsm.runCubeMutation(() => 2); // 遮断
+        fsm.cancelSolving();
+        fsm.cancelSolving(); // 遮断
+
+        fsm.startSolving();
+        fsm.finishSolving(false);
+        fsm.finishSolving(false); // 遮断
+
+        fsm.startSolving();
+        fsm.finishSolving(true);
+        fsm.closeSolution();
+        fsm.closeSolution(); // 遮断
+
+        fsm.startSolving();
+        fsm.finishSolving(true);
+        fsm.runCubeMutation(
+          () => 3,
+          () => {},
+        ); // プレビュー中変異（onExitPreview 付き）
+        fsm.setPreviewing();
+        fsm.setPreviewing(); // 同一状態遷移ガード (134, 135行目)
+        fsm.resetToIdle();
+        fsm.resetToIdle(); // 同一状態遷移ガード
 
         // --- model.ts ---
         model.inverse("R");

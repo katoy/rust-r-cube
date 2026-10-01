@@ -794,6 +794,18 @@ test.describe("E2E Coverage with CDP", () => {
         unsub(); // unsubscribe delete listener (132行)
         store.setSolution(undefined);
         store.replace(solved, false);
+        const { turnsToCenters } = await import("/web/centers.ts");
+        store.replace(solved, true, turnsToCenters([2, 0, 0, 0, 0, 0]));
+        let currState = solved;
+        for (let i = 0; i < 205; i++) {
+          currState = JSON.parse(
+            (window as any).cube_studio.apply_moves(
+              currState,
+              i % 2 === 0 ? "R" : "U",
+            ),
+          ).state;
+          store.replace(currState, true);
+        }
 
         // --- sound.ts ---
         const { sound, SoundManager } = await import("/web/sound.ts");

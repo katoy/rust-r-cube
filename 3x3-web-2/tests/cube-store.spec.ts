@@ -324,4 +324,75 @@ test.describe("CubeStore Unit Tests", () => {
     expect(result.canUndoAfterRedo).toBe(true);
     expect(result.canRedoAfterRedo).toBe(false);
   });
+
+  test("history limit caps at 200 entries and drops oldest", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const store = new CubeStore();
+
+      const { apply_moves } = (window as any).cube_studio;
+      let currentState = SOLVED;
+      for (let i = 0; i < 205; i++) {
+        const move = i % 3 === 0 ? "R" : i % 3 === 1 ? "U" : "F";
+        currentState = JSON.parse(apply_moves(currentState, move)).state;
+        store.replace(currentState);
+      }
+
+      const canUndo = store.canUndo();
+      let undoCount = 0;
+      while (store.undo()) {
+        undoCount++;
+      }
+
+      return {
+        canUndo,
+        undoCount,
+      };
+    });
+
+    expect(result.canUndo).toBe(true);
+    expect(result.undoCount).toBe(200);
+  });
+
+  test("replace with identical state but different centerTurns records history", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const { turnsToCenters } = await import("/web/centers.ts");
+      const store = new CubeStore();
+
+      const initialTurns = store.getCenterTurns();
+      store.replace(SOLVED, true, turnsToCenters([2, 0, 0, 0, 0, 0]));
+
+      const canUndo = store.canUndo();
+      const turnsAfter = store.getCenterTurns();
+
+      const undid = store.undo();
+      const turnsAfterUndo = store.getCenterTurns();
+
+      return {
+        initialTurns,
+        turnsAfter,
+        canUndo,
+        undid,
+        turnsAfterUndo,
+      };
+    });
+
+    expect(result.canUndo).toBe(true);
+    expect(result.turnsAfter).toEqual([2, 0, 0, 0, 0, 0]);
+    expect(result.undid).toBe(true);
+    expect(result.turnsAfterUndo).toEqual([0, 0, 0, 0, 0, 0]);
+  });
 });

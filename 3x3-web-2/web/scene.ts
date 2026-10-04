@@ -179,9 +179,10 @@ export class CubeScene {
           label.position.copy(mesh.position).addScaledVector(normal[f], 0.017);
           const rotMatrix = rotationMatrixForFaceAngle(f, 0);
           label.quaternion.setFromRotationMatrix(rotMatrix);
-          label.renderOrder = 9;
           this.centerLabels[f] = label;
-          this.add(label);
+          label.renderOrder = 9;
+          label.userData = { origin: label.position.clone(), face: f };
+          this.root.add(label);
         }
       }
 
@@ -379,6 +380,13 @@ export class CubeScene {
     this.outlineMaterial?.dispose();
     this.colorMaterials.forEach((mat) => mat.dispose());
     this.colorMaterials.clear();
+    for (const label of this.centerLabels) {
+      label.geometry?.dispose();
+      if (label.material instanceof THREE.MeshBasicMaterial) {
+        label.material.map?.dispose();
+        label.material.dispose();
+      }
+    }
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.stickers = [];
@@ -490,6 +498,13 @@ export class CubeScene {
     );
     movingArrows.forEach((mesh) => layer.attach(mesh));
 
+    // 回転する層のセンターラベルを layer に attach
+    const faceIdx = FACES.indexOf(move[0]);
+    const centerLabel = this.centerLabels[faceIdx];
+    if (centerLabel) {
+      layer.attach(centerLabel);
+    }
+
     const angle =
       ((move.endsWith("2") ? 2 : move.endsWith("'") ? -1 : 1) * -Math.PI) / 2;
     await new Promise<void>((resolve) => {
@@ -533,6 +548,12 @@ export class CubeScene {
       if (mesh.userData.origin) {
         mesh.position.copy(mesh.userData.origin);
         mesh.quaternion.copy(mesh.userData.rotation);
+      }
+    }
+    for (const label of this.centerLabels) {
+      this.root.add(label);
+      if (label.userData.origin) {
+        label.position.copy(label.userData.origin);
       }
     }
     this.turnLayer.quaternion.identity();

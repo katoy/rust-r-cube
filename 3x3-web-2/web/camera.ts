@@ -576,6 +576,7 @@ export class TwoViewCamera {
     try {
       await checkImagePixelCount(file);
     } catch (err) {
+      this.imageLoadFailed(view, generation);
       this.error(err instanceof Error ? err.message : String(err));
       return;
     }

@@ -69,65 +69,131 @@ test.describe("E2E Coverage with CDP", () => {
             throw new Error("Expected function to throw, but it succeeded");
         };
 
+        const assertTrue = (cond: boolean, msg = "Assertion failed") => {
+          if (!cond) throw new Error(msg);
+        };
+        const assertEqual = (
+          actual: any,
+          expected: any,
+          msg = "Assertion failed",
+        ) => {
+          if (actual !== expected)
+            throw new Error(`${msg}: expected ${expected}, got ${actual}`);
+        };
+
         // --- app-state.ts ---
         const idle = new appStateModule.IdleState();
-        idle.canModifyCube();
-        idle.canStartSolve();
-        idle.canCancelSolve();
-        idle.canUndoRedo();
-        idle.canSeekSolution();
-        idle.startSolve();
-        idle.finishSolve(true);
-        idle.finishSolve(false);
-        idle.cancelSolve();
-        idle.closeSolution();
-        idle.beforeModifyCube();
+        assertTrue(idle.canModifyCube(), "Idle should allow modify cube");
+        assertTrue(idle.canStartSolve(), "Idle should allow start solve");
+        assertTrue(
+          !idle.canCancelSolve(),
+          "Idle should not allow cancel solve",
+        );
+        assertTrue(idle.canUndoRedo(), "Idle should allow undo redo");
+        assertTrue(
+          !idle.canSeekSolution(),
+          "Idle should not allow seek solution",
+        );
+        assertTrue(idle.startSolve() instanceof appStateModule.SolvingState);
+        assertEqual(idle.finishSolve(true), null);
+        assertEqual(idle.finishSolve(false), null);
+        assertEqual(idle.cancelSolve(), null);
+        assertEqual(idle.closeSolution(), null);
+        assertEqual(idle.beforeModifyCube(), idle);
 
         const solving = new appStateModule.SolvingState();
-        solving.canModifyCube();
-        solving.canStartSolve();
-        solving.canCancelSolve();
-        solving.canUndoRedo();
-        solving.canSeekSolution();
-        solving.startSolve();
-        solving.finishSolve(true);
-        solving.finishSolve(false);
-        solving.cancelSolve();
-        solving.closeSolution();
-        solving.beforeModifyCube();
+        assertTrue(
+          !solving.canModifyCube(),
+          "Solving should not allow modify cube",
+        );
+        assertTrue(
+          !solving.canStartSolve(),
+          "Solving should not allow start solve",
+        );
+        assertTrue(
+          solving.canCancelSolve(),
+          "Solving should allow cancel solve",
+        );
+        assertTrue(
+          !solving.canUndoRedo(),
+          "Solving should not allow undo redo",
+        );
+        assertTrue(
+          !solving.canSeekSolution(),
+          "Solving should not allow seek solution",
+        );
+        assertEqual(solving.startSolve(), null);
+        assertTrue(
+          solving.finishSolve(true) instanceof appStateModule.PreviewingState,
+        );
+        assertTrue(
+          solving.finishSolve(false) instanceof appStateModule.IdleState,
+        );
+        assertTrue(solving.cancelSolve() instanceof appStateModule.IdleState);
+        assertEqual(solving.closeSolution(), null);
+        assertEqual(solving.beforeModifyCube(), null);
 
         const previewing = new appStateModule.PreviewingState();
-        previewing.canModifyCube();
-        previewing.canStartSolve();
-        previewing.canCancelSolve();
-        previewing.canUndoRedo();
-        previewing.canSeekSolution();
-        previewing.startSolve();
-        previewing.finishSolve(true);
-        previewing.finishSolve(false);
-        previewing.cancelSolve();
-        previewing.closeSolution();
-        previewing.beforeModifyCube();
+        assertTrue(
+          previewing.canModifyCube(),
+          "Previewing should allow modify cube",
+        );
+        assertTrue(
+          previewing.canStartSolve(),
+          "Previewing should allow start solve",
+        );
+        assertTrue(
+          !previewing.canCancelSolve(),
+          "Previewing should not allow cancel solve",
+        );
+        assertTrue(
+          previewing.canUndoRedo(),
+          "Previewing should allow undo redo",
+        );
+        assertTrue(
+          previewing.canSeekSolution(),
+          "Previewing should allow seek solution",
+        );
+        assertTrue(
+          previewing.startSolve() instanceof appStateModule.SolvingState,
+        );
+        assertEqual(previewing.finishSolve(true), null);
+        assertEqual(previewing.finishSolve(false), null);
+        assertEqual(previewing.cancelSolve(), null);
+        assertTrue(
+          previewing.closeSolution() instanceof appStateModule.IdleState,
+        );
+        assertTrue(
+          previewing.beforeModifyCube() instanceof appStateModule.IdleState,
+        );
 
         const fsm = new appStateModule.AppStateMachine();
-        fsm.getState();
-        const _k = fsm.kind;
-        fsm.isIdle();
-        fsm.isSolving();
-        fsm.isPreviewing();
+        assertTrue(fsm.getState() instanceof appStateModule.IdleState);
+        assertEqual(fsm.kind, "idle");
+        assertTrue(fsm.isIdle());
+        assertTrue(!fsm.isSolving());
+        assertTrue(!fsm.isPreviewing());
         let listenerCalls = 0;
         const unsubFsm = fsm.subscribe(() => {
           listenerCalls++;
         });
 
         // 状態遷移と runCubeMutation 分岐の網羅
-        fsm.runCubeMutation(() => 1);
+        assertEqual(
+          fsm.runCubeMutation(() => 1),
+          1,
+        );
         fsm.startSolving(); // リスナーが実行される (138, 139行目)
+        assertEqual(listenerCalls, 1);
         unsubFsm(); // 実行後に購読解除
 
         fsm.startSolving(); // 遮断
-        fsm.runCubeMutation(() => 2); // 遮断
+        assertEqual(
+          fsm.runCubeMutation(() => 2),
+          undefined,
+        ); // 遮断
         fsm.cancelSolving();
+        assertTrue(fsm.isIdle());
         fsm.cancelSolving(); // 遮断
 
         fsm.startSolving();
@@ -190,17 +256,19 @@ test.describe("E2E Coverage with CDP", () => {
         sampler.rgbToHsv(0, 0, 255); // max === b
 
         // classifyColor の各色・分岐（橙色、緑、青、黄、赤、白、不明）を網羅
-        sampler.classifyColor(20, 20, 20); // ? (極端に暗い)
-        sampler.classifyColor(240, 240, 240); // U (白)
-        sampler.classifyColor(50, 180, 50); // F (緑)
-        sampler.classifyColor(50, 50, 200); // B (青)
-        sampler.classifyColor(220, 200, 30); // D (黄)
-        sampler.classifyColor(236, 110, 40); // L (橙: h >= 18 && h < 40)
-        sampler.classifyColor(220, 20, 20); // R (赤)
-        sampler.classifyColor(240, 200, 180, {
-          whiteSaturationThreshold: 0.35,
-          darkValueThreshold: 0.1,
-        });
+        assertEqual(sampler.classifyColor(20, 20, 20), "?"); // ? (極端に暗い)
+        assertEqual(sampler.classifyColor(240, 240, 240), "U"); // U (白)
+        assertEqual(sampler.classifyColor(50, 180, 50), "F"); // F (緑)
+        assertEqual(sampler.classifyColor(50, 50, 200), "B"); // B (青)
+        assertEqual(sampler.classifyColor(220, 200, 30), "D"); // D (黄)
+        assertEqual(sampler.classifyColor(236, 110, 40), "L"); // L (橙: h >= 18 && h < 40)
+        assertEqual(sampler.classifyColor(220, 20, 20), "R"); // R (赤)
+        assertTrue(
+          typeof sampler.classifyColor(240, 200, 180, {
+            whiteSaturationThreshold: 0.35,
+            darkValueThreshold: 0.1,
+          }) === "string",
+        );
 
         // classify の直接実行（最多色分岐と無効色分岐）
         const testImgData = new ImageData(11, 11);
@@ -210,35 +278,55 @@ test.describe("E2E Coverage with CDP", () => {
           testImgData.data[i + 2] = 40;
           testImgData.data[i + 3] = 255;
         }
-        sampler.classify(testImgData, 5, 5, 2);
-        sampler.classify(testImgData, 5, 5, 2, {
-          whiteSaturationThreshold: 0.35,
-        });
+        assertEqual(sampler.classify(testImgData, 5, 5, 2), "L");
+        assertEqual(
+          sampler.classify(testImgData, 5, 5, 2, {
+            whiteSaturationThreshold: 0.35,
+          }),
+          "L",
+        );
 
         // getPerspectiveTransform のアフィン変換（平行四辺形・長方形）と非アフィン変換（台形）
-        sampler.getPerspectiveTransform([
+        const t1 = sampler.getPerspectiveTransform([
           { x: 0, y: 0 },
           { x: 100, y: 0 },
           { x: 100, y: 100 },
           { x: 0, y: 100 },
         ]);
-        sampler.getPerspectiveTransform([
+        assertTrue(typeof t1 === "function");
+        const proj1 = t1(0.5, 0.5);
+        assertEqual(proj1.x, 50);
+        assertEqual(proj1.y, 50);
+        const t2 = sampler.getPerspectiveTransform([
           { x: 20, y: 0 },
           { x: 80, y: 0 },
           { x: 100, y: 100 },
           { x: 0, y: 100 },
         ]);
+        assertTrue(typeof t2 === "function");
+        const proj2 = t2(0, 0);
+        assertEqual(proj2.x, 20);
+        assertEqual(proj2.y, 0);
 
-        sampler.buildState({
-          U: "UUUUUUUUU",
-          R: "RRRRRRRRR",
-          F: "FFFFFFFFF",
-          D: "DDDDDDDDD",
-          L: "LLLLLLLLL",
-          B: "BBBBBBBBB",
-        });
-        sampler.buildState({ U: "UUUUUUUUU" });
-        sampler.buildState({});
+        assertEqual(
+          sampler.buildState({
+            U: "UUUUUUUUU",
+            R: "RRRRRRRRR",
+            F: "FFFFFFFFF",
+            D: "DDDDDDDDD",
+            L: "LLLLLLLLL",
+            B: "BBBBBBBBB",
+          }),
+          "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+        );
+        assertEqual(
+          sampler.buildState({ U: "UUUUUUUUU" }),
+          "UUUUUUUUU?????????????????????????????????????????????",
+        );
+        assertEqual(
+          sampler.buildState({}),
+          "??????????????????????????????????????????????????????",
+        );
 
         assertThrows(() => sampler.sampleFace({} as any, [{ x: 0, y: 0 }]));
 

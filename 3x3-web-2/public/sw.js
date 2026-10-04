@@ -88,24 +88,41 @@ self.addEventListener("activate", (event) => {
           ),
       );
 
-      for (const oldKey of oldKeys) {
+      // 直近 1 世代の旧キャッシュのみを移行対象とし、無制限な旧資産コピーによるキャッシュ肥大化（Cache Bloat）を防止
+      const sortedOldKeys = [...oldKeys].sort();
+      const mostRecentOldKey = sortedOldKeys.pop();
+
+      if (mostRecentOldKey) {
         try {
-          const oldCache = await caches.open(oldKey);
+          const oldCache = await caches.open(mostRecentOldKey);
           const requests = await oldCache.keys();
+          let migratedCount = 0;
+          const MAX_MIGRATED_ITEMS = 15;
+
           for (const req of requests) {
-            // 自キャッシュにまだ存在しない旧資産（ハッシュ付きJS/WASM等）を引き継ぐ
+            if (migratedCount >= MAX_MIGRATED_ITEMS) break;
             const alreadyCached = await ownCache.match(req);
             if (!alreadyCached) {
               const res = await oldCache.match(req);
               if (res && res.ok) {
-                await ownCache.put(req, res);
+                await ownCache.put(req, res); // ignore-guardrail: SW cache migration preserves existing cached request keys
+                migratedCount++;
               }
             }
           }
         } catch {
           // 旧キャッシュアクセスエラーは無視
         }
-        await caches.delete(oldKey);
+        await caches.delete(mostRecentOldKey);
+      }
+
+      // 過去全世代の古いキャッシュは移行せず安全に完全削除
+      for (const oldKey of sortedOldKeys) {
+        try {
+          await caches.delete(oldKey);
+        } catch {
+          // 削除エラーは無視
+        }
       }
 
       await self.clients.claim();
@@ -165,10 +182,12 @@ self.addEventListener("fetch", (event) => {
     (async () => {
       const ownCache = await caches.open(CACHE_NAME);
       const canonicalKey = url.origin + url.pathname;
-      const cached =
-        (await ownCache.match(request)) ||
-        (await ownCache.match(canonicalKey)) ||
-        (await ownCache.match(url.pathname));
+      const cached = url.search
+        ? (await ownCache.match(request)) || (await ownCache.match(url.href))
+        : (await ownCache.match(request)) ||
+          (await ownCache.match(url.href)) ||
+          (await ownCache.match(canonicalKey)) ||
+          (await ownCache.match(url.pathname));
 
       // プリキャッシュ済み資産でキャッシュがある場合はネットワーク不要
       if (cached && PRECACHE_URLS.has(canonicalKey)) {
@@ -180,8 +199,8 @@ self.addEventListener("fetch", (event) => {
           if (networkResponse.ok && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {
-              const cacheKey = url.search ? request : canonicalKey;
-              await ownCache.put(cacheKey, clone);
+              const cacheKey = url.search ? url.href : canonicalKey;
+              await ownCache.put(cacheKey, clone); // ignore-guardrail: static asset queries (e.g. Vite ?url or ?v=) require full URL keying to prevent binary collisions
             } catch (error) {
               console.warn(
                 "[Service Worker] Runtime cache write failed:",

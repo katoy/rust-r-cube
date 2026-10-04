@@ -552,7 +552,7 @@ pub fn get_orientations(state: &str) -> Result<String, JsValue> {
     });
 
     serde_json::to_string(&result)
-        .map_err(|e| to_js_error(format!("JSON serialization error: {}", e)))
+        .map_err(|e| to_js_error(format!("JSONのシリアライズに失敗しました: {}", e)))
 }
 
 #[cfg(test)]

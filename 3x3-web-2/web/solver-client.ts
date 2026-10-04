@@ -57,6 +57,7 @@ export class SolverClient {
         this.readyResolve?.();
         this.status("ready", `準備完了 · ${Math.round(data.elapsed)} ms`);
       } else if (data.kind === "init-error") {
+        console.error("[SolverClient init-error]:", data.error);
         this.fail(data.error, true);
       } else if (
         this.pending?.id === data.id &&

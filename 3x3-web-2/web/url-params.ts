@@ -3,6 +3,7 @@ export interface ParsedUrlParams {
   state?: string;
   centers?: number[];
   alg?: string;
+  hasInvalidCenters?: boolean;
 }
 
 export function parseUrlParams(search: string): ParsedUrlParams {
@@ -25,15 +26,18 @@ export function parseUrlParams(search: string): ParsedUrlParams {
   const centersParam = params.get("centers");
   if (centersParam) {
     try {
-      const parsed = centersParam.split(",").map((v) => Number(v));
+      const parts = centersParam.split(",");
+      const parsed = parts.map((v) => Number(v.trim()));
       if (
-        parsed.length === 6 &&
+        parts.length === 6 &&
         parsed.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)
       ) {
         result.centers = parsed;
+      } else {
+        result.hasInvalidCenters = true;
       }
     } catch {
-      // 不正な centers は無視
+      result.hasInvalidCenters = true;
     }
   }
 

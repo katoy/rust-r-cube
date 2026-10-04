@@ -971,6 +971,9 @@ async function start(forceError = false) {
     const parsedParams = parseUrlParams(window.location.search);
     let paramsApplied = false;
     let hasInvalidParam = false;
+    if (parsedParams.hasInvalidCenters) {
+      hasInvalidParam = true;
+    }
     if (parsedParams.solver) {
       solverAlgo.value = parsedParams.solver;
       paramsApplied = true;
@@ -1210,6 +1213,7 @@ if (
     initializePresets,
     start,
     appState,
+    getScene: () => scene,
     setEngineError: (val: boolean) => {
       engineError = val;
     },

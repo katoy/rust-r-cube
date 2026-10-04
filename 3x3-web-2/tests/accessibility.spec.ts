@@ -3,6 +3,10 @@ import AxeBuilder from "@axe-core/playwright";
 
 test.describe("Comprehensive Accessibility (a11y) Audits", () => {
   test.beforeEach(async ({ page }) => {
+    page.on("console", (msg) =>
+      console.log(`[BROWSER ${msg.type()}]:`, msg.text()),
+    );
+    page.on("pageerror", (err) => console.log(`[PAGE ERROR]:`, err));
     await page.goto("/");
     await expect(page.locator("#engine-status")).toContainText("READY");
   });
@@ -36,6 +40,17 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
     const results = await new AxeBuilder({ page })
       .include("#help-dialog")
       .analyze();
+    expect(results.violations).toEqual([]);
+  });
+
+  test("color editor dialog meets accessibility standards", async ({
+    page,
+  }) => {
+    await page.locator('button[data-tab="colors"]').click();
+    await page.locator("#edit-colors").click();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const results = await new AxeBuilder({ page }).include("#editor").analyze();
     expect(results.violations).toEqual([]);
   });
 

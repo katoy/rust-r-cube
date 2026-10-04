@@ -161,7 +161,7 @@ function checkServiceWorkerCache() {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (
-      /\.put\(\s*(event\.)?request\b/.test(line) &&
+      /\.put\(\s*(event\.)?(request|req|cacheKey)\b/.test(line) &&
       !line.includes("// ignore-guardrail")
     ) {
       reportError(

@@ -516,15 +516,25 @@ test("offline navigation does not leak root scope's index.html into nested subsc
   }, ownCaches[0]);
 
   // 自スコープのHTMLキャッシュを意図的に削除した極限状態でも、他スコープのキャッシュを拾わないこと
+  await context.setOffline(true);
   try {
-    const response = await page.goto(deployment.origin + subScope + "subroute");
+    let response;
+    let navError: Error | null = null;
+    try {
+      response = await page.goto(deployment.origin + subScope + "subroute");
+    } catch (err: any) {
+      navError = err;
+    }
     if (response) {
       const text = await response.text();
       // ルートに存在する別アプリのキャッシュ (FOREIGN_ROOT_APP) を勝手に拾って返してはならない
       expect(text).not.toContain("FOREIGN_ROOT_APP");
+    } else {
+      expect(navError).not.toBeNull();
+      // 他スコープのキャッシュを越境取得せず、自スコープ内でフォールバック不能としてエラーとなるのは正常な隔離動作
+      expect(navError!.message).toMatch(/ERR_FAILED|ERR_INTERNET_DISCONNECTED/);
     }
-  } catch (err: any) {
-    // 他スコープのキャッシュを越境取得せず、自スコープ内でフォールバック不能としてエラーとなるのは正常な隔離動作
-    expect(err.message).toContain("ERR_FAILED");
+  } finally {
+    await context.setOffline(false);
   }
 });

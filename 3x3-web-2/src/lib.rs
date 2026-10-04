@@ -103,7 +103,14 @@ pub fn solve_state_with_algorithm(
     let mut total_nodes = 0u64;
     let mut phase_infos = Vec::new();
 
-    let mut moves = match algorithm {
+    let normalized_algorithm = match algorithm {
+        "cfop" => "cfop",
+        "thistlethwaite" => "thistlethwaite",
+        "korf" => "korf",
+        _ => "kociemba",
+    };
+
+    let mut moves = match normalized_algorithm {
         "cfop" => {
             let res = cfop::solve(&cube, budget_ms)?;
             total_nodes += res.nodes;
@@ -153,29 +160,106 @@ pub fn solve_state_with_algorithm(
             });
             sol.moves
         }
-        _ => {
+        "kociemba" => {
             // Kociemba (Two-Phase)
             let moves_opt = if let (true, Some(centers)) = (include_orientation, initial_centers) {
-                let oriented_budget = if budget_ms <= 1000 {
-                    budget_ms / 2
+                // 1. ピースがすでに完成している場合、探索せず即座に supercube 補正へ
+                if cube == coord::RawCube::default() {
+                    let center_fixes = supercube::solve_center_orientations(centers)?;
+                    if !center_fixes.is_empty() {
+                        phase_infos.push(PhaseInfo {
+                            name: "センター向き解決".to_string(),
+                            start: 0,
+                            end: center_fixes.len(),
+                        });
+                    }
+                    Some(center_fixes)
                 } else {
-                    budget_ms.saturating_sub(1000).max(budget_ms * 4 / 5)
-                };
-                let mut search_oriented =
-                    search::Search::new(oriented_budget).with_target_centers(centers);
-                let res = search_oriented.solve(&cube);
-                total_nodes += search_oriented.nodes;
-                res
+                    // 2. まず色のみの解を探索し、逐次解の手数を上限として取得
+                    let elapsed_ms = start.elapsed().as_millis() as u32;
+                    let remaining_budget = budget_ms.saturating_sub(elapsed_ms);
+                    let color_budget = (remaining_budget / 2).clamp(100, 2000);
+                    let mut search_color = search::Search::new(color_budget);
+                    let color_moves = search_color.solve(&cube);
+                    total_nodes += search_color.nodes;
+
+                    let (seq_len, seq_moves, p1_len) = if let Some(ref cm) = color_moves {
+                        let mut c_sim = centers;
+                        for &m in cm {
+                            let f = m / 3;
+                            let t = match m % 3 {
+                                0 => 1,
+                                1 => 2,
+                                _ => -1,
+                            };
+                            c_sim[f] = (c_sim[f] + t).rem_euclid(4);
+                        }
+                        let fixes = supercube::solve_center_orientations(c_sim).unwrap_or_default();
+                        let total_l = cm.len() + fixes.len();
+                        let p1 = search_color.best_phase1_len;
+                        let mut all_m = cm.clone();
+                        all_m.extend(fixes);
+                        (total_l, all_m, p1)
+                    } else {
+                        (usize::MAX, Vec::new(), 0)
+                    };
+
+                    // 3. 同時最適化は、逐次解より短い解（seq_len - 1 以下）のみを狙う
+                    let elapsed_ms = start.elapsed().as_millis() as u32;
+                    let oriented_budget = budget_ms.saturating_sub(elapsed_ms);
+                    let mut search_oriented =
+                        search::Search::new(oriented_budget).with_target_centers(centers);
+                    if seq_len < usize::MAX {
+                        search_oriented.set_max_total(seq_len.saturating_sub(1));
+                    }
+                    let res = search_oriented.solve(&cube);
+                    total_nodes += search_oriented.nodes;
+
+                    if let Some(m) = res {
+                        phase_infos.push(PhaseInfo {
+                            name: "同時最適化 (色＆センター)".to_string(),
+                            start: 0,
+                            end: m.len(),
+                        });
+                        Some(m)
+                    } else if !seq_moves.is_empty() {
+                        // 逐次解を採用
+                        let cm_len = color_moves.as_ref().map(|v| v.len()).unwrap_or(0);
+                        if p1_len > 0 && p1_len < cm_len {
+                            phase_infos.push(PhaseInfo {
+                                name: "Kociemba Phase 1 (G1縮約)".to_string(),
+                                start: 0,
+                                end: p1_len,
+                            });
+                            phase_infos.push(PhaseInfo {
+                                name: "Kociemba Phase 2 (群解決)".to_string(),
+                                start: p1_len,
+                                end: cm_len,
+                            });
+                        } else if cm_len > 0 {
+                            phase_infos.push(PhaseInfo {
+                                name: "Kociemba 直接解決".to_string(),
+                                start: 0,
+                                end: cm_len,
+                            });
+                        }
+                        if seq_moves.len() > cm_len {
+                            phase_infos.push(PhaseInfo {
+                                name: "センター向き解決".to_string(),
+                                start: cm_len,
+                                end: seq_moves.len(),
+                            });
+                        }
+                        Some(seq_moves)
+                    } else {
+                        None
+                    }
+                }
             } else {
                 None
             };
 
             if let Some(m) = moves_opt {
-                phase_infos.push(PhaseInfo {
-                    name: "同時最適化 (色＆センター)".to_string(),
-                    start: 0,
-                    end: m.len(),
-                });
                 m
             } else {
                 let elapsed_ms = start.elapsed().as_millis() as u32;
@@ -210,29 +294,35 @@ pub fn solve_state_with_algorithm(
                 m
             }
         }
+        _ => unreachable!(),
     };
 
     if include_orientation {
-        if let Some(initial) = initial_centers {
-            let mut centers = initial;
-            for &m in &moves {
-                let f = m / 3;
-                let t = match m % 3 {
-                    0 => 1,
-                    1 => 2,
-                    _ => -1,
-                };
-                centers[f] = (centers[f] + t).rem_euclid(4);
-            }
-            let center_fixes = supercube::solve_center_orientations(centers)?;
-            if !center_fixes.is_empty() {
-                let start_idx = moves.len();
-                moves.extend(center_fixes);
-                phase_infos.push(PhaseInfo {
-                    name: "センター向き解決".to_string(),
-                    start: start_idx,
-                    end: moves.len(),
-                });
+        let already_oriented = phase_infos
+            .iter()
+            .any(|p| p.name.contains("センター") || p.name.contains("同時最適化"));
+        if !already_oriented {
+            if let Some(initial) = initial_centers {
+                let mut centers = initial;
+                for &m in &moves {
+                    let f = m / 3;
+                    let t = match m % 3 {
+                        0 => 1,
+                        1 => 2,
+                        _ => -1,
+                    };
+                    centers[f] = (centers[f] + t).rem_euclid(4);
+                }
+                let center_fixes = supercube::solve_center_orientations(centers)?;
+                if !center_fixes.is_empty() {
+                    let start_idx = moves.len();
+                    moves.extend(center_fixes);
+                    phase_infos.push(PhaseInfo {
+                        name: "センター向き解決".to_string(),
+                        start: start_idx,
+                        end: moves.len(),
+                    });
+                }
             }
         }
     }
@@ -273,7 +363,7 @@ pub fn solve_state_with_algorithm(
         &moves,
         start.elapsed().as_secs_f64() * 1000.0,
         total_nodes,
-        algorithm,
+        normalized_algorithm,
         phase_infos,
     ))
 }

@@ -80,7 +80,9 @@ export class CubeStore {
   }
 
   canRedo(): boolean {
-    return this.future.length > 0;
+    if (this.future.length === 0) return false;
+    const next = this.future[this.future.length - 1];
+    return !this.isSameSnapshot(this.getSnapshot(), next);
   }
 
   getSnapshot(): CubeSnapshot {

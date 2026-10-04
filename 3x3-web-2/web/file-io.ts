@@ -29,7 +29,7 @@ export function validateAndParseCubeJson(
 }
 
 export function createCubeJsonBlob(snapshot: object): Blob {
-  return new Blob([JSON.stringify({ version: 1, ...snapshot }, null, 2)], {
+  return new Blob([JSON.stringify({ ...snapshot, version: 1 }, null, 2)], {
     type: "application/json",
   });
 }

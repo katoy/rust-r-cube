@@ -10,20 +10,29 @@ export class SolverClient {
     resolve: (data: ResultData) => void;
     reject: (error: Error) => void;
   };
+  private readyPromise?: Promise<void>;
+  private readyResolve?: () => void;
+  private readyReject?: (error: Error) => void;
   ready = false;
   constructor(
     private status: (
       status: "loading" | "ready" | "error",
       message: string,
+      isInitError?: boolean,
     ) => void,
   ) {
     this.restart();
   }
-  restart() {
+  restart(): Promise<void> {
     this.disposeRequest();
     this.worker?.terminate();
     this.ready = false;
     const generation = ++this.generation;
+    this.readyPromise = new Promise<void>((resolve, reject) => {
+      this.readyResolve = resolve;
+      this.readyReject = reject;
+    });
+    this.readyPromise.catch(() => {});
     this.status("loading", "エンジンを準備中");
     this.worker = new Worker(new URL("./solver.worker.ts", import.meta.url), {
       type: "module",
@@ -32,21 +41,24 @@ export class SolverClient {
       () =>
         this.fail(
           "エンジンの読み込みが時間切れになりました。再試行してください。",
+          true,
         ),
       20000,
     );
     this.worker.onerror = () => {
       if (generation === this.generation)
-        this.fail("エンジンを起動できませんでした。再試行してください。");
+        this.fail("エンジンを起動できませんでした。再試行してください。", true);
     };
     this.worker.onmessage = ({ data }: MessageEvent<Reply>) => {
       if (generation !== this.generation) return;
       if (data.kind === "ready") {
         clearTimeout(this.timer);
         this.ready = true;
+        this.readyResolve?.();
         this.status("ready", `準備完了 · ${Math.round(data.elapsed)} ms`);
-      } else if (data.kind === "init-error") this.fail(data.error);
-      else if (
+      } else if (data.kind === "init-error") {
+        this.fail(data.error, true);
+      } else if (
         this.pending?.id === data.id &&
         this.pending.revision === data.revision
       ) {
@@ -57,6 +69,12 @@ export class SolverClient {
         else pending.reject(new Error(data.error || "探索に失敗しました。"));
       }
     };
+    return this.readyPromise;
+  }
+  waitForReady(): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    if (this.readyPromise) return this.readyPromise;
+    return this.restart();
   }
   solve(
     state: string,
@@ -107,11 +125,15 @@ export class SolverClient {
     this.pending?.reject(new Error(reason));
     this.pending = undefined;
   }
-  private fail(message: string) {
+  private fail(message: string, isInit = false) {
     this.disposeRequest(message);
     this.worker?.terminate();
     this.generation++;
     this.ready = false;
-    this.status("error", message);
+    this.readyReject?.(new Error(message));
+    this.readyPromise = undefined;
+    this.readyResolve = undefined;
+    this.readyReject = undefined;
+    this.status("error", message, isInit);
   }
 }

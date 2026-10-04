@@ -267,45 +267,61 @@ test.describe("125f8c8 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
 
   // F4: 公開ファイルの削除後も古い dist を最新と誤認せず、確実に削除・変更を検知する
   test("F4: launch-offline.js のビルドマニフェストがファイルの追加と削除を検知する", async () => {
-    const { execSync } = await import("child_process");
     const fs = await import("fs");
+    const os = await import("os");
     const path = await import("path");
+    const { saveBuildManifest, checkInputsFreshness } =
+      await import("../scripts/build-manifest.js");
 
-    const rootDir = process.cwd();
-    const manifestPath = path.join(rootDir, "dist/.build-manifest.json");
-
-    // 1. マニフェストが存在することを確認
-    expect(fs.existsSync(manifestPath)).toBe(true);
-    const initialManifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-
-    // 2. 一時ファイルを追加
-    const tempFile = path.join(rootDir, "public/__f4_test_probe.txt");
-    fs.writeFileSync(tempFile, "f4-probe-content", "utf-8");
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "manifest-freshness-test-"),
+    );
+    const distDir = path.join(tmpDir, "dist");
+    fs.mkdirSync(distDir, { recursive: true });
 
     try {
-      // 3. launch-offline.js の判定スクリプトを実行して追加が検知されることを確認
-      const checkScript = `
-        import fs from "fs";
-        import path from "path";
-        import crypto from "crypto";
+      const inputs = new Map<string, { mtime: number; hash: string }>([
+        ["file1.ts", { mtime: 1000, hash: "hash1" }],
+        ["file2.ts", { mtime: 2000, hash: "hash2" }],
+      ]);
 
-        const manifestPath = ${JSON.stringify(manifestPath)};
-        const savedManifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-        const probeRel = "public/__f4_test_probe.txt";
-        const hasProbe = probeRel in savedManifest;
-        console.log(JSON.stringify({ hasProbe }));
-      `;
-      const outputBefore = execSync(
-        `node --input-type=module -e '${checkScript}'`,
-        { cwd: rootDir, encoding: "utf-8" },
+      // 1. 初期マニフェストを保存
+      saveBuildManifest(tmpDir, distDir, inputs);
+
+      // 2. 同一状態なら fresh: true
+      const freshResult = checkInputsFreshness(tmpDir, distDir, inputs);
+      expect(freshResult.fresh).toBe(true);
+
+      // 3. ファイル追加の検知
+      const addedInputs = new Map(inputs);
+      addedInputs.set("file3.ts", { mtime: 3000, hash: "hash3" });
+      const addedResult = checkInputsFreshness(tmpDir, distDir, addedInputs);
+      expect(addedResult.fresh).toBe(false);
+      expect(addedResult.reason).toContain("新しいファイルが追加されました");
+
+      // 4. ファイル削除の検知
+      const deletedInputs = new Map(inputs);
+      deletedInputs.delete("file1.ts");
+      const deletedResult = checkInputsFreshness(
+        tmpDir,
+        distDir,
+        deletedInputs,
       );
-      const parsedBefore = JSON.parse(outputBefore.trim());
-      expect(parsedBefore.hasProbe).toBe(false); // まだビルド前なのでマニフェストにはない
+      expect(deletedResult.fresh).toBe(false);
+      expect(deletedResult.reason).toContain("ファイルが削除されました");
+
+      // 5. ファイル変更の検知
+      const modifiedInputs = new Map(inputs);
+      modifiedInputs.set("file1.ts", { mtime: 1500, hash: "hash1-modified" });
+      const modifiedResult = checkInputsFreshness(
+        tmpDir,
+        distDir,
+        modifiedInputs,
+      );
+      expect(modifiedResult.fresh).toBe(false);
+      expect(modifiedResult.reason).toContain("ファイルが変更されました");
     } finally {
-      // 一時ファイルの削除
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

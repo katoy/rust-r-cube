@@ -82,7 +82,7 @@ impl ThistlethwaiteSearch {
         // Phase 1: G0 -> G1 (全エッジの向き flip = 0)
         let p1 = match self.solve_phase1(&current) {
             Ok(p) => p,
-            Err(_) => return self.fallback_solve(&current, all_phases),
+            Err(_) => return self.fallback_solve(&current, all_phases, 1),
         };
         current = apply(&current, &p1);
         all_phases.push(ThistlePhase {
@@ -93,7 +93,7 @@ impl ThistlethwaiteSearch {
         // Phase 2: G1 -> G2 (コーナー向き twist = 0 & Eスライスエッジ)
         let p2 = match self.solve_phase2(&current) {
             Ok(p) => p,
-            Err(_) => return self.fallback_solve(&current, all_phases),
+            Err(_) => return self.fallback_solve(&current, all_phases, 2),
         };
         current = apply(&current, &p2);
         all_phases.push(ThistlePhase {
@@ -104,7 +104,7 @@ impl ThistlethwaiteSearch {
         // Phase 3: G2 -> G3 (ピースのオービット分離 & パリティ)
         let p3 = match self.solve_phase3(&current) {
             Ok(p) => p,
-            Err(_) => return self.fallback_solve(&current, all_phases),
+            Err(_) => return self.fallback_solve(&current, all_phases, 3),
         };
         current = apply(&current, &p3);
         all_phases.push(ThistlePhase {
@@ -115,21 +115,16 @@ impl ThistlethwaiteSearch {
         // Phase 4: G3 -> G4 (完成)
         let p4 = match self.solve_phase4(&current) {
             Ok(p) => p,
-            Err(_) => return self.fallback_solve(&current, all_phases),
+            Err(_) => return self.fallback_solve(&current, all_phases, 4),
         };
-        #[cfg(any(debug_assertions, test))]
         let current = apply(&current, &p4);
+        if current != RawCube::default() {
+            return Err("Thistlethwaite解法の検証に失敗しました。".to_string());
+        }
         all_phases.push(ThistlePhase {
             name: "Phase 4 (G3→G4: 最終解決)",
             moves: p4,
         });
-
-        #[cfg(any(debug_assertions, test))]
-        assert_eq!(
-            current,
-            RawCube::default(),
-            "Thistlethwaite解法の検証に失敗しました。"
-        );
 
         let mut total = Vec::new();
         for p in &all_phases {
@@ -146,6 +141,7 @@ impl ThistlethwaiteSearch {
         &mut self,
         current: &RawCube,
         mut all_phases: Vec<ThistlePhase>,
+        phase_num: usize,
     ) -> Result<ThistleResult, String> {
         let elapsed_ms = self.start.elapsed().as_millis() as u32;
         let remaining_ms = (self.budget_ms as u32).saturating_sub(elapsed_ms);
@@ -159,7 +155,12 @@ impl ThistlethwaiteSearch {
         self.nodes += fallback.nodes;
         if !moves.is_empty() {
             all_phases.push(ThistlePhase {
-                name: "Phase 4 (最終解決フォールバック)",
+                name: match phase_num {
+                    1 => "Phase 1以降 Kociemba フォールバック",
+                    2 => "Phase 2以降 Kociemba フォールバック",
+                    3 => "Phase 3以降 Kociemba フォールバック",
+                    _ => "Phase 4 (最終解決フォールバック)",
+                },
                 moves,
             });
         }
@@ -561,7 +562,7 @@ mod tests {
         let sc = parse_moves("R U F").unwrap();
         let scrambled = apply(&cube, &sc);
         let mut th = ThistlethwaiteSearch::new(10_000);
-        let res = th.fallback_solve(&scrambled, Vec::new()).unwrap();
+        let res = th.fallback_solve(&scrambled, Vec::new(), 4).unwrap();
         assert!(!res.moves.is_empty());
         assert_eq!(apply(&scrambled, &res.moves), RawCube::default());
 
@@ -576,13 +577,14 @@ mod tests {
                     name: "Phase 1",
                     moves: p1,
                 }],
+                2,
             )
             .unwrap();
         assert!(res2.phases.len() >= 2);
 
         // 予算ゼロでのエラー
         let mut th_zero = ThistlethwaiteSearch::new(0);
-        assert!(th_zero.fallback_solve(&scrambled, Vec::new()).is_err());
+        assert!(th_zero.fallback_solve(&scrambled, Vec::new(), 4).is_err());
     }
 
     #[test]

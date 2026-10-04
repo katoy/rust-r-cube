@@ -33,14 +33,14 @@ export default defineConfig({
     {
       command: "npm run dev -- --port 5173 --strictPort",
       url: "http://127.0.0.1:5173",
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI && !process.env.STRICT_FRESH,
       timeout: 30000,
     },
     {
       command:
         "npm run preview -- --port 4173 --strictPort --base /nested/cube/",
       url: "http://127.0.0.1:4173/nested/cube/",
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI && !process.env.STRICT_FRESH,
       timeout: 30000,
     },
   ],

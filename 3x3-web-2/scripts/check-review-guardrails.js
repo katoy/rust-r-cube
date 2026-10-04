@@ -39,28 +39,49 @@ function reportWarning(rule, file, line, message) {
   hasWarnings = true;
 }
 
+function getFilesRecursively(dir, ext) {
+  if (!fs.existsSync(dir)) return [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  let files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files = files.concat(getFilesRecursively(fullPath, ext));
+    } else if (entry.name.endsWith(ext)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
 // 1. Rustコードの条件付きコンパイル検証 [F1]
 function checkRustDebugAssertions() {
   const srcDir = path.join(rootDir, "src");
-  if (!fs.existsSync(srcDir)) return;
-
-  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith(".rs"));
-  for (const file of files) {
-    const filePath = path.join(srcDir, file);
+  const files = getFilesRecursively(srcDir, ".rs");
+  for (const filePath of files) {
+    const relPath = path.relative(rootDir, filePath);
     const content = fs.readFileSync(filePath, "utf-8");
     const lines = content.split("\n");
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.includes("#[cfg(debug_assertions)]")) {
-        // 次の数行に return Err があるか走査
+      if (
+        line.includes("#[cfg(debug_assertions)]") ||
+        line.includes("#[cfg(any(debug_assertions") ||
+        line.includes("cfg!(debug_assertions)")
+      ) {
+        // 次の数行に return Err や assert があるか走査
         const lookahead = lines.slice(i, i + 25).join("\n");
-        if (lookahead.includes("return Err(")) {
+        if (
+          lookahead.includes("return Err(") ||
+          (lookahead.includes("assert_eq!(") &&
+            lookahead.includes("解法の検証に失敗"))
+        ) {
           reportError(
             "F1-RELEASE-VERIFICATION",
-            `src/${file}`,
+            relPath,
             i + 1,
-            "#[cfg(debug_assertions)] ブロック内に return Err が存在します。本番(Release)ビルドで検証ロジックが除外されるため、無条件検証にするか意図的ならコメントで明記してください。",
+            "デバッグ用条件付きコンパイルブロック内に検証・エラー返却ロジックが存在します。本番(Release)ビルドで検証ロジックが除外されるため、無条件検証にするか意図的ならコメントで明記してください。",
           );
         }
       }
@@ -71,25 +92,26 @@ function checkRustDebugAssertions() {
 // 2. ファイル読み込み順序の検査 [F3]
 function checkFileReadOrder() {
   const webDir = path.join(rootDir, "web");
-  if (!fs.existsSync(webDir)) return;
-
-  const files = fs.readdirSync(webDir).filter((f) => f.endsWith(".ts"));
-  for (const file of files) {
-    const filePath = path.join(webDir, file);
+  const files = getFilesRecursively(webDir, ".ts");
+  for (const filePath of files) {
+    const relPath = path.relative(rootDir, filePath);
     const content = fs.readFileSync(filePath, "utf-8");
     const lines = content.split("\n");
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.includes(".text()") && !line.includes("// ignore-guardrail")) {
+      if (
+        (line.includes(".text()") || line.includes(".arrayBuffer()")) &&
+        !line.includes("// ignore-guardrail")
+      ) {
         // 同じ関数の直前で .size チェックがあるか確認
         const lookbehind = lines.slice(Math.max(0, i - 15), i).join("\n");
         if (!lookbehind.includes(".size")) {
           reportError(
             "F3-FILE-SIZE-FIRST",
-            `web/${file}`,
+            relPath,
             i + 1,
-            "file.text() の実行前に file.size の事前検査が見当たりません。巨大ファイル選択時のメモリ圧迫を防ぐため、読み込み前にサイズを検証してください。",
+            "file.text() / arrayBuffer() の実行前に file.size の事前検査が見当たりません。巨大ファイル選択時のメモリ圧迫を防ぐため、読み込み前にサイズを検証してください。",
           );
         }
       }
@@ -139,7 +161,7 @@ function checkServiceWorkerCache() {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (
-      line.includes("cache.put(request,") &&
+      /\.put\(\s*(event\.)?request\b/.test(line) &&
       !line.includes("// ignore-guardrail")
     ) {
       reportError(

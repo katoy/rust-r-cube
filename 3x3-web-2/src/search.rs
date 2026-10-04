@@ -46,6 +46,13 @@ impl Search {
         self.current_centers = c;
         self
     }
+    pub fn set_max_total(&mut self, max: usize) {
+        self.max_total = max;
+    }
+    pub fn with_max_total(mut self, max: usize) -> Self {
+        self.max_total = max;
+        self
+    }
     pub fn solve(&mut self, cube: &RawCube) -> Option<Vec<usize>> {
         if *cube == RawCube::default() {
             if let Some(target) = self.target_centers {
@@ -75,29 +82,62 @@ impl Search {
             }
         }
 
-        for total in [22, 24, 30] {
-            self.max_total = total;
+        let initial_max = if self.max_total > 0 {
+            self.max_total
+        } else {
+            22
+        };
+        self.max_total = initial_max;
 
-            for depth in 0..=12 {
-                self.path.clear();
-                if let Some(target) = self.target_centers {
-                    self.current_centers = target;
-                }
-                if self.phase1(
-                    cube.get_twist(),
-                    cube.get_flip(),
-                    cube.get_ud_slice(),
-                    depth as u8,
-                    99,
-                ) || self.timed_out
-                {
-                    break;
-                }
+        for depth in 0..=12 {
+            if depth >= self.max_total {
+                break;
             }
-            if self.best_solution.is_some() || self.timed_out {
+            self.path.clear();
+            if let Some(target) = self.target_centers {
+                self.current_centers = target;
+            }
+            self.phase1(
+                cube.get_twist(),
+                cube.get_flip(),
+                cube.get_ud_slice(),
+                depth as u8,
+                99,
+            );
+            if self.timed_out {
                 break;
             }
         }
+
+        // もし 22 手以内で解が見つからなかった場合のみ、24, 30 と段階的に上限を緩和
+        if self.best_solution.is_none() && !self.timed_out && initial_max <= 22 {
+            for &total in &[24, 30] {
+                self.max_total = total;
+                for depth in 0..=12 {
+                    if depth >= self.max_total {
+                        break;
+                    }
+                    self.path.clear();
+                    if let Some(target) = self.target_centers {
+                        self.current_centers = target;
+                    }
+                    self.phase1(
+                        cube.get_twist(),
+                        cube.get_flip(),
+                        cube.get_ud_slice(),
+                        depth as u8,
+                        99,
+                    );
+                    if self.best_solution.is_some() || self.timed_out {
+                        break;
+                    }
+                }
+                if self.best_solution.is_some() || self.timed_out {
+                    break;
+                }
+            }
+        }
+
         self.best_solution.clone()
     }
     pub fn direct_solve(&mut self, cube: &RawCube, depth: u8, last: usize) -> bool {
@@ -146,11 +186,28 @@ impl Search {
         false
     }
     fn exhausted(&mut self) -> bool {
+        if self.budget_ms == 0 {
+            self.timed_out = true;
+            return true;
+        }
         self.nodes += 1;
         if self.nodes & 1023 == 0 && self.start.elapsed().as_millis() >= self.budget_ms {
             self.timed_out = true;
         }
         self.timed_out
+    }
+    fn min_phase1_center_moves(&self) -> u8 {
+        if self.target_centers.is_some() {
+            // R(1), F(2), L(4), B(5) は Phase 2 では 180° 回転しか行えないため、
+            // Phase 1 終了時点でこれらのセンター回転は偶数 (0 mod 2) でなければならない。
+            // 奇数回転の面の数が残り深さを超える場合は到達不能として枝刈りする。
+            ((self.current_centers[1] & 1)
+                + (self.current_centers[2] & 1)
+                + (self.current_centers[4] & 1)
+                + (self.current_centers[5] & 1)) as u8
+        } else {
+            0
+        }
     }
     fn min_phase2_center_moves(&self) -> u8 {
         self.current_centers.iter().filter(|&&c| c != 0).count() as u8
@@ -164,6 +221,9 @@ impl Search {
             .get_twist_slice(twist as usize, slice as usize)
             .max(self.pt.get_flip_slice(flip as usize, slice as usize));
         if distance > depth {
+            return false;
+        }
+        if self.min_phase1_center_moves() > depth {
             return false;
         }
         if depth == 0 {
@@ -223,15 +283,13 @@ impl Search {
                 };
                 self.path.push(m);
                 self.current_centers[face] = (self.current_centers[face] + t) & 3;
-                if self.phase1(
+                let _ = self.phase1(
                     self.mt.twist[twist as usize][m],
                     self.mt.flip[flip as usize][m],
                     self.mt.ud_slice[slice as usize][m],
                     depth - 1,
                     face,
-                ) {
-                    return true;
-                }
+                );
                 self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
                 self.path.pop();
                 if self.timed_out {
@@ -239,7 +297,7 @@ impl Search {
                 }
             }
         }
-        false
+        self.best_solution.is_some()
     }
     fn phase2(&mut self, cp: u16, ep: u16, sp: u16, depth: u8, last: usize) -> bool {
         if self.exhausted() {

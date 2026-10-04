@@ -76,23 +76,40 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter(
-              (key) =>
-                key.startsWith(CACHE_PREFIX) &&
-                key !== CACHE_NAME &&
-                /^(v\d+|old-v\d+|[0-9a-f]{8,})$/i.test(
-                  key.slice(CACHE_PREFIX.length),
-                ),
-            )
-            .map((key) => caches.delete(key)),
-        ),
-      )
-      .then(() => self.clients.claim()),
+    (async () => {
+      const ownCache = await caches.open(CACHE_NAME);
+      const keys = await caches.keys();
+      const oldKeys = keys.filter(
+        (key) =>
+          key.startsWith(CACHE_PREFIX) &&
+          key !== CACHE_NAME &&
+          /^(v\d+|old-v\d+|[0-9a-f]{8,})$/i.test(
+            key.slice(CACHE_PREFIX.length),
+          ),
+      );
+
+      for (const oldKey of oldKeys) {
+        try {
+          const oldCache = await caches.open(oldKey);
+          const requests = await oldCache.keys();
+          for (const req of requests) {
+            // 自キャッシュにまだ存在しない旧資産（ハッシュ付きJS/WASM等）を引き継ぐ
+            const alreadyCached = await ownCache.match(req);
+            if (!alreadyCached) {
+              const res = await oldCache.match(req);
+              if (res && res.ok) {
+                await ownCache.put(req, res);
+              }
+            }
+          }
+        } catch {
+          // 旧キャッシュアクセスエラーは無視
+        }
+        await caches.delete(oldKey);
+      }
+
+      await self.clients.claim();
+    })(),
   );
 });
 
@@ -135,24 +152,36 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 静的アセット（JS, WASM, CSS, 画像, プリセット JSON 等）
+  // 静的アセット（同一オリジンの JS, WASM, CSS, 画像, プリセット JSON 等）
+  const selfOrigin = self.location
+    ? self.location.origin ||
+      (self.location.href ? new URL(self.location.href).origin : undefined)
+    : self.registration
+      ? new URL(self.registration.scope).origin
+      : undefined;
+  if (selfOrigin && url.origin !== selfOrigin) return;
+
   event.respondWith(
     (async () => {
       const ownCache = await caches.open(CACHE_NAME);
+      const canonicalKey = url.origin + url.pathname;
       const cached =
         (await ownCache.match(request)) ||
-        (await ownCache.match(request.url)) ||
+        (await ownCache.match(canonicalKey)) ||
         (await ownCache.match(url.pathname));
+
+      // プリキャッシュ済み資産でキャッシュがある場合はネットワーク不要
+      if (cached && PRECACHE_URLS.has(canonicalKey)) {
+        return cached;
+      }
 
       const updatePromise = fetch(request)
         .then(async (networkResponse) => {
-          if (
-            networkResponse.ok &&
-            !PRECACHE_URLS.has(url.origin + url.pathname)
-          ) {
+          if (networkResponse.ok && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {
-              await ownCache.put(request, clone);
+              const cacheKey = url.search ? request : canonicalKey;
+              await ownCache.put(cacheKey, clone);
             } catch (error) {
               console.warn(
                 "[Service Worker] Runtime cache write failed:",

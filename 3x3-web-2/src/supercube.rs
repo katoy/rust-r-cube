@@ -177,7 +177,7 @@ fn evaluate_matching(mut cur: [i32; 6], matching: &[(usize, usize)]) -> Vec<usiz
 pub fn solve_center_orientations(current_rotations: [i32; 6]) -> Result<Vec<usize>, String> {
     let mut needed = [0i32; 6];
     for f in 0..6 {
-        needed[f] = (-current_rotations[f]).rem_euclid(4);
+        needed[f] = (4 - current_rotations[f].rem_euclid(4)) % 4;
     }
 
     if needed.iter().all(|&x| x == 0) {

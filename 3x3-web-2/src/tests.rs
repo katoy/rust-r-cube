@@ -2048,7 +2048,7 @@ fn test_r05_thistlethwaite_g3_membership() {
 
 #[test]
 fn test_r06_budget_contract() {
-    let superflip = "UBULURUFDFDRDBDLFRFLBLBRRFRBLBBRUFUBUDDFDFDLDLRFRBLBBR";
+    let superflip = "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB";
     // Superflipに対して予算1msを指定
     let budget_ms = 1;
 
@@ -2056,13 +2056,21 @@ fn test_r06_budget_contract() {
     let start = web_time::Instant::now();
     let _ = crate::solve_state_with_algorithm(superflip, budget_ms, false, None, "korf");
     let elapsed_korf = start.elapsed().as_millis();
-    println!("elapsed_korf: {}ms", elapsed_korf);
+    assert!(
+        elapsed_korf <= 150,
+        "Korf must respect budget_ms (got {}ms)",
+        elapsed_korf
+    );
 
     // Thistlethwaite
     let start = web_time::Instant::now();
     let _ = crate::solve_state_with_algorithm(superflip, budget_ms, false, None, "thistlethwaite");
     let elapsed_thistle = start.elapsed().as_millis();
-    println!("elapsed_thistle: {}ms", elapsed_thistle);
+    assert!(
+        elapsed_thistle <= 150,
+        "Thistlethwaite must respect budget_ms (got {}ms)",
+        elapsed_thistle
+    );
 
     let c = apply(&RawCube::default(), &scramble(948));
     let state_948 = facelets(&c);

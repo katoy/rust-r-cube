@@ -99,14 +99,9 @@ pub fn solve(cube: &RawCube, budget_ms: u32) -> Result<CfopResult, String> {
         moves: pll_moves.clone(),
     });
 
-    #[cfg(debug_assertions)]
-    {
-        current = apply(&current, &pll_moves);
-        debug_assert_eq!(
-            current,
-            RawCube::default(),
-            "CFOP解法の検証に失敗しました。"
-        );
+    current = apply(&current, &pll_moves);
+    if current != RawCube::default() {
+        return Err("CFOP解法の検証に失敗しました。".to_string());
     }
 
     let mut total_moves = Vec::new();

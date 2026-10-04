@@ -31,8 +31,15 @@ declare global {
   }
 }
 
+const isTestOrDev =
+  import.meta.env.DEV ||
+  Boolean((window as any).__TEST_ENV__) ||
+  Boolean(navigator.webdriver);
+
 const store = new CubeStore();
-window.cube_store = store;
+if (isTestOrDev) {
+  window.cube_store = store;
+}
 
 const appState = new AppStateMachine();
 
@@ -356,7 +363,9 @@ function initScene(forceError = false) {
   try {
     if (forceError) throw new Error("forced scene error");
     scene = new CubeScene($("scene"));
-    window.cube_scene = scene;
+    if (isTestOrDev) {
+      window.cube_scene = scene;
+    }
     $("scene").addEventListener("render-failed", fallback);
   } catch {
     fallback();
@@ -491,11 +500,19 @@ async function applyAlgorithm(algorithm: string, animate = true) {
   }
 }
 async function solve(budget = 5000) {
-  if (engineError) {
+  if (engineError || !solver?.ready) {
+    if (!solver) return;
     engineError = false;
-    solver?.restart();
+    $("solver-note").textContent = "エンジンを準備中…";
     refresh();
-    return;
+    try {
+      await solver.waitForReady();
+    } catch {
+      engineError = true;
+      message("エンジンの起動に失敗しました。ページを再読み込みしてください。");
+      refresh();
+      return;
+    }
   }
   if (!solver?.ready) return;
   if (!appState.startSolving()) return;
@@ -600,51 +617,59 @@ async function openModal<T>(
   open(modal);
 }
 
-let editorInstance: import("./editor").ColorEditor | undefined;
+let editorPromise:
+  Promise<import("./editor").ColorEditor | undefined> | undefined;
 async function getEditor(
   loader: () => Promise<typeof import("./editor")> = () => import("./editor"),
 ): Promise<import("./editor").ColorEditor | undefined> {
-  if (!editorInstance) {
-    try {
-      const { ColorEditor } = await loader();
-      editorInstance = new ColorEditor(
-        (s: string) => validate(s),
-        (s: string, centers: number[]) => {
-          if (!appState.getState().canModifyCube())
-            throw new Error(
-              "探索中は配色を適用できません。探索を中止してください。",
-            );
-          appState.runCubeMutation(() => replace(s, true, centers));
-        },
-      );
-    } catch {
-      promptReloadForUpdate();
-      return undefined;
-    }
+  if (!editorPromise) {
+    editorPromise = (async () => {
+      try {
+        const { ColorEditor } = await loader();
+        return new ColorEditor(
+          (s: string) => validate(s),
+          (s: string, centers: number[]) => {
+            if (!appState.getState().canModifyCube())
+              throw new Error(
+                "探索中は配色を適用できません。探索を中止してください。",
+              );
+            appState.runCubeMutation(() => replace(s, true, centers));
+          },
+        );
+      } catch {
+        editorPromise = undefined;
+        promptReloadForUpdate();
+        return undefined;
+      }
+    })();
   }
-  return editorInstance;
+  return editorPromise;
 }
 
-let cameraInstance: import("./camera").TwoViewCamera | undefined;
+let cameraPromise:
+  Promise<import("./camera").TwoViewCamera | undefined> | undefined;
 async function getCamera(
   loader: () => Promise<typeof import("./camera")> = () => import("./camera"),
 ): Promise<import("./camera").TwoViewCamera | undefined> {
-  if (!cameraInstance) {
-    try {
-      const { TwoViewCamera } = await loader();
-      cameraInstance = new TwoViewCamera(async (s: string) => {
-        let centers = [0, 0, 0, 0, 0, 0];
-        try {
-          centers = automaticCenters(s);
-        } catch {}
-        await openModal(getEditor, (ed) => ed.open(s, centers));
-      });
-    } catch {
-      promptReloadForUpdate();
-      return undefined;
-    }
+  if (!cameraPromise) {
+    cameraPromise = (async () => {
+      try {
+        const { TwoViewCamera } = await loader();
+        return new TwoViewCamera(async (s: string) => {
+          let centers = [0, 0, 0, 0, 0, 0];
+          try {
+            centers = automaticCenters(s);
+          } catch {}
+          await openModal(getEditor, (ed) => ed.open(s, centers));
+        });
+      } catch {
+        cameraPromise = undefined;
+        promptReloadForUpdate();
+        return undefined;
+      }
+    })();
   }
-  return cameraInstance;
+  return cameraPromise;
 }
 
 $("edit-colors").onclick = async () => {
@@ -720,7 +745,10 @@ $("reset").onclick = () =>
 const viewPresets = ["iso", "front", "top", "right"] as const;
 function updateActivePreset(presetName: (typeof viewPresets)[number]) {
   viewPresets.forEach((name) => {
-    $(`view-preset-${name}`).classList.toggle("active", name === presetName);
+    const btn = $(`view-preset-${name}`);
+    const active = name === presetName;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
   });
 }
 viewPresets.forEach((preset) => {
@@ -839,9 +867,13 @@ $("save").onclick = () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
-$("load").onclick = () => $<HTMLInputElement>("file").click();
+$("load").onclick = () => {
+  stop();
+  $<HTMLInputElement>("file").click();
+};
 let fileLoadRequestId = 0;
 $<HTMLInputElement>("file").onchange = async () => {
+  stop();
   const file = $<HTMLInputElement>("file").files?.[0];
   if (!file) return;
   if (!appState.getState().canModifyCube()) {
@@ -907,7 +939,9 @@ async function start(forceError = false) {
     if (forceError) throw new Error("forced start error");
     if (!mainReady) {
       await init({ module_or_path: wasmUrl });
-      window.cube_studio = cubeStudio;
+      if (isTestOrDev) {
+        window.cube_studio = cubeStudio;
+      }
       mainReady = true;
     }
     try {
@@ -935,8 +969,11 @@ async function start(forceError = false) {
     }
 
     const parsedParams = parseUrlParams(window.location.search);
+    let paramsApplied = false;
+    let hasInvalidParam = false;
     if (parsedParams.solver) {
       solverAlgo.value = parsedParams.solver;
+      paramsApplied = true;
     }
     if (parsedParams.state) {
       try {
@@ -945,8 +982,9 @@ async function start(forceError = false) {
           ? centersFromInput(parsedParams.state, parsedParams.centers)
           : automaticCenters(parsedParams.state);
         store.replace(parsedParams.state, false, restoredCenters);
+        paramsApplied = true;
       } catch {
-        // 不正な state は無視
+        hasInvalidParam = true;
       }
     } else if (parsedParams.alg) {
       try {
@@ -955,13 +993,33 @@ async function start(forceError = false) {
         validate(result.state);
         const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);
         store.replace(result.state, false, nextCenters);
+        paramsApplied = true;
       } catch {
-        // 不正な alg は無視（保存状態の局面を維持）
+        hasInvalidParam = true;
+      }
+    }
+    if (hasInvalidParam) {
+      message("URLパラメータで指定された盤面または手順が無効です。");
+    }
+    if (paramsApplied || hasInvalidParam) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("state");
+        url.searchParams.delete("alg");
+        url.searchParams.delete("centers");
+        url.searchParams.delete("solver");
+        const newSearch = url.searchParams.toString();
+        const newUrl =
+          url.pathname + (newSearch ? `?${newSearch}` : "") + url.hash;
+        window.history.replaceState(null, "", newUrl);
+      } catch {}
+      if (paramsApplied) {
+        persist();
       }
     }
     restoring = false;
 
-    solver = new SolverClient((status, text) => {
+    solver = new SolverClient((status, text, isInitError) => {
       engineError = status === "error";
       $("engine-status").textContent =
         status === "ready"
@@ -970,10 +1028,15 @@ async function start(forceError = false) {
             ? "読み込み失敗"
             : "準備中";
       $("engine-status").classList.toggle("ready", status === "ready");
-      if (!solving)
+      if (!solving || status === "error")
         $("solver-note").textContent =
           status === "ready" ? "ブラウザ内で計算 · 通常5秒以内" : text;
-      if (engineError) message(text);
+      if (engineError) {
+        message(text);
+        if (isInitError) {
+          promptReloadForUpdate();
+        }
+      }
       queueMicrotask(refresh);
     });
     refresh();
@@ -1168,8 +1231,8 @@ if (
       scene = val;
     },
     resetInstances: () => {
-      editorInstance = undefined;
-      cameraInstance = undefined;
+      editorPromise = undefined;
+      cameraPromise = undefined;
     },
     getSolver: () => solver,
     initScene: (forceError = false) => initScene(forceError),

@@ -108,7 +108,8 @@ test("F01: Redo equal to the current preview does not hide the preserved base be
     await page.locator("#last").click();
     if (run === 0) await page.locator("#undo").click();
   }
-  await page.locator("#redo").click();
+  // M7: 盤面が future の先頭と同じ場合、実質差分がないため Redo は無効
+  await expect(page.locator("#redo")).toBeDisabled();
   await expect(page.locator("#undo")).toBeEnabled();
   await page.locator("#undo").click();
   const restored = await snapshot(page);
@@ -122,6 +123,7 @@ test("F02: applying an already-open editor cannot bypass the solving guard", asy
   await ready(page);
   await page.locator('[data-tab="colors"]').click();
   await page.locator("#edit-colors").click();
+  await expect(page.locator("#editor")).toBeVisible();
   const before = await snapshot(page);
   await page.evaluate(() =>
     window.__cube_main_debug__?.appState.startSolving(),

@@ -62,7 +62,12 @@ export function setupKeyboardShortcuts(
       void options.onPlay();
     } else if (
       (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
-      !(event.target instanceof HTMLButtonElement)
+      !(event.target instanceof HTMLButtonElement) &&
+      !(
+        event.target instanceof HTMLElement &&
+        (event.target.getAttribute("role") === "tab" ||
+          event.target.getAttribute("role") === "slider")
+      )
     ) {
       event.preventDefault();
       options.onStop();

@@ -58,6 +58,17 @@ test.describe("E2E Coverage with CDP", () => {
         const view = await import("/web/view.ts");
         const appStateModule = await import("/web/app-state.ts");
 
+        const assertThrows = (fn: () => any) => {
+          let threw = false;
+          try {
+            fn();
+          } catch {
+            threw = true;
+          }
+          if (!threw)
+            throw new Error("Expected function to throw, but it succeeded");
+        };
+
         // --- app-state.ts ---
         const idle = new appStateModule.IdleState();
         idle.canModifyCube();
@@ -229,9 +240,7 @@ test.describe("E2E Coverage with CDP", () => {
         sampler.buildState({ U: "UUUUUUUUU" });
         sampler.buildState({});
 
-        try {
-          sampler.sampleFace({} as any, [{ x: 0, y: 0 }]);
-        } catch {}
+        assertThrows(() => sampler.sampleFace({} as any, [{ x: 0, y: 0 }]));
 
         const cv = document.createElement("canvas");
         cv.width = 100;
@@ -278,17 +287,15 @@ test.describe("E2E Coverage with CDP", () => {
 
         // 凸性エラー・退化エラー・4点未満エラー・分母ゼロエラー
         sampler.classifyColor(255, 0, 255); // マゼンタ (77行: return "?")
-        try {
-          sampler.getPerspectiveTransform([]); // 133-134行: 4点指定エラー
-        } catch {}
-        try {
+        assertThrows(() => sampler.getPerspectiveTransform([])); // 133-134行: 4点指定エラー
+        assertThrows(() =>
           sampler.getPerspectiveTransform([
             { x: 0, y: 0 },
             { x: 100, y: 100 },
             { x: 100, y: 0 },
             { x: 0, y: 100 },
-          ]);
-        } catch {}
+          ]),
+        );
         let threwDegenerate = false;
         try {
           sampler.getPerspectiveTransform([
@@ -305,7 +312,7 @@ test.describe("E2E Coverage with CDP", () => {
         if (!threwDegenerate) {
           throw new Error("退化四角形が正常に拒絶されませんでした。");
         }
-        try {
+        assertThrows(() => {
           const tf = sampler.getPerspectiveTransform([
             { x: 20, y: 0 },
             { x: 80, y: 0 },
@@ -314,7 +321,7 @@ test.describe("E2E Coverage with CDP", () => {
           ]);
           // 射影変換の分母不正例外 (w <= 1e-5) を確実に発生させる (u=0, v=10 で w = 1 - 0.4*10 = -3 <= 1e-5)
           tf(0, 10);
-        } catch {}
+        });
 
         // --- centers.ts ---
         centers.centerTurns([
@@ -332,15 +339,11 @@ test.describe("E2E Coverage with CDP", () => {
         centers.centersFromInput(solved, undefined);
         centers.centersFromInput(solved, [0, 0, 0, 0, 0, 0]);
 
-        try {
-          centers.centersFromInput(solved, [0]);
-        } catch {}
-        try {
-          centers.centersFromInput(solved, "invalid");
-        } catch {}
-        try {
-          centers.centersFromInput(solved, [1, 0, 0, 0, 0, 0]);
-        } catch {}
+        assertThrows(() => centers.centersFromInput(solved, [0]));
+        assertThrows(() => centers.centersFromInput(solved, "invalid"));
+        assertThrows(() =>
+          centers.centersFromInput(solved, [1, 0, 0, 0, 0, 0]),
+        );
 
         // --- keyboard-shortcuts.ts ---
         document.querySelectorAll("dialog").forEach((d) => d.close());
@@ -445,27 +448,21 @@ test.describe("E2E Coverage with CDP", () => {
 
         // --- file-io.ts ---
         const fileIo = await import("/web/file-io.ts");
-        try {
-          fileIo.validateAndParseCubeJson("{}", 70000);
-        } catch {}
-        try {
-          fileIo.validateAndParseCubeJson("null", 100);
-        } catch {}
-        try {
-          fileIo.validateAndParseCubeJson("{}", 100);
-        } catch {}
-        try {
+        assertThrows(() => fileIo.validateAndParseCubeJson("{}", 70000));
+        assertThrows(() => fileIo.validateAndParseCubeJson("null", 100));
+        assertThrows(() => fileIo.validateAndParseCubeJson("{}", 100));
+        assertThrows(() =>
           fileIo.validateAndParseCubeJson(
             '{"version":2,"state":"' + solved + '"}',
             100,
-          );
-        } catch {}
-        try {
-          fileIo.validateAndParseCubeJson('{"version":1}', 100);
-        } catch {}
-        try {
-          fileIo.validateAndParseCubeJson('{"version":1,"state":123}', 100);
-        } catch {}
+          ),
+        );
+        assertThrows(() =>
+          fileIo.validateAndParseCubeJson('{"version":1}', 100),
+        );
+        assertThrows(() =>
+          fileIo.validateAndParseCubeJson('{"version":1,"state":123}', 100),
+        );
         fileIo.validateAndParseCubeJson(
           JSON.stringify({
             version: 1,
@@ -624,13 +621,17 @@ test.describe("E2E Coverage with CDP", () => {
         (camInst as any).points = hex;
         try {
           (camInst as any).capture();
-        } catch {}
+        } catch (_err) {
+          // 単色画像でのステッカー判定例外を想定
+        }
 
         // capture 例外ハンドリング (588-589行)
         (camInst as any).points = [{}, {}, {}, {}, {}, {}];
         try {
           (camInst as any).capture();
-        } catch {}
+        } catch (_err) {
+          // 不正な頂点形式による例外を想定
+        }
         (camInst as any).points = [];
 
         // detectedLabels 未検出パス (705行)
@@ -694,7 +695,9 @@ test.describe("E2E Coverage with CDP", () => {
           try {
             await camInst.startLiveStream();
             camInst.stopLiveStream();
-          } catch {}
+          } catch (_err) {
+            // カメラ非接続または初期化例外を想定
+          }
 
           // startLiveStream getUserMedia 解決後の中断・クリーンアップ (846-849行)
           if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -706,7 +709,9 @@ test.describe("E2E Coverage with CDP", () => {
             };
             try {
               await camInst.startLiveStream();
-            } catch {}
+            } catch (_err) {
+              // 意図的なストリーム中断例外
+            }
             navigator.mediaDevices.getUserMedia = origGUM;
           }
 
@@ -723,7 +728,9 @@ test.describe("E2E Coverage with CDP", () => {
             };
             try {
               await camInst.startLiveStream();
-            } catch {}
+            } catch (_err) {
+              // 意図的な中断例外
+            }
             videoEl.play = origPlayForCancel;
 
             // startLiveStream video.play 例外時クリーンアップ (923-925行)
@@ -731,7 +738,9 @@ test.describe("E2E Coverage with CDP", () => {
             videoEl.play = () => Promise.reject(new Error("forced play error"));
             try {
               await camInst.startLiveStream();
-            } catch {}
+            } catch (_err) {
+              // 意図的な再生失敗例外
+            }
             videoEl.play = origPlayForError;
           }
           camDialog.close();
@@ -826,7 +835,9 @@ test.describe("E2E Coverage with CDP", () => {
               configurable: true,
             });
             soundSuspended.playMove();
-          } catch {}
+          } catch (_err) {
+            // AudioContext モックプロパティ例外を想定
+          }
         }
 
         // localStorage エラー時の constructor catch 分岐 (11-12行)
@@ -870,7 +881,9 @@ test.describe("E2E Coverage with CDP", () => {
             get: () => true,
             configurable: true,
           });
-        } catch {}
+        } catch (_err) {
+          // navigator.webdriver が read-only な環境での例外を想定
+        }
 
         // --- solver-client.ts ---
         const { SolverClient } = await import("/web/solver-client.ts");
@@ -1080,11 +1093,8 @@ test.describe("E2E Coverage with CDP", () => {
         ed.open("?".repeat(54), [0, 0, 0, 0, 0, 0]);
         // エラーインデックスあり描画（131-132行: is-error）
         (ed as any).errorIndices = [0, 1];
-        (ed as any).render();
         (ed as any).paint(0, "editor-net");
-        try {
-          (ed as any).paint(4, "editor-net");
-        } catch {}
+        (ed as any).paint(4, "editor-net");
         if (editorDialog?.open) editorDialog.close();
 
         // --- camera-geometry.ts ---
@@ -1749,7 +1759,9 @@ test.describe("E2E Coverage with CDP", () => {
           d.showModal = () => {};
           cam.open();
           d.showModal = origShow;
-        } catch {}
+        } catch (_err) {
+          // ダイアログ初期化例外を想定
+        }
 
         // 2. テキストファイル等の不正画像 (365-368行)
         try {
@@ -1757,7 +1769,9 @@ test.describe("E2E Coverage with CDP", () => {
             new File(["sample text"], "notes.txt", { type: "text/plain" }),
             "A",
           );
-        } catch {}
+        } catch (_err) {
+          // 不正画像形式例外を想定
+        }
 
         // 3. 世代不一致スキップ (337-340行, 365-368行, 384-385行)
         try {
@@ -1856,12 +1870,16 @@ test.describe("E2E Coverage with CDP", () => {
 
           window.Image = origImage;
           HTMLCanvasElement.prototype.toBlob = origToBlob;
-        } catch {}
+        } catch (_err) {
+          // モック画像処理例外を想定
+        }
 
         // 4. error() メソッド (854-856行)
         try {
           (cam as any).error("テストエラー表示");
-        } catch {}
+        } catch (_err) {
+          // エラー表示例外を想定
+        }
 
         // 5. mediaDevices 非サポート (860-865行)
         const origMedia = navigator.mediaDevices;
@@ -1895,7 +1913,9 @@ test.describe("E2E Coverage with CDP", () => {
           (cam as any).isStartingStream = false;
           if (d) d.open = true;
           await cam.startLiveStream();
-        } catch {}
+        } catch (_err) {
+          // ストリーム再生中断例外を想定
+        }
 
         // 7. video.play で例外発生 (873-885行)
         try {
@@ -2098,7 +2118,9 @@ test.describe("E2E Coverage with CDP", () => {
         try {
           dbg.replace("INVALID_STATE_XYZ", false);
           await dbg.solve(1);
-        } catch {}
+        } catch (_err) {
+          // 不正盤面探索例外を想定
+        }
 
         // getEditor / getCamera の catch 分岐 (392-394, 419-421行)
         await dbg.getEditor(() => Promise.reject(new Error("loader fail")));
@@ -2119,7 +2141,9 @@ test.describe("E2E Coverage with CDP", () => {
           pContainer.remove();
           try {
             dbg.initializePresets();
-          } catch {}
+          } catch (_err) {
+            // 要素欠落時の初期化例外を想定
+          }
           if (parent) parent.appendChild(pContainer);
         }
 
@@ -2149,7 +2173,9 @@ test.describe("E2E Coverage with CDP", () => {
         window.history.pushState(null, "", "?alg=R_U_R'_U'");
         try {
           await dbg.start();
-        } catch {}
+        } catch (_err) {
+          // start 復元例外を想定
+        }
 
         // 2. localStorage 復元成功パス
         localStorage.setItem(
@@ -2166,18 +2192,24 @@ test.describe("E2E Coverage with CDP", () => {
         window.history.pushState(null, "", "/");
         try {
           await dbg.start();
-        } catch {}
+        } catch (_err) {
+          // 復元例外を想定
+        }
 
         // 3. localStorage 復元失敗パス (664-665行)
         localStorage.setItem("cube-studio-v1", "{ invalid json");
         try {
           await dbg.start();
-        } catch {}
+        } catch (_err) {
+          // 不正JSONパース例外を想定
+        }
 
         // 4. start() 全体 catch パス (696-698行)
         try {
           await dbg.start(true);
-        } catch {}
+        } catch (_err) {
+          // 強制エラー例外を想定
+        }
 
         // 5. 解法セット & playing 状態での refresh (254-255, 660-661行)
         const currentStore = dbg.store;
@@ -2205,13 +2237,17 @@ test.describe("E2E Coverage with CDP", () => {
           document.getElementById("copy")?.click();
           await new Promise((r) => setTimeout(r, 20));
           navigator.clipboard.writeText = origWriteText;
-        } catch {}
+        } catch (_err) {
+          // クリップボード例外を想定
+        }
 
         // 6. initScene エラー分岐 (331-332行)
         try {
           dbg.initScene(true);
           dbg.initScene(false);
-        } catch {}
+        } catch (_err) {
+          // シーン初期化例外を想定
+        }
 
         // 7. seek & play & applyAlgorithm & 未カバーパス網羅
         try {
@@ -2238,7 +2274,9 @@ test.describe("E2E Coverage with CDP", () => {
           await dbg.applyAlgorithm("R");
           await dbg.applyAlgorithm("R'");
           await dbg.applyAlgorithm("INVALID_XYZ_FAIL");
-        } catch {}
+        } catch (_err) {
+          // 手順適用例外を想定
+        }
 
         // 8. solve の setInterval タイマー (357行) & innerWidth <= 740 での scrollTo (363-367行)
         try {
@@ -2264,7 +2302,9 @@ test.describe("E2E Coverage with CDP", () => {
             get: () => origInnerWidth,
             configurable: true,
           });
-        } catch {}
+        } catch (_err) {
+          // タイマー処理例外を想定
+        }
 
         // 9. solve の catch 分岐 (371-373行)
         try {
@@ -2273,14 +2313,18 @@ test.describe("E2E Coverage with CDP", () => {
           solver.solve = () => Promise.reject(new Error("forced solver fail"));
           await dbg.solve();
           solver.solve = origSolve;
-        } catch {}
+        } catch (_err) {
+          // 強制ソルバー失敗例外を想定
+        }
 
         // 10. getEditor / getCamera の catch 分岐 (396-398, 423-425行)
         try {
           dbg.resetInstances();
           await dbg.getEditor(() => Promise.reject(new Error("loader fail")));
           await dbg.getCamera(() => Promise.reject(new Error("loader fail")));
-        } catch {}
+        } catch (_err) {
+          // ローダー失敗例外を想定
+        }
 
         // 11. copy の失敗 catch 分岐 (664-665行)
         try {
@@ -2296,7 +2340,9 @@ test.describe("E2E Coverage with CDP", () => {
             value: origCb,
             configurable: true,
           });
-        } catch {}
+        } catch (_err) {
+          // クリップボード例外を想定
+        }
 
         // 12. プリセット衝突 (765-767行) & シードスクランブル例外 (783-784行)
         try {
@@ -2341,19 +2387,25 @@ test.describe("E2E Coverage with CDP", () => {
             wasm.scramble = origScramble;
           }
           window.fetch = origFetch;
-        } catch {}
+        } catch (_err) {
+          // プリセット・シード例外を想定
+        }
 
         // 13. localStorage 復元失敗パス (664-665行) & mainReady = false での start() (783-784行)
         try {
           dbg.setMainReady(true);
           localStorage.setItem("cube-studio-v1", "{ invalid json");
           await dbg.start();
-        } catch {}
+        } catch (_err) {
+          // 復元失敗例外を想定
+        }
 
         try {
           dbg.setMainReady(false);
           await dbg.start();
-        } catch {}
+        } catch (_err) {
+          // 初期化未完了例外を想定
+        }
         dbg.setMainReady(true);
 
         // 14. Space / ArrowLeft キーによるショートカット (761-763行)
@@ -2365,7 +2417,9 @@ test.describe("E2E Coverage with CDP", () => {
           document.body.dispatchEvent(
             new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
           );
-        } catch {}
+        } catch (_err) {
+          // キーイベント例外を想定
+        }
 
         // fallback (240-248行)
         dbg.fallback();

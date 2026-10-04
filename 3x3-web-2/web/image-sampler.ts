@@ -53,16 +53,6 @@ export function classifyColor(
   const darkV = adaptation?.darkValueThreshold ?? 0.18;
   const whiteS = adaptation?.whiteSaturationThreshold ?? 0.28;
 
-  // 1. 極端に暗いピクセル（黒プラスチック目地、完全な暗闇など）
-  if (v < darkV || (s < 0.25 && v < 0.45)) {
-    return "?";
-  }
-
-  // 2. 白（低彩度かつ十分な明度）
-  if (s < whiteS && v >= 0.45) {
-    return "U";
-  }
-
   let h = 0;
   if (max !== min) {
     if (max === rf) {
@@ -73,6 +63,19 @@ export function classifyColor(
       h = (rf - gf) / d + 4;
     }
     h *= 60;
+  }
+
+  // 1. 極端に暗いピクセル（黒プラスチック目地、完全な暗闇など）
+  if (v < darkV || (s < 0.25 && v < 0.45)) {
+    return "?";
+  }
+
+  // 2. 白（低彩度かつ十分な明度、または暖色照明下での微弱な偏り）
+  if (
+    (s < whiteS && v >= 0.45) ||
+    (s < 0.38 && v >= 0.85 && h >= 18 && h <= 55)
+  ) {
+    return "U";
   }
 
   // 3. 有彩色（色相 H: 0〜360 による判定）

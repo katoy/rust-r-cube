@@ -32,6 +32,31 @@ export function computeCenter(points: Point[]): Point {
   };
 }
 
+/**
+ * 6つの外周頂点を重心まわりの時計回り角度（最上部をP1として0°）で正規化する。
+ * 反時計回り入力や順序違いの再追加（M8, M9）を吸収する。
+ */
+export function normalizeOutlinePoints(points: Point[]): Point[] {
+  if (points.length !== 6) return points;
+  const cx = points.reduce((sum, p) => sum + p.x, 0) / 6;
+  const cy = points.reduce((sum, p) => sum + p.y, 0) / 6;
+
+  // 重心周りの偏角でソート（画面座標系で時計回りに並べる）
+  const sorted = [...points].sort((a, b) => {
+    return Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx);
+  });
+
+  // 最も上にある点（y が最小の点）を P1（てっぺん）として先頭にシフト
+  let topIdx = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].y < sorted[topIdx].y) {
+      topIdx = i;
+    }
+  }
+
+  return [...sorted.slice(topIdx), ...sorted.slice(0, topIdx)];
+}
+
 export function detectCubeOutline(
   canvas: HTMLCanvasElement,
   _image?: HTMLImageElement,

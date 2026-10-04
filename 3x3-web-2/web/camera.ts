@@ -2,6 +2,7 @@ import {
   type Point,
   computeCenter,
   detectCubeOutline,
+  normalizeOutlinePoints,
 } from "./camera-geometry";
 import {
   toCanvasCoords,
@@ -18,8 +19,70 @@ import {
 import { FACES, FACE_NAMES, NAMES } from "./model";
 import { renderPalette, renderResultFaces } from "./camera-results-ui";
 
-export { computeCenter, detectCubeOutline, type Point };
+export { computeCenter, detectCubeOutline, normalizeOutlinePoints, type Point };
 type Apply = (state: string) => void;
+
+async function checkImagePixelCount(
+  file: File,
+  maxPixels = 50_000_000,
+): Promise<void> {
+  if (file.size === 0 || file.size > 20 * 1024 * 1024) return;
+  try {
+    const slice = await file.slice(0, 65536).arrayBuffer();
+    const view = new DataView(slice);
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (
+      view.byteLength >= 24 &&
+      view.getUint32(0) === 0x89504e47 &&
+      view.getUint32(4) === 0x0d0a1a0a
+    ) {
+      const width = view.getUint32(16);
+      const height = view.getUint32(20);
+      if (width === 0 || height === 0) {
+        throw new Error("画像の寸法が不正です（幅または高さが0）。");
+      }
+      if (width * height > maxPixels) {
+        throw new Error(
+          `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
+        );
+      }
+      return;
+    }
+    // JPEG: FF D8
+    if (view.byteLength >= 4 && view.getUint16(0) === 0xffd8) {
+      let offset = 2;
+      while (offset < view.byteLength - 8) {
+        const marker = view.getUint16(offset);
+        offset += 2;
+        if (marker === 0xffda || marker === 0xffd9) break;
+        const length = view.getUint16(offset);
+        if (length < 2) break;
+        if (marker >= 0xffc0 && marker <= 0xffc3) {
+          const height = view.getUint16(offset + 3);
+          const width = view.getUint16(offset + 5);
+          if (width === 0 || height === 0) {
+            throw new Error("画像の寸法が不正です（幅または高さが0）。");
+          }
+          if (width * height > maxPixels) {
+            throw new Error(
+              `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
+            );
+          }
+          return;
+        }
+        offset += length;
+      }
+    }
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.message.includes("画像サイズが大きすぎます") ||
+        err.message.includes("画像の寸法が不正です"))
+    ) {
+      throw err;
+    }
+  }
+}
 
 export class TwoViewCamera {
   private imageA?: HTMLImageElement;
@@ -30,6 +93,7 @@ export class TwoViewCamera {
   private points: Point[] = [];
   private centerPoint?: Point;
   private faces: Partial<Record<(typeof FACES)[number], string>> = {};
+  private capturedFaces = new Set<string>();
   private detectedLabels: { A?: string; B?: string } = {};
   private selectedColor = "U";
   private draggingIndex = -1; // 0..5: points, 6: centerPoint
@@ -113,8 +177,11 @@ export class TwoViewCamera {
         // 既存の頂点の近くをクリックした場合は新規追加しない
         if (checkHit(x, y) === -1 && this.points.length < 6) {
           this.points.push({ x, y });
+          if (this.points.length === 6) {
+            this.points = normalizeOutlinePoints(this.points);
+            this.updateDetectedLabels();
+          }
           this.draw();
-          if (this.points.length === 6) this.updateDetectedLabels();
           this.update();
         }
       }
@@ -140,6 +207,7 @@ export class TwoViewCamera {
     };
 
     canvas.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !e.isPrimary) return;
       e.preventDefault();
       try {
         canvas.setPointerCapture(e.pointerId);
@@ -156,6 +224,7 @@ export class TwoViewCamera {
       }
     });
     canvas.addEventListener("pointerup", (e) => {
+      if (e.button !== 0 || !e.isPrimary) return;
       if (this.draggingIndex === -1) {
         try {
           if (canvas.hasPointerCapture(e.pointerId)) {
@@ -232,11 +301,17 @@ export class TwoViewCamera {
       };
     }
 
-    // キーボードショートカット 'r' で枠を回転
+    // キーボードショートカット 'r' で枠を回転（Cmd/Ctrl/Alt との組み合わせはリロード等を優先）
     window.addEventListener("keydown", (e) => {
       const dialog = $("camera-editor") as HTMLDialogElement | null;
       if (!dialog?.open) return;
-      if ((e.key === "r" || e.key === "R") && this.points.length === 6) {
+      if (
+        (e.key === "r" || e.key === "R") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        this.points.length === 6
+      ) {
         e.preventDefault();
         this.rotatePoints();
       }
@@ -391,6 +466,7 @@ export class TwoViewCamera {
       view === "A" ? (["U", "R", "F"] as const) : (["D", "L", "B"] as const);
     for (const key of keys) {
       delete this.faces[key];
+      this.capturedFaces.delete(key);
     }
     this.detectedLabels[view] = undefined;
   }
@@ -497,6 +573,13 @@ export class TwoViewCamera {
     // 新画像の選択・読込を開始した時点で該当ビューの旧結果を失効させて再読取待ちにする
     if (existingGeneration === undefined) this.beginImageLoad(view);
 
+    try {
+      await checkImagePixelCount(file);
+    } catch (err) {
+      this.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const rawImage = new Image();
@@ -600,7 +683,7 @@ export class TwoViewCamera {
     const ctx = rawCanvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(activeImage, 0, 0, rawCanvas.width, rawCanvas.height);
-    this.points = detectCubeOutline(rawCanvas);
+    this.points = normalizeOutlinePoints(detectCubeOutline(rawCanvas));
     this.centerPoint = undefined;
     if (this.points.length === 6) this.updateDetectedLabels();
     this.draw();
@@ -648,58 +731,44 @@ export class TwoViewCamera {
 
       // 3面の各面をサンプリング（同一画像からのImageData抽出を1回に集約してGPU同期とメモリ確保を削減）
       const pixels = getImagePixels(activeImage);
-      const sampledItems = rawQuads.map(({ defaultFace, quad }) => {
+      const faceDefs: {
+        targetFace: (typeof FACES)[number];
+        quad: Point[];
+      }[] =
+        this.currentView === "A"
+          ? [
+              { targetFace: "U", quad: [p1, p2, center, p6] },
+              { targetFace: "R", quad: [center, p2, p3, p4] },
+              { targetFace: "F", quad: [p6, center, p4, p5] },
+            ]
+          : [
+              { targetFace: "D", quad: [p6, p1, p2, center] },
+              { targetFace: "L", quad: [p4, p5, p6, center] },
+              { targetFace: "B", quad: [p3, p4, center, p2] },
+            ];
+
+      let centerMismatch = false;
+      for (const { targetFace, quad } of faceDefs) {
         const sampled = sampleFaceFromPixels(pixels, quad);
         const centerChar = sampled[4];
-        return { defaultFace, quad, sampled, centerChar };
-      });
-
-      // このビューが担当する面セット（A: U, R, F / B: D, L, B）
-      const allowedFaces: readonly string[] =
-        this.currentView === "A" ? ["U", "R", "F"] : ["D", "L", "B"];
-      const usedFaces = new Set<string>();
-      const faceAssignments: {
-        targetFace: (typeof FACES)[number];
-        sampled: string;
-      }[] = [];
-
-      // 1. このビューの許容面に含まれる有効なセンター色で、まだ重複していないものを割り当て
-      const assignedIndices = new Set<number>();
-      for (let i = 0; i < sampledItems.length; i++) {
-        const item = sampledItems[i];
-        if (
-          allowedFaces.includes(item.centerChar as any) &&
-          !usedFaces.has(item.centerChar)
-        ) {
-          usedFaces.add(item.centerChar);
-          faceAssignments.push({
-            targetFace: item.centerChar as (typeof FACES)[number],
-            sampled: item.sampled,
-          });
-          assignedIndices.add(i);
+        if (centerChar !== targetFace) {
+          centerMismatch = true;
         }
-      }
-
-      // 2. センター色がビュー外、'?' または重複している場合は、defaultFace またはビューの未割り当て面から補填
-      for (let i = 0; i < sampledItems.length; i++) {
-        if (assignedIndices.has(i)) continue;
-        const item = sampledItems[i];
-        let targetFace: string = item.defaultFace;
-        if (usedFaces.has(targetFace)) {
-          const fallback = allowedFaces.find((f) => !usedFaces.has(f));
-          targetFace = fallback ?? item.defaultFace;
-        }
-        usedFaces.add(targetFace);
-        faceAssignments.push({
-          targetFace: targetFace as (typeof FACES)[number],
-          sampled: item.sampled,
-        });
-        assignedIndices.add(i);
-      }
-
-      for (const { targetFace, sampled } of faceAssignments) {
         const normalized = sampled.slice(0, 4) + targetFace + sampled.slice(5);
         this.faces[targetFace] = normalized;
+        this.capturedFaces.add(targetFace);
+      }
+
+      if (centerMismatch) {
+        const expectedDesc =
+          this.currentView === "A"
+            ? "上面=白、右手前=赤、左手前=緑"
+            : "上面=黄、左手前=橙、右手前=青";
+        this.error(
+          `⚠️ センター色チェック: 一部のセンター色が期待（画像${this.currentView}: ${expectedDesc}）と異なります。キューブの向きを確認してください。`,
+        );
+      } else {
+        this.error("");
       }
 
       this.updateDetectedLabels();
@@ -713,7 +782,7 @@ export class TwoViewCamera {
       if (
         this.currentView === "A" &&
         this.imageB &&
-        Object.keys(this.faces).length < 6
+        this.capturedFaces.size < 6
       ) {
         this.switchView("B");
       }
@@ -860,6 +929,7 @@ export class TwoViewCamera {
       currentView: this.currentView,
       selectedColor: this.selectedColor,
       onUpdateSticker: (face, i) => {
+        if (!this.capturedFaces.has(face)) return;
         const current = this.faces[face] ?? "?????????";
         const updated =
           current.substring(0, i) +
@@ -879,15 +949,14 @@ export class TwoViewCamera {
   }
 
   private update() {
-    $("camera-progress").textContent =
-      `${Object.keys(this.faces).length} / 6 面`;
+    $("camera-progress").textContent = `${this.capturedFaces.size} / 6 面`;
     $("camera-capture").toggleAttribute(
       "disabled",
       !this.activeImage || this.points.length !== 6,
     );
     $("camera-apply").toggleAttribute(
       "disabled",
-      this.loading.A || this.loading.B || Object.keys(this.faces).length !== 6,
+      this.loading.A || this.loading.B || this.capturedFaces.size !== 6,
     );
 
     const faceSelect = $("camera-face") as HTMLSelectElement | null;

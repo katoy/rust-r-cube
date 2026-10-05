@@ -1,4 +1,9 @@
-import { SOLVED, type ResultData } from "./model";
+import {
+  SOLVED,
+  type ResultData,
+  type CubeType,
+  getSolvedState,
+} from "./model";
 import { automaticCenters, centerTurns, turnsToCenters } from "./centers";
 
 export interface CubeSnapshot {
@@ -14,7 +19,8 @@ export type StoreEventType =
   | "solution"
   | "step"
   | "seek"
-  | "algorithm";
+  | "algorithm"
+  | "cube-type";
 
 export interface StoreEventDetail {
   type: StoreEventType;
@@ -23,6 +29,7 @@ export interface StoreEventDetail {
 export type StoreListener = (store: CubeStore, event: StoreEventDetail) => void;
 
 export class CubeStore {
+  private cubeType: CubeType = "3x3";
   private state: string = SOLVED;
   private centerRotations: number[] = [0, 0, 0, 0, 0, 0];
   private revision: number = 0;
@@ -34,6 +41,24 @@ export class CubeStore {
   private listeners: Set<StoreListener> = new Set();
 
   private baseSnapshot?: CubeSnapshot = undefined;
+
+  getCubeType(): CubeType {
+    return this.cubeType;
+  }
+
+  setCubeType(type: CubeType): void {
+    if (this.cubeType === type) return;
+    this.cubeType = type;
+    this.state = getSolvedState(type);
+    this.centerRotations = [0, 0, 0, 0, 0, 0];
+    this.revision++;
+    this.solution = undefined;
+    this.baseSnapshot = undefined;
+    this.step = 0;
+    this.history = [];
+    this.future = [];
+    this.notify("cube-type");
+  }
 
   getState(): string {
     return this.state;
@@ -124,6 +149,7 @@ export class CubeStore {
         this.pushHistory(this.getSnapshot());
       }
     }
+    this.cubeType = next.length === 24 ? "2x2" : "3x3";
     this.state = next;
     this.centerRotations = [...centers];
     this.revision++;
@@ -140,6 +166,7 @@ export class CubeStore {
       }
       this.future.push(this.getSnapshot());
       this.state = this.baseSnapshot.state;
+      this.cubeType = this.state.length === 24 ? "2x2" : "3x3";
       this.centerRotations = turnsToCenters(this.baseSnapshot.centerTurns);
       this.revision++;
       this.solution = undefined;
@@ -152,6 +179,7 @@ export class CubeStore {
     if (!prev) return false;
     this.future.push(this.getSnapshot());
     this.state = prev.state;
+    this.cubeType = this.state.length === 24 ? "2x2" : "3x3";
     this.centerRotations = turnsToCenters(prev.centerTurns);
     this.revision++;
     this.solution = undefined;
@@ -174,6 +202,7 @@ export class CubeStore {
       this.appendHistory(this.getSnapshot());
     }
     this.state = next.state;
+    this.cubeType = this.state.length === 24 ? "2x2" : "3x3";
     this.centerRotations = turnsToCenters(next.centerTurns);
     this.revision++;
     this.solution = undefined;
@@ -252,6 +281,7 @@ export class CubeStore {
         this.pushHistory(this.getSnapshot());
       }
     }
+    this.cubeType = nextState.length === 24 ? "2x2" : "3x3";
     this.state = nextState;
     this.centerRotations = [...nextCenters];
     this.revision++;

@@ -22,6 +22,12 @@ const G1_MOVES = new Set([
 ]);
 
 const TRIGGERS: { pattern: string[]; name: string }[] = [
+  // 2x2 PBL / OLL 公式
+  { pattern: ["R2", "F2", "R2"], name: "PBL ダブル対角" },
+  { pattern: ["R", "U", "R'", "U", "R", "U2", "R'"], name: "スーネ (Sune)" },
+  { pattern: ["R", "U2", "R'", "U'", "R", "U'", "R'"], name: "アンチスーネ" },
+  { pattern: ["R2", "U2", "R", "U2", "R2"], name: "H型 OLL" },
+  // 共通トリガー
   { pattern: ["R", "U", "R'", "U'"], name: "セクシームーブ" },
   { pattern: ["L'", "U'", "L", "U"], name: "レフトセクシー" },
   { pattern: ["R'", "F", "R", "F'"], name: "スレッジハンマー" },
@@ -30,6 +36,19 @@ const TRIGGERS: { pattern: string[]; name: string }[] = [
 ];
 
 const PHASE_LABEL_MAP: Record<string, string> = {
+  // 2x2 LBL (Rust: c2x2/lbl.rs)
+  "ステップ 1: 完全1層 (First Layer)": "ステップ 1: 完全1層 (First Layer)",
+  "ステップ 2: 上面色揃え (OLL)": "ステップ 2: 上面色揃え (OLL)",
+  "ステップ 3: 上面位置揃え (PLL)": "ステップ 3: 上面位置揃え (PLL)",
+
+  // 2x2 Ortega (Rust: c2x2/ortega.rs)
+  "ステップ 1: 最初の1面 (First Face)": "ステップ 1: 最初の1面 (First Face)",
+  "ステップ 2: 反対面色揃え (OLL)": "ステップ 2: 反対面色揃え (OLL)",
+  "ステップ 3: 両層同時配置 (PBL)": "ステップ 3: 両層同時配置 (PBL)",
+
+  // 2x2 Optimal
+  "Optimal 最短探索 (IDA*)": "Optimal 最短手順探索 (IDA*)",
+
   // CFOP (Rust: cfop.rs)
   "Cross (クロス)": "ステップ 1: 底面クロス (Cross)",
   "First Layer (第1層コーナー)": "ステップ 2: 完全1層 (First Layer)",

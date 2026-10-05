@@ -1,16 +1,16 @@
-#[path = "src/coord.rs"]
+#[path = "src/c3x3/coord.rs"]
 #[allow(dead_code, clippy::upper_case_acronyms)]
 mod coord;
-#[path = "src/tables.rs"]
+#[path = "src/c3x3/tables.rs"]
 #[allow(dead_code)]
 mod tables;
 const TABLE_BYTES: Option<&[u8]> = None;
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/coord.rs");
-    println!("cargo:rerun-if-changed=src/tables.rs");
-    println!("cargo:rerun-if-changed=src/table_io.rs");
+    println!("cargo:rerun-if-changed=src/c3x3/coord.rs");
+    println!("cargo:rerun-if-changed=src/c3x3/tables.rs");
+    println!("cargo:rerun-if-changed=src/c3x3/table_io.rs");
     println!("cargo:rustc-check-cfg=cfg(coverage)");
     if std::env::var("CARGO_LLVM_COV").is_ok()
         || std::env::var("RUSTFLAGS")

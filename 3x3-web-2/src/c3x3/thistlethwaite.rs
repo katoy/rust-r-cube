@@ -542,7 +542,7 @@ mod tests {
     #[test]
     fn test_thistlethwaite_superflip_solves_under_45_moves() {
         let preset: serde_json::Value =
-            serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
+            serde_json::from_str(include_str!("../../cubes/superflip.json")).unwrap();
         let sc = parse_moves(preset["scramble"].as_str().unwrap()).unwrap();
         let cube = apply(&RawCube::default(), &sc);
         let budget = 60_000;

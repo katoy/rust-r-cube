@@ -2222,3 +2222,168 @@ fn test_f1_solution_verification_always_enforced() {
         crate::solve_state_with_algorithm(SOLVED, 1000, true, Some([1, 0, 0, 0, 0, 0]), "kociemba");
     assert!(bad_centers.is_err());
 }
+
+// ============================================================================
+// 2x2x2 ルービックキューブ ソルバー テスト群
+// ============================================================================
+
+#[test]
+fn test_2x2_solved_state() {
+    let solved = crate::c2x2::cube::SOLVED;
+    assert_eq!(solved.len(), 24);
+    assert!(crate::validate_core(solved).unwrap());
+    assert!(crate::is_valid_core(solved).unwrap());
+    assert!(crate::is_solved_core(solved).unwrap());
+
+    // 解法探索: 完成状態なら0手で即座に完了
+    let res = crate::c2x2::solve(solved, 1000, true, "optimal").unwrap();
+    assert_eq!(res.moves.len(), 0);
+    assert_eq!(res.state, solved);
+}
+
+#[test]
+fn test_2x2_basic_moves_and_inverse() {
+    let solved = crate::c2x2::cube::SOLVED;
+    let moves = ["U", "R", "F", "D", "L", "B"];
+    let inv_moves = ["U'", "R'", "F'", "D'", "L'", "B'"];
+
+    for (m, inv) in moves.iter().zip(inv_moves.iter()) {
+        let applied = crate::apply_moves_core(solved, m).unwrap();
+        assert_ne!(applied.state, solved);
+        assert!(!crate::is_solved_core(&applied.state).unwrap());
+
+        let restored = crate::apply_moves_core(&applied.state, inv).unwrap();
+        assert_eq!(restored.state, solved);
+        assert!(crate::is_solved_core(&restored.state).unwrap());
+    }
+
+    // 180°回転 (2回で元に戻る)
+    for m in &["U2", "R2", "F2", "D2", "L2", "B2"] {
+        let applied = crate::apply_moves_core(solved, m).unwrap();
+        let restored = crate::apply_moves_core(&applied.state, m).unwrap();
+        assert_eq!(restored.state, solved);
+    }
+}
+
+#[test]
+fn test_2x2_scramble_and_solve_optimal() {
+    // 複数のシード値でスクランブルして求解テスト
+    for seed in [1, 42, 99, 2026, 77777] {
+        let sc_str = crate::scramble_2x2(seed);
+        assert!(!sc_str.is_empty());
+
+        let sc_res = crate::apply_moves_core(crate::c2x2::cube::SOLVED, &sc_str).unwrap();
+        let scrambled_state = sc_res.state;
+
+        // 求解 (標準向き一致モード)
+        let sol = crate::c2x2::solve(&scrambled_state, 1000, true, "optimal").unwrap();
+        assert_eq!(sol.state, crate::c2x2::cube::SOLVED);
+        assert!(
+            sol.moves.len() <= 14,
+            "2x2 最短解は14手以内である必要があります: {}手",
+            sol.moves.len()
+        );
+
+        // 解法手順を適用して完成することを確認
+        let sol_applied = crate::apply_moves_core(&scrambled_state, &sol.moves.join(" ")).unwrap();
+        assert_eq!(sol_applied.state, crate::c2x2::cube::SOLVED);
+    }
+}
+
+#[test]
+fn test_2x2_lbl_and_ortega_algorithms() {
+    for seed in [10, 42, 101, 777] {
+        let sc_str = crate::scramble_2x2(seed);
+        let sc_res = crate::apply_moves_core(crate::c2x2::cube::SOLVED, &sc_str).unwrap();
+
+        // 1. LBL法 (Layer-by-Layer)
+        let sol_lbl = crate::c2x2::solve(&sc_res.state, 1000, true, "lbl").unwrap();
+        assert_eq!(sol_lbl.algorithm, "lbl");
+        assert_eq!(sol_lbl.state, crate::c2x2::cube::SOLVED);
+        assert_eq!(
+            sol_lbl.phases.len(),
+            3,
+            "LBL must produce 3 distinct phases"
+        );
+        assert!(sol_lbl.phases[0].name.contains("完全1層"));
+        assert!(sol_lbl.phases[1].name.contains("OLL"));
+        assert!(sol_lbl.phases[2].name.contains("PLL"));
+
+        let res_lbl = crate::apply_moves_core(&sc_res.state, &sol_lbl.moves.join(" ")).unwrap();
+        assert_eq!(res_lbl.state, crate::c2x2::cube::SOLVED);
+
+        // 2. Ortega法
+        let sol_ortega = crate::c2x2::solve(&sc_res.state, 1000, true, "ortega").unwrap();
+        assert_eq!(sol_ortega.algorithm, "ortega");
+        assert_eq!(sol_ortega.state, crate::c2x2::cube::SOLVED);
+        assert_eq!(
+            sol_ortega.phases.len(),
+            3,
+            "Ortega must produce 3 distinct phases"
+        );
+        assert!(sol_ortega.phases[0].name.contains("最初の1面"));
+        assert!(sol_ortega.phases[1].name.contains("OLL"));
+        assert!(sol_ortega.phases[2].name.contains("PBL"));
+
+        let res_ortega =
+            crate::apply_moves_core(&sc_res.state, &sol_ortega.moves.join(" ")).unwrap();
+        assert_eq!(res_ortega.state, crate::c2x2::cube::SOLVED);
+    }
+}
+
+#[test]
+fn test_2x2_orientation_modes() {
+    // スクランブル状態
+    let sc_str = "R U R' F' U2 R";
+    let sc_res = crate::apply_moves_core(crate::c2x2::cube::SOLVED, sc_str).unwrap();
+
+    // 向き一致モード (true)
+    let sol_strict = crate::c2x2::solve(&sc_res.state, 1000, true, "optimal").unwrap();
+    assert_eq!(sol_strict.state, crate::c2x2::cube::SOLVED);
+
+    // 向き不問モード (false)
+    let sol_any = crate::c2x2::solve(&sc_res.state, 1000, false, "optimal").unwrap();
+    // 向き不問モードの手数は、向き一致モードの手数以下であること
+    assert!(sol_any.moves.len() <= sol_strict.moves.len());
+
+    // 向き不問の解を適用した結果が完成状態（いずれかの向き）であること
+    let res_any = crate::apply_moves_core(&sc_res.state, &sol_any.moves.join(" ")).unwrap();
+    assert!(crate::c2x2::is_solved(&res_any.state, false).unwrap());
+}
+
+#[test]
+fn test_2x2_validation_and_errors() {
+    // 文字数不正
+    assert!(crate::validate_core("UUUURRRR").is_err());
+
+    // 各面4枚でない
+    let mut bad_colors = crate::c2x2::cube::SOLVED.to_string();
+    bad_colors.replace_range(0..1, "R"); // Uが3枚、Rが5枚
+    assert!(crate::validate_core(&bad_colors).is_err());
+
+    // コーナーねじれパリティ不正
+    let mut bad_twist = crate::c2x2::cube::SOLVED.to_string();
+    // コーナー0 (UFR: インデックス 3, 4, 9) をねじる (3=U, 4=R, 9=F -> 3=F, 4=U, 9=R)
+    bad_twist.replace_range(3..4, "F");
+    bad_twist.replace_range(4..5, "U");
+    bad_twist.replace_range(9..10, "R");
+    let twist_err = crate::validate_core(&bad_twist);
+    assert!(twist_err.is_err());
+    let msg = twist_err.unwrap_err();
+    assert!(msg.contains("ねじれ") || msg.contains("パリティ"));
+}
+
+#[test]
+fn test_2x2_wasm_wrappers() {
+    let solved = crate::c2x2::cube::SOLVED;
+    assert!(crate::validate(solved).unwrap());
+    assert!(crate::is_valid(solved).unwrap());
+    assert!(crate::is_solved(solved).unwrap());
+
+    let sol_json = crate::solve_2x2(solved, true).unwrap();
+    assert!(sol_json.contains("\"moves\":[]"));
+
+    // 統一 solve_with_algorithm で 24文字が 2x2 ソルバーで解かれること
+    let sol_unified = crate::solve_with_algorithm(solved, 1000, true, None, None).unwrap();
+    assert!(sol_unified.contains("\"algorithm\":\"optimal\""));
+}

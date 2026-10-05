@@ -1,7 +1,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { COLORS, FACES, getCellArrowInfo, ARROW_COLORS } from "./model";
+import {
+  COLORS,
+  FACES,
+  getCellArrowInfo,
+  ARROW_COLORS,
+  type CubeType,
+} from "./model";
 
 const normal = [
   new THREE.Vector3(0, 1, 0),
@@ -20,7 +26,8 @@ const faceUp = [
   new THREE.Vector3(0, 1, 0), // 4: L (上)
   new THREE.Vector3(0, 1, 0), // 5: B (上)
 ];
-function position(face: number, row: number, col: number) {
+
+function position3x3(face: number, row: number, col: number) {
   return new THREE.Vector3(
     ...([
       [col - 1, 1.49, row - 1],
@@ -29,6 +36,19 @@ function position(face: number, row: number, col: number) {
       [col - 1, -1.49, 1 - row],
       [-1.49, 1 - row, col - 1],
       [1 - col, 1 - row, -1.49],
+    ][face] as [number, number, number]),
+  );
+}
+
+function position2x2(face: number, row: number, col: number) {
+  return new THREE.Vector3(
+    ...([
+      [col - 0.5, 0.985, row - 0.5],
+      [0.985, 0.5 - row, 0.5 - col],
+      [col - 0.5, 0.5 - row, 0.985],
+      [col - 0.5, -0.985, 0.5 - row],
+      [-0.985, 0.5 - row, col - 0.5],
+      [0.5 - col, 0.5 - row, -0.985],
     ][face] as [number, number, number]),
   );
 }
@@ -54,6 +74,7 @@ export class CubeScene {
   private controls: OrbitControls;
   private root = new THREE.Group();
   private turnLayer = new THREE.Group(); // 回転アニメーション用レイヤー（再利用でGCゼロ化）
+  private cubeType: CubeType = "3x3";
   private stickers: THREE.Mesh<
     THREE.BufferGeometry,
     THREE.MeshStandardMaterial
@@ -122,73 +143,8 @@ export class CubeScene {
     floor.position.y = -2.25;
     floor.receiveShadow = true;
     this.scene.add(floor);
-    const body = new RoundedBoxGeometry(0.97, 0.97, 0.97, 3, 0.07);
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x202522,
-      roughness: 0.48,
-    });
-    for (let x = -1; x <= 1; x++)
-      for (let y = -1; y <= 1; y++)
-        for (let z = -1; z <= 1; z++) {
-          if (x === 0 && y === 0 && z === 0) continue;
-          const mesh = new THREE.Mesh(body, bodyMaterial);
-          mesh.position.set(x, y, z);
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          this.add(mesh);
-        }
-    const sticker = new RoundedBoxGeometry(0.855, 0.855, 0.026, 3, 0.048);
-    for (let f = 0; f < 6; f++)
-      for (let i = 0; i < 9; i++) {
-        const mesh = new THREE.Mesh(
-          sticker,
-          new THREE.MeshStandardMaterial({
-            color: COLORS[FACES[f]],
-            roughness: 0.42,
-            metalness: 0.02,
-          }),
-        );
-        mesh.position.copy(position(f, Math.floor(i / 3), i % 3));
-        mesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          normal[f],
-        );
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        this.stickers.push(mesh);
-        this.add(mesh);
-        if (i === 4) {
-          const canvas = document.createElement("canvas");
-          canvas.width = 128;
-          canvas.height = 128;
-          const ctx = canvas.getContext("2d")!;
-          ctx.fillStyle = "#16231f";
-          ctx.font = "700 32px sans-serif";
-          ctx.textAlign = "left";
-          ctx.textBaseline = "top";
-          ctx.fillText(FACES[f], 14, 12);
-          const texture = new THREE.CanvasTexture(canvas);
-          const label = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.855, 0.855),
-            new THREE.MeshBasicMaterial({
-              map: texture,
-              transparent: true,
-              depthWrite: false,
-            }),
-          );
-          label.position.copy(mesh.position).addScaledVector(normal[f], 0.017);
-          const rotMatrix = rotationMatrixForFaceAngle(f, 0);
-          label.quaternion.setFromRotationMatrix(rotMatrix);
-          this.centerLabels[f] = label;
-          label.renderOrder = 9;
-          label.userData = {
-            origin: label.position.clone(),
-            rotation: label.quaternion.clone(),
-            face: f,
-          };
-          this.root.add(label);
-        }
-      }
+
+    this.buildCube("3x3");
 
     // 矢印用ジオメトリとアウトラインマテリアルを事前生成（再利用でGPUメモリリーク防止）
     const stemW = 0.05;
@@ -401,17 +357,184 @@ export class CubeScene {
     this.turnLayer.clear();
     this.scene.clear();
   }
+  setCubeType(type: CubeType, state?: string) {
+    if (this.cubeType === type && !state) return;
+    this.cubeType = type;
+    this.buildCube(type);
+    if (state) {
+      this.show(state);
+    }
+  }
+
+  getCubeType(): CubeType {
+    return this.cubeType;
+  }
+
+  private buildCube(type: CubeType) {
+    this.finish();
+
+    for (const piece of this.pieces) {
+      this.root.remove(piece);
+      if (piece instanceof THREE.Mesh) {
+        piece.geometry?.dispose();
+      }
+    }
+    this.pieces = [];
+
+    for (const sticker of this.stickers) {
+      this.root.remove(sticker);
+      sticker.geometry?.dispose();
+      if (sticker.material instanceof THREE.Material) {
+        sticker.material.dispose();
+      }
+    }
+    this.stickers = [];
+
+    for (const label of this.centerLabels) {
+      if (label) {
+        this.root.remove(label);
+        label.geometry?.dispose();
+        if (label.material instanceof THREE.MeshBasicMaterial) {
+          label.material.map?.dispose();
+          label.material.dispose();
+        }
+      }
+    }
+    this.centerLabels = [];
+
+    if (type === "2x2") {
+      this.arrowGroup.visible = false;
+      for (const m of this.arrowMeshes) m.visible = false;
+      for (const m of this.outlineMeshes) m.visible = false;
+      const body = new RoundedBoxGeometry(0.97, 0.97, 0.97, 3, 0.07);
+      const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x202522,
+        roughness: 0.48,
+      });
+      for (const x of [-0.5, 0.5]) {
+        for (const y of [-0.5, 0.5]) {
+          for (const z of [-0.5, 0.5]) {
+            const mesh = new THREE.Mesh(body, bodyMaterial);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            this.add(mesh);
+          }
+        }
+      }
+      const stickerGeom = new RoundedBoxGeometry(0.855, 0.855, 0.026, 3, 0.048);
+      for (let f = 0; f < 6; f++) {
+        for (let i = 0; i < 4; i++) {
+          const mesh = new THREE.Mesh(
+            stickerGeom,
+            new THREE.MeshStandardMaterial({
+              color: COLORS[FACES[f]],
+              roughness: 0.42,
+              metalness: 0.02,
+            }),
+          );
+          mesh.position.copy(position2x2(f, Math.floor(i / 2), i % 2));
+          mesh.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            normal[f],
+          );
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          this.stickers.push(mesh);
+          this.add(mesh);
+        }
+      }
+    } else {
+      const body = new RoundedBoxGeometry(0.97, 0.97, 0.97, 3, 0.07);
+      const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x202522,
+        roughness: 0.48,
+      });
+      for (let x = -1; x <= 1; x++)
+        for (let y = -1; y <= 1; y++)
+          for (let z = -1; z <= 1; z++) {
+            if (x === 0 && y === 0 && z === 0) continue;
+            const mesh = new THREE.Mesh(body, bodyMaterial);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            this.add(mesh);
+          }
+      const sticker = new RoundedBoxGeometry(0.855, 0.855, 0.026, 3, 0.048);
+      for (let f = 0; f < 6; f++)
+        for (let i = 0; i < 9; i++) {
+          const mesh = new THREE.Mesh(
+            sticker,
+            new THREE.MeshStandardMaterial({
+              color: COLORS[FACES[f]],
+              roughness: 0.42,
+              metalness: 0.02,
+            }),
+          );
+          mesh.position.copy(position3x3(f, Math.floor(i / 3), i % 3));
+          mesh.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            normal[f],
+          );
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          this.stickers.push(mesh);
+          this.add(mesh);
+          if (i === 4) {
+            const canvas = document.createElement("canvas");
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext("2d")!;
+            ctx.fillStyle = "#16231f";
+            ctx.font = "700 32px sans-serif";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(FACES[f], 14, 12);
+            const texture = new THREE.CanvasTexture(canvas);
+            const label = new THREE.Mesh(
+              new THREE.PlaneGeometry(0.855, 0.855),
+              new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                depthWrite: false,
+              }),
+            );
+            label.position
+              .copy(mesh.position)
+              .addScaledVector(normal[f], 0.017);
+            const rotMatrix = rotationMatrixForFaceAngle(f, 0);
+            label.quaternion.setFromRotationMatrix(rotMatrix);
+            this.centerLabels[f] = label;
+            label.renderOrder = 9;
+            label.userData = {
+              origin: label.position.clone(),
+              rotation: label.quaternion.clone(),
+              face: f,
+            };
+            this.root.add(label);
+          }
+        }
+    }
+    this.dirty = true;
+  }
+
   show(state: string, next = "") {
     this.dirty = true;
     this.next = next;
+    const perFace = this.cubeType === "2x2" ? 4 : 9;
     this.stickers.forEach((mesh, i) => {
       mesh.material.color.set(COLORS[state[i]] ?? COLORS["?"]);
       mesh.material.emissive.set(
-        Math.floor(i / 9) === FACES.indexOf(next[0]) ? 0x1c2010 : 0x000000,
+        Math.floor(i / perFace) === FACES.indexOf(next[0])
+          ? 0x1c2010
+          : 0x000000,
       );
     });
-    // 矢印を更新
-    this.updateArrows(state);
+    if (this.cubeType === "3x3") {
+      this.updateArrows(state);
+    } else {
+      this.arrowGroup.visible = false;
+    }
   }
 
   getArrowCount(): number {
@@ -423,6 +546,7 @@ export class CubeScene {
   }
 
   private updateCenterLabels() {
+    if (this.cubeType === "2x2") return;
     for (let f = 0; f < 6; f++) {
       const label = this.centerLabels[f];
       if (!label) continue;
@@ -433,11 +557,15 @@ export class CubeScene {
   }
 
   private updateArrows(state?: string) {
-    if (!state || state.length < 54) {
+    if (this.cubeType === "2x2" || !state || state.length < 54) {
       this.arrowGroup.visible = false;
+      for (const m of this.arrowMeshes) m.visible = false;
+      for (const m of this.outlineMeshes) m.visible = false;
       return;
     }
     this.arrowGroup.visible = true;
+    for (const m of this.arrowMeshes) m.visible = true;
+    for (const m of this.outlineMeshes) m.visible = true;
 
     this.updateCenterLabels();
 
@@ -490,23 +618,24 @@ export class CubeScene {
     const layer = this.turnLayer;
     layer.quaternion.identity();
     this.pieces
-      .filter((mesh) => mesh.position.dot(axis) > 0.5)
+      .filter((mesh) => mesh.position.dot(axis) > 0.2)
       .forEach((mesh) => layer.attach(mesh));
 
-    // 回転する層に属する矢印（カラー矢印およびアウトライン）を layer に attach
-    const movingArrows = (this.arrowGroup.children as THREE.Object3D[]).filter(
-      (mesh) => {
+    // 3x3 の場合のみ回転する層に属する矢印およびセンターラベルを layer に attach
+    if (this.cubeType === "3x3" && this.arrowGroup.visible) {
+      const movingArrows = (
+        this.arrowGroup.children as THREE.Object3D[]
+      ).filter((mesh) => {
         mesh.getWorldPosition(CubeScene.tempVec);
         return CubeScene.tempVec.dot(axis) > 0.5;
-      },
-    );
-    movingArrows.forEach((mesh) => layer.attach(mesh));
+      });
+      movingArrows.forEach((mesh) => layer.attach(mesh));
 
-    // 回転する層のセンターラベルを layer に attach
-    const faceIdx = FACES.indexOf(move[0]);
-    const centerLabel = this.centerLabels[faceIdx];
-    if (centerLabel) {
-      layer.attach(centerLabel);
+      const faceIdx = FACES.indexOf(move[0]);
+      const centerLabel = this.centerLabels[faceIdx];
+      if (centerLabel) {
+        layer.attach(centerLabel);
+      }
     }
 
     const angle =

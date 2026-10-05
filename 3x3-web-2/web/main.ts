@@ -1,8 +1,17 @@
 import "./style.css";
 import init, * as cubeStudio from "../pkg/cube_studio";
-const { apply_moves, validate, scramble } = cubeStudio;
+const { apply_moves, validate, scramble, scramble_2x2 } = cubeStudio;
 import wasmUrl from "../pkg/cube_studio_bg.wasm?url";
-import { SOLVED, FACES, inverse, instruction, type ResultData } from "./model";
+import {
+  SOLVED,
+  FACES,
+  inverse,
+  instruction,
+  type ResultData,
+  type CubeType,
+  getSolvedState,
+} from "./model";
+import { SOLVED_2X2, PRESETS_2X2 } from "./model-2x2";
 import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
 import { SolverClient } from "./solver-client";
@@ -67,9 +76,142 @@ reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const includeOrientation = $<HTMLInputElement>("include-orientation");
 includeOrientation.checked = true;
 const solverAlgo = $<HTMLSelectElement>("solver-algorithm");
+
+function updateSolverNote() {
+  const note = $("solver-note");
+  if (!note || solving) return;
+  const is2x2 = store.getCubeType() === "2x2";
+  if (is2x2) {
+    switch (solverAlgo.value) {
+      case "lbl":
+        note.textContent =
+          "完全1層 → 上面色 (OLL) → 上面配置 (PLL) の学習向け王道手順";
+        break;
+      case "ortega":
+        note.textContent =
+          "1面完成 → 反対面色 (OLL) → 両層同時配置 (PBL) の実践的スピード解法";
+        break;
+      case "optimal":
+        note.textContent = "11手以内の最短手数で解く機械的最適解 (IDA*)";
+        break;
+      default:
+        note.textContent = "ブラウザ内で計算 · 即座に完了";
+    }
+  } else {
+    switch (solverAlgo.value) {
+      case "cfop":
+        note.textContent = "クロス → F2L → OLL → PLL の王道解法";
+        break;
+      case "kociemba":
+        note.textContent = "二相法による高速探索 · 通常20手前後";
+        break;
+      case "thistlethwaite":
+        note.textContent = "群論に基づく4段階解決法";
+        break;
+      case "korf":
+        note.textContent = "IDA* 最短探索 (最大20手)";
+        break;
+      default:
+        note.textContent = "ブラウザ内で計算 · 通常5秒以内";
+    }
+  }
+}
+
 solverAlgo.onchange = () => {
+  updateSolverNote();
   persist();
 };
+
+function updateCubeTypeUI(type: CubeType) {
+  const btn3 = $("cube-type-3x3");
+  const btn2 = $("cube-type-2x2");
+  if (btn3 && btn2) {
+    btn3.classList.toggle("active", type === "3x3");
+    btn3.setAttribute("aria-checked", String(type === "3x3"));
+    btn2.classList.toggle("active", type === "2x2");
+    btn2.setAttribute("aria-checked", String(type === "2x2"));
+  }
+
+  const movesCount = $("scramble-moves-count");
+  if (movesCount) {
+    movesCount.textContent = type === "2x2" ? "11手" : "25手";
+  }
+
+  const orientLabel = $("orientation-label-text");
+  if (orientLabel) {
+    orientLabel.textContent =
+      type === "2x2" ? "標準の向きに揃える (白上・緑前)" : "向きも含めて揃える";
+  }
+
+  const algoSelect = $<HTMLSelectElement>("solver-algorithm");
+  if (algoSelect) {
+    const prevValue = algoSelect.value;
+    if (type === "2x2") {
+      if (!algoSelect.querySelector('option[value="lbl"]')) {
+        algoSelect.innerHTML = `
+          <option value="lbl" selected>LBL法 (初心者向け3ステップ)</option>
+          <option value="ortega">Ortega法 (スピード解法)</option>
+          <option value="optimal">Optimal 最短探索 (IDA*)</option>
+        `;
+        if (["lbl", "ortega", "optimal"].includes(prevValue)) {
+          algoSelect.value = prevValue;
+        } else {
+          algoSelect.value = "lbl";
+        }
+      }
+      algoSelect.disabled = solving;
+    } else {
+      if (
+        algoSelect.querySelector('option[value="lbl"]') ||
+        algoSelect.querySelector('option[value="optimal"]')
+      ) {
+        algoSelect.innerHTML = `
+          <option value="kociemba">Kociemba (Two-Phase)</option>
+          <option value="cfop">LBL / CFOP</option>
+          <option value="thistlethwaite">Thistlethwaite</option>
+          <option value="korf">Korf (IDA*)</option>
+        `;
+        if (
+          ["kociemba", "cfop", "thistlethwaite", "korf"].includes(prevValue)
+        ) {
+          algoSelect.value = prevValue;
+        } else {
+          algoSelect.value = "kociemba";
+        }
+      }
+      algoSelect.disabled = solving;
+    }
+    updateSolverNote();
+  }
+
+  const camColors = $("camera-colors");
+  if (camColors) {
+    camColors.hidden = type === "2x2";
+  }
+
+  renderPresetButtons(type);
+}
+
+function switchCubeType(type: CubeType) {
+  if (store.getCubeType() === type) return;
+  stop();
+  cancelSearch();
+  message();
+  store.setCubeType(type);
+  scene?.setCubeType(type);
+  updateCubeTypeUI(type);
+  persist();
+  refresh();
+}
+
+const cubeTypeBtn3 = $("cube-type-3x3");
+if (cubeTypeBtn3) {
+  cubeTypeBtn3.onclick = () => switchCubeType("3x3");
+}
+const cubeTypeBtn2 = $("cube-type-2x2");
+if (cubeTypeBtn2) {
+  cubeTypeBtn2.onclick = () => switchCubeType("2x2");
+}
 
 const soundToggleBtn = $("sound-toggle");
 function updateSoundButton() {
@@ -119,6 +261,7 @@ function persist() {
       JSON.stringify({
         version: 1,
         ...store.getSnapshot(),
+        cubeType: store.getCubeType(),
         reducedMotion: reduced.checked,
         speed: $<HTMLSelectElement>("speed").value,
         solverAlgorithm: solverAlgo.value,
@@ -133,7 +276,7 @@ function persist() {
 function replace(
   next: string,
   record = true,
-  centers = automaticCenters(next),
+  centers = next.length === 24 ? [0, 0, 0, 0, 0, 0] : automaticCenters(next),
 ) {
   stop();
   cancelSearch();
@@ -152,21 +295,30 @@ function refresh() {
   const step = store.getStep();
   const centerRotations = store.getCenterRotations();
   const next = solution?.moves[step] || "";
-  const statusText =
-    state === SOLVED
-      ? store.getCenterTurns().some((t) => t !== 0)
-        ? "色は完成・センターの向きあり"
-        : "完成状態"
-      : solution
-        ? `${step} / ${solution.moves.length} 手`
-        : "スクランブル状態";
+  const is2x2 = state.length === 24;
+  const solved = getSolvedState(is2x2 ? "2x2" : "3x3");
+  const isSolved = state === solved;
+  const statusText = isSolved
+    ? !is2x2 && store.getCenterTurns().some((t) => t !== 0)
+      ? "色は完成・センターの向きあり"
+      : "完成状態"
+    : solution
+      ? `${step} / ${solution.moves.length} 手`
+      : "スクランブル状態";
   if (scene) {
     scene.centerRotations = [...centerRotations];
     if (!inMotion) scene.show(state, next);
     scene.updateAriaLabel(statusText);
   }
   if (!inMotion) {
-    net($("fallback-net"), state, false, undefined, -1, store.getCenterTurns());
+    net(
+      $("fallback-net"),
+      state,
+      false,
+      undefined,
+      -1,
+      is2x2 ? undefined : store.getCenterTurns(),
+    );
   }
   $("cube-status").textContent = statusText;
   $("scene").dataset.state = state;
@@ -179,7 +331,7 @@ function refresh() {
   $("solve").hidden = solving;
   $("cancel").hidden = !solving;
   $("solve").innerHTML =
-    `<span>${engineError ? "エンジンを再試行" : state === SOLVED ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
+    `<span>${engineError ? "エンジンを再試行" : isSolved ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
   $<HTMLButtonElement>("undo").disabled =
     !mainReady || !store.canUndo() || !canModify;
   $<HTMLButtonElement>("redo").disabled =
@@ -337,12 +489,18 @@ store.subscribe((_s, { type }) => {
     $("double").setAttribute("aria-pressed", String(mod === "2"));
     return;
   }
-  if (
+  if (type === "cube-type") {
+    updateCubeTypeUI(store.getCubeType());
+    scene?.setCubeType(store.getCubeType());
+    persist();
+  } else if (
     type === "replace" ||
     type === "undo" ||
     type === "redo" ||
     type === "algorithm"
   ) {
+    updateCubeTypeUI(store.getCubeType());
+    scene?.setCubeType(store.getCubeType());
     persist();
   }
   refresh();
@@ -543,6 +701,7 @@ async function solve(budget = 5000) {
       includeOrientation.checked,
       store.getCenterRotations(),
       solverAlgo.value as import("./model").SolverAlgorithm,
+      store.getCubeType(),
     );
 
     if (!appState.isSolving() || store.getRevision() !== at) return;
@@ -707,13 +866,17 @@ $("cancel").onclick = () => {
 $("scramble").onclick = () => {
   if (!mainReady) return;
   appState.runCubeMutation(() => {
+    const is2x2 = store.getCubeType() === "2x2";
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-    const algorithm = scramble(seed);
-    const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
+    const algorithm = is2x2 ? scramble_2x2(seed) : scramble(seed);
+    const solvedState = is2x2 ? SOLVED_2X2 : SOLVED;
+    const result: ResultData = JSON.parse(apply_moves(solvedState, algorithm));
     replace(
       result.state,
       true,
-      rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
+      is2x2
+        ? [0, 0, 0, 0, 0, 0]
+        : rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
     );
     $("scramble-text").textContent = algorithm;
   });
@@ -756,7 +919,7 @@ $("redo").onclick = () => {
 };
 $("reset").onclick = () =>
   appState.runCubeMutation(() => {
-    replace(SOLVED);
+    replace(getSolvedState(store.getCubeType()));
   });
 const viewPresets = ["iso", "front", "top", "right"] as const;
 function updateActivePreset(presetName: (typeof viewPresets)[number]) {
@@ -875,6 +1038,7 @@ $("share-link").onclick = async () => {
     snapshot.state,
     snapshot.centerTurns,
     solverAlgo.value,
+    store.getCubeType(),
   );
   try {
     await navigator.clipboard.writeText(shareUrl);
@@ -982,12 +1146,21 @@ async function start(forceError = false) {
         if (["1000", "500", "250"].includes(data.speed))
           $<HTMLSelectElement>("speed").value = data.speed;
         if (
-          ["kociemba", "cfop", "thistlethwaite", "korf"].includes(
+          ["kociemba", "cfop", "thistlethwaite", "korf", "optimal"].includes(
             data.solverAlgorithm,
           )
         )
           solverAlgo.value = data.solverAlgorithm;
-        const restoredCenters = centersFromInput(data.state, data.centerTurns);
+        const restoredType: CubeType =
+          data.cubeType === "2x2" || (data.state && data.state.length === 24)
+            ? "2x2"
+            : "3x3";
+        store.setCubeType(restoredType);
+        scene?.setCubeType(restoredType);
+        const restoredCenters =
+          restoredType === "2x2"
+            ? [0, 0, 0, 0, 0, 0]
+            : centersFromInput(data.state, data.centerTurns);
         store.replace(data.state, false, restoredCenters);
       }
     } catch {
@@ -1000,6 +1173,11 @@ async function start(forceError = false) {
     if (parsedParams.hasInvalidCenters) {
       hasInvalidParam = true;
     }
+    if (parsedParams.cubeType) {
+      store.setCubeType(parsedParams.cubeType);
+      scene?.setCubeType(parsedParams.cubeType);
+      paramsApplied = true;
+    }
     if (parsedParams.solver) {
       solverAlgo.value = parsedParams.solver;
       paramsApplied = true;
@@ -1007,9 +1185,15 @@ async function start(forceError = false) {
     if (parsedParams.state) {
       try {
         validate(parsedParams.state);
-        const restoredCenters = parsedParams.centers
-          ? centersFromInput(parsedParams.state, parsedParams.centers)
-          : automaticCenters(parsedParams.state);
+        const is2x2 = parsedParams.state.length === 24;
+        const restoredType: CubeType = is2x2 ? "2x2" : "3x3";
+        store.setCubeType(restoredType);
+        scene?.setCubeType(restoredType);
+        const restoredCenters = is2x2
+          ? [0, 0, 0, 0, 0, 0]
+          : parsedParams.centers
+            ? centersFromInput(parsedParams.state, parsedParams.centers)
+            : automaticCenters(parsedParams.state);
         store.replace(parsedParams.state, false, restoredCenters);
         paramsApplied = true;
       } catch {
@@ -1017,10 +1201,16 @@ async function start(forceError = false) {
       }
     } else if (parsedParams.alg) {
       try {
+        const is2x2 = store.getCubeType() === "2x2";
+        const baseSolved = is2x2 ? SOLVED_2X2 : SOLVED;
         const cleanAlg = parsedParams.alg.replace(/[_+]/g, " ").trim();
-        const result: ResultData = JSON.parse(apply_moves(SOLVED, cleanAlg));
+        const result: ResultData = JSON.parse(
+          apply_moves(baseSolved, cleanAlg),
+        );
         validate(result.state);
-        const nextCenters = rotateCenters([0, 0, 0, 0, 0, 0], result.moves);
+        const nextCenters = is2x2
+          ? [0, 0, 0, 0, 0, 0]
+          : rotateCenters([0, 0, 0, 0, 0, 0], result.moves);
         store.replace(result.state, false, nextCenters);
         paramsApplied = true;
       } catch {
@@ -1033,6 +1223,7 @@ async function start(forceError = false) {
     if (paramsApplied || hasInvalidParam) {
       try {
         const url = new URL(window.location.href);
+        url.searchParams.delete("type");
         url.searchParams.delete("state");
         url.searchParams.delete("alg");
         url.searchParams.delete("centers");
@@ -1048,6 +1239,7 @@ async function start(forceError = false) {
       }
     }
     restoring = false;
+    updateCubeTypeUI(store.getCubeType());
 
     solver = new SolverClient((status, text, isInitError) => {
       engineError = status === "error";
@@ -1166,39 +1358,78 @@ async function loadPreset(
 }
 
 // プリセットボタンを生成
-async function initializePresets() {
+function renderPresetButtons(type: CubeType) {
   const presetButtons = $("preset-buttons");
   const presetStatus = $("preset-status");
+  if (!presetButtons || !presetStatus) return;
+  presetButtons.replaceChildren();
 
-  try {
-    for (const preset of presets) {
-      const button = document.createElement("button");
-      button.className = "secondary";
-      button.textContent = `${preset.emoji} ${preset.label}`;
-      button.disabled = !mainReady;
-      button.onclick = async () => {
-        if (!mainReady || !appState.getState().canModifyCube()) return;
-        stop();
-        cancelSearch();
-        const requestId = ++presetRequestId;
-        const initialRevision = store.getRevision();
-        try {
-          await loadPreset(preset, requestId, initialRevision);
-        } catch (error) {
-          if (requestId === presetRequestId) {
-            const errorMsg =
-              error instanceof Error ? error.message : String(error);
-            presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
-          }
-        }
-      };
-      presetButtons.append(button);
+  if (type === "2x2") {
+    try {
+      for (const preset of PRESETS_2X2) {
+        const button = document.createElement("button");
+        button.className = "secondary";
+        button.textContent = `${preset.emoji} ${preset.label}`;
+        button.disabled = !mainReady;
+        button.onclick = () => {
+          if (!mainReady || !appState.getState().canModifyCube()) return;
+          stop();
+          cancelSearch();
+          appState.runCubeMutation(() => {
+            if (preset.scramble) {
+              const result: ResultData = JSON.parse(
+                apply_moves(SOLVED_2X2, preset.scramble),
+              );
+              replace(result.state, true, [0, 0, 0, 0, 0, 0]);
+              $("scramble-text").textContent = preset.scramble;
+            } else if (preset.state) {
+              replace(preset.state, true, [0, 0, 0, 0, 0, 0]);
+            }
+          });
+          presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
+        };
+        presetButtons.append(button);
+      }
+      presetStatus.textContent =
+        "プリセットから選択してください（下のタブから 📌 プリセット）";
+    } catch (error) {
+      presetStatus.textContent = `初期化エラー: ${String(error)}`;
     }
-    presetStatus.textContent =
-      "プリセットから選択してください（下のタブから 📌 プリセット）";
-  } catch (error) {
-    presetStatus.textContent = `初期化エラー: ${String(error)}`;
+  } else {
+    try {
+      for (const preset of presets) {
+        const button = document.createElement("button");
+        button.className = "secondary";
+        button.textContent = `${preset.emoji} ${preset.label}`;
+        button.disabled = !mainReady;
+        button.onclick = async () => {
+          if (!mainReady || !appState.getState().canModifyCube()) return;
+          stop();
+          cancelSearch();
+          const requestId = ++presetRequestId;
+          const initialRevision = store.getRevision();
+          try {
+            await loadPreset(preset, requestId, initialRevision);
+          } catch (error) {
+            if (requestId === presetRequestId) {
+              const errorMsg =
+                error instanceof Error ? error.message : String(error);
+              presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
+            }
+          }
+        };
+        presetButtons.append(button);
+      }
+      presetStatus.textContent =
+        "プリセットから選択してください（下のタブから 📌 プリセット）";
+    } catch (error) {
+      presetStatus.textContent = `初期化エラー: ${String(error)}`;
+    }
   }
+}
+
+async function initializePresets() {
+  renderPresetButtons(store.getCubeType());
 }
 
 // プリセット初期化を開始

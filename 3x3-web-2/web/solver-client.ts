@@ -84,6 +84,7 @@ export class SolverClient {
     includeOrientation = true,
     centerRotations?: number[],
     algorithm?: import("./model").SolverAlgorithm,
+    cubeType?: import("./model").CubeType,
   ) {
     if (!this.ready)
       return Promise.reject(new Error("エンジンの準備完了をお待ちください。"));
@@ -111,6 +112,7 @@ export class SolverClient {
         includeOrientation,
         centerRotations,
         algorithm,
+        cubeType,
       });
     });
   }

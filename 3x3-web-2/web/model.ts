@@ -1,5 +1,10 @@
 export const FACES = "URFDLB";
-export const SOLVED = [...FACES].map((f) => f.repeat(9)).join("");
+import { SOLVED_2X2 } from "./model-2x2";
+export { SOLVED_2X2 } from "./model-2x2";
+
+export const SOLVED_3X3 = [...FACES].map((f) => f.repeat(9)).join("");
+export const SOLVED = SOLVED_3X3;
+
 export const COLORS: Record<string, string> = {
   U: "#eeeade",
   R: "#e55649",
@@ -34,7 +39,29 @@ export const FACE_NAMES_EN: Record<string, string> = {
   L: "左面 (Left)",
   B: "背面 (Back)",
 };
-export type SolverAlgorithm = "kociemba" | "cfop" | "thistlethwaite" | "korf";
+
+export type CubeType = "2x2" | "3x3";
+
+export function getSolvedState(type: CubeType): string {
+  return type === "2x2" ? SOLVED_2X2 : SOLVED_3X3;
+}
+
+export function getStickerCount(type: CubeType): number {
+  return type === "2x2" ? 24 : 54;
+}
+
+export function getGridSize(type: CubeType): number {
+  return type === "2x2" ? 2 : 3;
+}
+
+export type SolverAlgorithm =
+  | "kociemba"
+  | "cfop"
+  | "thistlethwaite"
+  | "korf"
+  | "optimal"
+  | "lbl"
+  | "ortega";
 
 export interface PhaseInfo {
   name: string;
@@ -57,6 +84,7 @@ export interface Request {
   kind: "solve";
   state: string;
   budget: number;
+  cubeType?: CubeType;
   includeOrientation?: boolean;
   centerRotations?: number[];
   algorithm?: SolverAlgorithm;

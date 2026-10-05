@@ -247,6 +247,12 @@ test.describe("E2E Coverage with CDP", () => {
         model.getCellArrowInfo("?".repeat(54));
         model.getErrorIndices("エラー: エッジ 1 の色が不正です");
         model.getErrorIndices("エラー: コーナー 1 の色が不正です");
+        model.getSolvedState("2x2");
+        model.getSolvedState("3x3");
+        model.getStickerCount("2x2");
+        model.getStickerCount("3x3");
+        model.getGridSize("2x2");
+        model.getGridSize("3x3");
 
         // --- image-sampler.ts ---
         sampler.rgbToHsv(0, 0, 0); // max === min
@@ -432,10 +438,32 @@ test.describe("E2E Coverage with CDP", () => {
         assertThrows(() =>
           centers.centersFromInput(solved, [1, 0, 0, 0, 0, 0]),
         );
+        assertThrows(() =>
+          centers.centersFromInput(solved, [0, 0, 0, 0, 0, 5]),
+        );
+        assertThrows(() =>
+          centers.centersFromInput(solved, [0, 0, 0, 0, 0, "invalid" as any]),
+        );
 
         // --- keyboard-shortcuts.ts ---
         document.querySelectorAll("dialog").forEach((d) => d.close());
         const kb = await import("/web/keyboard-shortcuts.ts");
+        const cleanupKbSolving = kb.setupKeyboardShortcuts({
+          isReady: () => true,
+          isSolving: () => true,
+          getModifier: () => "",
+          onMove: () => {},
+          onPlay: () => {},
+          onStop: () => {},
+          onSeek: () => {},
+          getCurrentStep: () => 0,
+          getSolutionLength: () => 10,
+        });
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "U", bubbles: true }),
+        );
+        cleanupKbSolving();
+
         let moved = "";
         let played = false;
         let stopped = false;
@@ -522,6 +550,13 @@ test.describe("E2E Coverage with CDP", () => {
         urlParams.parseUrlParams("?algorithm=korf");
         urlParams.parseUrlParams("?centers=invalid");
         urlParams.parseUrlParams("");
+        urlParams.parseUrlParams("?type=2x2");
+        urlParams.parseUrlParams("?type=3x3");
+        urlParams.parseUrlParams("?type=invalid");
+        urlParams.parseUrlParams("?solver=optimal");
+        urlParams.parseUrlParams("?state=" + "U".repeat(24));
+        urlParams.parseUrlParams("?centers=0,0,0,0,0,99");
+        urlParams.parseUrlParams("?centers=0,0,0");
         urlParams.buildShareUrl(
           "http://localhost:5173/",
           solved,
@@ -533,6 +568,20 @@ test.describe("E2E Coverage with CDP", () => {
           [1, 0, 0, 0, 0, 0],
         );
         urlParams.buildShareUrl("http://localhost:5173/", solved);
+        urlParams.buildShareUrl(
+          "http://localhost:5173/",
+          "U".repeat(24),
+          undefined,
+          "optimal",
+          "2x2",
+        );
+        urlParams.buildShareUrl(
+          "http://localhost:5173/",
+          solved,
+          undefined,
+          "thistlethwaite",
+          "3x3",
+        );
 
         // --- file-io.ts ---
         const fileIo = await import("/web/file-io.ts");
@@ -893,6 +942,39 @@ test.describe("E2E Coverage with CDP", () => {
         store.replace(solved, false);
         const { turnsToCenters } = await import("/web/centers.ts");
         store.replace(solved, true, turnsToCenters([2, 0, 0, 0, 0, 0]));
+
+        // CubeStore 2x2, baseSnapshot, restoreBaseSnapshot, applyAlgorithmResult
+        store.getCubeType();
+        store.setCubeType("2x2");
+        store.setCubeType("2x2"); // 同一タイプ早期リターン
+        store.setCubeType("3x3");
+        store.getBaseSnapshot();
+        store.restoreBaseSnapshot(); // 未設定時 false
+        store.setSolution({
+          moves: ["R"],
+          states: [rState, solved],
+          elapsed_ms: 10,
+        } as any);
+        store.getBaseSnapshot();
+        store.setStep(1);
+        store.undo(); // isSameSnapshot(getSnapshot(), baseSnapshot) -> false (123-124行)
+        store.restoreBaseSnapshot(); // 設定時 true
+
+        // redo 時に baseSnapshot が履歴に追加されるパス (153-154行)
+        store.replace(rState, true);
+        store.undo(); // future に rState が入る
+        store.setSolution({
+          moves: ["R"],
+          states: [rState, solved],
+          elapsed_ms: 10,
+        } as any);
+        store.updateAfterSeek(rState, [0, 0, 0, 0, 0, 0], 1);
+        store.redo(); // 153-154行を通過
+
+        // applyAlgorithmResult (3x3 と 2x2)
+        store.applyAlgorithmResult(solved, [0, 0, 0, 0, 0, 0], true);
+        store.applyAlgorithmResult("U".repeat(24), [0, 0, 0, 0, 0, 0], false);
+
         let currState = solved;
         for (let i = 0; i < 205; i++) {
           currState = JSON.parse(
@@ -991,6 +1073,15 @@ test.describe("E2E Coverage with CDP", () => {
 
         // 新しい SolverClient インスタンスで onmessage 分岐を確実に網羅 (generation一致)
         const client2 = new SolverClient(() => {});
+        (client2 as any).worker?.onmessage?.({
+          data: { kind: "ready", elapsed: 50 },
+        } as any);
+        await client2.waitForReady();
+        (client2 as any).ready = false;
+        await client2.waitForReady();
+        (client2 as any).readyPromise = undefined;
+        void client2.waitForReady();
+        (client2 as any).ready = true;
         (client2 as any).pending = {
           id: 999,
           revision: 1,
@@ -1185,6 +1276,34 @@ test.describe("E2E Coverage with CDP", () => {
         (ed as any).paint(4, "editor-net");
         if (editorDialog?.open) editorDialog.close();
 
+        // 2x2 での open, paint, clear, apply
+        const ed2x2 = new editorModule.ColorEditor(
+          () => true,
+          () => {},
+        );
+        ed2x2.open("?".repeat(24), [0, 0, 0, 0, 0, 0]);
+        document.getElementById("clear-colors")?.click();
+        (ed2x2 as any).paint(0, "editor-net");
+        document.getElementById("editor-apply")?.click();
+        if (editorDialog?.open) editorDialog.close();
+
+        // バリデーションエラー発生時の catch (行62-67)
+        const edErr = new editorModule.ColorEditor(
+          () => {
+            throw new Error("エッジ 1 のエラー");
+          },
+          () => {},
+        );
+        edErr.open("?".repeat(54), [0, 0, 0, 0, 0, 0]);
+        document.getElementById("editor-apply")?.click();
+
+        // editor-net 内のステッカーボタンクリック (行164-165)
+        const netBtn = document.querySelector<HTMLButtonElement>(
+          "#editor-net .sticker",
+        );
+        netBtn?.click();
+        if (editorDialog?.open) editorDialog.close();
+
         // --- camera-geometry.ts ---
         const cameraGeo = await import("/web/camera-geometry.ts");
         const brokenCanvas = {
@@ -1215,6 +1334,15 @@ test.describe("E2E Coverage with CDP", () => {
         scene.setViewPreset("iso");
         scene.resetView();
         scene.updateAriaLabel("テスト状態");
+
+        // 2x2 切り替えと描画
+        scene.setCubeType("2x2");
+        scene.getCubeType();
+        scene.setCubeType("2x2"); // 同一タイプ早期リターン
+        scene.show("U".repeat(24));
+        scene.setCubeType("3x3");
+        scene.setCubeType("2x2", "U".repeat(24));
+        scene.setCubeType("3x3", solved);
 
         // 矢印取得メソッド (368-373行)
         scene.getArrowCount();
@@ -1416,6 +1544,30 @@ test.describe("E2E Coverage with CDP", () => {
       // 解法を閉じる
       await page.locator("#solution-close").click();
       await expect(page.locator("#solution-content")).not.toBeVisible();
+
+      // 2x2 キューブへの切り替えと操作
+      const btn2x2 = page.locator("#cube-type-2x2");
+      if (await btn2x2.isVisible()) {
+        await btn2x2.click();
+        await page.waitForTimeout(200);
+        // 2x2 プリセット選択
+        await page.locator("#tab-presets").click();
+        await page.waitForTimeout(100);
+        const preset2x2 = page.locator(".preset-button").first();
+        if (await preset2x2.isVisible()) {
+          await preset2x2.click();
+          await page.waitForTimeout(200);
+        }
+        // 2x2 解く
+        await page.locator("#solve").click();
+        await expect(page.locator("#solution-content")).toBeVisible({
+          timeout: 15000,
+        });
+        await page.locator("#solution-close").click();
+        // 3x3 に戻す
+        await page.locator("#cube-type-3x3").click();
+        await page.waitForTimeout(200);
+      }
 
       // CFOP で解いてフェーズバッジ (phase-badge) を描画
       await page.locator("#solver-algorithm").selectOption("cfop");

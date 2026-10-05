@@ -1,12 +1,14 @@
-pub mod cfop;
-#[allow(clippy::upper_case_acronyms)]
-pub mod coord;
-pub mod cube;
-pub mod korf;
-pub mod search;
-pub mod supercube;
-mod tables;
-pub mod thistlethwaite;
+pub mod c2x2;
+pub mod c3x3;
+
+pub use c3x3::cfop;
+pub use c3x3::coord;
+pub use c3x3::cube;
+pub use c3x3::korf;
+pub use c3x3::search;
+pub use c3x3::supercube;
+pub use c3x3::tables;
+pub use c3x3::thistlethwaite;
 
 const TABLE_BYTES: Option<&[u8]> = Some(include_bytes!(concat!(env!("OUT_DIR"), "/tables.bin")));
 
@@ -119,6 +121,9 @@ pub fn solve_state_with_algorithm(
     initial_centers: Option<[i32; 6]>,
     algorithm: &str,
 ) -> Result<ResultData, String> {
+    if state.len() == 24 {
+        return c2x2::solve(state, budget_ms, include_orientation, algorithm);
+    }
     let cube = cube::parse_state(state)?;
     if let (true, Some(centers)) = (include_orientation, initial_centers) {
         let center_parity = centers.iter().map(|c| c.rem_euclid(4)).sum::<i32>() % 2;
@@ -390,6 +395,9 @@ fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
 }
 /// 純粋な Rust 向けの内部・共通ロジック
 pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> {
+    if state.len() == 24 {
+        return c2x2::apply_moves_core(state, moves);
+    }
     let cube = cube::parse_state(state)?;
     let m = cube::parse_moves(moves)?;
     Ok(result(&cube, state, &m, 0.0, 0, "apply", Vec::new()))
@@ -399,6 +407,9 @@ pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> 
 /// 合法だが未完成（スクランブル状態）であれば false、
 /// 不正な配色・パリティであれば Err を返します。
 pub fn validate_core(state: &str) -> Result<bool, String> {
+    if state.len() == 24 {
+        return c2x2::is_solved(state, true);
+    }
     cube::parse_state(state).map(|c| c == coord::RawCube::default())
 }
 
@@ -406,17 +417,26 @@ pub fn validate_core(state: &str) -> Result<bool, String> {
 /// 盤面が正常にパース可能で妥当なキューブ表現であれば Ok(true) を返し、
 /// 文字数不正・文字種不正・パーツ構成不正・パリティエラー等で無効な状態であれば Err を返します。
 pub fn is_valid_core(state: &str) -> Result<bool, String> {
+    if state.len() == 24 {
+        return c2x2::is_valid(state);
+    }
     cube::parse_state(state).map(|_| true)
 }
 
 /// 状態が完成状態（6面すべて揃っている状態）であるかを判定します。
 pub fn is_solved_core(state: &str) -> Result<bool, String> {
+    if state.len() == 24 {
+        return c2x2::is_solved(state, true);
+    }
     cube::parse_state(state).map(|c| c == coord::RawCube::default())
 }
 
 /// センタークォーターターンの総和パリティ（0 または 1）を返します。
 /// コーナー置換パリティとセンター回転総和パリティの偶奇は常に一致する必要があります。
 pub fn center_parity_core(state: &str) -> Result<u8, String> {
+    if state.len() == 24 {
+        return Ok(0);
+    }
     cube::parse_state(state).map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
 }
 
@@ -428,6 +448,34 @@ pub fn initialize() {
 
     let _ = tables::MoveTable::get();
     let _ = tables::PruningTable::get();
+    let _ = c2x2::tables::MoveTable::get();
+    let _ = c2x2::tables::PruningTable::get();
+}
+
+/// 2x2 キューブ用のスクランブル文字列を生成します。
+#[wasm_bindgen]
+pub fn scramble_2x2(seed: u32) -> String {
+    c2x2::cube::scramble(seed)
+        .iter()
+        .map(|m| c2x2::cube::notation(*m))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 2x2 キューブを解き、解法手順と各ステップの盤面を含む JSON 文字列を返します。
+#[wasm_bindgen]
+pub fn solve_2x2(state: &str, include_orientation: bool) -> Result<String, JsValue> {
+    json(c2x2::solve(state, 1000, include_orientation, "optimal"))
+}
+
+/// 2x2 キューブを指定アルゴリズム (optimal, lbl, ortega) で解き、解法手順と各ステップの盤面を含む JSON 文字列を返します。
+#[wasm_bindgen]
+pub fn solve_2x2_with_algorithm(
+    state: &str,
+    include_orientation: bool,
+    algorithm: &str,
+) -> Result<String, JsValue> {
+    json(c2x2::solve(state, 1000, include_orientation, algorithm))
 }
 
 /// 状態が合法であるかを検証し、完成状態（SOLVED）であれば true、

@@ -128,6 +128,106 @@ pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
     current
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TaggedMove {
+    pub mv: usize,
+    pub phase: usize,
+}
+
+fn cancel_tagged_moves_single_pass(moves: &[TaggedMove]) -> Vec<TaggedMove> {
+    let mut reduced: Vec<TaggedMove> = Vec::new();
+    for &tm in moves {
+        let face = tm.mv / 3;
+        let mut turns = tm.mv % 3 + 1;
+        let mut i = reduced.len();
+        let mut matched = false;
+
+        while i > 0 {
+            let prev_face = reduced[i - 1].mv / 3;
+            if prev_face == face {
+                let prev_turns = reduced[i - 1].mv % 3 + 1;
+                turns = (prev_turns + turns) % 4;
+                let prev_phase = reduced[i - 1].phase;
+                reduced.remove(i - 1);
+                if turns != 0 {
+                    reduced.insert(
+                        i - 1,
+                        TaggedMove {
+                            mv: face * 3 + turns - 1,
+                            phase: prev_phase,
+                        },
+                    );
+                }
+                matched = true;
+                break;
+            } else if is_opposite_face(prev_face, face) {
+                i -= 1;
+            } else {
+                break;
+            }
+        }
+        if !matched && turns != 0 {
+            reduced.push(tm);
+        }
+    }
+    reduced
+}
+
+pub fn cancel_tagged_moves(moves: &[TaggedMove]) -> Vec<TaggedMove> {
+    let mut current = moves.to_vec();
+    loop {
+        let prev_len = current.len();
+        current = cancel_tagged_moves_single_pass(&current);
+        if current.len() == prev_len {
+            break;
+        }
+    }
+    current
+}
+
+/// 手順列とフェーズ情報を受け取り、フェーズ境界をまたぐ冗長手や可換対向面を相殺・統合した上で、
+/// 各フェーズの開始・終了インデックス（start, end）を整合的に再構築します。
+pub fn cancel_redundant_moves_with_phases(
+    moves: Vec<usize>,
+    phase_infos: Vec<crate::PhaseInfo>,
+) -> (Vec<usize>, Vec<crate::PhaseInfo>) {
+    if moves.is_empty() || phase_infos.is_empty() {
+        return (cancel_redundant_moves(&moves), phase_infos);
+    }
+
+    let mut tagged = Vec::with_capacity(moves.len());
+    for (i, &mv) in moves.iter().enumerate() {
+        let p_idx = phase_infos
+            .iter()
+            .position(|p| i >= p.start && i < p.end)
+            .unwrap_or(phase_infos.len().saturating_sub(1));
+        tagged.push(TaggedMove { mv, phase: p_idx });
+    }
+
+    let reduced_tagged = cancel_tagged_moves(&tagged);
+    let final_moves: Vec<usize> = reduced_tagged.iter().map(|tm| tm.mv).collect();
+
+    let mut new_phase_infos = Vec::new();
+    for (p_idx, p_info) in phase_infos.iter().enumerate() {
+        let indices: Vec<usize> = reduced_tagged
+            .iter()
+            .enumerate()
+            .filter(|(_, tm)| tm.phase == p_idx)
+            .map(|(i, _)| i)
+            .collect();
+
+        if let (Some(&first), Some(&last)) = (indices.first(), indices.last()) {
+            new_phase_infos.push(crate::PhaseInfo {
+                name: p_info.name.clone(),
+                start: first,
+                end: last + 1,
+            });
+        }
+    }
+
+    (final_moves, new_phase_infos)
+}
+
 fn generate_perfect_matchings(faces: &[usize]) -> Vec<Vec<(usize, usize)>> {
     if faces.is_empty() {
         return vec![vec![]];
@@ -280,5 +380,56 @@ mod tests {
         let moves3 = parse_moves("F U R R' U' F'").unwrap();
         let canceled3 = cancel_redundant_moves(&moves3);
         assert!(canceled3.is_empty(), "3面連鎖の相殺で空配列になること");
+    }
+
+    #[test]
+    fn test_cancel_redundant_moves_with_phases() {
+        use crate::cube::parse_moves;
+
+        // 1. 接合部相殺: [R, U] + [U', D] -> [R, D]
+        let moves = parse_moves("R U U' D").unwrap();
+        let phases = vec![
+            crate::PhaseInfo {
+                name: "Phase 1".to_string(),
+                start: 0,
+                end: 2,
+            },
+            crate::PhaseInfo {
+                name: "Phase 2".to_string(),
+                start: 2,
+                end: 4,
+            },
+        ];
+        let (opt_moves, opt_phases) = cancel_redundant_moves_with_phases(moves, phases);
+        let expected = parse_moves("R D").unwrap();
+        assert_eq!(opt_moves, expected);
+        assert_eq!(opt_phases.len(), 2);
+        assert_eq!(opt_phases[0].start, 0);
+        assert_eq!(opt_phases[0].end, 1);
+        assert_eq!(opt_phases[1].start, 1);
+        assert_eq!(opt_phases[1].end, 2);
+
+        // 2. 接合部合算: [R, U] + [U, D] -> [R, U2, D]
+        let moves2 = parse_moves("R U U D").unwrap();
+        let phases2 = vec![
+            crate::PhaseInfo {
+                name: "Phase 1".to_string(),
+                start: 0,
+                end: 2,
+            },
+            crate::PhaseInfo {
+                name: "Phase 2".to_string(),
+                start: 2,
+                end: 4,
+            },
+        ];
+        let (opt_moves2, opt_phases2) = cancel_redundant_moves_with_phases(moves2, phases2);
+        let expected2 = parse_moves("R U2 D").unwrap();
+        assert_eq!(opt_moves2, expected2);
+        assert_eq!(opt_phases2.len(), 2);
+        assert_eq!(opt_phases2[0].start, 0);
+        assert_eq!(opt_phases2[0].end, 2);
+        assert_eq!(opt_phases2[1].start, 2);
+        assert_eq!(opt_phases2[1].end, 3);
     }
 }

@@ -181,7 +181,11 @@ export class CubeScene {
           label.quaternion.setFromRotationMatrix(rotMatrix);
           this.centerLabels[f] = label;
           label.renderOrder = 9;
-          label.userData = { origin: label.position.clone(), face: f };
+          label.userData = {
+            origin: label.position.clone(),
+            rotation: label.quaternion.clone(),
+            face: f,
+          };
           this.root.add(label);
         }
       }
@@ -554,6 +558,7 @@ export class CubeScene {
       this.root.add(label);
       if (label.userData.origin) {
         label.position.copy(label.userData.origin);
+        label.quaternion.copy(label.userData.rotation);
       }
     }
     this.turnLayer.quaternion.identity();

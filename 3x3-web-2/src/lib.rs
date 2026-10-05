@@ -250,7 +250,10 @@ pub fn solve_state_with_algorithm(
                                 end: seq_moves.len(),
                             });
                         }
-                        Some(seq_moves)
+                        let (opt_moves, opt_phases) =
+                            supercube::cancel_redundant_moves_with_phases(seq_moves, phase_infos);
+                        phase_infos = opt_phases;
+                        Some(opt_moves)
                     } else {
                         None
                     }
@@ -322,6 +325,10 @@ pub fn solve_state_with_algorithm(
                         start: start_idx,
                         end: moves.len(),
                     });
+                    let (opt_moves, opt_phases) =
+                        supercube::cancel_redundant_moves_with_phases(moves, phase_infos);
+                    moves = opt_moves;
+                    phase_infos = opt_phases;
                 }
             }
         }
@@ -402,6 +409,8 @@ pub fn validate_core(state: &str) -> Result<bool, String> {
 }
 
 /// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
+/// 盤面が正常にパース可能で妥当なキューブ表現であれば Ok(true) を返し、
+/// 文字数不正・文字種不正・パーツ構成不正・パリティエラー等で無効な状態であれば Err を返します。
 pub fn is_valid_core(state: &str) -> Result<bool, String> {
     cube::parse_state(state).map(|_| true)
 }
@@ -436,6 +445,7 @@ pub fn validate(state: &str) -> Result<bool, JsValue> {
 }
 
 /// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
+/// 妥当な状態であれば true を返し、不正な盤面に対しては詳細なエラーメッセージとともに例外（Err）をスローします。
 #[wasm_bindgen]
 pub fn is_valid(state: &str) -> Result<bool, JsValue> {
     is_valid_core(state).map_err(to_js_error)

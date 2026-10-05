@@ -21,13 +21,17 @@ export function automaticCenters(state: string): number[] {
 
 export function centersFromInput(state: string, turns: unknown): number[] {
   if (turns === undefined) return automaticCenters(state);
-  if (
-    !Array.isArray(turns) ||
-    turns.length !== 6 ||
-    !turns.every((t) => Number.isInteger(t) && t >= 0 && t <= 3)
-  ) {
+  if (!Array.isArray(turns) || turns.length !== 6) {
     throw new Error(
-      "センターの向きは6面それぞれ0°・90°・180°・270°で指定してください。",
+      `センターの向きは6面それぞれ0°・90°・180°・270°で指定してください (要素数: ${Array.isArray(turns) ? turns.length : typeof turns})。`,
+    );
+  }
+  const invalidIndex = turns.findIndex(
+    (t) => !Number.isInteger(t) || t < 0 || t > 3,
+  );
+  if (invalidIndex !== -1) {
+    throw new Error(
+      `センターの向きは6面それぞれ0°・90°・180°・270°で指定してください (${FACES[invalidIndex]}面: ${JSON.stringify(turns[invalidIndex])})。`,
     );
   }
   if (turns.reduce((sum, t) => sum + t, 0) % 2 !== center_parity(state)) {

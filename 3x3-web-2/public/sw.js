@@ -89,7 +89,9 @@ self.addEventListener("activate", (event) => {
       );
 
       // 直近 1 世代の旧キャッシュのみを移行対象とし、無制限な旧資産コピーによるキャッシュ肥大化（Cache Bloat）を防止
-      const sortedOldKeys = [...oldKeys].sort();
+      const sortedOldKeys = [...oldKeys].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      );
       const mostRecentOldKey = sortedOldKeys.pop();
 
       if (mostRecentOldKey) {

@@ -53,14 +53,25 @@ export function buildShareUrl(
   baseHref: string,
   state: string,
   centerTurns?: number[],
+  solver?: string,
 ): string {
   const url = new URL(baseHref);
   url.searchParams.delete("alg");
+  url.searchParams.delete("algorithm");
   url.searchParams.set("state", state);
   if (centerTurns && centerTurns.some((t) => t !== 0)) {
     url.searchParams.set("centers", centerTurns.join(","));
   } else {
     url.searchParams.delete("centers");
+  }
+  if (
+    solver &&
+    solver !== "kociemba" &&
+    ["cfop", "thistlethwaite", "korf"].includes(solver)
+  ) {
+    url.searchParams.set("solver", solver);
+  } else {
+    url.searchParams.delete("solver");
   }
   return url.toString();
 }

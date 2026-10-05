@@ -104,7 +104,8 @@ export class ColorEditor {
       const count = [...this.draft].filter((f) => f === color).length;
       const button = document.createElement("button");
       button.className = `color-choice ${count > 9 ? "over" : ""}`;
-      button.setAttribute("aria-pressed", String(this.color === color));
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(this.color === color));
       button.setAttribute(
         "aria-label",
         `${NAMES[color]}を選択 残り${9 - count}枚`,

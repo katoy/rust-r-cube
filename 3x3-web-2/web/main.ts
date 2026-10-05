@@ -99,6 +99,7 @@ function stop() {
   inMotion = false;
   if (wasPlaying) {
     persist();
+    refresh();
   }
 }
 function cancelSearch() {
@@ -288,6 +289,7 @@ function refresh() {
     timeline.max = String(solution.moves.length);
     timeline.value = String(step);
     timeline.setAttribute("aria-valuenow", String(step));
+    timeline.setAttribute("aria-valuemax", String(solution.moves.length));
     const nextMeta = cachedAnalyzedMoves[step];
     const valuetext =
       solution.moves.length === 0
@@ -324,6 +326,7 @@ function refresh() {
     timeline.max = "0";
     timeline.value = "0";
     timeline.setAttribute("aria-valuenow", "0");
+    timeline.setAttribute("aria-valuemax", "0");
     timeline.removeAttribute("aria-valuetext");
   }
 }
@@ -591,6 +594,8 @@ function promptReloadForUpdate(reloadFn = () => window.location.reload()) {
 }
 
 let modalRequestId = 0;
+let modalOpening = false;
+let lastTriggerElement: HTMLElement | null = null;
 async function openModal<T>(
   load: () => Promise<T | undefined>,
   open: (modal: T) => void,
@@ -599,22 +604,33 @@ async function openModal<T>(
     message("探索中は色入力を開けません。探索を中止してから操作してください。");
     return;
   }
+  if (modalOpening) return;
+  modalOpening = true;
+
+  const trigger = document.activeElement as HTMLElement | null;
   const requestId = ++modalRequestId;
   const at = store.getRevision();
   const state = appState.getState();
   stop();
   refresh();
-  const modal = await load();
-  if (!modal || requestId !== modalRequestId) return;
-  if (
-    state !== appState.getState() ||
-    at !== store.getRevision() ||
-    !appState.getState().canModifyCube()
-  ) {
-    message("読込中に状態が変わったため、色入力の起動を中断しました。");
-    return;
+  try {
+    const modal = await load();
+    if (!modal || requestId !== modalRequestId) return;
+    if (
+      state !== appState.getState() ||
+      at !== store.getRevision() ||
+      !appState.getState().canModifyCube()
+    ) {
+      message("読込中に状態が変わったため、色入力の起動を中断しました。");
+      return;
+    }
+    if (trigger) {
+      lastTriggerElement = trigger;
+    }
+    open(modal);
+  } finally {
+    modalOpening = false;
   }
-  open(modal);
 }
 
 let editorPromise:
@@ -815,9 +831,18 @@ $("solution-close").onclick = () => {
 $("help").onclick = () => {
   stop();
   refresh();
+  lastTriggerElement = document.activeElement as HTMLElement | null;
   $<HTMLDialogElement>("help-dialog").showModal();
 };
 $("help-close").onclick = () => $<HTMLDialogElement>("help-dialog").close();
+["help-dialog", "editor", "camera-editor"].forEach((id) => {
+  const dialog = document.getElementById(id) as HTMLDialogElement | null;
+  dialog?.addEventListener("close", () => {
+    if (lastTriggerElement && typeof lastTriggerElement.focus === "function") {
+      lastTriggerElement.focus();
+    }
+  });
+});
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
   button.onclick = () => {
     document
@@ -849,6 +874,7 @@ $("share-link").onclick = async () => {
     window.location.href,
     snapshot.state,
     snapshot.centerTurns,
+    solverAlgo.value,
   );
   try {
     await navigator.clipboard.writeText(shareUrl);
@@ -1011,6 +1037,7 @@ async function start(forceError = false) {
         url.searchParams.delete("alg");
         url.searchParams.delete("centers");
         url.searchParams.delete("solver");
+        url.searchParams.delete("algorithm");
         const newSearch = url.searchParams.toString();
         const newUrl =
           url.pathname + (newSearch ? `?${newSearch}` : "") + url.hash;

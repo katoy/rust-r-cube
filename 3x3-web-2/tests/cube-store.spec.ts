@@ -243,4 +243,156 @@ test.describe("CubeStore Unit Tests", () => {
       "algorithm",
     ]);
   });
+
+  test("closing solution after seek preserves undo history to base snapshot and supports redo", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const { apply_moves } = (window as any).cube_studio;
+      const rState = JSON.parse(apply_moves(SOLVED, "R")).state;
+      const store = new CubeStore();
+
+      store.replace(rState);
+      store.setSolution({
+        state: rState,
+        moves: ["R'"],
+        states: [rState, SOLVED],
+        elapsed_ms: 5,
+        nodes: 10,
+      });
+
+      // 解法の手順を進める（SOLVED へシーク）
+      store.updateAfterSeek(SOLVED, [0, 0, 0, 0, 0, 0], 1);
+      const stateBeforeClose = store.getState();
+      const canUndoBeforeClose = store.canUndo();
+
+      // 解法を閉じる
+      store.setSolution(undefined);
+      const stateAfterClose = store.getState();
+      const canUndoAfterClose = store.canUndo();
+      const canRedoAfterClose = store.canRedo();
+
+      // Undo 実行 -> 解法シーク前の rState に戻る
+      const undid = store.undo();
+      const stateAfterUndo = store.getState();
+      const canUndoAfterUndo = store.canUndo();
+      const canRedoAfterUndo = store.canRedo();
+
+      // Redo 実行 -> シーク後の SOLVED に戻る
+      const redid = store.redo();
+      const stateAfterRedo = store.getState();
+      const canUndoAfterRedo = store.canUndo();
+      const canRedoAfterRedo = store.canRedo();
+
+      return {
+        stateBeforeClose,
+        canUndoBeforeClose,
+        stateAfterClose,
+        canUndoAfterClose,
+        canRedoAfterClose,
+        undid,
+        stateAfterUndo,
+        canUndoAfterUndo,
+        canRedoAfterUndo,
+        redid,
+        stateAfterRedo,
+        canUndoAfterRedo,
+        canRedoAfterRedo,
+        rState,
+        solved: SOLVED,
+      };
+    });
+
+    expect(result.stateBeforeClose).toBe(result.solved);
+    expect(result.canUndoBeforeClose).toBe(true);
+    expect(result.stateAfterClose).toBe(result.solved);
+    expect(result.canUndoAfterClose).toBe(true);
+    expect(result.canRedoAfterClose).toBe(false);
+
+    expect(result.undid).toBe(true);
+    expect(result.stateAfterUndo).toBe(result.rState);
+    expect(result.canUndoAfterUndo).toBe(true); // 初期完成局面への Undo が可能
+    expect(result.canRedoAfterUndo).toBe(true);
+
+    expect(result.redid).toBe(true);
+    expect(result.stateAfterRedo).toBe(result.solved);
+    expect(result.canUndoAfterRedo).toBe(true);
+    expect(result.canRedoAfterRedo).toBe(false);
+  });
+
+  test("history limit caps at 200 entries and drops oldest", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const store = new CubeStore();
+
+      const { apply_moves } = (window as any).cube_studio;
+      let currentState = SOLVED;
+      for (let i = 0; i < 205; i++) {
+        const move = i % 3 === 0 ? "R" : i % 3 === 1 ? "U" : "F";
+        currentState = JSON.parse(apply_moves(currentState, move)).state;
+        store.replace(currentState);
+      }
+
+      const canUndo = store.canUndo();
+      let undoCount = 0;
+      while (store.undo()) {
+        undoCount++;
+      }
+
+      return {
+        canUndo,
+        undoCount,
+      };
+    });
+
+    expect(result.canUndo).toBe(true);
+    expect(result.undoCount).toBe(200);
+  });
+
+  test("replace with identical state but different centerTurns records history", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const result = await page.evaluate(async () => {
+      const { CubeStore } = await import("/web/cube-store.ts");
+      const { SOLVED } = await import("/web/model.ts");
+      const { turnsToCenters } = await import("/web/centers.ts");
+      const store = new CubeStore();
+
+      const initialTurns = store.getCenterTurns();
+      store.replace(SOLVED, true, turnsToCenters([2, 0, 0, 0, 0, 0]));
+
+      const canUndo = store.canUndo();
+      const turnsAfter = store.getCenterTurns();
+
+      const undid = store.undo();
+      const turnsAfterUndo = store.getCenterTurns();
+
+      return {
+        initialTurns,
+        turnsAfter,
+        canUndo,
+        undid,
+        turnsAfterUndo,
+      };
+    });
+
+    expect(result.canUndo).toBe(true);
+    expect(result.turnsAfter).toEqual([2, 0, 0, 0, 0, 0]);
+    expect(result.undid).toBe(true);
+    expect(result.turnsAfterUndo).toEqual([0, 0, 0, 0, 0, 0]);
+  });
 });

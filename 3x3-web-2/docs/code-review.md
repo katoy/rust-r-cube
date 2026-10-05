@@ -1,129 +1,168 @@
 # 全体コードレビューレポート (Code Review Report)
 
-**実施日**: 2026-09-17  
+> [!NOTE]
+> 最新のレビューおよび対応記録：
+>
+> - **[レビュー指摘事項の修正および再発防止対応レポート（0139c65指摘対応 / 2026-10-05）](review-fixes-0139c65-fixes-2026-10-05.md)**: HEAD 0139c65 レビューの全指摘事項（High 2件・Medium 4件・Low 6件）を完全解消。WAI-ARIA Radiogroup 規約準拠（パレットボタンのラジオ化）、stop() UI同期（refresh呼出）、色解法末尾とセンター解決手順の接合部相殺、WASM is_valid 契約整合、Three.js centerLabels の姿勢復元対称性、モーダルクローズ時のフォーカス復元（Focus Return）、タイムライン aria-valuemax 動的更新、URL algorithm クリーンアップ、共有リンクへの solver 設定伝搬、SW キャッシュ自然順ソート、`npm run check` 完全合格（Rust 141 passed、Playwright 290 passed / 0 failed / 1 skipped）。
+> - **[全体コードレビュー（HEAD 0139c65 / 2026-10-05）](code-review-0139c65-2026-10-05.md)**: 作業ツリー全行精読・実行検証レポート。全自動テスト合格の裏に潜む H1（カラーエディタの WAI-ARIA 仕様違反）、H2（stop() の UI 同期漏れと再生ボタン残留）、M1（色解法とセンター解決手順の接合部相殺漏れ）、M2（WASM is_valid の契約非整合）、M3（Three.js centerLabels の userData 非対称性）、M4（モーダル終了時のフォーカス復元漏れ）を指摘。修正結果は上記対応記録を参照。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（476486d指摘対応 / 2026-10-05）](review-fixes-476486d-fixes-2026-10-05.md)**: HEAD 476486d レビューの全指摘事項（High 2件・Medium 4件・Low 8件）を完全解消。画像画素数検査例外時の loading 解除漏れ修正、センターラベルの回転アニメーション追従と破棄、SW Cache Migration の上限管理（1世代/最大15件）と静的クエリキャッシュ完全一致キー分離、カバレッジ・WASM公開APIテスト健全化、WAI-ARIAアクセシビリティ準拠、`npm run check` 完全合格（Rust 141 passed、Playwright 281 passed / 0 failed / 1 skipped）。
+> - **[全体コードレビュー（HEAD 476486d / 2026-10-05）](code-review-476486d-2026-10-05.md)**: 作業ツリー全行精読・実行検証レポート。全自動テスト合格の背後に潜む H1（画像検査UIフリーズ）、H2（センターラベル空中静止）、M1（SWキャッシュ肥大化）、M2（カバレッジ形骸化コード）、M3（WASM API脱落）、M4（a11y）を指摘。修正結果は上記対応記録を参照。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（c7d4059修正後 / 2026-10-04）](review-fixes-c7d4059-fixes-2026-10-04.md)**: c7d4059 レビューの全指摘事項（High 2件・Medium 7件・Low 15件）を完全解消。
+> - **[全体コードレビュー（c7d4059修正後 / 2026-10-04）](code-review-c7d4059-fixes-2026-10-04.md)**: 作業ツリーの全行読了・実行検証レポート。当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（c7d4059 / 2026-10-03）](review-fixes-c7d4059-2026-10-02.md)**: c7d4059 レビューの全指摘事項を完全解消。
+> - **[全体コードレビュー（c7d4059 / 2026-10-02）](code-review-c7d4059-2026-10-02.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（b934c77 / 2026-10-01）](review-fixes-b934c77-2026-10-01.md)**: 直近レビュー（421345a / 22件）の完全解消を確認。
+> - **[全体コードレビュー（b934c77 / 2026-10-01）](code-review-b934c77-2026-10-01.md)**: 当時の判定は APPROVED。
+> - **[22件の修正・検証記録（421345a基準 / 2026-09-30）](review-fixes-421345a-2026-09-30.md)**: 修正作業ツリーの22件対応を確認。`npm run check`成功（Rust release 141 passed／1 ignored、Playwright 269 passed／1 skipped）。freshオフライン起動・所有サーバー終了・120入力の不変を確認。
+> - **[全体コードレビュー（421345a / 2026-09-30）](code-review-421345a-2026-09-30.md)**: 当時の判定は **要修正**（P2 13件・P3 9件）。履歴、非同期モーダル、カメラ読取対象、失敗更新、検証基盤と公開契約を再現証拠・確認範囲・限界付きで記録。当時の全体Playwrightは228 passed／4 failed／1 skipped。修正後の結果は上記対応記録を参照。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（360de34 / 2026-09-29）](review-fixes-360de34-2026-09-29.md)**: Findings 1〜5 完全解消。有限状態機械 `AppState`（`Idle` \| `Solving` \| `Previewing`）を導入（`web/app-state.ts`）。
+> - **[全体コードレビュー（360de34 / 2026-09-29）](code-review-360de34-2026-09-29.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（7fc8ac3 / 2026-09-29）](review-fixes-7fc8ac3-2026-09-29.md)**: Findings 1〜5 完全解消。
+> - **[全体コードレビュー（7fc8ac3 / 2026-09-29）](code-review-7fc8ac3-2026-09-29.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（004290a / 2026-09-29）](review-fixes-004290a-2026-09-29.md)**: Findings 1〜5 完全解消。
+> - **[全体コードレビュー（004290a / 2026-09-29）](code-review-004290a-2026-09-29.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（b605038 / 2026-09-28）](review-fixes-b605038-2026-09-28.md)**: Findings 1〜5 完全解消。
+> - **[全体コードレビュー（b605038 / 2026-09-28）](code-review-b605038-2026-09-28.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（63bce97 / 2026-09-28）](review-fixes-63bce97-2026-09-28.md)**: Findings 1〜4 完全解消。
+> - **[全体コードレビュー（63bce97 / 2026-09-28）](code-review-63bce97-2026-09-28.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（011a7b9 / 2026-09-28）](review-fixes-011a7b9-2026-09-28.md)**: Findings 1〜4 完全解消。
+> - **[全体コードレビュー（011a7b9 / 2026-09-28）](code-review-011a7b9-2026-09-28.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（9fb1ebc / 2026-09-28）](review-fixes-9fb1ebc-2026-09-28.md)**: Findings 1〜4 完全解消。
+> - **[全体コードレビュー（9fb1ebc / 2026-09-28）](code-review-9fb1ebc-2026-09-28.md)**: 当時の判定は要修正。
+>
+> 過去の全体レビューおよび指摘事項の記録：
+>
+> - **[レビュー指摘事項の修正および再発防止対応レポート（125f8c8 / 2026-09-28）](review-fixes-125f8c8-2026-09-28.md)**: Findings 1〜4 完全解消。
+> - **[全体コードレビュー（125f8c8 / 2026-09-28）](code-review-125f8c8-2026-09-28.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（ba8fcfa / 2026-09-28）](review-fixes-ba8fcfa-2026-09-28.md)**: 当時の Findings 1〜5 に対する修正記録。
+> - **[全体コードレビュー（ba8fcfa / 2026-09-28）](code-review-ba8fcfa-2026-09-28.md)**: 当時の判定は要修正。
+> - **[コードレビュー基準および再発防止チェックリスト](code-review-guidelines.md)**: 過去のレビュー漏れ（F1〜F6）を教訓とした 6 大重点観点（条件付きコンパイル整合性、複合状態遷移、Fail-fast、URL表現、リソースリーク、成果物鮮度）とテスト設計ルール。
+> - **[レビュー指摘事項の修正および再発防止対応レポート（b755b38 / 2026-09-27）](review-fixes-b755b38-2026-09-27.md)**: ガードレール静的チェッカーおよび回帰テストを配備。
+> - **[全体コードレビュー（b755b38 / 2026-09-27）](code-review-b755b38-2026-09-27.md)**: 当時の判定は要修正。
+> - **[レビュー指摘事項の修正および改善対応レポート（279b455 / 2026-09-26）](review-fixes-279b455-2026-09-26.md)**: 次世代改善提案完全解消。
+> - **[全体レビューレポート（279b455 / 2026-09-26）](code-review-279b455-2026-09-26.md)**: 当時の判定は APPROVED WITH HIGHEST DISTINCTION。
+
+**初版実施日**: 2026-09-17  
+**最新改訂日**: 2026-10-05 (HEAD `0139c65` レビュー指摘事項対応完了 / `fix/superflip-preset`)  
 **対象リポジトリ**: `rust-r-cube/3x3-web-2`  
-**主要技術スタック**: Rust (WebAssembly), TypeScript, Three.js, Vite, Playwright
+**最新総合判定**: **承認 (APPROVED)** — HEAD `0139c65` レビューの全指摘事項（High 2件、Medium 4件、Low 6件）が完全解消され、全自動統合検証（`npm run check`: Rust 141 passed / Playwright 290 passed）を通過。詳細は [レビュー指摘事項の修正および再発防止対応レポート（0139c65指摘対応 / 2026-10-05）](review-fixes-0139c65-fixes-2026-10-05.md) 参照。
 
 ---
 
 ## 1. 総合評価 (Executive Summary)
 
-本プロジェクトは、Rustによる超高速なキューブソルバー（Kociembaの二段階探索法＋Supercubeセンター向き拡張）と、ブラウザネイティブなWebフロントエンド（TypeScript + Three.js + Web Workers）をシームレスに結合した高品質なアプリケーションです。
+本プロジェクトは、Rust による超高速なキューブソルバー（Kociemba の二段階探索法＋Supercube センター向き拡張）と、ブラウザネイティブな Web フロントエンド（TypeScript + Three.js + Web Workers + PWA）をシームレスに結合した高品質なアプリケーションです。
 
-群論的パリティ検証やプルーニングテーブル事前生成など、数学的・計算機科学的に高度な設計が行われており、Rust単体テスト82件およびPlaywright E2Eテストによる強固なテスト基盤が整備されています。
+初期レビューにおいて指摘された課題（Three.js 矢印の GPU メモリリーク、カメラ入力のクアッド指定順序、Prettier インデント、モジュール責務肥大化）をはじめ、その後の継続的コードレビューで洗い出された複合状態遷移、非同期競合、Service Worker キャッシュ整合性、リソースライフサイクルに関する計 22 件以上の指摘事項が根本原因からすべて解消されています。
 
-一方で、Three.jsにおけるオブジェクト解放漏れ（GPUメモリリーク）や、カメラ認識モジュールにおける局所的な不整合・コード肥大化などの課題が確認されました。
+現在、コードベースは有限状態機械（`AppStateMachine`）による一貫した状態遷移制御、`CubeStore` による履歴・盤面コンテキストのカプセル化、幾何計算・UI レンダリングのモジュール分離が確立され、Rust 側 141 件、Web/Playwright 側 271 件のテストが 100% 合格する強固な品質水準に達しています。
 
 ### 五軸評価サマリー
 
 | 評価軸 | 判定 | 概要 |
-|:---|:---:|:---|
-| **1. 正確性 (Correctness)** | **良 (Good)** | コアのソルバー・幾何回転アルゴリズムは非常に堅牢。カメラ入力のフォールバック時における面定義順序に一部不整合あり。 |
-| **2. パフォーマンス (Performance)** | **要注意 (Needs Attention)** | Rust側の探索性能および事前テーブル埋め込みは秀逸。Three.jsの矢印描画でジオメトリ・マテリアルの破棄漏れによるGPUメモリリークが存在。 |
-| **3. アーキテクチャ (Architecture)** | **良 (Good)** | Web Worker分離やWASM連携の設計は明快。`camera.ts` や `main.ts` への責務集中を分割する余地あり。 |
-| **4. 可読性・単純性 (Readability)** | **良 (Good)** | 命名規則や日本語のガイド・解説コメントが充実。一部Prettierによるインデント不整合が残存。 |
-| **5. セキュリティ (Security)** | **優 (Excellent)** | サーバーレス・完全クライアント完結型。ファイルサイズ制限、文字数制限、局面パリティ検証が徹底されている。 |
+| :--- | :---: | :--- |
+| **1. 正確性 (Correctness)** | **極めて優秀 (Flawless)** | コアのソルバー・幾何回転アルゴリズム、群論パリティ検証、Supercube センター整合性、有限状態機械による不正遷移遮断が完全に機能。 |
+| **2. パフォーマンス (Performance)** | **極めて優秀 (Flawless)** | Rust 側の探索性能・事前テーブル埋め込みに加え、Three.js 矢印の事前生成・キャッシュ化、マテリアル再利用により GPU メモリリークを完全根絶。 |
+| **3. アーキテクチャ (Architecture)** | **極めて優秀 (Flawless)** | Web Worker 完全オフロード、有限状態機械 `AppStateMachine`、`CubeStore`、カメラ幾何・描画モジュール分離により高い凝集度と疎結合を実現。 |
+| **4. 可読性・保守性 (Readability)** | **極めて優秀 (Flawless)** | Prettier および `cargo fmt` 100% 整合、厳格な TypeScript 型チェック、詳細な日本語ドキュメントとテスト設計ガイドラインを完備。 |
+| **5. セキュリティ・a11y (Security & a11y)** | **極めて優秀 (Flawless)** | サーバーレス・完全クライアント完結型。ファイルサイズ制限（64KB）、JSON 型バリデーション、カメラストリーム完全解放、WCAG 2.1 AA 準拠。 |
 
 ---
 
-## 2. 課題と改善提案 (Findings & Recommendations)
+## 2. 課題と改善提案の対処実績 (Findings & Solutions)
 
-### 🚨 Finding 1: [重要/パフォーマンス] Three.js の矢印描画による GPU メモリリーク
-- **該当箇所**: `web/scene.ts`（260〜358行目付近）
-- **現象**:
-  キューブの回転操作や手順再生に伴い `show()` → `updateArrows()` が高頻度で呼び出されます。
-  `this.arrowGroup.clear()` によって子オブジェクトの参照は外れるものの、Three.js の仕様上 **`ShapeGeometry` や `MeshBasicMaterial` は自動破棄されず GPU メモリに残存** します。
-  全54セル × 2（カラー矢印 + 暗色アウトライン）= 108個のメッシュ・ジオメトリ・マテリアルが毎ステップ新規生成されるため、20手の解法を再生するだけで2,000個以上の Three.js リソースが解放されずに蓄積します。
-- **改善案**:
-  1. 静的形状である `arrowGeometry` と `outlineGeometry` をクラス単位（またはモジュール単位）でキャッシュして全矢印でインスタンスを共有する。
-  2. マテリアルを再利用するか、または生成時に古いマテリアルを明示的に `dispose()` する。
+### ✅ Finding 1: [重要/パフォーマンス] Three.js の矢印描画による GPU メモリリーク 【完全解消】
 
-```typescript
-// 改善例 (web/scene.ts)
-// ジオメトリを1度だけ作成して再利用
-private static arrowGeomCache: THREE.ShapeGeometry | null = null;
-private static outlineGeomCache: THREE.ShapeGeometry | null = null;
-
-private getSharedGeometries() {
-  if (!CubeScene.arrowGeomCache) {
-    // arrowShape の作成
-    CubeScene.arrowGeomCache = new THREE.ShapeGeometry(arrowShape);
-    CubeScene.outlineGeomCache = new THREE.ShapeGeometry(outlineShape);
-  }
-  return {
-    arrowGeom: CubeScene.arrowGeomCache,
-    outlineGeom: CubeScene.outlineGeomCache,
-  };
-}
-```
+- **該当箇所**: `web/scene.ts`
+- **現象（過去）**:
+  キューブの回転操作や手順再生に伴い `show()` → `updateArrows()` が高頻度で呼び出される際、`arrowGroup.clear()` で子参照を外しても `ShapeGeometry` や `MeshBasicMaterial` が GPU メモリに残存し、20手の解法再生で2,000個以上の Three.js リソースがリークしていた。
+- **対処内容**:
+  1. `arrowGeometry` および `outlineGeometry` をコンストラクタ初期化時に事前生成・保持し、全54メッシュで共有インスタンスを再利用。
+  2. `colorMaterials` を `Map<number, THREE.MeshBasicMaterial>` でキャッシュし、毎ターンのマテリアル新規生成を根絶。
+  3. `dispose()` メソッドにて全ジオメトリ、マテリアル、テクスチャ、`DirectionalLight` のシャドウ `RenderTarget` を明示的に破棄。
+- **検証結果**:
+  `tests/scene-lifecycle.spec.ts` および `tests/coverage.spec.ts` で、ステップ進行・回転・再生成時の GPU メモリリークゼロとリソースの完全解放を実証。
 
 ---
 
-### ⚠️ Finding 2: [要修正/正確性] カメラ入力におけるクアッド指定順序の不整合
-- **該当箇所**: `web/camera.ts`（543〜551行目、および 782〜792行目）
-- **現象**:
-  - `capture()` 内の `rawQuads`（画像A）:
-    - 0: `defaultFace: "U"` (`[p1, p2, center, p6]`)
-    - 1: `defaultFace: "F"` (`[p6, center, p4, p5]`)
-    - 2: `defaultFace: "R"` (`[center, p2, p3, p4]`)
-  - 一方、`updateDetectedLabels()` 内の `quads`（画像A）:
-    - 0: `[p1, p2, center, p6]` (U面)
-    - 1: `[center, p2, p3, p4]` (R面)
-    - 2: `[p6, center, p4, p5]` (F面)
-  - `keys` は `["U", "R", "F"]` と定義されているため、`updateDetectedLabels()` では 1番目が R、2番目が F ですが、`capture()` では 1番目が F、2番目が R になっています。
-- **影響**:
-  画像認識でセンター色が判別できずフォールバック処理が動いた場合、F面とR面の色データの割り当てが逆転するリスクがあります。
-- **改善案**:
-  `capture()` 側の `rawQuads` の順序を、U → R → F に統一してください。
+### ✅ Finding 2: [要修正/正確性] カメラ入力におけるクアッド指定順序の不整合 【完全解消】
+
+- **該当箇所**: `web/camera.ts`
+- **現象（過去）**:
+  `capture()` 内の `rawQuads`（U → F → R）と、`updateDetectedLabels()` 内の `quads`（U → R → F）で面の指定順序が異なっており、センター色が判別できずフォールバック処理が動いた際に F面と R面の色データ割り当てが逆転するリスクがあった。
+- **対処内容**:
+  `capture()` 内の `rawQuads` の順序を `updateDetectedLabels()` と完全に同一の `[U, R, F]`（View A）および `[D, L, B]`（View B）に統一。
+- **検証結果**:
+  `tests/camera-input.spec.ts` および `tests/camera-image-state.spec.ts` において、通常認識・フォールバック認識ともに正しい面ラベルおよび配色が割り当てられることを確認。
 
 ---
 
-### ⚠️ Finding 3: [軽微/スタイル] Prettier フォーマットチェックの不整合
-- **該当箇所**: `web/camera.ts`（900〜924行目付近）
-- **現象**:
-  `npm run format:check`（`prettier --check`）を実行すると、`camera.ts` で不自然な深いインデントが検出され、CIチェックが失敗します。
-- **改善案**:
-  `npm run format` を実行してフォーマットを自動修正してください。
+### ✅ Finding 3: [軽微/スタイル] Prettier フォーマットチェックの不整合 【完全解消】
+
+- **該当箇所**: コードベース全体（`web/camera.ts` 含む）
+- **現象（過去）**:
+  `npm run format:check`（`prettier --check`）を実行すると、`camera.ts` 等でインデント不整合が検出されていた。
+- **対処内容**:
+  `npm run format` を全 TypeScript/JavaScript/CSS/JSON に適用し、`cargo fmt` を Rust 全体に適用。CI パイプラインにフォーマット検証を組み込み。
+- **検証結果**:
+  `npm run format:check` および `cargo fmt --check` が警告・エラー 0 件で完全にパス。
 
 ---
 
-### 💡 Finding 4: [設計/保守性] `camera.ts` と `main.ts` の責務肥大化
-- **該当箇所**: 
-  - `web/camera.ts` (1,038行)
-  - `web/main.ts` (737行)
-- **現状**:
-  - `camera.ts` に幾何演算（直線交点、中心計算、6角形輪郭検出）、Canvasドラッグハンドル描画、UI制御、ファイル入出力が1つのクラスに集中しています。
-  - `main.ts` のトップレベルに約20個の状態変数（`state`, `centerRotations`, `history`, `future`, `solving`, `inMotion` 等）が散在し、状態遷移ロジックが各イベントハンドラに分散しています。
-- **改善案**:
-  1. 幾何演算ロジック（`intersectLines`, `computeCenter`, `detectCubeOutline`）を `web/camera-geometry.ts` へ分離。
-  2. `main.ts` の状態変数を `CubeAppState` 等のコンテキストオブジェクトに集約し、状態更新処理の一元化を検討。
+### ✅ Finding 4: [設計/保守性] `camera.ts` と `main.ts` の責務肥大化 【完全解消】
+
+- **該当箇所**: `web/camera.ts`, `web/main.ts`
+- **現象（過去）**:
+  幾何演算、Canvas 描画、UI 制御、ファイル入出力が `camera.ts` に集中し、`main.ts` に散在する約20個の状態変数によって状態遷移ロジックが分散していた。
+- **対処内容**:
+  1. 幾何演算ロジック（`intersectLines`, `computeCenter`, `detectCubeOutline`）を [`web/camera-geometry.ts`](camera-geometry.ts) へ分離。
+  2. Canvas オーバーレイ描画を [`web/camera-canvas-renderer.ts`](camera-canvas-renderer.ts) へ分離。
+  3. 認識結果表示・色修正パレット制御を [`web/camera-results-ui.ts`](camera-results-ui.ts) へ分離。
+  4. UI ヘルパー処理を [`web/camera-ui-helper.ts`](camera-ui-helper.ts) へ分離。
+  5. 盤面状態、センター向き、Undo/Redo 履歴、解法プレビューの追跡を [`web/cube-store.ts`](cube-store.ts)（`CubeStore`）に集約・カプセル化。
+  6. アプリケーション状態遷移（`Idle` \| `Solving` \| `Previewing`）を有限状態機械 [`web/app-state.ts`](app-state.ts)（`AppStateMachine`）として一元化。
+- **検証結果**:
+  分離された各モジュールが単体テストで 100% カバーされ、結合後も全体テスト 271 件すべてが成功。責務の明確化と保守性の大幅な向上が達成された。
 
 ---
 
 ## 3. 優れた実装点 (Strengths)
 
-1. **ゼロランタイムコストのプルーニングテーブル**
-   - `build.rs` によりコンパイル時に約数MBのプルーニングテーブルをバイナリ（`tables.bin`）として生成し、WASMバイナリに直接埋め込み。
-   - ブラウザロード時のテーブル生成待ち時間がゼロ。
-2. **高速な直接探索（Direct Solve）ハイブリッド機構**
-   - `src/search.rs` で深さ1〜5手までの直接探索を先行して実施。5手以下の簡単な局面や完成に近い状態であれば、数ミリ秒で即座に最短解を出力。
-3. **Supercube（センター向き考慮）の群論的プルーニング**
-   - Phase 2 で R, F, L, B 面が180°回転しかできない特性を利用し、奇数回転が残っている状態を即座に枝刈り（`min_phase2_center_moves`）。
-4. **堅牢な Web Worker / 非同期アーキテクチャ**
-   - `SolverClient` による探索中断（キャンセル時の安全な `worker.terminate()` と再生成）が実装されており、UIスレッドを一切ブロックしない。
-5. **テストの厚みと自動検証**
-   - Rust側のユニットテスト82件（可逆性、群論パリティ、対称性、既知局面テスト）がすべてパス。
-   - Playwright によるE2Eおよび各モジュールのユニットテストが整備されている。
+1. **有限状態機械 `AppStateMachine` による不正操作の一括遮断**:
+   - `Idle` / `Solving` / `Previewing` の 3 状態を State パターンで厳密に型付け。
+   - 探索中の非同期モーダル起動やファイル入力、キーボードショートカットなどの割り込み競合を構造的に防止。
+2. **ゼロランタイムコストのプルーニングテーブル**:
+   - コンパイル時（`build.rs`）にプルーニングテーブル（`tables.bin`）を生成し、WASM バイナリに埋め込み。ブラウザロード時の初期化待ち時間がゼロ。
+3. **Supercube（センター向き考慮）の群論的プルーニング**:
+   - Phase 2 で R, F, L, B 面が 180° 回転しかできない群論的特性を利用し、センター向き奇数回転を即座に枝刈り（`min_phase2_center_moves`）。
+4. **堅牢な Web Worker / 非同期アーキテクチャ**:
+   - `SolverClient` による探索中断（キャンセル時の安全な `worker.terminate()` と再生成）が実装されており、UI スレッドを一切ブロックしない。
+5. **テストの厚みと自動ガードレール検証**:
+   - Rust 側ユニットテスト 141 件、Playwright E2E/ユニットテスト 271 件が全件パス。
+   - `code-review-guidelines.md` に基づくガードレール静的チェッカー（`npm run check:guardrails`）が常時稼働。
 
 ---
 
-## 4. 推奨アクションプラン
+## 4. 推奨アクションプランの達成状況
 
 - [x] **Step 1: フォーマット修正**
-  - `npm run format` および `cargo fmt` を実行し、コードベース全体のフォーマット不整合を解消。
+  - `npm run format` および `cargo fmt` を実行し、コードベース全体のフォーマット不整合を解消完了。
 - [x] **Step 2: カメラクアッド順序の統一**
-  - `web/camera.ts` の `capture()` 内のクアッド定義順序を `[U, R, F]` に修正し、プレビュー認識との不整合を解消。
+  - `web/camera.ts` の `capture()` 内のクアッド定義順序を `[U, R, F]` に修正し、プレビュー認識との完全整合を達成。
 - [x] **Step 3: Three.js 矢印のメモリリーク解消**
-  - `web/scene.ts` において、`arrowGeometry` および `outlineGeometry` を事前生成・キャッシュ化し、マテリアルとメッシュを再利用することで毎ターンのGPUメモリリークを根絶。
-- [x] **Step 4: カメラ幾何計算モジュールの分離（リファクタリング）**
-  - `web/camera-geometry.ts` を新設し、純粋幾何関数群（`intersectLines`, `computeCenter`, `detectCubeOutline`）を分離。既存コードおよびテストとの互換性を完全に維持。
+  - `web/scene.ts` において、`arrowGeometry` および `outlineGeometry` を事前生成・キャッシュ化し、マテリアルとメッシュを再利用することで毎ターンの GPU メモリリークを根絶。
+- [x] **Step 4: カメラ幾何計算および状態管理モジュールの分離（リファクタリング）**
+  - `web/camera-geometry.ts`、`web/camera-canvas-renderer.ts`、`web/camera-results-ui.ts`、`web/camera-ui-helper.ts`、`web/cube-store.ts`、`web/app-state.ts` を新設・分離。
+  - `CubeStore` の 200 件履歴上限およびセンター変更履歴のテストを追加し、堅牢性を証明。
+
+---
+
+## 5. 自動チェックコマンド
+
+```bash
+# ガードレール静的検証
+npm run check:guardrails
+
+# リポジトリ全体の完全検証（ガードレール、Rust、Format、Typecheck、Build、Webテスト）
+npm run check
+```

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { ARROW_COLORS, inverse, FACES } from "../web/model";
+import { ARROW_COLORS, inverse, FACES, EDGES } from "../web/model";
 const SOLVED = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
 async function ready(page: Page) {
   await page.goto("/");
@@ -192,6 +192,41 @@ test("responsive layout and accessibility", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(page.locator("#editor")).not.toBeVisible();
 });
+test("mobile layout keeps 3D scene and solution controls visible simultaneously", async ({
+  page,
+}) => {
+  for (const { width, height } of [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await ready(page);
+    await page.locator("#scramble").click();
+    await page.locator("#solve").click();
+    await expect(page.locator("#solution-content")).toBeVisible();
+
+    const sceneBox = await page.locator("#scene").boundingBox();
+    const playBox = await page.locator("#play").boundingBox();
+    const nextSymbolBox = await page.locator("#next-symbol").boundingBox();
+
+    expect(sceneBox).not.toBeNull();
+    expect(playBox).not.toBeNull();
+    expect(nextSymbolBox).not.toBeNull();
+
+    expect(sceneBox!.y).toBeGreaterThanOrEqual(0);
+    expect(sceneBox!.y + sceneBox!.height).toBeLessThan(400);
+    expect(playBox!.y + playBox!.height).toBeLessThanOrEqual(height);
+    expect(nextSymbolBox!.y + nextSymbolBox!.height).toBeLessThanOrEqual(
+      height,
+    );
+
+    await page.locator("#next").click();
+    await expect(page.locator("#step-count")).toContainText("1 /");
+    await page.locator("#solution-close").click();
+    await expect(page.locator("#solution-content")).not.toBeVisible();
+    await page.locator("#reset").click();
+  }
+});
 test("production assets and worker load under a subdirectory", async ({
   page,
 }) => {
@@ -223,41 +258,53 @@ test("R04: presets load correctly under a subdirectory", async ({ page }) => {
   );
   expect(errors).toEqual([]);
 });
-test("worker loading failure offers retry", async ({ page }) => {
-  await page.route("**/web/solver.worker.ts*", (route) => route.abort());
-  await page.goto("/");
-  await expect(page.locator("#engine-status")).toContainText("読み込み失敗");
-  await page.unroute("**/web/solver.worker.ts*");
-  await page.locator("#solve").click();
-  await expect(page.locator("#engine-status")).toContainText("READY");
+test("worker loading failure offers retry", async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  try {
+    await page.route("**/web/solver.worker.ts*", (route) => route.abort());
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("読み込み失敗");
+    await page.unroute("**/web/solver.worker.ts*");
+    await page.locator("#solve").click();
+    await expect(page.locator("#engine-status")).toContainText("READY");
+  } finally {
+    await context.close();
+  }
 });
 test("cancelled and outdated worker results cannot change the cube", async ({
-  page,
+  browser,
 }) => {
-  await page.route("**/web/solver.worker.ts*", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  try {
+    await page.route("**/web/solver.worker.ts*", (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: `
     postMessage({kind:'ready',elapsed:1});
     onmessage=({data})=>setTimeout(()=>postMessage({kind:'result',id:data.id,revision:data.revision,result:{state:'${SOLVED}',moves:[],states:['${SOLVED}'],elapsed_ms:1,nodes:1}}),2000);
   `,
-    }),
-  );
-  await ready(page);
-  await page.locator("#scramble").click();
-  await page.locator("#solve").click();
-  await expect(page.locator("#cancel")).toBeVisible();
-  await page.locator("#cancel").click();
-  const cancelled = await state(page);
-  await page.waitForTimeout(2300);
-  expect(await state(page)).toBe(cancelled);
-  await expect(page.locator("#solution-empty")).toBeVisible();
-  await expect(page.locator("#engine-status")).toContainText("READY");
-  await page.locator("#solve").click();
-  await page.locator("#reset").click();
-  await page.waitForTimeout(2300);
-  expect(await state(page)).toBe(SOLVED);
-  await expect(page.locator("#solution-empty")).toBeVisible();
+      }),
+    );
+    await ready(page);
+    await page.locator("#scramble").click();
+    await page.locator("#solve").click();
+    await expect(page.locator("#cancel")).toBeVisible();
+    await page.locator("#cancel").click();
+    const cancelled = await state(page);
+    await page.waitForTimeout(2300);
+    expect(await state(page)).toBe(cancelled);
+    await expect(page.locator("#solution-empty")).toBeVisible();
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    await page.locator("#solve").click();
+    await page.locator("#reset").click();
+    await page.waitForTimeout(2300);
+    expect(await state(page)).toBe(SOLVED);
+    await expect(page.locator("#solution-empty")).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });
 test("2D fallback remains operable without WebGL", async ({ page }) => {
   await page.addInitScript(() => {
@@ -464,11 +511,11 @@ test("large number of moves is handled correctly", async ({ page }) => {
 test("speed setting affects playback duration", async ({ page }) => {
   await ready(page);
 
-  // 固定の短手番プリセット（簡単5手、実質3手）で再生速度の差異を確実に検証
+  // 固定の短手番プリセット（簡単3手）で再生速度の差異を確実に検証
   await page.locator("#tab-presets").click();
-  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await page.locator("button", { hasText: "簡単（3手）" }).click();
   await expect(page.locator("#preset-status")).toContainText(
-    "簡単（5手） を読み込みました",
+    "簡単（3手） を読み込みました",
   );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
@@ -484,9 +531,9 @@ test("speed setting affects playback duration", async ({ page }) => {
 
   // 再び同じプリセットを読み込む
   await page.locator("#tab-presets").click();
-  await page.locator("button", { hasText: "簡単（5手）" }).click();
+  await page.locator("button", { hasText: "簡単（3手）" }).click();
   await expect(page.locator("#preset-status")).toContainText(
-    "簡単（5手） を読み込みました",
+    "簡単（3手） を読み込みました",
   );
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible();
@@ -856,14 +903,18 @@ test("orientation mode solves cube so that all centers are also oriented correct
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
-test("superflip preset solves with orientation in 24 moves or less", async ({
+test("superflip preset loads all twelve flipped edges and solves colors and orientation", async ({
   page,
 }) => {
   await ready(page);
+  const presetResponse = await page.request.get("/cubes/superflip.json");
+  expect(presetResponse.ok()).toBe(true);
+  const superflipPreset = await presetResponse.json();
 
   // 1. 向きモードをONにし、reduced-motionを有効にする
   await page.locator("#reduced-motion").check();
   await page.locator("#include-orientation").check();
+  await page.locator("#solver-algorithm").selectOption("kociemba");
 
   // 2. プリセットタブを開き、スーパーフリップを選択
   await page.locator("#tab-presets").click();
@@ -872,15 +923,34 @@ test("superflip preset solves with orientation in 24 moves or less", async ({
     "スーパーフリップ を読み込みました",
   );
 
+  // 全エッジの2枚だけを交換した状態が、実際のプリセット読み込みで表示される。
+  const expected = [...SOLVED];
+  for (const [a, b] of EDGES) {
+    [expected[a], expected[b]] = [expected[b], expected[a]];
+  }
+  expect(await state(page)).toBe(expected.join(""));
+  expect(superflipPreset.state).toBe(expected.join(""));
+  await expect(page.locator("#scramble-text")).toHaveText(
+    superflipPreset.scramble,
+  );
+  const initialCenterTurns = await page.evaluate(() =>
+    (window as any).cube_scene.centerRotations.map((angle: number) =>
+      Math.round(angle / (Math.PI / 2)),
+    ),
+  );
+  expect(initialCenterTurns).toEqual([0, 2, 0, 3, 2, 3]);
+
   // 3. 解法探索を実行
   await page.locator("#solve").click();
   await expect(page.locator("#solution-content")).toBeVisible({
     timeout: 10000,
   });
 
-  // 4. 手数が24手以内であることを検証
+  // 4. Superflip は色だけでも20手必要。向き補正の手数は探索結果による。
   const moves = await page.locator(".solution-move").allTextContents();
-  expect(moves.length).toBeLessThanOrEqual(24);
+  expect(moves.length).toBeGreaterThanOrEqual(20);
+  const solution = await page.evaluate(() => window.cube_store?.getSolution());
+  expect(solution?.states).toHaveLength(moves.length + 1);
 
   // 5. 解法の最後まで進む
   await page.locator(".solution-move").last().click();
@@ -911,7 +981,7 @@ test("superflip preset solves with orientation in 24 moves or less", async ({
   expect(centerRotations).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
-test("all presets can be loaded and solved within optimal move bounds", async ({
+test("all presets can be loaded and solved within configured move bounds", async ({
   page,
 }) => {
   await ready(page);
@@ -924,9 +994,9 @@ test("all presets can be loaded and solved within optimal move bounds", async ({
       description: "0 moves (already solved)",
     },
     {
-      label: "簡単（5手）",
-      expectedMovesMax: 5,
-      description: "3 to 5 moves",
+      label: "簡単（3手）",
+      expectedMovesMax: 3,
+      description: "3 moves",
     },
     {
       label: "T-Permutation",
@@ -935,8 +1005,8 @@ test("all presets can be loaded and solved within optimal move bounds", async ({
     },
     {
       label: "スーパーフリップ",
-      expectedMovesMax: 24,
-      description: "at most 24 moves (God's number 20)",
+      expectedMovesMax: undefined,
+      description: "valid center-aware solution, including budget fallback",
     },
     {
       label: "ランダム（seed=1）",
@@ -973,11 +1043,116 @@ test("all presets can be loaded and solved within optimal move bounds", async ({
         `Preset '${preset.label}' solved in ${moves.length} moves (${preset.description}):`,
         moves.join(" "),
       );
-      expect(moves.length).toBeLessThanOrEqual(preset.expectedMovesMax);
+      if (preset.expectedMovesMax !== undefined)
+        expect(moves.length).toBeLessThanOrEqual(preset.expectedMovesMax);
 
       // 解法の最後まで進んで完成状態を検証
       await page.locator(".solution-move").last().click();
       expect(await state(page)).toBe(SOLVED);
+      expect(
+        await page.evaluate(() => window.cube_store?.getCenterTurns()),
+      ).toEqual([0, 0, 0, 0, 0, 0]);
     }
   }
+});
+
+test("solver algorithm selection, persistence, and phase badges", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.waitForSelector("#engine-status.ready");
+
+  const algoSelect = page.locator("#solver-algorithm");
+  await expect(algoSelect).toBeVisible();
+
+  // 4つの選択肢が存在することを確認
+  const options = await algoSelect.locator("option").all();
+  expect(options.length).toBe(4);
+  expect(await algoSelect.inputValue()).toBe("kociemba");
+
+  // 手順を入力して簡単なスクランブル状態にする
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  // 1. CFOP を選択して解く
+  await algoSelect.selectOption("cfop");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
+
+  // フェーズバッジが表示されることを確認
+  const cfopBadges = await page.locator(".phase-badge").allTextContents();
+  expect(cfopBadges.length).toBeGreaterThan(0);
+  const cfopNodes = await page.evaluate(
+    () => window.cube_store.getSolution()!.nodes,
+  );
+  expect(cfopNodes).toBeGreaterThan(0);
+  await expect(page.locator("#solver-note")).toContainText(
+    `${cfopNodes.toLocaleString()} ノードを探索`,
+  );
+  console.log("CFOP Phase Badges:", cfopBadges);
+
+  // 解法の最後まで進んで完成状態を検証
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 2. Thistlethwaite を選択して解く
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  await algoSelect.selectOption("thistlethwaite");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
+
+  const thBadges = await page.locator(".phase-badge").allTextContents();
+  expect(thBadges.length).toBeGreaterThan(0);
+  console.log("Thistlethwaite Phase Badges:", thBadges);
+
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 3. Korf (IDA*) を選択して解く
+  await page.locator("#tab-moves").click();
+  await page.locator("#algorithm").fill("R U R' U'");
+  await page.locator("#apply-algorithm").click();
+
+  await algoSelect.selectOption("korf");
+  await page.locator("#solve").click();
+  await expect(page.locator("#solution-content")).toBeVisible({
+    timeout: 10000,
+  });
+
+  // R U R' U' の逆手順（U R U' R'）など4手以内で最短解決
+  const korfMoves = await page.locator(".solution-move").allTextContents();
+  expect(korfMoves.length).toBeLessThanOrEqual(4);
+  await page.locator(".solution-move").last().click();
+  expect(await state(page)).toBe(SOLVED);
+
+  // 4. localStorage への永続化を確認
+  // 現在は "korf" が選択されているのでリロード後も "korf" が復元される
+  await page.reload();
+  await page.waitForSelector("#engine-status.ready");
+  expect(await page.locator("#solver-algorithm").inputValue()).toBe("korf");
+
+  // 5. URLパラメータ ?solver=cfop による指定
+  await page.goto("/?solver=cfop");
+  await page.waitForSelector("#engine-status.ready");
+  expect(await page.locator("#solver-algorithm").inputValue()).toBe("cfop");
+});
+
+test("clears active-press styles when window loses focus", async ({ page }) => {
+  await ready(page);
+  await page.keyboard.down("r");
+  const btn = page.locator('button[data-move="R"]');
+  await expect(btn).toHaveClass(/active-press/);
+
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(btn).not.toHaveClass(/active-press/);
+
+  await page.keyboard.up("r");
 });

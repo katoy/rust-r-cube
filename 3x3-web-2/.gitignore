@@ -11,8 +11,11 @@
 /test-images/
 /coverage-e2e/
 /coverage-e2e-advanced/
+*.lcov
 
 # OS and editor artifacts
 .DS_Store
 *.swp
 *~
+.sw-regression-*
+.offline-regression-*

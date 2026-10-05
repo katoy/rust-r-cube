@@ -1,0 +1,9 @@
+{"name":"physical_sticker_oracle","seed":20260923,"moves":3000,"colorChecks":3000,"arrowChecks":162000,"mismatches":0}
+{"name":"wasm_solver_sweep","algorithm":"kociemba","orientation":false,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":494.573}
+{"name":"wasm_solver_sweep","algorithm":"kociemba","orientation":true,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":500.279}
+{"name":"wasm_solver_sweep","algorithm":"cfop","orientation":false,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":25,"maxMs":9.944}
+{"name":"wasm_solver_sweep","algorithm":"cfop","orientation":true,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":25,"maxMs":10.085}
+{"name":"wasm_solver_sweep","algorithm":"thistlethwaite","orientation":false,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":500.282}
+{"name":"wasm_solver_sweep","algorithm":"thistlethwaite","orientation":true,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":500.289}
+{"name":"wasm_solver_sweep","algorithm":"korf","orientation":false,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":500.38}
+{"name":"wasm_solver_sweep","algorithm":"korf","orientation":true,"seeds":"1..25","budgetMs":500,"success":25,"rejected":0,"zeroNodes":0,"maxMs":500.465}

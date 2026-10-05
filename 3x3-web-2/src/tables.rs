@@ -62,10 +62,9 @@ impl MoveTable {
     pub fn get() -> &'static MoveTable {
         static TABLE: OnceLock<MoveTable> = OnceLock::new();
         TABLE.get_or_init(|| {
-            if let Some(bytes) = crate::TABLE_BYTES {
-                return decode_moves(bytes);
-            }
-            build_move_table()
+            crate::TABLE_BYTES
+                .map(decode_moves)
+                .unwrap_or_else(build_move_table)
         })
     }
 }
@@ -87,11 +86,9 @@ impl PruningTable {
     pub fn get() -> &'static PruningTable {
         static TABLE: OnceLock<PruningTable> = OnceLock::new();
         let move_table = MoveTable::get();
-        TABLE.get_or_init(|| {
-            if let Some(bytes) = crate::TABLE_BYTES {
-                return decode_pruning(bytes);
-            }
-            build_pruning_table(move_table)
+        TABLE.get_or_init(|| match crate::TABLE_BYTES {
+            Some(bytes) => decode_pruning(bytes),
+            None => build_pruning_table(move_table),
         })
     }
 }
@@ -294,7 +291,11 @@ pub(crate) fn generate_x2_maps() -> SymmetryMaps {
             continue;
         }
         rc.set_twist(i as u16);
-        let sym_rc = rc.multiply(&x2_cube);
+        let mut sym_rc = RawCube::default();
+        for slot in 0..8 {
+            let src = x2_cube.cp[slot] as usize;
+            sym_rc.co[slot] = (3 - rc.co[src]) % 3;
+        }
         let sym_i = sym_rc.get_twist() as usize;
 
         twist_seen[i] = true;
@@ -506,8 +507,9 @@ pub(crate) fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
 
     let mut distance = 0;
     let mut count = 1;
-    while count < total_size {
-        let mut found = false;
+    let mut found = true;
+    while count < total_size && found {
+        found = false;
         for i in 0..total_size {
             if table[i] == distance {
                 let s1 = i / size2;
@@ -523,9 +525,6 @@ pub(crate) fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
                     }
                 }
             }
-        }
-        if !found {
-            break;
         }
         distance += 1;
     }
@@ -547,8 +546,9 @@ pub(crate) fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
 
     let mut distance = 0;
     let mut count = 1;
-    while count < total_size {
-        let mut found = false;
+    let mut found = true;
+    while count < total_size && found {
+        found = false;
         for i in 0..total_size {
             if table[i] == distance {
                 let s1 = i / size2;
@@ -564,9 +564,6 @@ pub(crate) fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
                     }
                 }
             }
-        }
-        if !found {
-            break;
         }
         distance += 1;
     }

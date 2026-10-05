@@ -1,0 +1,13 @@
+
+Running 1 test using 1 worker
+
+✅ E2E Coverage Test Results:
+✓ initialize()
+✓ All functions tested with seed 1
+✓ All functions tested with seed 50
+✓ All functions tested with seed 100
+✓ All functions tested with seed 500
+✓ All functions tested with seed 1000
+  ✓  1 [chromium] › tests/e2e-complete-coverage.spec.ts:8:3 › Complete WASM and Tables Coverage › all WASM functions with comprehensive scenarios (9.4s)
+
+  1 passed (12.3s)

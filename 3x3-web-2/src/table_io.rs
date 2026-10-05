@@ -30,11 +30,38 @@ pub fn encode() -> Vec<u8> {
     output
 }
 
-struct Reader<'a> { data: &'a [u8], at: usize }
+#[allow(dead_code)]
+pub fn verify_table_data(data: &[u8]) -> Result<(), &'static str> {
+    if data.len() < 16 {
+        return Err("table data too short");
+    }
+    if &data[..8] != b"CUBE0001" {
+        return Err("table version mismatch");
+    }
+    let expected_checksum = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let actual_checksum = checksum(&data[16..]);
+    if expected_checksum != actual_checksum {
+        return Err("table checksum mismatch");
+    }
+    Ok(())
+}
+
+fn ensure_table_verified(data: &[u8]) {
+    static VERIFIED_PTR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let ptr = data.as_ptr() as usize;
+    if VERIFIED_PTR.load(std::sync::atomic::Ordering::Acquire) != ptr {
+        verify_table_data(data).expect("table validation failed");
+        VERIFIED_PTR.store(ptr, std::sync::atomic::Ordering::Release);
+    }
+}
+
+struct Reader<'a> {
+    data: &'a [u8],
+    at: usize,
+}
 impl<'a> Reader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        assert_eq!(&data[..8], b"CUBE0001", "table version mismatch");
-        assert_eq!(u64::from_le_bytes(data[8..16].try_into().unwrap()), checksum(&data[16..]), "table checksum mismatch");
+        ensure_table_verified(data);
         Self { data, at: 16 }
     }
     fn short(&mut self) -> u16 {

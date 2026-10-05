@@ -12,9 +12,22 @@ export interface PaletteOptions {
 export function renderPalette(options: PaletteOptions): void {
   const { container, selectedColor, onSelectColor } = options;
   if (!container) return;
-  container.replaceChildren();
 
   const colors = [...FACES, "?"];
+  const existingButtons = container.querySelectorAll<HTMLButtonElement>(
+    "button.color-choice",
+  );
+
+  if (existingButtons.length === colors.length) {
+    existingButtons.forEach((button, i) => {
+      const c = colors[i];
+      button.setAttribute("aria-checked", String(selectedColor === c));
+    });
+    return;
+  }
+
+  container.replaceChildren();
+
   colors.forEach((c) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -32,6 +45,7 @@ export function renderPalette(options: PaletteOptions): void {
     button.append(swatch, text);
     button.onclick = () => {
       onSelectColor(c);
+      button.focus();
     };
     container.append(button);
   });
@@ -51,10 +65,49 @@ export interface ResultsOptions {
 export function renderResultFaces(options: ResultsOptions): void {
   const { host, faces, currentView, onUpdateSticker } = options;
   if (!host) return;
-  host.replaceChildren();
 
   // 展開図（cube-net）と同じ URFDLB 順
   const faceOrder = ["U", "R", "F", "D", "L", "B"] as const;
+  const existingCards =
+    host.querySelectorAll<HTMLDivElement>(".camera-face-card");
+
+  if (existingCards.length === faceOrder.length) {
+    existingCards.forEach((card, faceIdx) => {
+      const face = faceOrder[faceIdx];
+      const viewOfFace = ["U", "R", "F"].includes(face) ? "A" : "B";
+      card.classList.toggle("is-active-view", currentView === viewOfFace);
+
+      const faceState = faces[face] ?? "?????????";
+      const centerColor = faceState[4];
+      const centerName =
+        centerColor && centerColor !== "?"
+          ? `${NAMES[centerColor]}面`
+          : FACE_NAMES[face];
+
+      const title = card.querySelector(".camera-face-title");
+      if (title) {
+        title.textContent = `${face} · ${centerName}`;
+      }
+
+      const cells = card.querySelectorAll<HTMLButtonElement>(".sticker");
+      cells.forEach((cell, i) => {
+        const color = i === 4 ? face : faceState[i];
+        cell.dataset.color = color;
+        cell.setAttribute(
+          "aria-label",
+          `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[color]}${i === 4 ? "（センター）" : ""}`,
+        );
+        if (i !== 4) {
+          cell.onclick = () => {
+            onUpdateSticker(face, i);
+          };
+        }
+      });
+    });
+    return;
+  }
+
+  host.replaceChildren();
 
   faceOrder.forEach((face) => {
     const card = document.createElement("div");

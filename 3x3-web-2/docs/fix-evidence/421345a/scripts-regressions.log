@@ -1,0 +1,10 @@
+
+Running 5 tests using 1 worker
+
+  ✓  1 [chromium] › tests/scripts-regression.spec.ts:12:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R14: generate-test-images.js exits with code 1 on failure (383ms)
+  ✓  2 [chromium] › tests/scripts-regression.spec.ts:52:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R14: launch-offline.js exits with code 1 on failure (211ms)
+  ✓  3 [chromium] › tests/scripts-regression.spec.ts:78:3 › R14 & R16: Script Exit Codes and Symlink Resolution › R16: scripts/start.sh resolves symlink and sets working directory to project root (93ms)
+  ✓  4 [chromium] › tests/scripts-regression.spec.ts:120:3 › R14 & R16: Script Exit Codes and Symlink Resolution › F3: check-review-guardrails.js exits with code 1 on violation fixture (105ms)
+  ✓  5 [chromium] › tests/scripts-regression.spec.ts:190:3 › R14 & R16: Script Exit Codes and Symlink Resolution › F5: launch-offline.js terminates cleanly with numeric exit code on SIGINT (806ms)
+
+  5 passed (2.4s)

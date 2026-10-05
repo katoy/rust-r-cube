@@ -50,14 +50,17 @@
   - Node.js 20 & npm 依存関係のインストール
   - Playwright (Chromium) のセットアップ
   - Rust チェック (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --release`)
+  - MSRV Rust 1.87.0 の独立ジョブでロック済み依存関係を含めた native 全ターゲット / WASM lib の `cargo check --locked`
   - Web チェック (`npm run format:check`, `npm run typecheck`, `npm run build`)
   - Playwright E2E テストの実行 (`npx playwright test`)
-  - テスト失敗時のレポート保存
+  - テスト失敗時の `3x3-web-2/test-results/` 保存（list reporter のスクリーンショット・trace・エラー情報。HTML レポートは生成しない）
 
 ### 3. GitHub Pages デプロイ (deploy-pages)
 **ファイル**: `.github/workflows/deploy-pages.yml`
 
 - **トリガー**: `main` ブランチへの push, workflow_dispatch
+- **手動実行**: Actions の「Deploy to GitHub Pages」→ Run workflow で **main** を選択。main の push / workflow_dispatch のみ deploy を許可し、PR や他ブランチの手動実行ではデプロイしない。
+- **品質ゲート**: `test-3x3-web-2`（stable 検証と Rust 1.87.0 native / WASM 互換チェック）→ `build` → `deploy` の依存関係を維持。テスト失敗時は `test-results/` を保存。
 - **デプロイ先**:
   - `/`: 2x2 Web (Trunk)
   - `/3x3/`: 3x3 Web (Trunk)

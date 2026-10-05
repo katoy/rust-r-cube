@@ -9,21 +9,29 @@ export function centerTurns(rotations: number[]): number[] {
   );
 }
 
+export function turnsToCenters(turns: number[]): number[] {
+  return turns.map((t) => (((t % 4) + 4) % 4) * quarterTurn);
+}
+
 export function automaticCenters(state: string): number[] {
-  // Any legal quarter turn changes both corner permutation parity and the
-  // parity of the center-turn sum. This picks one compatible orientation.
+  // 面の90°回転はコーナー置換パリティとセンター回転総和パリティの双方を反転させるため、
+  // パリティ整合を満たす有効な向きの代表値（U面の回転）を選択
   return [center_parity(state) * quarterTurn, 0, 0, 0, 0, 0];
 }
 
 export function centersFromInput(state: string, turns: unknown): number[] {
   if (turns === undefined) return automaticCenters(state);
-  if (
-    !Array.isArray(turns) ||
-    turns.length !== 6 ||
-    !turns.every((t) => Number.isInteger(t) && t >= 0 && t <= 3)
-  ) {
+  if (!Array.isArray(turns) || turns.length !== 6) {
     throw new Error(
-      "センターの向きは6面それぞれ0°・90°・180°・270°で指定してください。",
+      `センターの向きは6面それぞれ0°・90°・180°・270°で指定してください (要素数: ${Array.isArray(turns) ? turns.length : typeof turns})。`,
+    );
+  }
+  const invalidIndex = turns.findIndex(
+    (t) => !Number.isInteger(t) || t < 0 || t > 3,
+  );
+  if (invalidIndex !== -1) {
+    throw new Error(
+      `センターの向きは6面それぞれ0°・90°・180°・270°で指定してください (${FACES[invalidIndex]}面: ${JSON.stringify(turns[invalidIndex])})。`,
     );
   }
   if (turns.reduce((sum, t) => sum + t, 0) % 2 !== center_parity(state)) {

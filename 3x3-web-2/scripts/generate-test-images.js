@@ -97,7 +97,7 @@ const CUBE_STATES = [
   },
   {
     name: "superflip",
-    state: "RFUUUUDDFUBBRRFFLFRRRFFBFFDDDRDDUDDUURBLLLLLLLRBUBBLBB",
+    state: "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
   },
   {
     name: "scrambled-1",
@@ -395,4 +395,7 @@ async function generateTestImages() {
   console.log(`   - マニフェスト: ${manifestPath}`);
 }
 
-generateTestImages().catch(console.error);
+generateTestImages().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

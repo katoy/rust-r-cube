@@ -1,0 +1,6 @@
+{
+  "parentPid": 95182,
+  "descendants": [95220],
+  "afterOnlyServerProcKillStillResponds": false,
+  "expected": "owned preview server and descendants stop at launcher cleanup"
+}

@@ -1,0 +1,13 @@
+{
+  "scrambledIsSolved": false,
+  "beforeClose": {
+    "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "canUndo": true,
+    "undoDisabled": false
+  },
+  "afterClose": {
+    "state": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "canUndo": false,
+    "undoDisabled": true
+  }
+}

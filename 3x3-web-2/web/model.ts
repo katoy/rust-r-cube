@@ -34,12 +34,22 @@ export const FACE_NAMES_EN: Record<string, string> = {
   L: "左面 (Left)",
   B: "背面 (Back)",
 };
+export type SolverAlgorithm = "kociemba" | "cfop" | "thistlethwaite" | "korf";
+
+export interface PhaseInfo {
+  name: string;
+  start: number;
+  end: number;
+}
+
 export interface ResultData {
   state: string;
   moves: string[];
   states: string[];
   elapsed_ms: number;
   nodes: number;
+  algorithm?: string;
+  phases?: PhaseInfo[];
 }
 export interface Request {
   id: number;
@@ -49,6 +59,7 @@ export interface Request {
   budget: number;
   includeOrientation?: boolean;
   centerRotations?: number[];
+  algorithm?: SolverAlgorithm;
 }
 
 export type Reply =

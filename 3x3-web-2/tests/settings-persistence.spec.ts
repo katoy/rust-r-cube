@@ -46,4 +46,24 @@ test.describe("R09: Settings persistence across multiple reloads", () => {
     // 2回目のリロード後も設定が維持されていること
     await expect(page.locator("#reduced-motion")).toBeChecked();
   });
+
+  test("R09-scope: localStorage state and settings are isolated per deployment scope on same origin", async ({
+    page,
+  }) => {
+    // 1. ルートスコープ (/) で reduced-motion 設定を有効にして保存
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+    await page.locator("#reduced-motion").check();
+    await expect(page.locator("#reduced-motion")).toBeChecked();
+
+    // 2. 同一オリジンの別スコープ (/nested/cube/) にアクセス
+    await page.goto("/nested/cube/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    // 別スコープでは、ルートスコープで保存された設定 (reduced-motion: checked) で汚染されず、デフォルト値 (未チェック) であるべき
+    await expect(
+      page.locator("#reduced-motion"),
+      "Settings in localStorage must not leak across different deployment scopes",
+    ).not.toBeChecked();
+  });
 });

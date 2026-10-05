@@ -1,0 +1,80 @@
+
+Running 21 tests using 1 worker
+
+  ✓   1 [chromium] › tests/app-state.spec.ts:10:3 › AppStateMachine / AppState (State パターン検証) › 初期状態は IdleState であり、適切な権限を持つ (5ms)
+  ✓   2 [chromium] › tests/app-state.spec.ts:25:3 › AppStateMachine / AppState (State パターン検証) › Idle から Solving への遷移と、Solving 中の不正操作一括遮断 (7ms)
+  ✓   3 [chromium] › tests/app-state.spec.ts:62:3 › AppStateMachine / AppState (State パターン検証) › Solving 中のキャンセルによる Idle 復帰 (1ms)
+  ✓   4 [chromium] › tests/app-state.spec.ts:75:3 › AppStateMachine / AppState (State パターン検証) › Solving 完了による Previewing 遷移（解法あり） (3ms)
+  ✓   5 [chromium] › tests/app-state.spec.ts:92:3 › AppStateMachine / AppState (State パターン検証) › Solving 完了による Idle 復帰（解法なし・失敗） (0ms)
+  ✓   6 [chromium] › tests/app-state.spec.ts:101:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中にキューブ変更操作が入った場合、プレビューを自動終了して Idle へ安全に遷移する (1ms)
+  ✓   7 [chromium] › tests/app-state.spec.ts:126:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中に closeSolution を呼ぶと Idle へ遷移する (1ms)
+  ✓   8 [chromium] › tests/app-state.spec.ts:140:3 › AppStateMachine / AppState (State パターン検証) › 未変更・例外ではプレビューと終了フックを保持する (2ms)
+  ✓   9 [chromium] › tests/app-state.spec.ts:168:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中に再探索（startSolving）を開始すると Solving へ直接遷移可能 (0ms)
+  ✓  10 [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves colors and orientation (7.0s)
+Preset '簡単（3手）' solved in 3 moves (3 moves): F' U' R'
+Preset 'T-Permutation' solved in 11 moves (at most 14 moves): U F2 U' F2 D R2 B2 U B2 D' R2
+Preset 'スーパーフリップ' solved in 23 moves (valid center-aware solution, including budget fallback): R L' F' U D R' B2 U2 L F B' L2 U2 B2 U2 B2 D2 L2 D L2 D R2 U
+Preset 'ランダム（seed=1）' solved in 24 moves (at most 25 moves): D L' B D B U L F' R' U' B' U2 F2 R2 U2 R2 U2 B2 L2 F2 D L2 D R2
+  ✓  11 [chromium] › tests/app.spec.ts:984:1 › all presets can be loaded and solved within configured move bounds (13.2s)
+  ✓  12 [chromium] › tests/code-review-421345a-regression.spec.ts:25:1 › F01: Redo during preview preserves both preview and base in Undo history (6.2s)
+  ✓  13 [chromium] › tests/code-review-421345a-regression.spec.ts:54:3 › F02: delayed editor import cannot open after search starts (8.2s)
+  ✓  14 [chromium] › tests/code-review-421345a-regression.spec.ts:54:3 › F02: delayed camera import cannot open after search starts (10.2s)
+  ✓  15 [chromium] › tests/code-review-421345a-regression.spec.ts:100:1 › F02: applying an already-open editor cannot bypass the solving guard (6.8s)
+  ✓  16 [chromium] › tests/code-review-421345a-regression.spec.ts:119:1 › F03/F12: malformed center types reject the actual file without leaving preview (7.5s)
+  ✘  17 [chromium] › tests/code-review-421345a-regression.spec.ts:148:1 › F12: empty and invalid algorithms keep preview; valid input commits it (45.6s)
+  ✓  18 [chromium] › tests/code-review-421345a-regression.spec.ts:167:1 › F13: disposing a rendered scene releases the actual shadow target (1.9s)
+  ✓  19 [chromium] › tests/code-review-63bce97-regression.spec.ts:13:3 › 63bce97 レビュー指摘点 (F1〜F4) 回帰テスト › F1: 解法表示中に再探索を開始した際、古い解法が失効し、再生・シーク操作が無効化されて探索完了後に新解法が確実に反映される (2.6s)
+  ✓  20 [chromium] › tests/code-review-63bce97-regression.spec.ts:194:3 › 63bce97 レビュー指摘点 (F1〜F4) 回帰テスト › F4: 探索中はプリセット変更が遮断され、キャンセル後に読み込める (2.4s)
+  ✓  21 [chromium] › tests/code-review-b605038-regression.spec.ts:110:3 › b605038 レビュー指摘点 (F1〜F5) 回帰テスト › F3: 探索中の色・カメラ入力は直接ハンドラを呼んでも拒否される (2.1s)
+
+
+  1) [chromium] › tests/code-review-421345a-regression.spec.ts:148:1 › F12: empty and invalid algorithms keep preview; valid input commits it 
+
+    Test timeout of 45000ms exceeded.
+
+    Error: locator.fill: Test timeout of 45000ms exceeded.
+    Call log:
+      - waiting for locator('#algorithm')
+        - locator resolved to <textarea id="algorithm" maxlength="4096" spellcheck="false" placeholder="R U R' U'"></textarea>
+        - fill(" ")
+      - attempting fill action
+        2 × waiting for element to be visible, enabled and editable
+          - element is not visible
+        - retrying fill action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and editable
+          - element is not visible
+        - retrying fill action
+          - waiting 100ms
+        80 × waiting for element to be visible, enabled and editable
+           - element is not visible
+         - retrying fill action
+           - waiting 500ms
+
+
+      154 |   const before = await snapshot(page);
+      155 |   for (const algorithm of [" ", "not-a-move"]) {
+    > 156 |     await page.locator("#algorithm").fill(algorithm);
+          |                                      ^
+      157 |     await page.locator("#apply-algorithm").click();
+      158 |     expect(await snapshot(page)).toEqual(before);
+      159 |     await expect(page.locator("#solution-content")).toBeVisible();
+        at /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/tests/code-review-421345a-regression.spec.ts:156:38
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/code-review-421345a-regres-81620-view-valid-input-commits-it-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/code-review-421345a-regres-81620-view-valid-input-commits-it-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/code-review-421345a-regres-81620-view-valid-input-commits-it-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/code-review-421345a-regres-81620-view-valid-input-commits-it-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/code-review-421345a-regression.spec.ts:148:1 › F12: empty and invalid algorithms keep preview; valid input commits it 
+  20 passed (1.9m)

@@ -1,0 +1,80 @@
+{
+  "f1Timeline": {
+    "valuetext": "開始状態",
+    "valuenow": "0",
+    "max": "0",
+    "stepCount": "0 / 0",
+    "nextInstruction": "6面が揃いました。おつかれさまでした。",
+    "expectedText": "完成 (0手)",
+    "isMisleading": true
+  },
+  "f2DuringSolve": {
+    "solving": true,
+    "cancelVisible": true,
+    "solutionContentVisible": true,
+    "playDisabled": false,
+    "timelineDisabled": false,
+    "nextDisabled": false,
+    "moveButtonsCount": 18
+  },
+  "f2AfterSolve": {
+    "note": "23,519 ノードを探索 · 完成を検証",
+    "solutionAlgorithm": "kociemba",
+    "solutionMoves": [
+      "U2",
+      "R2",
+      "L2",
+      "D'",
+      "F2",
+      "L2",
+      "D'",
+      "B",
+      "U'",
+      "F2",
+      "L2",
+      "U",
+      "B2",
+      "R2",
+      "B2",
+      "U",
+      "L2",
+      "U"
+    ],
+    "discarded": false
+  },
+  "f2Data": {
+    "initialSolution": {
+      "moveCount": "18 手",
+      "stepCount": "0 / 18",
+      "hasSolution": true,
+      "playDisabled": false,
+      "timelineDisabled": false
+    },
+    "beforeSolveRevision": 1,
+    "revisionAfterSeek": 2,
+    "revisionChangedDuringSolve": true
+  },
+  "f3BeforeClose": {
+    "hasImageA": true,
+    "statusTextA": "読込完了 (640×480)",
+    "cardHasClass": true,
+    "inputAValue": ""
+  },
+  "f3AfterClose": {
+    "hasImageA": false,
+    "statusTextA": "読込完了 (640×480)",
+    "cardHasClass": true,
+    "inputAValue": "",
+    "facesLength": 0,
+    "inconsistent": true
+  },
+  "f4DuringPreset": {
+    "solvingStillActive": false,
+    "presetStatus": "読み込み中…"
+  },
+  "f4AfterPreset": {
+    "solving": true,
+    "presetStatus": "✓ 簡単（3手） を読み込みました",
+    "solverNote": "53,668 ノードを探索 · 完成を検証"
+  }
+}

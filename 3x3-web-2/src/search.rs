@@ -6,7 +6,7 @@ pub struct Search {
     mt: &'static MoveTable,
     pt: &'static PruningTable,
     start: Instant,
-    budget_ms: f64,
+    budget_ms: u128,
     pub nodes: u64,
     pub timed_out: bool,
     pub path: Vec<usize>,
@@ -15,6 +15,8 @@ pub struct Search {
     target_centers: Option<[i32; 6]>,
     current_centers: [i32; 6],
     best_solution: Option<Vec<usize>>,
+    pub best_phase1_len: usize,
+    current_p1_len: usize,
 }
 impl Search {
     pub fn new(budget_ms: u32) -> Self {
@@ -22,7 +24,7 @@ impl Search {
             mt: MoveTable::get(),
             pt: PruningTable::get(),
             start: Instant::now(),
-            budget_ms: f64::from(budget_ms),
+            budget_ms: budget_ms as u128,
             nodes: 0,
             timed_out: false,
             path: Vec::with_capacity(32),
@@ -31,6 +33,8 @@ impl Search {
             target_centers: None,
             current_centers: [0; 6],
             best_solution: None,
+            best_phase1_len: 0,
+            current_p1_len: 0,
         }
     }
     pub fn with_target_centers(mut self, centers: [i32; 6]) -> Self {
@@ -40,6 +44,13 @@ impl Search {
         }
         self.target_centers = Some(c);
         self.current_centers = c;
+        self
+    }
+    pub fn set_max_total(&mut self, max: usize) {
+        self.max_total = max;
+    }
+    pub fn with_max_total(mut self, max: usize) -> Self {
+        self.max_total = max;
         self
     }
     pub fn solve(&mut self, cube: &RawCube) -> Option<Vec<usize>> {
@@ -54,6 +65,7 @@ impl Search {
         }
         self.initial = *cube;
         self.best_solution = None;
+        self.best_phase1_len = 0;
 
         // 短い手数（深さ 1..=5）の直接探索（理論的最短手数を瞬時に見つける）
         for d in 1..=5 {
@@ -62,6 +74,7 @@ impl Search {
                 self.current_centers = target;
             }
             if self.direct_solve(cube, d, 99) {
+                self.best_phase1_len = self.path.len();
                 return Some(self.path.clone());
             }
             if self.timed_out {
@@ -69,48 +82,62 @@ impl Search {
             }
         }
 
-        for total in [22, 24, 30] {
-            if let Some(ref best) = self.best_solution {
-                if best.len() <= total {
-                    return self.best_solution.clone();
-                }
-            }
-            self.max_total = self
-                .best_solution
-                .as_ref()
-                .map_or(total, |b| (b.len().saturating_sub(1)).min(total));
+        let initial_max = if self.max_total > 0 {
+            self.max_total
+        } else {
+            22
+        };
+        self.max_total = initial_max;
 
-            for depth in 0..=12 {
-                if depth > self.max_total {
-                    break;
-                }
-                self.path.clear();
-                if let Some(target) = self.target_centers {
-                    self.current_centers = target;
-                }
-                if self.phase1(
-                    cube.get_twist(),
-                    cube.get_flip(),
-                    cube.get_ud_slice(),
-                    depth as u8,
-                    99,
-                ) {
-                    // 解が見つかった場合、max_total はすでに短縮されている。
-                    // 非常に短い解（<= 5手）なら直ちに最善解として終了してよい
-                    if let Some(ref b) = self.best_solution {
-                        if b.len() <= depth || b.len() <= 5 {
-                            return self.best_solution.clone();
-                        }
-                    }
-                }
-                if self.timed_out {
-                    return self.best_solution.clone();
-                }
+        for depth in 0..=12 {
+            if depth >= self.max_total {
+                break;
             }
-            if self.best_solution.is_some() {
-                return self.best_solution.clone();
+            self.path.clear();
+            if let Some(target) = self.target_centers {
+                self.current_centers = target;
+            }
+            self.phase1(
+                cube.get_twist(),
+                cube.get_flip(),
+                cube.get_ud_slice(),
+                depth as u8,
+                99,
+            );
+            if self.timed_out {
+                break;
             }
         }
+
+        // もし 22 手以内で解が見つからなかった場合のみ、24, 30 と段階的に上限を緩和
+        if self.best_solution.is_none() && !self.timed_out && initial_max <= 22 {
+            for &total in &[24, 30] {
+                self.max_total = total;
+                for depth in 0..=12 {
+                    if depth >= self.max_total {
+                        break;
+                    }
+                    self.path.clear();
+                    if let Some(target) = self.target_centers {
+                        self.current_centers = target;
+                    }
+                    self.phase1(
+                        cube.get_twist(),
+                        cube.get_flip(),
+                        cube.get_ud_slice(),
+                        depth as u8,
+                        99,
+                    );
+                    if self.best_solution.is_some() || self.timed_out {
+                        break;
+                    }
+                }
+                if self.best_solution.is_some() || self.timed_out {
+                    break;
+                }
+            }
+        }
+
         self.best_solution.clone()
     }
     pub fn direct_solve(&mut self, cube: &RawCube, depth: u8, last: usize) -> bool {
@@ -159,33 +186,31 @@ impl Search {
         false
     }
     fn exhausted(&mut self) -> bool {
+        if self.budget_ms == 0 {
+            self.timed_out = true;
+            return true;
+        }
         self.nodes += 1;
-        if self.nodes & 1023 == 0 && self.start.elapsed().as_secs_f64() * 1000.0 >= self.budget_ms {
+        if self.nodes & 1023 == 0 && self.start.elapsed().as_millis() >= self.budget_ms {
             self.timed_out = true;
         }
         self.timed_out
     }
+    fn min_phase1_center_moves(&self) -> u8 {
+        if self.target_centers.is_some() {
+            // R(1), F(2), L(4), B(5) は Phase 2 では 180° 回転しか行えないため、
+            // Phase 1 終了時点でこれらのセンター回転は偶数 (0 mod 2) でなければならない。
+            // 奇数回転の面の数が残り深さを超える場合は到達不能として枝刈りする。
+            ((self.current_centers[1] & 1)
+                + (self.current_centers[2] & 1)
+                + (self.current_centers[4] & 1)
+                + (self.current_centers[5] & 1)) as u8
+        } else {
+            0
+        }
+    }
     fn min_phase2_center_moves(&self) -> u8 {
-        let mut count = 0u8;
-        if self.current_centers[0] != 0 {
-            count += 1;
-        }
-        if self.current_centers[1] == 2 {
-            count += 1;
-        }
-        if self.current_centers[2] == 2 {
-            count += 1;
-        }
-        if self.current_centers[3] != 0 {
-            count += 1;
-        }
-        if self.current_centers[4] == 2 {
-            count += 1;
-        }
-        if self.current_centers[5] == 2 {
-            count += 1;
-        }
-        count
+        self.current_centers.iter().filter(|&&c| c != 0).count() as u8
     }
     fn phase1(&mut self, twist: u16, flip: u16, slice: u16, depth: u8, last: usize) -> bool {
         if self.exhausted() {
@@ -198,13 +223,16 @@ impl Search {
         if distance > depth {
             return false;
         }
+        if self.min_phase1_center_moves() > depth {
+            return false;
+        }
         if depth == 0 {
             if self.path.len() > self.max_total {
                 return false;
             }
             if self.target_centers.is_some() {
-                // In Phase 2, R(1), F(2), L(4), B(5) can only turn by 180° (+2 mod 4).
-                // If any of their remaining center rotations is odd, it can never be solved to 0 mod 4.
+                // Phase 2 では R(1), F(2), L(4), B(5) は 180° (+2 mod 4) 回転のみ許可される。
+                // したがって、残余センター回転が奇数の面がある場合、Phase 2 内で 0 mod 4 に解消することはできない。
                 if (self.current_centers[1] & 1) != 0
                     || (self.current_centers[2] & 1) != 0
                     || (self.current_centers[4] & 1) != 0
@@ -224,11 +252,10 @@ impl Search {
             } else {
                 0
             };
+            self.current_p1_len = self.path.len();
             let mut found = false;
-            for d in min_d..=max {
-                if self.path.len() + d > self.max_total {
-                    break;
-                }
+            let max_d = max.min(self.max_total.saturating_sub(self.path.len()));
+            for d in min_d..=max_d {
                 if self.phase2(
                     cube.get_cp(),
                     cube.get_ep8(),
@@ -239,9 +266,6 @@ impl Search {
                     found = true;
                     // 見つかった解で max_total が縮小されたので、これ以上大きい d は探索不要
                     break;
-                }
-                if self.timed_out {
-                    return false;
                 }
             }
             return found;
@@ -259,15 +283,13 @@ impl Search {
                 };
                 self.path.push(m);
                 self.current_centers[face] = (self.current_centers[face] + t) & 3;
-                if self.phase1(
+                let _ = self.phase1(
                     self.mt.twist[twist as usize][m],
                     self.mt.flip[flip as usize][m],
                     self.mt.ud_slice[slice as usize][m],
                     depth - 1,
                     face,
-                ) {
-                    return true;
-                }
+                );
                 self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
                 self.path.pop();
                 if self.timed_out {
@@ -275,7 +297,7 @@ impl Search {
                 }
             }
         }
-        false
+        self.best_solution.is_some()
     }
     fn phase2(&mut self, cp: u16, ep: u16, sp: u16, depth: u8, last: usize) -> bool {
         if self.exhausted() {
@@ -299,13 +321,8 @@ impl Search {
             }
         }
         if depth == 0 {
-            if cp != 0 || ep != 0 || sp != 0 {
-                return false;
-            }
-            if self.target_centers.is_some() && !self.current_centers.iter().all(|&c| c == 0) {
-                return false;
-            }
             self.best_solution = Some(self.path.clone());
+            self.best_phase1_len = self.current_p1_len;
             self.max_total = self.path.len().saturating_sub(1);
             return true;
         }
@@ -332,13 +349,122 @@ impl Search {
             }
             self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
             self.path.pop();
-            if self.timed_out {
-                return false;
-            }
         }
         false
     }
 }
 fn redundant(face: usize, last: usize) -> bool {
     face == last || ((3..6).contains(&last) && face + 3 == last)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_min_phase2_center_moves() {
+        let mut search = Search::new(1000);
+        assert_eq!(search.min_phase2_center_moves(), 0);
+
+        search.current_centers = [1, 2, 0, 3, 2, 0];
+        // 非ゼロのセンター回転面 (0, 1, 3, 4) の個数は 4
+        assert_eq!(search.min_phase2_center_moves(), 4);
+
+        search.current_centers = [0, 0, 0, 0, 0, 0];
+        assert_eq!(search.min_phase2_center_moves(), 0);
+
+        search.current_centers = [2, 2, 2, 2, 2, 2];
+        assert_eq!(search.min_phase2_center_moves(), 6);
+    }
+
+    #[test]
+    fn test_search_solved_with_zero_target_centers() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+        let res = search.solve(&RawCube::default());
+        assert_eq!(res, Some(Vec::new()));
+    }
+
+    #[test]
+    fn test_search_direct_solve_edge_cases() {
+        let mut search = Search::new(1000).with_target_centers([1, 0, 0, 0, 0, 0]);
+        search.current_centers = [1, 0, 0, 0, 0, 0];
+        // キューブは default だが centers が 0 ではないので false
+        assert!(!search.direct_solve(&RawCube::default(), 0, 99));
+
+        // キューブが default でない場合
+        let mut non_default = RawCube::default();
+        non_default.co[0] = 1;
+        assert!(!search.direct_solve(&non_default, 0, 99));
+
+        // non_zero_centers > depth
+        search.current_centers = [1, 2, 1, 2, 1, 0];
+        assert!(!search.direct_solve(&RawCube::default(), 2, 99));
+    }
+
+    #[test]
+    fn test_search_phase2_branch_coverage() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+
+        // depth == 0 でパーツ未解決 (cp != 0)
+        assert!(!search.phase2(1, 0, 0, 0, 99));
+        assert!(!search.phase2(0, 1, 0, 0, 99));
+        assert!(!search.phase2(0, 0, 1, 0, 99));
+
+        // depth == 0 でパーツは解決 (0, 0, 0) だが centers が 0 ではない
+        search.current_centers = [1, 0, 0, 0, 0, 0];
+        assert!(!search.phase2(0, 0, 0, 0, 99));
+
+        // センター奇数回転チェック (face 1, 2, 4, 5 のいずれかが奇数)
+        search.current_centers = [0, 1, 0, 0, 0, 0]; // R が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 1, 0, 0, 0]; // F が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 0, 0, 1, 0]; // L が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        search.current_centers = [0, 0, 0, 0, 0, 1]; // B が奇数
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        // min_phase2_center_moves > depth
+        search.current_centers = [2, 2, 2, 2, 2, 2]; // 6手必要
+        assert!(!search.phase2(0, 0, 0, 2, 99));
+
+        // depth == 0 で完全解決
+        search.current_centers = [0; 6];
+        assert!(search.phase2(0, 0, 0, 0, 99));
+        assert!(search.best_solution.is_some());
+
+        // phase2 先頭でのタイムアウト分岐
+        search.timed_out = true;
+        assert!(!search.phase2(0, 0, 0, 1, 99));
+
+        // phase2 再帰ループ内でのタイムアウト分岐 (timed_out チェック)
+        let mut search2 = Search::new(0);
+        search2.timed_out = true;
+        assert!(!search2.phase2(1, 0, 0, 1, 99));
+    }
+
+    #[test]
+    fn test_search_phase1_branch_coverage() {
+        let mut search = Search::new(1000).with_target_centers([0; 6]);
+        search.max_total = 5;
+        search.path = vec![0; 10]; // path.len() > max_total
+        assert!(!search.phase1(0, 0, 0, 0, 99));
+
+        // phase1 depth == 0 で target_centers の奇数回転チェック
+        search.path = vec![0; 2];
+        search.max_total = 10;
+        search.current_centers = [0, 1, 0, 0, 0, 0]; // R が奇数
+        assert!(!search.phase1(0, 0, 0, 0, 99));
+    }
+
+    #[test]
+    fn test_search_timeout_returns_none() {
+        let sc = crate::cube::parse_moves("R U F B L D R U F B L D").unwrap();
+        let scrambled = crate::cube::apply(&RawCube::default(), &sc);
+        let mut search = Search::new(0);
+        assert!(search.solve(&scrambled).is_none());
+    }
 }

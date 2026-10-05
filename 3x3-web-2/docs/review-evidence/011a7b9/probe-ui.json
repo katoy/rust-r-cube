@@ -1,0 +1,42 @@
+{
+  "cameraBefore": {
+    "faces": {
+      "U": "UUUUUUUUU",
+      "R": "RRRRRRRRR",
+      "F": "FFFFFFFFF",
+      "D": "DDDDDDDDD",
+      "L": "LLLLLLLLL",
+      "B": "BBBBBBBBB"
+    },
+    "progress": "6 / 6 面",
+    "applyEnabled": true,
+    "imageA": "blob:http://127.0.0.1:5173/e9ef39d8-90ba-44c3-8a8d-befe79a82d08"
+  },
+  "cameraAfter": {
+    "faces": {
+      "U": "UUUUUUUUU",
+      "R": "RRRRRRRRR",
+      "F": "FFFFFFFFF",
+      "D": "DDDDDDDDD",
+      "L": "LLLLLLLLL",
+      "B": "BBBBBBBBB"
+    },
+    "progress": "6 / 6 面",
+    "applyEnabled": true,
+    "imageAChanged": true,
+    "statusA": "読込完了 (640×480)"
+  },
+  "presetBeforeOldFailure": "✓ 簡単（3手） を読み込みました",
+  "presetStateBeforeOldFailure": "UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB",
+  "presetAfterOldFailure": "❌ 読み込み失敗 (HTTP 503: ファイルが見つかりません (http://127.0.0.1:5173/cubes/solved.json))",
+  "presetStateAfterOldFailure": "UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB",
+  "timeline": {
+    "step": 1,
+    "moves": [
+      "U'",
+      "R'"
+    ],
+    "ariaValueText": "1手目: R' (同時最適化: 色＆センター向き)",
+    "nextSymbol": "R'"
+  }
+}

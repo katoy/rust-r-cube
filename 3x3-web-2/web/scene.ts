@@ -47,11 +47,13 @@ function rotationMatrixForFaceAngle(
 }
 
 export class CubeScene {
+  private static tempVec = new THREE.Vector3();
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
   private controls: OrbitControls;
   private root = new THREE.Group();
+  private turnLayer = new THREE.Group(); // 回転アニメーション用レイヤー（再利用でGCゼロ化）
   private stickers: THREE.Mesh<
     THREE.BufferGeometry,
     THREE.MeshStandardMaterial
@@ -82,7 +84,12 @@ export class CubeScene {
   };
   private dirty = true;
   private observer: ResizeObserver;
+  private resizeRafId?: number;
   private next = "";
+  private onContextLost = (event: Event) => {
+    event.preventDefault();
+    this.host.dispatchEvent(new Event("render-failed"));
+  };
 
   constructor(private host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -91,13 +98,12 @@ export class CubeScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.domElement.setAttribute(
-      "aria-label",
-      "3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンを使ってください。",
-    );
+    this.updateAriaLabel("完成状態");
     this.renderer.domElement.setAttribute("role", "img");
+    this.renderer.domElement.setAttribute("tabindex", "0");
     this.host.append(this.renderer.domElement);
     this.scene.add(this.root, new THREE.HemisphereLight(0xfdf5df, 0x506977, 3));
+    this.root.add(this.turnLayer);
     this.root.add(this.arrowGroup);
     const key = new THREE.DirectionalLight(0xfff3dc, 4);
     key.position.set(-3, 7, 5);
@@ -173,9 +179,14 @@ export class CubeScene {
           label.position.copy(mesh.position).addScaledVector(normal[f], 0.017);
           const rotMatrix = rotationMatrixForFaceAngle(f, 0);
           label.quaternion.setFromRotationMatrix(rotMatrix);
-          label.renderOrder = 9;
           this.centerLabels[f] = label;
-          this.add(label);
+          label.renderOrder = 9;
+          label.userData = {
+            origin: label.position.clone(),
+            rotation: label.quaternion.clone(),
+            face: f,
+          };
+          this.root.add(label);
         }
       }
 
@@ -246,14 +257,14 @@ export class CubeScene {
     this.controls.minPolarAngle = 0.12;
     this.controls.maxPolarAngle = Math.PI - 0.12;
     this.resetView();
-    this.observer = new ResizeObserver(() => this.resize());
+    this.observer = new ResizeObserver(() => this.resize(false));
     this.observer.observe(host);
-    this.resize();
+    this.resize(true);
     this.renderer.setAnimationLoop((time) => this.frame(time));
-    this.renderer.domElement.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-      host.dispatchEvent(new Event("render-failed"));
-    });
+    this.renderer.domElement.addEventListener(
+      "webglcontextlost",
+      this.onContextLost,
+    );
   }
   private add(mesh: THREE.Object3D) {
     mesh.userData.origin = mesh.position.clone();
@@ -261,11 +272,30 @@ export class CubeScene {
     this.pieces.push(mesh);
     this.root.add(mesh);
   }
-  private resize() {
+  private resize(immediate = false) {
+    if (immediate) {
+      if (this.resizeRafId !== undefined) {
+        cancelAnimationFrame(this.resizeRafId);
+        this.resizeRafId = undefined;
+      }
+      this.applyResize();
+      return;
+    }
+    if (this.resizeRafId !== undefined) return;
+    this.resizeRafId = requestAnimationFrame(() => {
+      this.resizeRafId = undefined;
+      this.applyResize();
+    });
+  }
+  private applyResize() {
     this.dirty = true;
     const w = this.host.clientWidth,
       h = this.host.clientHeight;
     if (!w || !h) return;
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.renderer.getPixelRatio() !== pr) {
+      this.renderer.setPixelRatio(pr);
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
@@ -307,28 +337,69 @@ export class CubeScene {
   }
 
   dispose() {
+    if (this.resizeRafId !== undefined) {
+      cancelAnimationFrame(this.resizeRafId);
+      this.resizeRafId = undefined;
+    }
     this.finish();
     this.renderer.setAnimationLoop(null);
+    this.renderer.domElement.removeEventListener(
+      "webglcontextlost",
+      this.onContextLost,
+    );
     this.controls.dispose();
     this.observer.disconnect();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+
     this.scene.traverse((object) => {
+      if (
+        object instanceof THREE.DirectionalLight ||
+        object instanceof THREE.SpotLight ||
+        object instanceof THREE.PointLight
+      ) {
+        object.shadow.dispose();
+      }
       if (object instanceof THREE.Mesh) {
-        object.geometry.dispose();
-        const materials = Array.isArray(object.material)
+        if (object.geometry) geometries.add(object.geometry);
+        const mats = Array.isArray(object.material)
           ? object.material
           : [object.material];
-        for (const material of materials) {
-          material.map?.dispose();
-          material.dispose();
+        for (const mat of mats) {
+          if (mat) {
+            if ("map" in mat && mat.map instanceof THREE.Texture) {
+              mat.map.dispose();
+            }
+            materials.add(mat);
+          }
         }
       }
     });
+
+    geometries.forEach((g) => g.dispose());
+    materials.forEach((m) => m.dispose());
+
     this.arrowGeometry?.dispose();
     this.outlineGeometry?.dispose();
     this.outlineMaterial?.dispose();
     this.colorMaterials.forEach((mat) => mat.dispose());
     this.colorMaterials.clear();
+    for (const label of this.centerLabels) {
+      label.geometry?.dispose();
+      if (label.material instanceof THREE.MeshBasicMaterial) {
+        label.material.map?.dispose();
+        label.material.dispose();
+      }
+    }
     this.renderer.dispose();
+    this.renderer.domElement.remove();
+    this.stickers = [];
+    this.pieces = [];
+    this.centerLabels = [];
+    this.outlineMeshes = [];
+    this.arrowMeshes = [];
+    this.turnLayer.clear();
+    this.scene.clear();
   }
   show(state: string, next = "") {
     this.dirty = true;
@@ -416,8 +487,8 @@ export class CubeScene {
       return;
     }
     const axis = normal[FACES.indexOf(move[0])];
-    const layer = new THREE.Group();
-    this.root.add(layer);
+    const layer = this.turnLayer;
+    layer.quaternion.identity();
     this.pieces
       .filter((mesh) => mesh.position.dot(axis) > 0.5)
       .forEach((mesh) => layer.attach(mesh));
@@ -425,12 +496,18 @@ export class CubeScene {
     // 回転する層に属する矢印（カラー矢印およびアウトライン）を layer に attach
     const movingArrows = (this.arrowGroup.children as THREE.Object3D[]).filter(
       (mesh) => {
-        const pos = new THREE.Vector3();
-        mesh.getWorldPosition(pos);
-        return pos.dot(axis) > 0.5;
+        mesh.getWorldPosition(CubeScene.tempVec);
+        return CubeScene.tempVec.dot(axis) > 0.5;
       },
     );
     movingArrows.forEach((mesh) => layer.attach(mesh));
+
+    // 回転する層のセンターラベルを layer に attach
+    const faceIdx = FACES.indexOf(move[0]);
+    const centerLabel = this.centerLabels[faceIdx];
+    if (centerLabel) {
+      layer.attach(centerLabel);
+    }
 
     const angle =
       ((move.endsWith("2") ? 2 : move.endsWith("'") ? -1 : 1) * -Math.PI) / 2;
@@ -447,6 +524,12 @@ export class CubeScene {
         },
       };
     });
+  }
+  updateAriaLabel(statusText: string): void {
+    this.renderer.domElement.setAttribute(
+      "aria-label",
+      `3Dキューブ。ドラッグで視点を回転できます。回転操作は下のボタンまたはキーボードショートカットを使ってください。状態: ${statusText}`,
+    );
   }
   finish() {
     const active = this.active;
@@ -471,7 +554,15 @@ export class CubeScene {
         mesh.quaternion.copy(mesh.userData.rotation);
       }
     }
-    this.root.remove(active.layer);
+    for (const label of this.centerLabels) {
+      this.root.add(label);
+      if (label.userData.origin) {
+        label.position.copy(label.userData.origin);
+        label.quaternion.copy(label.userData.rotation);
+      }
+    }
+    this.turnLayer.quaternion.identity();
+    this.turnLayer.clear();
     active.finish();
   }
   private frame(time: number) {

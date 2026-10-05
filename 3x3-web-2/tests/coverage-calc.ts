@@ -1,3 +1,43 @@
+export interface ModuleCoverage {
+  url: string;
+  total: number;
+}
+
+/**
+ * Validate the measured module inventory independently of percentage thresholds.
+ * Query variants must be merged before this gate, not counted as extra modules.
+ */
+export function assertCoverageInventory(
+  stats: ModuleCoverage[],
+  expectedModules: string[],
+): void {
+  if (expectedModules.length === 0) {
+    throw new Error("Coverage inventory must not be empty");
+  }
+  const expected = new Set(expectedModules);
+  if (expected.size !== expectedModules.length) {
+    throw new Error("Duplicate expected coverage module");
+  }
+  const measured = new Set<string>();
+  for (const stat of stats) {
+    const pathname = new URL(stat.url, "http://coverage.local").pathname;
+    if (!expected.has(pathname)) {
+      throw new Error(`Unexpected coverage module: ${pathname}`);
+    }
+    if (measured.has(pathname)) {
+      throw new Error(`Duplicate measured coverage module: ${pathname}`);
+    }
+    if (!Number.isFinite(stat.total) || stat.total <= 0) {
+      throw new Error(`Empty coverage measurement: ${pathname}`);
+    }
+    measured.add(pathname);
+  }
+  const missing = expectedModules.filter((name) => !measured.has(name));
+  if (missing.length > 0) {
+    throw new Error(`Missing coverage modules: ${missing.join(", ")}`);
+  }
+}
+
 /**
  * V8 Coverage データから行カバレッジを計算（単一または複数エントリの統合）
  */

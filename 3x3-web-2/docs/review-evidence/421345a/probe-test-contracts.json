@@ -1,0 +1,23 @@
+{
+  "method": "Real UI with a controlled solver-client completion barrier; not a solver benchmark.",
+  "pending": {
+    "fsm": "solving",
+    "solutionVisible": false,
+    "presetDisabled": true
+  },
+  "modalAfterDirectHandler": {
+    "fsm": "solving",
+    "editorOpen": false
+  },
+  "waitedWhileSolving": {
+    "clickCompleted": false,
+    "fsm": "solving",
+    "solutionVisible": false,
+    "presetDisabled": true
+  },
+  "afterCompletion": {
+    "fsm": "idle",
+    "presetStatus": "✓ 簡単（3手） を読み込みました"
+  },
+  "conclusion": "Disabled preset clicks wait for search completion, while direct editor handlers are refused during solving."
+}

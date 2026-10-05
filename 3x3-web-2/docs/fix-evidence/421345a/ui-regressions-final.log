@@ -1,0 +1,14 @@
+
+Running 9 tests using 1 worker
+
+  ✓  1 [chromium] › tests/code-review-421345a-regression.spec.ts:25:1 › F01: Redo during preview preserves both preview and base in Undo history (3.3s)
+  ✓  2 [chromium] › tests/code-review-421345a-regression.spec.ts:54:3 › F02: delayed editor import cannot open after search starts (2.2s)
+  ✓  3 [chromium] › tests/code-review-421345a-regression.spec.ts:54:3 › F02: delayed camera import cannot open after search starts (2.2s)
+  ✓  4 [chromium] › tests/code-review-421345a-regression.spec.ts:100:1 › F01: Redo equal to the current preview does not hide the preserved base behind a no-op Undo (2.8s)
+  ✓  5 [chromium] › tests/code-review-421345a-regression.spec.ts:119:1 › F02: applying an already-open editor cannot bypass the solving guard (1.8s)
+  ✓  6 [chromium] › tests/code-review-421345a-regression.spec.ts:138:1 › F03/F12: malformed center types reject the actual file without leaving preview (2.1s)
+  ✓  7 [chromium] › tests/code-review-421345a-regression.spec.ts:167:1 › F12: empty and invalid algorithms keep preview; valid input commits it (2.2s)
+  ✓  8 [chromium] › tests/code-review-421345a-regression.spec.ts:187:1 › F13: disposing a rendered scene releases the actual shadow target (1.5s)
+  ✓  9 [chromium] › tests/code-review-421345a-regression.spec.ts:224:1 › F09: a valid 72-move fallback replays color and center phases and restores its base (2.3s)
+
+  9 passed (21.6s)

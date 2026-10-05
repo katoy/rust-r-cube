@@ -3,6 +3,10 @@ import AxeBuilder from "@axe-core/playwright";
 
 test.describe("Comprehensive Accessibility (a11y) Audits", () => {
   test.beforeEach(async ({ page }) => {
+    page.on("console", (msg) =>
+      console.log(`[BROWSER ${msg.type()}]:`, msg.text()),
+    );
+    page.on("pageerror", (err) => console.log(`[PAGE ERROR]:`, err));
     await page.goto("/");
     await expect(page.locator("#engine-status")).toContainText("READY");
   });
@@ -20,7 +24,7 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
     // プリセットを解いて解法を表示
     await page.locator("#tab-presets").click();
     await page
-      .locator("#preset-buttons button", { hasText: "簡単（5手）" })
+      .locator("#preset-buttons button", { hasText: "簡単（3手）" })
       .click();
     await page.locator("#solve").click();
     await expect(page.locator("#solution-content")).toBeVisible();
@@ -39,6 +43,17 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
     expect(results.violations).toEqual([]);
   });
 
+  test("color editor dialog meets accessibility standards", async ({
+    page,
+  }) => {
+    await page.locator('button[data-tab="colors"]').click();
+    await page.locator("#edit-colors").click();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    const results = await new AxeBuilder({ page }).include("#editor").analyze();
+    expect(results.violations).toEqual([]);
+  });
+
   test("camera editor dialog meets accessibility standards", async ({
     page,
   }) => {
@@ -50,5 +65,28 @@ test.describe("Comprehensive Accessibility (a11y) Audits", () => {
       .include("#camera-editor")
       .analyze();
     expect(results.violations).toEqual([]);
+  });
+
+  test("3D canvas element is keyboard-focusable with accessible name and live region", async ({
+    page,
+  }) => {
+    const canvas = page.locator("#scene canvas");
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveAttribute("tabindex", "0");
+    await expect(canvas).toHaveAttribute("role", "img");
+    await expect(canvas).toHaveAttribute(
+      "aria-label",
+      /3Dキューブ。ドラッグで視点を回転できます。/,
+    );
+
+    // キーボードフォーカス可能であることを検証
+    await canvas.focus();
+    await expect(canvas).toBeFocused();
+
+    // cube-status が live region として構成されていることを検証
+    const status = page.locator("#cube-status");
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toHaveText("完成状態");
   });
 });

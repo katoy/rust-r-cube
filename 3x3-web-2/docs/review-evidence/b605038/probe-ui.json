@@ -1,0 +1,40 @@
+{
+  "f1PreviewSeekSolveRace": {
+    "originalState": "RUDDUUULUFLRURDURDRBLFFBDFBRDLRDDDULULFRLLFBBFFBBBFBRL",
+    "stateAtStep5": "RLLRUDRDURRURRUFRFULFBFFBFLLUDDDUUUDBBBLLDLFDBBDBBFRLF",
+    "solution2StartState": "RLLRUDRDURRURRUFRFULFBFFBFLLUDDDUUUDBBBLLDLFDBBDBBFRLF",
+    "solvedWrongState": true,
+    "algorithm": "cfop",
+    "movesCount": 132
+  },
+  "f2UndoDuringSolve": {
+    "undoDisabledDuringSolve": false,
+    "cancelVisible": true,
+    "solveHidden": true,
+    "solverNote": "探索中 · 0.2 秒 / 5 秒",
+    "solverClientPending": true
+  },
+  "f3EditorDuringSolve": {
+    "editorOpen": true,
+    "hasSolution": true,
+    "solutionMoves": [
+      "U",
+      "R",
+      "U'",
+      "R'"
+    ],
+    "hasSolutionClass": true
+  },
+  "f4PlayUndoStuckState": {
+    "hasSolution": false,
+    "playBtnLabel": "一時停止",
+    "playBtnBefore": "自動再生",
+    "playBtnAfter": "自動再生",
+    "isStuck": true
+  },
+  "f5FocusLossAfterClose": {
+    "activeElementTag": "BODY",
+    "activeElementId": "",
+    "isBody": true
+  }
+}

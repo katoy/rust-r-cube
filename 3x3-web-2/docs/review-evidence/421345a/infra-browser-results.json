@@ -1,0 +1,39 @@
+{
+  "beforeOffline": {
+    "active": "http://127.0.0.1:61419/sw.js",
+    "keys": ["cube-studio-root-aaaaaaaaaa", "cube-studio-root-bbbbbbbbbb"],
+    "bootVersion": null,
+    "cachedHTML": "<title>fixture b</title><script type=\"module\" src=\"/assets/b.js\"></script>"
+  },
+  "offline": {
+    "title": "fixture b",
+    "bootVersion": null
+  },
+  "requests": [
+    "/",
+    "/assets/a.js",
+    "/sw.js",
+    "/",
+    "/index.html",
+    "/assets/lazy-a.js",
+    "/assets/a.js",
+    "/",
+    "/assets/b.js",
+    "/sw.js",
+    "/",
+    "/index.html",
+    "/assets/b.js"
+  ],
+  "errors": [],
+  "conclusion": "Failed B precache leaves active A SW with B navigation HTML; offline A boot is lost.",
+  "successfulUpdateBreaksOldLazyImports": {
+    "documentVersion": "a",
+    "remainingCaches": ["cube-studio-root-bbbbbbbbbb"],
+    "lazyLoadError": "Failed to fetch dynamically imported module: http://127.0.0.1:61419/assets/lazy-a.js"
+  },
+  "firstInstallFailureLeavesLauncherReadyAwaitPending": {
+    "bootVersion": "a",
+    "activeWorker": null,
+    "readyResolved": false
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "afterUserSwitch": "B",
+  "afterDelayedALoad": "B",
+  "imageALoaded": true,
+  "imageBLoaded": false
+}

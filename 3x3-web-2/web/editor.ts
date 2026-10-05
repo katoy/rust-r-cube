@@ -89,7 +89,7 @@ export class ColorEditor {
       try {
         this.turns = centerTurns(automaticCenters(this.draft));
       } catch {
-        // Incomplete colors are validated when the user applies the draft.
+        // 編集中で色が未完成な段階のエラーは無視し、適用時に一括バリデーションを実施
       }
     }
     this.render();
@@ -104,7 +104,8 @@ export class ColorEditor {
       const count = [...this.draft].filter((f) => f === color).length;
       const button = document.createElement("button");
       button.className = `color-choice ${count > 9 ? "over" : ""}`;
-      button.setAttribute("aria-pressed", String(this.color === color));
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(this.color === color));
       button.setAttribute(
         "aria-label",
         `${NAMES[color]}を選択 残り${9 - count}枚`,

@@ -2,6 +2,9 @@
   "name": "cube-studio",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "type": "module",
   "scripts": {
     "start": "./start.sh",
@@ -16,11 +19,13 @@
     "test:coverage": "playwright test tests/coverage.spec.ts",
     "test:camera": "node scripts/generate-test-images.js && playwright test tests/camera-input.spec.ts tests/center-input.spec.ts",
     "generate-test-images": "node scripts/generate-test-images.js",
-    "format": "prettier --write web tests scripts *.json *.ts",
-    "format:check": "prettier --check web tests scripts *.json *.ts",
+    "format": "prettier --write web tests scripts public/sw.js *.json *.ts",
+    "format:check": "prettier --check web tests scripts public/sw.js *.json *.ts",
     "benchmark": "cargo run --release --bin benchmark",
+    "benchmark:superflip": "cargo run --release --bin superflip_bench",
     "benchmark:web": "CUBE_BENCH=1 playwright test tests/performance.spec.ts --output=benchmark-results",
-    "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --release && npm run format:check && npm run build && npm test"
+    "check:guardrails": "node scripts/check-review-guardrails.js",
+    "check": "npm run check:guardrails && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --release && npm run format:check && npm run build && npm test"
   },
   "dependencies": {
     "three": "0.186.0"

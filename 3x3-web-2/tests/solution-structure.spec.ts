@@ -12,10 +12,10 @@ test.describe("Solution Structure and Phase Guide UI", () => {
     // プリセットタブから「簡単（5手）」を読み込む
     await page.locator("#tab-presets").click();
     await page
-      .locator("#preset-buttons button", { hasText: "簡単（5手）" })
+      .locator("#preset-buttons button", { hasText: "簡単（3手）" })
       .click();
     await expect(page.locator("#preset-status")).toContainText(
-      "簡単（5手） を読み込みました",
+      "簡単（3手） を読み込みました",
     );
 
     // 解法を探索

@@ -1,0 +1,13 @@
+{
+  "deployCondition": "github.event_name == 'push'",
+  "deployRunsByEvent": {
+    "push": true,
+    "pull_request": false,
+    "workflow_dispatch": false
+  },
+  "reporterFixtureExit": 1,
+  "configuredReporter": "list",
+  "htmlReportExists": false,
+  "failureArtifactsExist": true,
+  "conclusion": "The CI reporter setting creates no HTML report for the configured upload path."
+}

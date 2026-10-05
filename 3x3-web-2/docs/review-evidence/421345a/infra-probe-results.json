@@ -1,0 +1,33 @@
+{
+  "quotaWriteFailure": {
+    "expected": "deliver successful HTTP 200 network asset despite optional cache failure",
+    "actual": {
+      "type": "error",
+      "status": 0
+    }
+  },
+  "failedUpdatePoisonsOldNavigation": {
+    "expected": "failed B installation preserves a complete offline A document/assets",
+    "actual": {
+      "offlineDocument": "<script type=\"module\" src=\"/assets/b.js\"></script>",
+      "missingAssetType": "error",
+      "indexAlias": "<script type=\"module\" src=\"/assets/a.js\"></script>"
+    }
+  },
+  "serverProvenance": {
+    "expected": "prove responding server serves the freshly built project, or reject reuse",
+    "actual": "HTTP 200 unrelated server accepted, no owned preview server started"
+  },
+  "emptyCoverageGate": {
+    "inputEntries": 0,
+    "thresholdsChecked": 0,
+    "generatedBothReports": true,
+    "actual": "all coverage-stage assertions pass with no measured module"
+  },
+  "existingCoverageInventory": {
+    "note": "pre-existing artifact, not current-run evidence",
+    "timestamp": "2026-09-29T21:20:39.862Z",
+    "missingFromReport": ["solver.worker.ts"],
+    "observedWebCount": 23
+  }
+}

@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "state": null,
+  "state": "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
   "description": "スーパーフリップ状態。すべてのエッジピースが反転し、コーナーピースは正しい位置にある状態。神の数 20手で解ける最難題のキューブ状態の1つです。",
-  "scramble": "R U' R U R U R U' R' U' R2 U R U' R' U' R2 U",
+  "scramble": "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2",
   "solution_moves": null,
   "solution_length": 20,
-  "notes": "スーパーフリップは最高難易度のキューブ状態として知られています。すべてのエッジが反転していますが、キューブはスクランブルされていません（色は正しい位置）。God's Number = 20 として実装されています。",
+  "notes": "12個のエッジは元の位置で反転し、8個のコーナーは位置・向きともに完成状態です。色のみの最短解は20手（HTM: 180°回転も1手）。センターの向きはスクランブル手順で決まり、探索で得られる解法の手数は予算や向きの補正によって異なります。",
   "generation_method": "上記のスクランブルシーケンスを実行して得られる状態"
 }

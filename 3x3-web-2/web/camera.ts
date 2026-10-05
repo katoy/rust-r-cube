@@ -2,6 +2,7 @@ import {
   type Point,
   computeCenter,
   detectCubeOutline,
+  normalizeOutlinePoints,
 } from "./camera-geometry";
 import {
   toCanvasCoords,
@@ -9,12 +10,79 @@ import {
   rotatePointsArray,
 } from "./camera-ui-helper";
 import { renderCanvasOverlay } from "./camera-canvas-renderer";
-import { renderPalette, renderResultFaces } from "./camera-results-ui";
-import { buildState, sampleFace } from "./image-sampler";
+import {
+  buildState,
+  sampleFace,
+  sampleFaceFromPixels,
+  getImagePixels,
+} from "./image-sampler";
 import { FACES, FACE_NAMES, NAMES } from "./model";
+import { renderPalette, renderResultFaces } from "./camera-results-ui";
 
-export { computeCenter, detectCubeOutline, type Point };
+export { computeCenter, detectCubeOutline, normalizeOutlinePoints, type Point };
 type Apply = (state: string) => void;
+
+async function checkImagePixelCount(
+  file: File,
+  maxPixels = 50_000_000,
+): Promise<void> {
+  if (file.size === 0 || file.size > 20 * 1024 * 1024) return;
+  try {
+    const slice = await file.slice(0, 65536).arrayBuffer();
+    const view = new DataView(slice);
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (
+      view.byteLength >= 24 &&
+      view.getUint32(0) === 0x89504e47 &&
+      view.getUint32(4) === 0x0d0a1a0a
+    ) {
+      const width = view.getUint32(16);
+      const height = view.getUint32(20);
+      if (width === 0 || height === 0) {
+        throw new Error("画像の寸法が不正です（幅または高さが0）。");
+      }
+      if (width * height > maxPixels) {
+        throw new Error(
+          `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
+        );
+      }
+      return;
+    }
+    // JPEG: FF D8
+    if (view.byteLength >= 4 && view.getUint16(0) === 0xffd8) {
+      let offset = 2;
+      while (offset < view.byteLength - 8) {
+        const marker = view.getUint16(offset);
+        offset += 2;
+        if (marker === 0xffda || marker === 0xffd9) break;
+        const length = view.getUint16(offset);
+        if (length < 2) break;
+        if (marker >= 0xffc0 && marker <= 0xffc3) {
+          const height = view.getUint16(offset + 3);
+          const width = view.getUint16(offset + 5);
+          if (width === 0 || height === 0) {
+            throw new Error("画像の寸法が不正です（幅または高さが0）。");
+          }
+          if (width * height > maxPixels) {
+            throw new Error(
+              `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
+            );
+          }
+          return;
+        }
+        offset += length;
+      }
+    }
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.message.includes("画像サイズが大きすぎます") ||
+        err.message.includes("画像の寸法が不正です"))
+    ) {
+      throw err;
+    }
+  }
+}
 
 export class TwoViewCamera {
   private imageA?: HTMLImageElement;
@@ -25,6 +93,7 @@ export class TwoViewCamera {
   private points: Point[] = [];
   private centerPoint?: Point;
   private faces: Partial<Record<(typeof FACES)[number], string>> = {};
+  private capturedFaces = new Set<string>();
   private detectedLabels: { A?: string; B?: string } = {};
   private selectedColor = "U";
   private draggingIndex = -1; // 0..5: points, 6: centerPoint
@@ -34,6 +103,13 @@ export class TwoViewCamera {
   private isStreaming = false;
   private streamRafId?: number;
   private streamRequestId = 0;
+  private isStartingStream = false;
+  private loadGenerationA = 0;
+  private loadGenerationB = 0;
+  private captureRequestId = 0;
+  private viewActionSequence = 0;
+  private latestViewActivationSeq = 0;
+  private loading: Record<"A" | "B", boolean> = { A: false, B: false };
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -101,32 +177,23 @@ export class TwoViewCamera {
         // 既存の頂点の近くをクリックした場合は新規追加しない
         if (checkHit(x, y) === -1 && this.points.length < 6) {
           this.points.push({ x, y });
+          if (this.points.length === 6) {
+            this.points = normalizeOutlinePoints(this.points);
+            this.updateDetectedLabels();
+          }
           this.draw();
-          if (this.points.length === 6) this.updateDetectedLabels();
           this.update();
         }
       }
     };
 
     // ポインターイベント（マウス・トラックパッド・タッチ対応）
-    canvas.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch {}
-      handlePointerDown(e.clientX, e.clientY);
-    });
-    window.addEventListener("pointermove", (e) => {
+    const onWindowPointerMove = (e: PointerEvent) => {
       if (this.draggingIndex !== -1) {
         handlePointerMove(e.clientX, e.clientY);
       }
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (this.draggingIndex === -1) {
-        handlePointerMove(e.clientX, e.clientY);
-      }
-    });
-    window.addEventListener("pointerup", (e) => {
+    };
+    const onWindowPointerUp = (e: PointerEvent) => {
       if (this.draggingIndex !== -1) {
         try {
           if (canvas.hasPointerCapture(e.pointerId)) {
@@ -135,8 +202,29 @@ export class TwoViewCamera {
         } catch {}
         handlePointerUp(e.clientX, e.clientY);
       }
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+    };
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !e.isPrimary) return;
+      e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {}
+      handlePointerDown(e.clientX, e.clientY);
+      if (this.draggingIndex !== -1) {
+        window.addEventListener("pointermove", onWindowPointerMove);
+        window.addEventListener("pointerup", onWindowPointerUp);
+      }
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (this.draggingIndex === -1) {
+        handlePointerMove(e.clientX, e.clientY);
+      }
     });
     canvas.addEventListener("pointerup", (e) => {
+      if (e.button !== 0 || !e.isPrimary) return;
       if (this.draggingIndex === -1) {
         try {
           if (canvas.hasPointerCapture(e.pointerId)) {
@@ -152,6 +240,8 @@ export class TwoViewCamera {
           canvas.releasePointerCapture(e.pointerId);
         }
       } catch {}
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
       this.draggingIndex = -1;
       this.hoverIndex = -1;
       this.draw();
@@ -166,6 +256,7 @@ export class TwoViewCamera {
     // 右クリックで頂点を削除
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      if (!this.activeImage) return;
       const { x, y } = getCanvasCoords(e.clientX, e.clientY);
       const hit = checkHit(x, y);
       if (hit >= 0 && hit < this.points.length) {
@@ -201,6 +292,7 @@ export class TwoViewCamera {
     const clearButton = $("camera-clear-points");
     if (clearButton) {
       clearButton.onclick = () => {
+        if (!this.activeImage) return;
         this.points = [];
         this.centerPoint = undefined;
         this.detectedLabels[this.currentView] = undefined;
@@ -209,11 +301,17 @@ export class TwoViewCamera {
       };
     }
 
-    // キーボードショートカット 'r' で枠を回転
+    // キーボードショートカット 'r' で枠を回転（Cmd/Ctrl/Alt との組み合わせはリロード等を優先）
     window.addEventListener("keydown", (e) => {
       const dialog = $("camera-editor") as HTMLDialogElement | null;
       if (!dialog?.open) return;
-      if ((e.key === "r" || e.key === "R") && this.points.length === 6) {
+      if (
+        (e.key === "r" || e.key === "R") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        this.points.length === 6
+      ) {
         e.preventDefault();
         this.rotatePoints();
       }
@@ -245,6 +343,12 @@ export class TwoViewCamera {
 
     $("camera-capture").onclick = () => this.capture();
     $("camera-apply").onclick = () => {
+      if (
+        this.loading.A ||
+        this.loading.B ||
+        Object.keys(this.faces).length !== 6
+      )
+        return;
       const state = buildState(this.faces);
       this.close();
       this.apply(state);
@@ -297,6 +401,9 @@ export class TwoViewCamera {
   }
 
   open() {
+    this.stopLiveStream();
+    this.error("");
+    this.loading = { A: false, B: false };
     this.faces = {};
     this.detectedLabels = {};
     this.points = [];
@@ -323,13 +430,116 @@ export class TwoViewCamera {
   }
 
   private switchView(view: "A" | "B") {
-    if (this.currentView === view && this.points.length === 0) return;
+    this.latestViewActivationSeq = ++this.viewActionSequence;
+    if (this.currentView === view) return;
     this.currentView = view;
     this.points = [];
     this.centerPoint = undefined;
     this.renderImage();
     this.renderResults();
     this.autoDetectOutline();
+  }
+
+  private updateCardStatus(view: "A" | "B") {
+    const isA = view === "A";
+    const image = isA ? this.imageA : this.imageB;
+    const status = $(isA ? "camera-status-a" : "camera-status-b");
+    if (status) {
+      status.textContent = this.loading[view]
+        ? "読込中…"
+        : image
+          ? `読込完了 (${image.naturalWidth}×${image.naturalHeight})`
+          : "未選択（クリックまたはドロップ）";
+    }
+    const card = $(isA ? "camera-drop-a" : "camera-drop-b");
+    if (card) {
+      card.classList.toggle("has-file", !!image);
+      const title = card.querySelector(".file-card-title");
+      if (title) {
+        title.textContent = `画像${view}（${this.getViewFacesLabel(view)}）`;
+      }
+    }
+  }
+
+  private clearViewResults(view: "A" | "B"): void {
+    const keys =
+      view === "A" ? (["U", "R", "F"] as const) : (["D", "L", "B"] as const);
+    for (const key of keys) {
+      delete this.faces[key];
+      this.capturedFaces.delete(key);
+    }
+    this.detectedLabels[view] = undefined;
+  }
+
+  private beginImageLoad(view: "A" | "B"): void {
+    this.loading[view] = true;
+    if (view === "A") {
+      if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
+      this.sourceUrlA = undefined;
+      this.imageA = undefined;
+    } else {
+      if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
+      this.sourceUrlB = undefined;
+      this.imageB = undefined;
+    }
+    this.clearViewResults(view);
+    if (this.currentView === view) {
+      this.points = [];
+      this.centerPoint = undefined;
+      this.renderImage();
+    }
+    this.error("");
+    this.renderResults();
+    this.update();
+  }
+
+  private imageLoadFailed(view: "A" | "B", generation: number): void {
+    const currentGen =
+      view === "A" ? this.loadGenerationA : this.loadGenerationB;
+    if (generation !== currentGen) return;
+    this.loading[view] = false;
+    this.clearViewResults(view);
+    if (this.currentView === view) {
+      this.points = [];
+      this.centerPoint = undefined;
+      this.renderImage();
+    }
+    this.renderResults();
+    this.update();
+    this.error(`画像${view}を読み込めませんでした。もう一度選択してください。`);
+  }
+
+  private onImageLoaded(
+    view: "A" | "B",
+    requestSeq: number,
+    image: HTMLImageElement,
+    url: string,
+  ): void {
+    this.loading[view] = false;
+    if (view === "A") {
+      this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
+      this.sourceUrlA = url;
+      this.imageA = image;
+    } else {
+      this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
+      this.sourceUrlB = url;
+      this.imageB = image;
+    }
+
+    this.clearViewResults(view);
+    this.updateCardStatus(view);
+    this.renderResults();
+
+    if (requestSeq >= this.latestViewActivationSeq) {
+      this.latestViewActivationSeq = requestSeq;
+      this.currentView = view;
+      this.renderImage();
+      this.autoDetectOutline();
+    } else if (this.currentView === view) {
+      this.renderImage();
+      this.autoDetectOutline();
+    }
+    this.update();
   }
 
   private async loadFile(input: HTMLInputElement, view: "A" | "B") {
@@ -339,37 +549,126 @@ export class TwoViewCamera {
     input.value = "";
   }
 
-  private async processFile(file: File, view: "A" | "B"): Promise<void> {
-    if (view === "A") {
-      this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
-      this.sourceUrlA = URL.createObjectURL(file);
-    } else {
-      this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
-      this.sourceUrlB = URL.createObjectURL(file);
+  private async processFile(
+    file: File,
+    view: "A" | "B",
+    existingGeneration?: number,
+    existingRequestSeq?: number,
+  ): Promise<void> {
+    if (file.type && !file.type.startsWith("image/")) {
+      this.error("画像ファイル（PNG、JPEG等）を選択してください。");
+      return;
     }
-    const url = view === "A" ? this.sourceUrlA : this.sourceUrlB;
+    if (file.size > 20 * 1024 * 1024) {
+      this.error("画像ファイルは20MB以内にしてください。");
+      return;
+    }
+    // ファイル選択（ドロップ含む）時は、カメラアクセス待機中であってもライブモードを解除
+    if (existingGeneration === undefined) this.stopLiveStream();
+    const generation =
+      existingGeneration ??
+      (view === "A" ? ++this.loadGenerationA : ++this.loadGenerationB);
+    const requestSeq = existingRequestSeq ?? ++this.viewActionSequence;
+
+    // 新画像の選択・読込を開始した時点で該当ビューの旧結果を失効させて再読取待ちにする
+    if (existingGeneration === undefined) this.beginImageLoad(view);
+
+    try {
+      await checkImagePixelCount(file);
+    } catch (err) {
+      this.imageLoadFailed(view, generation);
+      this.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
-      const image = new Image();
-      image.onload = () => {
-        if (view === "A") {
-          this.imageA = image;
-        } else {
-          this.imageB = image;
+      const rawImage = new Image();
+      rawImage.onload = () => {
+        const currentGen =
+          view === "A" ? this.loadGenerationA : this.loadGenerationB;
+        if (generation !== currentGen) {
+          URL.revokeObjectURL(url);
+          resolve();
+          return;
         }
-        this.currentView = view;
-        this.renderImage();
-        this.autoDetectOutline();
+
+        const MAX_DIM = 1600;
+        const { naturalWidth: nw, naturalHeight: nh } = rawImage;
+        if (nw > MAX_DIM || nh > MAX_DIM) {
+          const scale = Math.min(MAX_DIM / nw, MAX_DIM / nh);
+          const w = Math.max(1, Math.round(nw * scale));
+          const h = Math.max(1, Math.round(nh * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(rawImage, 0, 0, w, h);
+            canvas.toBlob(
+              (blob) => {
+                const currentGenNow =
+                  view === "A" ? this.loadGenerationA : this.loadGenerationB;
+                URL.revokeObjectURL(url);
+                if (generation !== currentGenNow) {
+                  resolve();
+                  return;
+                }
+                if (!blob) {
+                  this.imageLoadFailed(view, generation);
+                  resolve();
+                  return;
+                }
+                const resizedUrl = URL.createObjectURL(blob);
+                const resizedImage = new Image();
+                resizedImage.onload = () => {
+                  const currentGenFinal =
+                    view === "A" ? this.loadGenerationA : this.loadGenerationB;
+                  if (generation !== currentGenFinal) {
+                    URL.revokeObjectURL(resizedUrl);
+                    resolve();
+                    return;
+                  }
+                  this.onImageLoaded(
+                    view,
+                    requestSeq,
+                    resizedImage,
+                    resizedUrl,
+                  );
+                  resolve();
+                };
+                resizedImage.onerror = () => {
+                  URL.revokeObjectURL(resizedUrl);
+                  this.imageLoadFailed(view, generation);
+                  resolve();
+                };
+                resizedImage.src = resizedUrl;
+              },
+              "image/jpeg",
+              0.92,
+            );
+            return;
+          }
+          URL.revokeObjectURL(url);
+          this.imageLoadFailed(view, generation);
+          resolve();
+          return;
+        }
+
+        this.onImageLoaded(view, requestSeq, rawImage, url);
         resolve();
       };
-      image.onerror = () => {
-        this.error(`画像${view}を読み込めませんでした。`);
+      rawImage.onerror = () => {
+        URL.revokeObjectURL(url);
+        this.imageLoadFailed(view, generation);
         resolve();
       };
-      image.src = url!;
+      rawImage.src = url;
     });
   }
 
   private autoDetectOutline() {
+    if (this.isStartingStream || this.isStreaming) return;
     const activeImage = this.activeImage;
     if (!activeImage) {
       this.points = [];
@@ -378,9 +677,14 @@ export class TwoViewCamera {
       this.update();
       return;
     }
-    // まず画像をCanvasに描画した上で検出
-    this.draw();
-    this.points = detectCubeOutline(this.canvas, activeImage);
+    // 編集用ガイドが描画されたCanvasを避け、画像本体のみから輪郭を検出
+    const rawCanvas = document.createElement("canvas");
+    rawCanvas.width = this.canvas.width;
+    rawCanvas.height = this.canvas.height;
+    const ctx = rawCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(activeImage, 0, 0, rawCanvas.width, rawCanvas.height);
+    this.points = normalizeOutlinePoints(detectCubeOutline(rawCanvas));
     this.centerPoint = undefined;
     if (this.points.length === 6) this.updateDetectedLabels();
     this.draw();
@@ -388,7 +692,7 @@ export class TwoViewCamera {
   }
 
   rotatePoints(step = 1) {
-    if (this.points.length !== 6) return;
+    if (!this.activeImage || this.points.length !== 6) return;
     this.points = rotatePointsArray(this.points, step);
     this.centerPoint = undefined;
     this.updateDetectedLabels();
@@ -426,59 +730,46 @@ export class TwoViewCamera {
               { defaultFace: "B", quad: [p3, p4, center, p2] },
             ];
 
-      // 3面の各面をサンプリング
-      const sampledItems = rawQuads.map(({ defaultFace, quad }) => {
-        const sampled = sampleFace(activeImage, quad);
-        const centerChar = sampled[4];
-        return { defaultFace, quad, sampled, centerChar };
-      });
-
-      // 3面の画像の各面のセンターを認識して、該当する面の色を設定する
-      const usedFaces = new Set<string>();
-      const faceAssignments: {
+      // 3面の各面をサンプリング（同一画像からのImageData抽出を1回に集約してGPU同期とメモリ確保を削減）
+      const pixels = getImagePixels(activeImage);
+      const faceDefs: {
         targetFace: (typeof FACES)[number];
-        sampled: string;
-      }[] = [];
+        quad: Point[];
+      }[] =
+        this.currentView === "A"
+          ? [
+              { targetFace: "U", quad: [p1, p2, center, p6] },
+              { targetFace: "R", quad: [center, p2, p3, p4] },
+              { targetFace: "F", quad: [p6, center, p4, p5] },
+            ]
+          : [
+              { targetFace: "D", quad: [p6, p1, p2, center] },
+              { targetFace: "L", quad: [p4, p5, p6, center] },
+              { targetFace: "B", quad: [p3, p4, center, p2] },
+            ];
 
-      // 1. 有効なセンター色で、まだこのキャプチャ内で重複していないものを優先割り当て
-      const assignedIndices = new Set<number>();
-      for (let i = 0; i < sampledItems.length; i++) {
-        const item = sampledItems[i];
-        if (
-          FACES.includes(item.centerChar) &&
-          !usedFaces.has(item.centerChar)
-        ) {
-          usedFaces.add(item.centerChar);
-          faceAssignments.push({
-            targetFace: item.centerChar as (typeof FACES)[number],
-            sampled: item.sampled,
-          });
-          assignedIndices.add(i);
+      let centerMismatch = false;
+      for (const { targetFace, quad } of faceDefs) {
+        const sampled = sampleFaceFromPixels(pixels, quad);
+        const centerChar = sampled[4];
+        if (centerChar !== targetFace) {
+          centerMismatch = true;
         }
-      }
-
-      // 2. センター色が '?' または重複している場合は、defaultFace または未割り当ての面から補填
-      for (let i = 0; i < sampledItems.length; i++) {
-        if (assignedIndices.has(i)) continue;
-        const item = sampledItems[i];
-        let targetFace = item.defaultFace;
-        if (usedFaces.has(targetFace)) {
-          const fallback = rawQuads
-            .map((q) => q.defaultFace)
-            .find((f) => !usedFaces.has(f));
-          targetFace = fallback ?? item.defaultFace;
-        }
-        usedFaces.add(targetFace);
-        faceAssignments.push({
-          targetFace: targetFace as (typeof FACES)[number],
-          sampled: item.sampled,
-        });
-        assignedIndices.add(i);
-      }
-
-      for (const { targetFace, sampled } of faceAssignments) {
         const normalized = sampled.slice(0, 4) + targetFace + sampled.slice(5);
         this.faces[targetFace] = normalized;
+        this.capturedFaces.add(targetFace);
+      }
+
+      if (centerMismatch) {
+        const expectedDesc =
+          this.currentView === "A"
+            ? "上面=白、右手前=赤、左手前=緑"
+            : "上面=黄、左手前=橙、右手前=青";
+        this.error(
+          `⚠️ センター色チェック: 一部のセンター色が期待（画像${this.currentView}: ${expectedDesc}）と異なります。キューブの向きを確認してください。`,
+        );
+      } else {
+        this.error("");
       }
 
       this.updateDetectedLabels();
@@ -492,7 +783,7 @@ export class TwoViewCamera {
       if (
         this.currentView === "A" &&
         this.imageB &&
-        Object.keys(this.faces).length < 6
+        this.capturedFaces.size < 6
       ) {
         this.switchView("B");
       }
@@ -502,6 +793,12 @@ export class TwoViewCamera {
   }
 
   private get activeImage(): HTMLImageElement | undefined {
+    if (
+      this.isStartingStream ||
+      this.isStreaming ||
+      this.loading[this.currentView]
+    )
+      return undefined;
     return this.currentView === "A" ? this.imageA : this.imageB;
   }
 
@@ -524,6 +821,7 @@ export class TwoViewCamera {
   }
 
   private draw() {
+    if (this.isStreaming) return;
     renderCanvasOverlay(this.canvas, {
       activeImage: this.activeImage,
       points: this.points,
@@ -583,8 +881,9 @@ export class TwoViewCamera {
                 [p3, p4, center, p2],
               ];
 
+        const pixels = getImagePixels(img);
         const sampledNames = quads.map((quad) => {
-          const sampled = sampleFace(img, quad);
+          const sampled = sampleFaceFromPixels(pixels, quad);
           const c = sampled[4];
           return c && c !== "?" ? NAMES[c] : undefined;
         });
@@ -631,6 +930,7 @@ export class TwoViewCamera {
       currentView: this.currentView,
       selectedColor: this.selectedColor,
       onUpdateSticker: (face, i) => {
+        if (!this.capturedFaces.has(face)) return;
         const current = this.faces[face] ?? "?????????";
         const updated =
           current.substring(0, i) +
@@ -640,20 +940,24 @@ export class TwoViewCamera {
 
         this.renderResults();
         this.update();
+        document
+          .querySelector<HTMLElement>(
+            `#camera-face-card-${face} button[data-index="${i}"]`,
+          )
+          ?.focus();
       },
     });
   }
 
   private update() {
-    $("camera-progress").textContent =
-      `${Object.keys(this.faces).length} / 6 面`;
+    $("camera-progress").textContent = `${this.capturedFaces.size} / 6 面`;
     $("camera-capture").toggleAttribute(
       "disabled",
       !this.activeImage || this.points.length !== 6,
     );
     $("camera-apply").toggleAttribute(
       "disabled",
-      Object.keys(this.faces).length !== 6,
+      this.loading.A || this.loading.B || this.capturedFaces.size !== 6,
     );
 
     const faceSelect = $("camera-face") as HTMLSelectElement | null;
@@ -687,42 +991,24 @@ export class TwoViewCamera {
     if (tabB)
       tabB.setAttribute("aria-selected", String(this.currentView === "B"));
 
-    const statusA = $("camera-status-a");
-    const statusB = $("camera-status-b");
-    if (statusA) {
-      statusA.textContent = this.imageA
-        ? `読込完了 (${this.imageA.naturalWidth}×${this.imageA.naturalHeight})`
-        : "未選択（クリックまたはドロップ）";
-    }
-    if (statusB) {
-      statusB.textContent = this.imageB
-        ? `読込完了 (${this.imageB.naturalWidth}×${this.imageB.naturalHeight})`
-        : "未選択（クリックまたはドロップ）";
-    }
-
-    const cardA = $("camera-drop-a");
-    const cardB = $("camera-drop-b");
-    if (cardA) {
-      cardA.classList.toggle("has-file", !!this.imageA);
-      const titleA = cardA.querySelector(".file-card-title");
-      if (titleA) {
-        titleA.textContent = `画像A（${this.getViewFacesLabel("A")}）`;
-      }
-    }
-    if (cardB) {
-      cardB.classList.toggle("has-file", !!this.imageB);
-      const titleB = cardB.querySelector(".file-card-title");
-      if (titleB) {
-        titleB.textContent = `画像B（${this.getViewFacesLabel("B")}）`;
-      }
-    }
+    this.updateCardStatus("A");
+    this.updateCardStatus("B");
 
     const rotateBtn = $("camera-rotate-points") as HTMLButtonElement | null;
     if (rotateBtn) {
-      rotateBtn.disabled = this.points.length !== 6;
+      rotateBtn.disabled = !this.activeImage || this.points.length !== 6;
+    }
+    for (const id of ["camera-detect", "camera-clear-points"]) {
+      $(id)?.toggleAttribute("disabled", !this.activeImage);
     }
 
-    if (!this.activeImage) {
+    if (this.isStartingStream || this.isStreaming) {
+      $("camera-help").textContent =
+        "キューブをカメラに向けて「📸 この映像で取り込む」をクリックしてください。";
+    } else if (this.loading[this.currentView]) {
+      $("camera-help").textContent =
+        `画像${this.currentView}を読み込んでいます。`;
+    } else if (!this.activeImage) {
       $("camera-help").textContent =
         `画像${this.currentView}が未選択です。画像Aまたは画像Bを選択してください。`;
     } else if (this.points.length < 6) {
@@ -733,7 +1019,6 @@ export class TwoViewCamera {
       $("camera-help").textContent =
         `画像${this.currentView}の6角と中心点を自動検出しました（枠の向きが合わない場合は「🔄 枠を回転」で60°調整可能。頂点・中心ドラッグで微調整）。「この3面を読み取る」を押すと3面（${facesText}）を一括認識します。`;
     }
-    $("camera-error").textContent = "";
   }
 
   private error(message: string) {
@@ -748,10 +1033,25 @@ export class TwoViewCamera {
       );
       return;
     }
+    if (this.isStartingStream) return;
+    this.loadGenerationA++;
+    this.loadGenerationB++;
+    this.captureRequestId++;
+    this.loading = { A: false, B: false };
+    this.latestViewActivationSeq = ++this.viewActionSequence;
+    const liveBtn = $("camera-live-stream") as HTMLButtonElement | null;
+
+    // 既存のストリームがあれば確実に停止
+    this.stopLiveStream();
+    this.isStartingStream = true;
+    this.update();
+    if (liveBtn) liveBtn.disabled = true;
+
     const requestId = ++this.streamRequestId;
     const dialog = $("camera-editor") as HTMLDialogElement;
+    let stream: MediaStream | undefined;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
           width: { ideal: 1280 },
@@ -768,21 +1068,48 @@ export class TwoViewCamera {
       video.srcObject = this.mediaStream;
       await video.play();
       if (requestId !== this.streamRequestId || !dialog.open) {
-        this.stopLiveStream();
+        stream.getTracks().forEach((track) => track.stop());
+        if (this.mediaStream === stream) {
+          this.mediaStream = undefined;
+        }
+        if (video.srcObject === stream) {
+          video.srcObject = null;
+        }
         return;
       }
       this.isStreaming = true;
-      $("camera-live-stream").hidden = true;
+      this.update();
+      if (liveBtn) {
+        liveBtn.hidden = true;
+        liveBtn.disabled = false;
+      }
       $("camera-take-photo").hidden = false;
       $("camera-stop-stream").hidden = false;
       $("camera-help").textContent =
         "キューブをカメラに向けて「📸 この映像で取り込む」をクリックしてください。";
       this.renderLiveStream();
     } catch {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      if (this.mediaStream === stream) {
+        this.mediaStream = undefined;
+      }
+      const video = $("camera-video") as HTMLVideoElement | null;
+      if (video && video.srcObject === stream) {
+        video.srcObject = null;
+      }
       if (requestId === this.streamRequestId && dialog.open) {
         this.error(
           "カメラへのアクセスが拒否されたか、カメラを起動できませんでした。",
         );
+      }
+    } finally {
+      if (requestId === this.streamRequestId) {
+        this.isStartingStream = false;
+        if (!this.isStreaming) this.renderImage();
+        this.update();
+        if (liveBtn) liveBtn.disabled = false;
       }
     }
   }
@@ -803,21 +1130,42 @@ export class TwoViewCamera {
   public captureLiveFrame() {
     const video = $("camera-video") as HTMLVideoElement | null;
     if (!this.isStreaming || !video) return;
+    const targetView = this.currentView;
+    const generation =
+      targetView === "A" ? ++this.loadGenerationA : ++this.loadGenerationB;
+    const captureRequestId = ++this.captureRequestId;
+    const requestSeq = ++this.viewActionSequence;
+
     const offscreen = document.createElement("canvas");
     offscreen.width = video.videoWidth || 640;
     offscreen.height = video.videoHeight || 480;
     const ctx = offscreen.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      this.error("撮影画像を作成できませんでした。");
+      return;
+    }
     ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+
+    this.beginImageLoad(targetView);
+    this.stopLiveStream();
 
     offscreen.toBlob(
       (blob) => {
-        if (!blob) return;
-        const file = new File([blob], `camera-${this.currentView}.jpg`, {
+        const currentGen =
+          targetView === "A" ? this.loadGenerationA : this.loadGenerationB;
+        if (
+          captureRequestId !== this.captureRequestId ||
+          generation !== currentGen
+        )
+          return;
+        if (!blob) {
+          this.imageLoadFailed(targetView, generation);
+          return;
+        }
+        const file = new File([blob], `camera-${targetView}.jpg`, {
           type: "image/jpeg",
         });
-        this.stopLiveStream();
-        void this.processFile(file, this.currentView);
+        void this.processFile(file, targetView, generation, requestSeq);
       },
       "image/jpeg",
       0.92,
@@ -826,6 +1174,7 @@ export class TwoViewCamera {
 
   public stopLiveStream() {
     this.streamRequestId++;
+    this.isStartingStream = false;
     this.isStreaming = false;
     if (this.streamRafId !== undefined) {
       cancelAnimationFrame(this.streamRafId);
@@ -836,22 +1185,47 @@ export class TwoViewCamera {
       this.mediaStream = undefined;
     }
     const video = $("camera-video") as HTMLVideoElement | null;
-    if (video) video.srcObject = null;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
     const liveBtn = $("camera-live-stream");
     const takeBtn = $("camera-take-photo");
     const stopBtn = $("camera-stop-stream");
-    if (liveBtn) liveBtn.hidden = false;
+    if (liveBtn) {
+      liveBtn.hidden = false;
+      (liveBtn as HTMLButtonElement).disabled = false;
+    }
     if (takeBtn) takeBtn.hidden = true;
     if (stopBtn) stopBtn.hidden = true;
-    this.draw();
+    this.renderImage();
+    this.update();
   }
 
   private handleDialogClose() {
     this.stopLiveStream();
+    this.loadGenerationA++;
+    this.loadGenerationB++;
+    this.captureRequestId++;
+    this.loading = { A: false, B: false };
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
     this.sourceUrlA = undefined;
     this.sourceUrlB = undefined;
+    this.imageA = undefined;
+    this.imageB = undefined;
+    this.clearViewResults("A");
+    this.clearViewResults("B");
+    this.points = [];
+    this.centerPoint = undefined;
+    const inputA = $("camera-file-a") as HTMLInputElement | null;
+    const inputB = $("camera-file-b") as HTMLInputElement | null;
+    if (inputA) inputA.value = "";
+    if (inputB) inputB.value = "";
+    this.updateCardStatus("A");
+    this.updateCardStatus("B");
+    this.renderResults();
+    this.update();
   }
 
   private close() {

@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 /// コーナーピース (Kociemba順: 0:UFR, 1:UFL, 2:ULB, 3:UBR, 4:DFR, 5:DLF, 6:DBL, 7:DRB)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Corner {
     UFR = 0,
@@ -14,7 +14,7 @@ pub enum Corner {
 }
 
 /// エッジピース (Kociemba順: 0:UR, 1:UF, 2:UL, 3:UB, 4:DR, 5:DF, 6:DL, 7:DB, 8:FR, 9:FL, 10:BL, 11:BR)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Edge {
     UR = 0,
@@ -31,7 +31,7 @@ pub enum Edge {
     BR,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RawCube {
     pub cp: [Corner; 8],
     pub co: [u8; 8],
@@ -249,7 +249,7 @@ impl RawCube {
         })[mv]
     }
 
-    // Coordinate encoders.
+    // --- 座標エンコーダ・デコーダ ---
 
     /// Twist (コーナーの向き) を取得 (0..2186)
     pub fn get_twist(&self) -> u16 {
@@ -514,5 +514,59 @@ impl Default for RawCube {
             ],
             eo: [0; 12],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_n_choose_k_boundaries() {
+        assert_eq!(n_choose_k(5, 0), 1);
+        assert_eq!(n_choose_k(5, 5), 1);
+        assert_eq!(n_choose_k(5, 2), 10);
+        assert_eq!(n_choose_k(5, 3), 10);
+        // 境界ケース: n < k または k < 0
+        assert_eq!(n_choose_k(3, 5), 0);
+        assert_eq!(n_choose_k(5, -1), 0);
+        assert_eq!(n_choose_k(0, 1), 0);
+    }
+
+    #[test]
+    fn test_factorial_and_combinations() {
+        assert_eq!(factorial(0), 1);
+        assert_eq!(factorial(1), 1);
+        assert_eq!(factorial(5), 120);
+        assert_eq!(factorial(8), 40320);
+    }
+
+    #[test]
+    fn test_raw_cube_coords() {
+        let mut cube = RawCube::default();
+        assert_eq!(cube.get_twist(), 0);
+        assert_eq!(cube.get_flip(), 0);
+        assert_eq!(cube.get_ud_slice(), 0);
+        assert_eq!(cube.get_cp(), 0);
+        assert_eq!(cube.get_ep8(), 0);
+        assert_eq!(cube.get_slice_p(), 0);
+
+        cube.set_twist(1234);
+        assert_eq!(cube.get_twist(), 1234);
+
+        cube.set_flip(567);
+        assert_eq!(cube.get_flip(), 567);
+
+        cube.set_ud_slice(234);
+        assert_eq!(cube.get_ud_slice(), 234);
+
+        cube.set_cp(12345);
+        assert_eq!(cube.get_cp(), 12345);
+
+        cube.set_ep8(23456);
+        assert_eq!(cube.get_ep8(), 23456);
+
+        cube.set_slice_p(15);
+        assert_eq!(cube.get_slice_p(), 15);
     }
 }

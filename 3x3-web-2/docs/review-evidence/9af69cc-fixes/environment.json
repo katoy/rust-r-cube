@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-09-22T21:45:01.661Z",
+  "reviewBase": "9af69cc8176ce63b55704f4af6d7b59b2b35150f",
+  "testedSourceCommit": "d27bed7a0b30669af2fcc436e76732572bae79d4",
+  "node": "v26.7.0",
+  "rust": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "wasmPack": "wasm-pack 0.15.0",
+  "sha256": {
+    "web/camera.ts": "19d2a18c027ba91450973099c7a9992ac146d55f34d12d9a6a5916d38a58f45c",
+    "web/main.ts": "b58e0e284be438f31d00bfee48d843a58bf709e3cfa0af0f70c91e855d4aef6e",
+    "src/cfop.rs": "fa4928b722af20e7c3ee4dfafae72e7cd6dd785445886fad827b950016b48377",
+    "src/lib.rs": "da698cf734ea5eb0452dca325adeab12b92eca6eb97ff312bdf8249a568e8e13",
+    "src/tests.rs": "1eb125f4d213be9b9260ff7339cdfa1ace8fe052ef367a53ebffa1561338bc1d",
+    "tests/camera-image-state.spec.ts": "b7698efa702bff7500e7e9516faef271882a934ad78f6030f5a81464de5858d8",
+    "tests/json-load-race.spec.ts": "da7c0bfca9283ef4e8130a9c146244cb19093a84e0967aed852b61d425058377",
+    "tests/app.spec.ts": "944bda4adcba485cb120cc9c18f0289cbbb4416d40a47f9162c4ecb64b3fa1a4",
+    "README.md": "566108a407436be5b26a000ee22d893732419e4522ab7a6c003ac89fc7836eed",
+    "package-lock.json": "4b84d0387eb13ae6171ec2f1a98af139dcd9b62c87a7426b7839ff1c1a18f383",
+    "playwright.config.ts": "4d7e6ad1fd96e68d66d8ffb97a1e2726adc2aba3bc92abbc46645b612d54e6ed"
+  }
+}

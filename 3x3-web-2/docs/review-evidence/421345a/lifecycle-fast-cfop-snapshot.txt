@@ -1,0 +1,12 @@
+```yaml
+- strong: 187 手
+- text: "5 ms · 検証済み ステップ 1: 底面クロス (Cross)"
+- 'button "1手目 L2 (ステップ 1: 底面クロス (Cross)) の直後へ移動"': L2
+- 'button "2手目 B'' (ステップ 1: 底面クロス (Cross)) の直後へ移動"': B'
+- text: "ステップ 2: 完全1層 (First Layer)"
+- 'button "3手目 R'' (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': R'
+- 'button "4手目 U2 (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': U2
+- 'button "5手目 R2 (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': R2
+- 'button "6手目 U'' (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': U'
+- 'button "7手目 R'' (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': R'
+- 'button "8手目 L'' (ステップ 2: 完全1層 (First Layer)) の直後へ移動"': L'

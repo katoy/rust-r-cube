@@ -3,19 +3,23 @@ import { spawn } from "child_process";
 import http from "http";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { chromium } from "@playwright/test";
+
+import { collectInputFiles, checkInputsFreshness } from "./build-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const distDir = path.join(rootDir, "dist");
 
-const PORT = 4173;
+const portArg = process.argv.find((arg) => arg.startsWith("--port="));
+const PORT = portArg ? Number(portArg.slice("--port=".length)) : 4173;
 const BASE_URL = `http://127.0.0.1:${PORT}/`;
 
-// 1. ビルド成果物の確認（存在しない場合は自動ビルド）
-async function ensureBuild() {
+// 1. ビルド成果物の確認（存在しない場合、またはソースが更新・追加・削除されている場合は自動ビルド）
+async function ensureBuild(forceBuild = false) {
   const swPath = path.join(distDir, "sw.js");
   const indexPath = path.join(distDir, "index.html");
 
@@ -24,6 +28,31 @@ async function ensureBuild() {
       "📦 ビルド成果物が見つかりません。本番ビルドを実行しています...",
     );
     await runCommand("npm", ["run", "build"]);
+    return;
+  }
+
+  if (forceBuild) {
+    console.log("🔨 強制再ビルドを実行しています (--build / --fresh)...");
+    await runCommand("npm", ["run", "build"]);
+    return;
+  }
+
+  const currentInputs = collectInputFiles(rootDir);
+  const freshness = checkInputsFreshness(rootDir, distDir, currentInputs);
+
+  if (!freshness.fresh) {
+    console.log(
+      `🔄 ソースコードまたは設定の変更を検知しました (${freshness.reason})。最新の成果物をビルドしています...`,
+    );
+    await runCommand("npm", ["run", "build"]);
+  } else {
+    const distMtime = Math.min(
+      fs.statSync(swPath).mtimeMs,
+      fs.statSync(indexPath).mtimeMs,
+    );
+    console.log(
+      `⚡ 既存の最新ビルド成果物を使用します (${new Date(distMtime).toLocaleTimeString()})`,
+    );
   }
 }
 
@@ -45,6 +74,7 @@ function runCommand(cmd, args) {
           ),
         );
     });
+    proc.on("error", reject);
   });
 }
 
@@ -52,6 +82,7 @@ function runCommand(cmd, args) {
 function checkServer(url) {
   return new Promise((resolve) => {
     const req = http.get(url, (res) => {
+      res.resume();
       resolve(res.statusCode >= 200 && res.statusCode < 400);
     });
     req.on("error", () => resolve(false));
@@ -62,20 +93,71 @@ function checkServer(url) {
   });
 }
 
+export async function verifyServerBuild(baseUrl, directory = distDir) {
+  const files = fs.readdirSync(directory, { recursive: true });
+  for (const file of files) {
+    const filename = path.join(directory, file);
+    if (!fs.statSync(filename).isFile() || file === ".build-manifest.json")
+      continue;
+    const expected = fs.readFileSync(filename);
+    const expectedHash = crypto
+      .createHash("sha256")
+      .update(expected)
+      .digest("hex");
+    const url = new URL(
+      file.split(path.sep).map(encodeURIComponent).join("/"),
+      baseUrl,
+    );
+    const actualHash = await new Promise((resolve, reject) => {
+      const req = http.get(url, (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(
+            new Error(
+              `Preview build mismatch: ${url} (HTTP ${res.statusCode})`,
+            ),
+          );
+          return;
+        }
+        const hash = crypto.createHash("sha256");
+        let size = 0;
+        res.on("data", (chunk) => {
+          size += chunk.length;
+          if (size > expected.length) {
+            req.destroy(new Error(`Preview build mismatch: ${url} (size)`));
+            return;
+          }
+          hash.update(chunk);
+        });
+        res.on("end", () => resolve(hash.digest("hex")));
+        res.on("error", reject);
+      });
+      req.on("error", reject);
+      // An absolute deadline also bounds servers that trickle bytes forever.
+      const timer = setTimeout(() => {
+        req.destroy(new Error(`Preview verification timed out: ${url}`));
+      }, 5000);
+      req.on("close", () => clearTimeout(timer));
+    });
+    if (actualHash !== expectedHash)
+      throw new Error(`Preview build mismatch: ${url} (content)`);
+  }
+}
+
 // 3. プレビューサーバーの起動
-async function startServer() {
+async function startServer(onSpawn = () => {}) {
   const isRunning = await checkServer(BASE_URL);
   if (isRunning) {
+    await verifyServerBuild(BASE_URL);
     console.log(`🌐 プレビューサーバーは既に稼働しています (${BASE_URL})`);
     return null;
   }
 
   console.log(`🚀 プレビューサーバーを起動しています (ポート ${PORT})...`);
-  const npxCmd = isWin ? "npx.cmd" : "npx";
   const serverProc = spawn(
-    npxCmd,
+    process.execPath,
     [
-      "vite",
+      path.join(rootDir, "node_modules/vite/bin/vite.js"),
       "preview",
       "--port",
       String(PORT),
@@ -85,7 +167,13 @@ async function startServer() {
     ],
     { cwd: rootDir, stdio: "pipe" },
   );
+  onSpawn(serverProc);
 
+  serverProc.stdout.resume();
+  let startError;
+  serverProc.on("error", (error) => {
+    startError = error;
+  });
   serverProc.stderr.on("data", (d) => {
     const msg = d.toString();
     if (!msg.includes("ExperimentalWarning")) {
@@ -94,22 +182,102 @@ async function startServer() {
   });
 
   // サーバーの起動待ち
-  const maxRetries = 30;
-  for (let i = 0; i < maxRetries; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-    if (await checkServer(BASE_URL)) {
-      console.log(`✅ プレビューサーバーが起動しました (${BASE_URL})`);
-      return serverProc;
+  try {
+    const maxRetries = 30;
+    for (let i = 0; i < maxRetries; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (startError) throw startError;
+      if (serverProc.exitCode !== null)
+        throw new Error(
+          `Preview server exited with code ${serverProc.exitCode}`,
+        );
+      if (await checkServer(BASE_URL)) {
+        await verifyServerBuild(BASE_URL);
+        console.log(`✅ プレビューサーバーが起動しました (${BASE_URL})`);
+        return serverProc;
+      }
     }
+    throw new Error("プレビューサーバーの起動がタイムアウトしました。");
+  } catch (error) {
+    serverProc.kill();
+    throw error;
   }
+}
 
-  serverProc.kill();
-  throw new Error("プレビューサーバーの起動がタイムアウトしました。");
+export async function waitForServiceWorker(page, timeoutMs = 15000) {
+  await page.evaluate((timeout) => {
+    if (!("serviceWorker" in navigator))
+      throw new Error("Service Worker is unavailable");
+    return new Promise((resolve, reject) => {
+      const serviceWorker = navigator.serviceWorker;
+      let ready = false;
+      let finished = false;
+      let lastState = "registration missing";
+      const watched = new Set();
+      const finish = (error) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(deadline);
+        clearInterval(poll);
+        serviceWorker.removeEventListener("controllerchange", check);
+        for (const worker of watched)
+          worker.removeEventListener("statechange", check);
+        if (error) reject(error);
+        else resolve();
+      };
+      const check = async () => {
+        if (finished) return;
+        if ([...watched].some((candidate) => candidate.state === "redundant")) {
+          finish(new Error("Service Worker installation failed (redundant)"));
+          return;
+        }
+        if (ready && serviceWorker.controller?.state === "activated") {
+          finish();
+          return;
+        }
+        try {
+          const registration = await serviceWorker.getRegistration();
+          if (finished) return;
+          const worker =
+            registration?.installing ||
+            registration?.waiting ||
+            registration?.active;
+          if (!worker) return;
+          lastState = worker.state;
+          if (!watched.has(worker)) {
+            watched.add(worker);
+            worker.addEventListener("statechange", check);
+          }
+          if ([...watched].some((candidate) => candidate.state === "redundant"))
+            finish(new Error("Service Worker installation failed (redundant)"));
+        } catch (error) {
+          finish(error);
+        }
+      };
+      const deadline = setTimeout(
+        () =>
+          finish(
+            new Error(
+              `Service Worker readiness timed out after ${timeout}ms (${lastState})`,
+            ),
+          ),
+        timeout,
+      );
+      const poll = setInterval(check, 100);
+      serviceWorker.addEventListener("controllerchange", check);
+      serviceWorker.ready.then(() => {
+        ready = true;
+        check();
+      }, finish);
+      check();
+    });
+  }, timeoutMs);
 }
 
 async function main() {
   const args = process.argv.slice(2);
   const isHeadless = args.includes("--headless");
+  const forceBuild = args.includes("--build") || args.includes("--fresh");
   const showHelp = args.includes("--help") || args.includes("-h");
 
   if (showHelp) {
@@ -117,17 +285,21 @@ async function main() {
 
 オプション:
   --headless    ブラウザを非表示（ヘッドレスモード）で実行してオフライン起動を検証
+  --fresh, --build 強制的にビルドを実行して最新状態を検証
+  --port=番号  プレビューサーバーのポート（既定: 4173）
   -h, --help    このヘルプを表示
 `);
     process.exit(0);
   }
 
-  await ensureBuild();
+  if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535)
+    throw new Error("Invalid --port: expected an integer between 1 and 65535");
+  await ensureBuild(forceBuild);
 
   let serverProc = null;
   let browser = null;
 
-  const cleanup = async () => {
+  const cleanup = async (exitCode = 0) => {
     console.log("\n🧹 終了処理を実行中...");
     if (browser) {
       try {
@@ -137,14 +309,24 @@ async function main() {
     if (serverProc) {
       serverProc.kill();
     }
-    process.exit(0);
+    const numericCode =
+      typeof exitCode === "number"
+        ? exitCode
+        : exitCode === "SIGINT"
+          ? 130
+          : exitCode === "SIGTERM"
+            ? 143
+            : 0;
+    process.exit(numericCode);
   };
 
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  process.on("SIGINT", () => cleanup(130));
+  process.on("SIGTERM", () => cleanup(143));
 
   try {
-    serverProc = await startServer();
+    serverProc = await startServer((proc) => {
+      serverProc = proc;
+    });
 
     console.log(
       `🖥️  ブラウザ (Chromium) を起動しています (${isHeadless ? "ヘッドレス" : "GUI表示"})...`,
@@ -176,19 +358,7 @@ async function main() {
     );
 
     // Service Worker の登録とコントローラー化の完了待機
-    await page.evaluate(async () => {
-      if (!("serviceWorker" in navigator)) return;
-      await navigator.serviceWorker.ready;
-      if (!navigator.serviceWorker.controller) {
-        await new Promise((resolve) => {
-          navigator.serviceWorker.addEventListener(
-            "controllerchange",
-            resolve,
-            { once: true },
-          );
-        });
-      }
-    });
+    await waitForServiceWorker(page);
 
     // キャッシュされたファイル一覧を取得
     const cachedCount = await page.evaluate(async () => {
@@ -290,8 +460,13 @@ async function main() {
     await cleanup();
   } catch (err) {
     console.error("❌ エラーが発生しました:", err);
-    await cleanup();
+    await cleanup(1);
   }
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main().catch((error) => {
+    console.error("❌ エラーが発生しました:", error);
+    process.exitCode = 1;
+  });
+}

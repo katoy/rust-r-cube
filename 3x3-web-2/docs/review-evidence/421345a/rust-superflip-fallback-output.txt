@@ -1,0 +1,5 @@
+snapshot_input_state=UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB
+initial_centers=[0, 2, 0, 3, 2, 3]
+color_moves=22 remaining_centers=[3, 0, 2, 0, 3, 0]
+center_moves=50 exact_current_correction_match=true
+total_moves=72 pieces_solved=true final_centers=[0, 0, 0, 0, 0, 0]

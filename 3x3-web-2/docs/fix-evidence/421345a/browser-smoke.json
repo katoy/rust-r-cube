@@ -1,0 +1,14 @@
+{
+  "method": "Chrome DevTools isolated context; DOM button click events, not physical pointer input",
+  "sequence": "Reset -> R -> U -> Undo -> Solve -> Last -> Redo -> Undo -> Undo",
+  "result": {
+    "engine": "● READY",
+    "baseRestored": true,
+    "state": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "centers": [0, 1, 0, 0, 0, 0],
+    "canUndo": true,
+    "message": ""
+  },
+  "consoleErrorOrWarningCount": 0,
+  "contextClosed": true
+}

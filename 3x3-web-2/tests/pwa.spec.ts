@@ -1,6 +1,22 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("PWA and Offline Support", () => {
+  test.afterEach(async ({ page }) => {
+    try {
+      await page.evaluate(async () => {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      });
+    } catch {
+      // ページが閉じられている場合等は安全に無視
+    }
+  });
   test("manifest.webmanifest and PWA meta tags are present and valid", async ({
     page,
   }) => {
@@ -106,54 +122,101 @@ test.describe("PWA and Offline Support", () => {
   });
 
   test("R02: isolates cache per deployment path and preserves other apps and other paths", async ({
-    page,
-    context,
+    browser,
   }) => {
-    // 既存の SW とキャッシュをクリーンアップ
+    // 他テスト（オフライン等）の SW やキャッシュ状態の影響を完全に遮断するため独立コンテキストを使用
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      // 1. SW を登録しないモード（?no-sw）で初回ロードし、ドメインのキャッシュストレージを準備
+      await page.goto("/?no-sw");
+      await expect(page.locator("#engine-status")).toContainText("READY");
+
+      // 2. 他アプリのキャッシュおよび別配置パスのキャッシュ、同一パスの旧キャッシュを作成
+      await page.evaluate(async () => {
+        const otherApp = await caches.open("another-app-v1");
+        await otherApp.put("/dummy1", new Response("dummy1"));
+
+        const otherPathV2 = await caches.open("cube-studio-v2");
+        await otherPathV2.put("/dummy2", new Response("dummy2"));
+
+        const otherPathNested = await caches.open("cube-studio-nested-cube-v1");
+        await otherPathNested.put("/dummy3", new Response("dummy3"));
+
+        const samePathOld = await caches.open("cube-studio-root-old-v0");
+        await samePathOld.put("/dummy4", new Response("dummy4"));
+      });
+
+      // 3. 通常モードでアクセスし、新規 Service Worker の登録・初回 activate を実行
+      await page.goto("/");
+      await expect(page.locator("#engine-status")).toContainText("READY");
+
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        // activate 完了とキャッシュ整理（caches.delete）を待機
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
+
+      // 検証
+      const cacheKeys = await page.evaluate(async () => {
+        return await caches.keys();
+      });
+
+      // 1. 他アプリのキャッシュが残っていること
+      expect(cacheKeys).toContain("another-app-v1");
+      // 2. 別配置パス（v2, nested-cube）のキャッシュが保護されて残っていること
+      expect(cacheKeys).toContain("cube-studio-v2");
+      expect(cacheKeys).toContain("cube-studio-nested-cube-v1");
+      // 3. 同一スコープ（root）の旧バージョンキャッシュは削除されていること
+      expect(cacheKeys).not.toContain("cube-studio-root-old-v0");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("R04: suppresses SW auto-registration in dev mode when not automated or forced", async ({
+    page,
+  }) => {
+    // navigator.webdriver = false を模倣（人間のブラウザ開発環境をシミュレート）
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => false,
+      });
+    });
+
     await page.goto("/");
-    await page.evaluate(async () => {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs) await r.unregister();
-      const keys = await caches.keys();
-      for (const k of keys) await caches.delete(k);
-    });
-
-    // 他アプリのキャッシュおよび別配置パスのキャッシュ、同一パスの旧キャッシュを作成
-    await page.evaluate(async () => {
-      const otherApp = await caches.open("another-app-v1");
-      await otherApp.put("/dummy1", new Response("dummy1"));
-
-      const otherPathV2 = await caches.open("cube-studio-v2");
-      await otherPathV2.put("/dummy2", new Response("dummy2"));
-
-      const otherPathNested = await caches.open("cube-studio-nested-cube-v1");
-      await otherPathNested.put("/dummy3", new Response("dummy3"));
-
-      const samePathOld = await caches.open("cube-studio-root-old-v0");
-      await samePathOld.put("/dummy4", new Response("dummy4"));
-    });
-
-    // ページを再読み込みして Service Worker を登録・有効化させる
-    await page.reload();
     await expect(page.locator("#engine-status")).toContainText("READY");
 
-    await page.evaluate(async () => {
-      await navigator.serviceWorker.ready;
-      // activate が完了するのを少し待つ
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    const regCount = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return 0;
+      const regs = await navigator.serviceWorker.getRegistrations();
+      return regs.length;
     });
 
-    // 検証
-    const cacheKeys = await page.evaluate(async () => {
-      return await caches.keys();
+    // 開発サーバーで人間のアクセス時は SW 登録が抑止され 0 件であること
+    expect(regCount).toBe(0);
+  });
+
+  test("R04: allows SW registration in dev mode when ?force-sw is present", async ({
+    page,
+  }) => {
+    // navigator.webdriver = false の人間環境でも ?force-sw があれば登録されること
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => false,
+      });
     });
 
-    // 1. 他アプリのキャッシュが残っていること
-    expect(cacheKeys).toContain("another-app-v1");
-    // 2. 別配置パス（v2, nested-cube）のキャッシュが保護されて残っていること
-    expect(cacheKeys).toContain("cube-studio-v2");
-    expect(cacheKeys).toContain("cube-studio-nested-cube-v1");
-    // 3. 同一スコープ（root）の旧バージョンキャッシュは削除されていること
-    expect(cacheKeys).not.toContain("cube-studio-root-old-v0");
+    await page.goto("/?force-sw");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const hasReg = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return false;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return !!reg;
+    });
+
+    expect(hasReg).toBe(true);
   });
 });

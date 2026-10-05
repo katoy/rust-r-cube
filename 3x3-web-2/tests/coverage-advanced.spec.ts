@@ -246,14 +246,90 @@ test.describe("Advanced E2E Coverage Tracking", () => {
         result: "OK",
       });
 
+      // 8. is_valid() - 状態妥当性判定
+      console.log("8️⃣  is_valid() テスト");
+      const isValidResult = await page.evaluate(async () => {
+        const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+        const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        const validSolved = wasm.is_valid(solved);
+        const invalidState =
+          "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBU";
+        let invalidThrew = false;
+        try {
+          wasm.is_valid(invalidState);
+        } catch {
+          invalidThrew = true;
+        }
+        return validSolved === true && invalidThrew === true;
+      });
+      expect(isValidResult).toBe(true);
+      operationLog.push({
+        timestamp: Date.now(),
+        operation: "is_valid()",
+        result: "OK",
+      });
+
+      // 9. is_solved() - 完成状態判定
+      console.log("9️⃣  is_solved() テスト");
+      const isSolvedResult = await page.evaluate(async () => {
+        const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+        const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        const solvedTrue = wasm.is_solved(solved);
+        const scrambled = wasm.scramble(42);
+        const movedState = JSON.parse(
+          wasm.apply_moves(solved, scrambled),
+        ).state;
+        const solvedFalse = wasm.is_solved(movedState);
+        return solvedTrue === true && solvedFalse === false;
+      });
+      expect(isSolvedResult).toBe(true);
+      operationLog.push({
+        timestamp: Date.now(),
+        operation: "is_solved()",
+        result: "OK",
+      });
+
+      // 10. center_parity() - センターパリティ計算
+      console.log("🔟 center_parity() テスト");
+      const parityResult = await page.evaluate(async () => {
+        const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+        const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        return wasm.center_parity(solved);
+      });
+      expect(parityResult).toBe(0);
+      operationLog.push({
+        timestamp: Date.now(),
+        operation: "center_parity()",
+        result: `Parity: ${parityResult}`,
+      });
+
+      // 11. solve_with_algorithm() - アルゴリズム指定解法
+      console.log("1️⃣1️⃣ solve_with_algorithm() テスト");
+      const algSolveResult = await page.evaluate(async () => {
+        const wasm = await import(/* @vite-ignore */ "/pkg/cube_studio.js");
+        const solved = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        const scrambled = wasm.scramble(11);
+        const state = JSON.parse(wasm.apply_moves(solved, scrambled)).state;
+        const cfopRes = JSON.parse(
+          wasm.solve_with_algorithm(state, 5000, false, undefined, "cfop"),
+        );
+        return cfopRes.moves.length;
+      });
+      expect(algSolveResult).toBeGreaterThan(0);
+      operationLog.push({
+        timestamp: Date.now(),
+        operation: "solve_with_algorithm('cfop')",
+        result: `${algSolveResult} 手`,
+      });
+
       console.log("\n✅ すべての WASM 関数テスト完了");
 
       // レポート生成
       generateWasmCoverageReport(operationLog);
 
       // テスト検証
-      expect(operationLog.length).toBe(7);
-      console.log(`\n✅ 7 個の WASM 関数をすべてテスト完了`);
+      expect(operationLog.length).toBe(11);
+      console.log(`\n✅ 11 個の WASM 公開関数をすべてテスト完了`);
     } catch (error) {
       console.error("❌ テスト実行中にエラー:", error);
       throw error;

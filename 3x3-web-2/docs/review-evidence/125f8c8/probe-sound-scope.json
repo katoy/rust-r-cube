@@ -1,0 +1,14 @@
+{
+  "root": {
+    "enabled": "false",
+    "soundKeys": [
+      "cube_studio_sound_enabled"
+    ]
+  },
+  "index": {
+    "enabled": "false",
+    "soundKeys": [
+      "cube_studio_sound_enabled"
+    ]
+  }
+}

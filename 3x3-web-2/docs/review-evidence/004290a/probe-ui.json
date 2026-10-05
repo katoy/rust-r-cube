@@ -1,0 +1,37 @@
+{
+  "f1KeyboardMoveDuringSolve": {
+    "buttonDisabled": true,
+    "cancelWasVisibleBefore": true,
+    "cancelVisibleAfterKeypress": false,
+    "searchCancelledByKeypress": true,
+    "revisionChanged": true,
+    "solverNoteAfterKeypress": "ブラウザ内で計算 · 通常5秒以内"
+  },
+  "f2ZombieSolverNoteOnTimeout": {
+    "note": "探索中 · 0.2 秒 / 5 秒",
+    "extendedHidden": false,
+    "cancelHidden": true,
+    "message": "探索時間の上限に達しました。30秒の延長探索を試してください。"
+  },
+  "f3ShareLinkDuringPreview": {
+    "scrambleState": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+    "stepState": "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "isStepStateSolved": true,
+    "copiedUrl": "http://127.0.0.1:5173/?no-sw=&state=UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB",
+    "urlContainsScrambleState": false,
+    "urlContainsStepState": true
+  },
+  "f4DoubleNotificationOnSolve": {
+    "events": [
+      "solution",
+      "solution"
+    ],
+    "initialRestore": true
+  },
+  "f5ShareLinkEnabledDuringSolve": {
+    "shareDisabled": false,
+    "scrambleDisabled": true,
+    "saveDisabled": true,
+    "loadDisabled": true
+  }
+}

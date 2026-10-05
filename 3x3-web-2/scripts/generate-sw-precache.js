@@ -2,10 +2,12 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { collectInputFiles, saveBuildManifest } from "./build-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const rootDir = path.resolve(__dirname, "..");
 const distDir = path.resolve(__dirname, "../dist");
 const swPath = path.join(distDir, "sw.js");
 
@@ -19,7 +21,7 @@ if (fs.existsSync(swPath)) {
         files.push(...getFiles(fullPath, baseDir));
       } else {
         const rel = path.relative(baseDir, fullPath).replace(/\\/g, "/");
-        if (rel !== "sw.js") {
+        if (rel !== "sw.js" && rel !== ".build-manifest.json") {
           files.push(`./${rel}`);
         }
       }
@@ -59,4 +61,8 @@ if (fs.existsSync(swPath)) {
   console.log(
     `[generate-sw-precache] Injected ${allFiles.length} assets and version ${contentHash} into dist/sw.js`,
   );
+
+  // ビルド入力マニフェストを記録（ファイルの削除・追加・変更の検知用）
+  const inputs = collectInputFiles(rootDir);
+  saveBuildManifest(rootDir, distDir, inputs);
 }

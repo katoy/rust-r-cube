@@ -52,11 +52,12 @@ const result = wasm.validate(solved);  // true を返す
 
 **特徴**: すべてのエッジピース（12個）が反転している特殊な状態
 
-- **神の数**: 20手（最難度のキューブ状態の1つ）
-- **特異性**: コーナーピースは正しい位置だが、すべてのエッジが反転
+- **色のみの最短手数**: 20手（HTM: 180°回転も1手）
+- **特異性**: コーナーは位置・向きともに完成状態。12個のエッジは元の位置で反転
+- **センターの向き**: スクランブル手順の回転を引き継ぎます。探索結果の手数は探索予算と向き補正によって変わり、20手での解法を保証するものではありません
 - **生成方法**: 
   ```
-  R U' R U R U R U' R' U' R2 U R U' R' U' R2 U
+  U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2
   ```
 
 **数学的意義**：
@@ -67,10 +68,10 @@ const result = wasm.validate(solved);  // true を返す
 **使用例:**
 ```typescript
 // スーパーフリップを生成
-const superflip = wasm.apply_moves(solved, "R U' R U R U R U' R' U' R 2 U R U' R' U' R 2 U");
+const superflip = JSON.parse(wasm.apply_moves(solved, "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2")).state;
 
 // ソルバーの能力確認
-const solution = wasm.solve(state, 5000);  // 最大5秒で解く
+const solution = JSON.parse(wasm.solve(superflip, 5000));  // 最大5秒で探索
 if (solution.moves.length <= 20) {
   console.log("✅ God's Number を達成");
 }
@@ -78,15 +79,15 @@ if (solution.moves.length <= 20) {
 
 **参考資料**:
 - [SuperFlip - Rubik's Cube Wiki](https://www.speedcubing.org)
-- [God's Number - 20](https://en.wikipedia.org/wiki/Rubik%27s_cube#Optimal_solutions)
+- [God's Number is 20（証明を行った研究チーム）](https://www.cube20.org/)
 
 ---
 
-### easy-5-moves.json - 簡単な状態（5手） 🟢
+### easy-5-moves.json - 簡単な状態（3手） 🟢
 
 初級者向けの簡単なスクランブルです。
 
-- **解くために必要な手数**: 5手
+- **解くために必要な手数**: 3手
 - **スクランブル**: `R U F`
 - **用途**: UI テスト、ベンチマーク、デモンストレーション
 
@@ -164,17 +165,13 @@ document.getElementById("load-superflip")?.addEventListener("click", async () =>
 
 ```rust
 #[test]
-fn superflip_solvable_in_20_moves() {
-    // スーパーフリップのスクランブル実行
-    let scramble = vec![/* R, U', R, U, ... */];
-    let cube = cube::apply(&cube::parse_state(SOLVED).unwrap(), &scramble);
-    
-    // 解法試行
-    let mut search = search::Search::new(5000);
-    let moves = search.solve(&cube);
-    
-    // 20手以内で解けるか確認
-    assert!(moves.unwrap_or_default().len() <= 20);
+fn superflip_preset_flips_all_edges_without_moving_pieces() {
+    let preset: serde_json::Value =
+        serde_json::from_str(include_str!("../cubes/superflip.json")).unwrap();
+    let moves = cube::parse_moves(preset["scramble"].as_str().unwrap()).unwrap();
+    let actual = cube::apply(&RawCube::default(), &moves);
+    let expected = RawCube { eo: [1; 12], ..RawCube::default() };
+    assert_eq!(actual, expected);
 }
 ```
 

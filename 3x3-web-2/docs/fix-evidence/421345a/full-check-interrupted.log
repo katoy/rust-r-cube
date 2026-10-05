@@ -1,0 +1,306 @@
+
+> cube-studio@0.1.0 check
+> npm run check:guardrails && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --release && npm run format:check && npm run build && npm test
+
+
+> cube-studio@0.1.0 check:guardrails
+> node scripts/check-review-guardrails.js
+
+🔍 コードレビュー・ガードレール静的検証を実行中...
+
+✅ レビュー・ガードレール検査をパスしました。
+   Compiling cube-studio v0.1.0 (/Users/katoy/github/study-rust/rust-r-cube/3x3-web-2)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.97s
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running unittests src/lib.rs (target/release/deps/cube_studio-278187723c098ccf)
+
+running 142 tests
+test cfop::tests::test_cfop_redundant ... ok
+test coord::tests::test_factorial_and_combinations ... ok
+test coord::tests::test_n_choose_k_boundaries ... ok
+test coord::tests::test_raw_cube_coords ... ok
+test cfop::tests::test_cross_on_solved ... ok
+test cube::tests::test_parse_moves_too_long ... ok
+test cfop::tests::test_cfop_phases_on_solved ... ok
+test cfop::tests::test_cfop_corner_search_d_face_exclusion ... ok
+test cube::tests::test_parse_moves_tokens ... ok
+test cube::tests::test_parse_state_center_mismatch ... ok
+test cube::tests::test_parse_state_corner_duplicate_and_invalid ... ok
+test cube::tests::test_parse_state_edge_duplicate_and_invalid ... ok
+test cube::tests::test_scramble_and_notation ... ok
+test cfop::tests::test_cfop_scramble_10_moves ... ok
+test cfop::tests::test_cfop_scramble_full_25_moves ... ok
+test korf::tests::test_korf_short_scramble ... ok
+test korf::tests::test_korf_solved ... ok
+test korf::tests::test_korf_zero_budget_returns_none ... ok
+test korf::tests::test_korf_timeout_in_search ... ok
+test korf::tests::test_korf_exhausted_and_redundant ... ok
+test korf::tests::test_korf_medium_scramble_optimal ... ok
+test search::tests::test_min_phase2_center_moves ... ok
+test search::tests::test_search_direct_solve_edge_cases ... ok
+test search::tests::test_search_phase1_branch_coverage ... ok
+test search::tests::test_search_phase2_branch_coverage ... ok
+test search::tests::test_search_solved_with_zero_target_centers ... ok
+test search::tests::test_search_timeout_returns_none ... ok
+test supercube::tests::test_cancel_redundant_moves_cascading ... ok
+test supercube::tests::test_odd_center_rotations_parity_rejected ... ok
+test cfop::tests::test_cfop_error_paths_and_helpers ... ok
+test supercube::tests::test_perfect_matching_optimality ... ok
+test supercube::tests::test_rotate_center_180_invariance ... ok
+test tests::all_move_cube_18_patterns_covered ... ok
+test tests::apply_multiple_moves_consistency ... ok
+test tests::all_moves_match_geometry ... ok
+test tests::center_input_parity_matches_legal_moves ... ok
+test tests::complex_algorithms_are_invertible ... ok
+test tests::coord_cube_default_is_solved ... ok
+test tests::corner_and_edge_consistency ... ok
+test tests::empty_move_list_produces_no_state_changes ... ok
+test tests::cfop_reports_visited_nodes_in_solution_statistics ... ok
+test tests::extensive_error_cases ... ok
+test tests::facelets_all_colors_present ... ok
+test tests::facelets_have_correct_sticker_count ... ok
+test tests::facelets_encode_decode_roundtrip ... ok
+test tests::incompatible_center_input_is_rejected_before_search ... ok
+test tests::invalid_notation_rejected ... ok
+test tests::invalid_state_format_error ... ok
+test tests::move_notation_accuracy ... ok
+test tests::moves_and_inverse_roundtrip ... ok
+test tests::notation_roundtrip ... ok
+test tests::orientation_invalid_for_unsolvable ... ok
+test tests::orientation_mode_false_empty_state ... ok
+test korf::tests::test_korf_fallback_on_deep_scramble ... ok
+test tests::parse_state_invalid_color_counts ... ok
+test tests::parse_state_rejects_invalid_corner_colors ... ok
+test tests::parse_state_roundtrip_after_moves ... ok
+test tests::parse_state_validates_color_counts ... ok
+test tests::rejects_impossible_states ... ok
+test tests::parse_state_center_validation ... ok
+test tests::deadline_and_table_integrity ... ok
+test tests::scramble_produces_different_states ... ok
+test tests::single_move_affects_cube_state ... ok
+test tests::solve_state_error_handling ... ok
+test tests::sample_face_turn_sequences_are_solvable ... ok
+test tests::solve_with_empty_state ... ok
+test tests::orientation_modes_produce_different_solutions ... ok
+test tests::solves_one_thousand_scrambles ... ignored, long-running solver regression; run explicitly before releases or after search changes
+test tests::multiple_solve_calls_are_consistent ... ok
+test tests::orientation_mode_comparison ... ok
+test tests::superflip_preset_flips_all_edges_without_moving_pieces ... ok
+test tests::solves_known_states ... ok
+test tests::tables_caching_mechanism ... ok
+test tests::solve_state_with_different_budgets ... ok
+test tests::superflip_solver_returns_valid_solution ... ok
+test tests::solves_with_orientation_mode_true ... ok
+test tests::tables_extensive_consistency_checks ... ok
+test tests::tables_cp_slice_pruning_generation ... ok
+test tests::solves_with_orientation_mode_false ... ok
+test tests::tables_move_table_consistency ... ok
+test tests::tables_symmetry_maps_generation ... ok
+test tests::test_cancel_redundant_moves_opposite_faces ... ok
+test tests::test_coord_cube_cp_roundtrip ... ok
+test tests::test_coord_cube_default ... ok
+test tests::test_coord_cube_ep8_roundtrip ... ok
+test tests::test_coord_cube_flip_roundtrip ... ok
+test tests::test_coord_cube_slice_p_roundtrip ... ok
+test tests::test_coord_cube_twist_roundtrip ... ok
+test tests::test_coord_cube_ud_slice_roundtrip ... ok
+test tests::test_easy_5_moves_length ... ok
+test tests::test_f1_solution_verification_always_enforced ... ok
+test tests::test_get_flip_slice ... ok
+test tests::test_get_twist_slice ... ok
+test tests::test_move_cube_18_all_moves ... ok
+test tests::test_move_cube_operations ... ok
+test tests::tables_encode_decode_roundtrip ... ok
+test tests::test_move_table_integrity ... ok
+test tests::test_multiply_operation ... ok
+test tests::test_pruning_table_integrity ... ok
+test tests::test_r01_twist_slice_admissible ... ok
+test tests::test_native_core_functions ... ok
+test tests::test_r05_thistlethwaite_g3_membership ... ok
+test tests::test_r07_invalid_center_input_rejected ... ok
+test tests::test_solve_state_invalid_state ... ok
+test tests::test_r06_budget_contract ... ok
+test tests::test_solve_state_orientation_true ... ok
+test tests::test_solve_state_timeout ... ok
+test tests::test_solve_state_unsolvable_with_orientation ... ok
+test tests::test_solve_state_with_all_algorithms ... ok
+test tests::tables_ep8_slice_pruning_generation ... ok
+test tests::test_solve_state_orientation_false ... ok
+test tests::test_superflip_cfop_move_counts_match_implementation_values ... ok
+test tests::orientation_colors_always_solvable ... ok
+test tests::test_r01_twist_slice_all_admissible ... ok
+test tests::solve_state_with_various_scrambles ... ok
+test tests::tables_generation_functions_exist ... ok
+test tests::test_tables_encode_and_decode ... ok
+test tests::test_wasm_wrapper_functions ... ok
+test tests::timeout_on_hard_scrambles ... ok
+test tests::complete_end_to_end_multiple_seeds ... ok
+test tests::wasm_apply_moves_function ... ok
+test tests::wasm_get_orientations_function ... ok
+test tests::wasm_result_data_serialization ... ok
+test tests::wasm_scramble_function ... ok
+test tests::wasm_solve_with_orientation_function ... ok
+test tests::wasm_validate_function ... ok
+test thistlethwaite::tests::test_thistlethwaite_direct_phases_on_solved ... ok
+test thistlethwaite::tests::test_thistlethwaite_fallback_solve ... ok
+test thistlethwaite::tests::test_thistlethwaite_is_g3_not_ud_edges ... ok
+test thistlethwaite::tests::test_thistlethwaite_phase2_explicit ... ok
+test thistlethwaite::tests::test_thistlethwaite_phase_fallbacks ... ok
+test thistlethwaite::tests::test_thistlethwaite_phases_1_and_2 ... ok
+test thistlethwaite::tests::test_thistlethwaite_short_scramble ... ok
+test thistlethwaite::tests::test_thistlethwaite_solved ... ok
+test tests::wasm_solve_function ... ok
+test thistlethwaite::tests::test_thistlethwaite_superflip_solves_under_45_moves ... ok
+test tests::test_superflip_thistlethwaite_move_counts_match_theoretical_bounds ... ok
+test tests::test_superflip_orientation_solve_length ... ok
+test tests::test_superflip_kociemba_move_counts_match_theoretical_bounds ... ok
+test tests::test_superflip_5s_budget_solves_colors_and_centers ... ok
+test tests::test_supercube_centers ... ok
+test tests::test_superflip_korf_move_counts_match_theoretical_bounds ... ok
+
+test result: ok. 141 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.32s
+
+     Running unittests src/bin/benchmark.rs (target/release/deps/benchmark-e1d4975ee2f02f99)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/serialization_bench.rs (target/release/deps/serialization_bench-cc6530b26b69eb85)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/superflip_bench.rs (target/release/deps/superflip_bench-12554e2bd02d5b21)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests cube_studio
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+> cube-studio@0.1.0 format:check
+> prettier --check web tests scripts *.json *.ts
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> cube-studio@0.1.0 build
+> npm run wasm && npm run typecheck && vite build && node scripts/generate-sw-precache.js
+
+
+> cube-studio@0.1.0 wasm
+> wasm-pack build --target web --release --out-dir pkg --no-pack
+
+[INFO]: 🎯  Checking for the Wasm target...
+[INFO]: 🌀  Compiling to Wasm...
+    Finished `release` profile [optimized] target(s) in 0.25s
+[INFO]: ⬇️  Installing wasm-bindgen...
+[INFO]: Optimizing wasm binaries with `wasm-opt`...
+[INFO]: ✨   Done in 1.35s
+[INFO]: 📦   Your wasm pkg is ready to publish at /Users/katoy/github/study-rust/rust-r-cube/3x3-web-2/pkg.
+
+> cube-studio@0.1.0 typecheck
+> tsc --noEmit
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 33 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                               1.34 kB │ gzip:     0.81 kB
+dist/assets/solver.worker-BLfl36-u.js         5.15 kB
+dist/assets/cube_studio_bg-CQHutqv8.wasm  6,289.62 kB │ gzip: 3,412.79 kB
+dist/assets/index-DfshNm8g.css               23.40 kB │ gzip:     5.65 kB
+dist/assets/editor-JbaEtJEL.js                4.26 kB │ gzip:     1.71 kB
+dist/assets/camera-B9i0ZnhM.js               27.51 kB │ gzip:     8.69 kB
+dist/assets/index-sb0zlyTq.js                75.85 kB │ gzip:    26.28 kB
+dist/assets/three-bE9chA0F.js               577.97 kB │ gzip:   144.39 kB
+
+✓ built in 381ms
+[generate-sw-precache] Injected 19 assets and version ce8f4e33ca into dist/sw.js
+
+> cube-studio@0.1.0 test
+> playwright test
+
+
+Running 269 tests using 1 worker
+
+  ✓    1 [chromium] › tests/accessibility.spec.ts:10:3 › Comprehensive Accessibility (a11y) Audits › initial main page meets WCAG accessibility standards (2.5s)
+  ✓    2 [chromium] › tests/accessibility.spec.ts:17:3 › Comprehensive Accessibility (a11y) Audits › solution content page meets accessibility standards (2.5s)
+  ✓    3 [chromium] › tests/accessibility.spec.ts:32:3 › Comprehensive Accessibility (a11y) Audits › help dialog meets accessibility standards (1.9s)
+  ✓    4 [chromium] › tests/accessibility.spec.ts:42:3 › Comprehensive Accessibility (a11y) Audits › camera editor dialog meets accessibility standards (2.0s)
+  ✓    5 [chromium] › tests/accessibility.spec.ts:55:3 › Comprehensive Accessibility (a11y) Audits › 3D canvas element is keyboard-focusable with accessible name and live region (1.5s)
+  ✓    6 [chromium] › tests/app-state.spec.ts:10:3 › AppStateMachine / AppState (State パターン検証) › 初期状態は IdleState であり、適切な権限を持つ (1ms)
+  ✓    7 [chromium] › tests/app-state.spec.ts:25:3 › AppStateMachine / AppState (State パターン検証) › Idle から Solving への遷移と、Solving 中の不正操作一括遮断 (3ms)
+  ✓    8 [chromium] › tests/app-state.spec.ts:62:3 › AppStateMachine / AppState (State パターン検証) › Solving 中のキャンセルによる Idle 復帰 (0ms)
+  ✓    9 [chromium] › tests/app-state.spec.ts:75:3 › AppStateMachine / AppState (State パターン検証) › Solving 完了による Previewing 遷移（解法あり） (1ms)
+  ✓   10 [chromium] › tests/app-state.spec.ts:92:3 › AppStateMachine / AppState (State パターン検証) › Solving 完了による Idle 復帰（解法なし・失敗） (0ms)
+  ✓   11 [chromium] › tests/app-state.spec.ts:101:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中にキューブ変更操作が入った場合、プレビューを自動終了して Idle へ安全に遷移する (0ms)
+  ✓   12 [chromium] › tests/app-state.spec.ts:126:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中に closeSolution を呼ぶと Idle へ遷移する (0ms)
+  ✓   13 [chromium] › tests/app-state.spec.ts:140:3 › AppStateMachine / AppState (State パターン検証) › 未変更・例外ではプレビューと終了フックを保持する (1ms)
+  ✓   14 [chromium] › tests/app-state.spec.ts:168:3 › AppStateMachine / AppState (State パターン検証) › Previewing 中に再探索（startSolving）を開始すると Solving へ直接遷移可能 (0ms)
+  ✓   15 [chromium] › tests/app.spec.ts:15:1 › initial screen, keyboard, inverse, undo and redo (2.0s)
+  ✓   16 [chromium] › tests/app.spec.ts:42:1 › scramble, solve, step, backwards, jump and complete playback (5.8s)
+  ✓   17 [chromium] › tests/app.spec.ts:71:1 › all eighteen moves match their inverse and manual edits invalidate solution (6.8s)
+  ✓   18 [chromium] › tests/app.spec.ts:94:1 › physical color input, unknown colors, validation and solve (6.2s)
+  ✓   19 [chromium] › tests/app.spec.ts:122:1 › persistence, valid JSON import and invalid JSON rejection (3.4s)
+  ✓   20 [chromium] › tests/app.spec.ts:148:1 › animation interruption, pause and speed changes do not corrupt state (7.5s)
+  ✓   21 [chromium] › tests/app.spec.ts:171:1 › responsive layout and accessibility (2.9s)
+  ✓   22 [chromium] › tests/app.spec.ts:195:1 › mobile layout keeps 3D scene and solution controls visible simultaneously (6.6s)
+  ✓   23 [chromium] › tests/app.spec.ts:230:1 › production assets and worker load under a subdirectory (6.3s)
+  ✓   24 [chromium] › tests/app.spec.ts:245:1 › R04: presets load correctly under a subdirectory (1.6s)
+  ✓   25 [chromium] › tests/app.spec.ts:261:1 › worker loading failure offers retry (2.2s)
+  ✓   26 [chromium] › tests/app.spec.ts:275:1 › cancelled and outdated worker results cannot change the cube (9.2s)
+  ✓   27 [chromium] › tests/app.spec.ts:309:1 › 2D fallback remains operable without WebGL (1.6s)
+  ✓   28 [chromium] › tests/app.spec.ts:329:1 › orientation mode toggle correctly changes solve behavior (3.4s)
+  ✓   29 [chromium] › tests/app.spec.ts:371:1 › orientation mode unchecked solves to color-only completion (2.4s)
+  ✓   30 [chromium] › tests/app.spec.ts:397:1 › arrow indicators display piece orientation (2.1s)
+  ✓   31 [chromium] › tests/app.spec.ts:435:1 › orientation toggle does not affect UI state or undo/redo (2.1s)
+  ✓   32 [chromium] › tests/app.spec.ts:465:1 › error handling for invalid algorithm syntax (1.8s)
+  ✓   33 [chromium] › tests/app.spec.ts:474:1 › persistence saves and loads state correctly (3.1s)
+  ✓   34 [chromium] › tests/app.spec.ts:488:1 › large number of moves is handled correctly (2.1s)
+  ✓   35 [chromium] › tests/app.spec.ts:511:1 › speed setting affects playback duration (7.1s)
+  ✓   36 [chromium] › tests/app.spec.ts:554:1 › arrows are displayed on initial solved state (1.9s)
+  ✓   37 [chromium] › tests/app.spec.ts:581:1 › arrows update after scramble (2.1s)
+  ✓   38 [chromium] › tests/app.spec.ts:623:1 › arrows visibility persists during solve (3.8s)
+  ✓   39 [chromium] › tests/app.spec.ts:669:1 › arrow orientations update correctly on all faces for all moves (U, R, F, D, L, B, inverses, doubles) (4.4s)
+  ✓   40 [chromium] › tests/app.spec.ts:780:1 › all 18 basic moves correctly update arrow orientations on all faces (6.2s)
+  ✓   41 [chromium] › tests/app.spec.ts:859:1 › orientation mode solves cube so that all centers are also oriented correctly to 0 (2.7s)
+  ✓   42 [chromium] › tests/app.spec.ts:906:1 › superflip preset loads all twelve flipped edges and solves colors and orientation (4.6s)
+Preset '簡単（3手）' solved in 3 moves (3 moves): F' U' R'
+Preset 'T-Permutation' solved in 11 moves (at most 14 moves): U F2 U' F2 D R2 B2 U B2 D' R2
+Preset 'スーパーフリップ' solved in 23 moves (valid center-aware solution, including budget fallback): R L' F' U D R' B2 U2 L F B' L2 U2 B2 U2 B2 D2 L2 D L2 D R2 U
+Preset 'ランダム（seed=1）' solved in 24 moves (at most 25 moves): D L' B D B U L F' R' U' B' U2 F2 R2 U2 R2 U2 B2 L2 F2 D L2 D R2
+  ✓   43 [chromium] › tests/app.spec.ts:984:1 › all presets can be loaded and solved within configured move bounds (7.8s)
+CFOP Phase Badges: [ 'ステップ 2: 完全1層 (First Layer)', 'ステップ 3: 中層エッジ (Second Layer)' ]
+Thistlethwaite Phase Badges: [ '第2段階: G1→G2 (コーナー向き+中層)', '第4段階: G3→G4 (最終揃え)' ]
+  ✓   44 [chromium] › tests/app.spec.ts:1059:1 › solver algorithm selection, persistence, and phase badges (6.5s)
+  ✓   45 [chromium] › tests/app.spec.ts:1148:1 › clears active-press styles when window loses focus (2.3s)
+  ✓   46 [chromium] › tests/arrow-direction.spec.ts:9:3 › R05: 3D arrow and center label rotation directions › U center arrow points to +X (right, [1, 0, 0]) after clockwise U turn (1.8s)
+  ✓   47 [chromium] › tests/beginner-guidance.spec.ts:9:3 › Beginner Guidance and Notation UI › face-buttons have informative title tooltips for beginners (1.9s)
+  ✓   48 [chromium] › tests/beginner-guidance.spec.ts:38:3 › Beginner Guidance and Notation UI › help dialog provides notation table for beginners (1.9s)
+  ✓   49 [chromium] › tests/camera-async-regressions.spec.ts:69:1 › F04: replacement decode invalidates old guides and prevents old capture/apply (2.5s)
+  ✓   50 [chromium] › tests/camera-async-regressions.spec.ts:104:1 › F05: static-to-live blocks old-photo sampling and editing until stopped (2.4s)
+  ✓   51 [chromium] › tests/camera-async-regressions.spec.ts:132:1 › F14: delayed JPEG preserves the later selected view and original storage target (2.3s)
+  ✓   52 [chromium] › tests/camera-async-regressions.spec.ts:178:3 › F15: raw decode failure remains visible and invalidates old photo (2.1s)
+  ✓   53 [chromium] › tests/camera-async-regressions.spec.ts:178:3 › F15: resized decode failure remains visible and invalidates old photo (2.1s)
+  ✓   54 [chromium] › tests/camera-async-regressions.spec.ts:218:1 › F16: real 4000x1 replacement resizes to nonzero pixels instead of retaining old photo (1.8s)
+  ✓   55 [chromium] › tests/camera-async-regressions.spec.ts:236:1 › F16: current resize encoding failure is explicit and cannot revive old photo (1.9s)
+  ✓   56 [chromium] › tests/camera-face-and-focus.spec.ts:5:3 › R09 & R13: Camera Face Assignment and Palette Focus › R09: unrecognized or mismatched center colors in view A do not overwrite view B faces (2.0s)
+  ✓   57 [chromium] › tests/camera-face-and-focus.spec.ts:97:3 › R09 & R13: Camera Face Assignment and Palette Focus › R13: clicking or selecting palette buttons does not drop focus to body (2.0s)
+  ✓   58 [chromium] › tests/camera-fixture.spec.ts:12:3 › R03: Camera fixture availability in clean environment › loadFullManifest automatically ensures manifest and test images exist (1.2s)
+  ✓   59 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via file stops live video and displays that image (2.1s)
+  ✓   60 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via card-drop stops live video and displays that image (2.7s)
+  ✓   61 [chromium] › tests/camera-image-state.spec.ts:50:3 › selecting an image via canvas-drop stops live video and displays that image (2.7s)
+  ✓   62 [chromium] › tests/camera-image-state.spec.ts:124:1 › selecting an image cancels a pending camera start (2.1s)
+  ✓   63 [chromium] › tests/camera-image-state.spec.ts:156:1 › outline detection ignores previously drawn and manually moved guides (2.4s)
+  ✓   64 [chromium] › tests/camera-image-state.spec.ts:171:1 › reselecting the active image preserves manually adjusted vertices and center (2.6s)
+  ✓   65 [chromium] › tests/camera-input.spec.ts:23:3 › カメラ入力 - 画像処理テスト › マニフェストが存在し、すべての画像ファイルと立体座標が揃っている (5ms)
+  ✓   66 [chromium] › tests/camera-input.spec.ts:58:3 › カメラ入力 - 画像処理テスト › solved 状態の画像をアップロードできる (2.3s)

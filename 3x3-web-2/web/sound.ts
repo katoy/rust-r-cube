@@ -1,12 +1,17 @@
-const STORAGE_KEY = "cube_studio_sound_enabled";
+import { getScopedStorageKey } from "./storage-key";
 
-class SoundManager {
+export class SoundManager {
   private ctx: AudioContext | null = null;
   private enabled: boolean = true;
+  private storageKey: string;
 
-  constructor() {
+  constructor(customPath?: string) {
+    this.storageKey = getScopedStorageKey(
+      "cube_studio_sound_enabled",
+      customPath,
+    );
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(this.storageKey);
       // デフォルトは有効
       this.enabled = saved === null ? true : saved === "true";
     } catch {
@@ -36,7 +41,7 @@ class SoundManager {
   public toggle(): boolean {
     this.enabled = !this.enabled;
     try {
-      localStorage.setItem(STORAGE_KEY, String(this.enabled));
+      localStorage.setItem(this.storageKey, String(this.enabled));
     } catch {}
     return this.enabled;
   }

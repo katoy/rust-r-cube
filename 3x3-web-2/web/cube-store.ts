@@ -1,5 +1,5 @@
 import { SOLVED, type ResultData } from "./model";
-import { automaticCenters, centerTurns, centersFromInput } from "./centers";
+import { automaticCenters, centerTurns, turnsToCenters } from "./centers";
 
 export interface CubeSnapshot {
   state: string;
@@ -33,6 +33,8 @@ export class CubeStore {
   private future: CubeSnapshot[] = [];
   private listeners: Set<StoreListener> = new Set();
 
+  private baseSnapshot?: CubeSnapshot = undefined;
+
   getState(): string {
     return this.state;
   }
@@ -61,12 +63,26 @@ export class CubeStore {
     return this.modifier;
   }
 
+  private isSameSnapshot(a: CubeSnapshot, b: CubeSnapshot): boolean {
+    return (
+      a.state === b.state &&
+      a.centerTurns.every((val, idx) => val === b.centerTurns[idx])
+    );
+  }
+
   canUndo(): boolean {
-    return this.history.length > 0;
+    if (this.solution && this.step > 0 && this.baseSnapshot) {
+      return !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot);
+    }
+    if (this.history.length === 0) return false;
+    const top = this.history[this.history.length - 1];
+    return !this.isSameSnapshot(this.getSnapshot(), top);
   }
 
   canRedo(): boolean {
-    return this.future.length > 0;
+    if (this.future.length === 0) return false;
+    const next = this.future[this.future.length - 1];
+    return !this.isSameSnapshot(this.getSnapshot(), next);
   }
 
   getSnapshot(): CubeSnapshot {
@@ -76,33 +92,70 @@ export class CubeStore {
     };
   }
 
+  private appendHistory(snapshot: CubeSnapshot): void {
+    const previous = this.history[this.history.length - 1];
+    if (previous && this.isSameSnapshot(previous, snapshot)) return;
+    this.history.push(snapshot);
+    if (this.history.length > 200) this.history.shift();
+  }
+
+  private pushHistory(snapshot: CubeSnapshot): void {
+    this.appendHistory(snapshot);
+    this.future = [];
+  }
+
+  private commitBaseSnapshotIfPreviewing(): void {
+    if (
+      this.baseSnapshot &&
+      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
+    ) {
+      this.pushHistory(this.baseSnapshot);
+    }
+  }
+
   replace(next: string, record = true, centers = automaticCenters(next)): void {
     const nextTurns = centerTurns(centers);
-    if (
-      record &&
-      (this.state !== next ||
-        this.getCenterTurns().some((t, i) => t !== nextTurns[i]))
-    ) {
-      this.history.push(this.getSnapshot());
-      if (this.history.length > 200) this.history.shift();
-      this.future = [];
+    if (record) {
+      this.commitBaseSnapshotIfPreviewing();
+      if (
+        this.state !== next ||
+        this.getCenterTurns().some((t, i) => t !== nextTurns[i])
+      ) {
+        this.pushHistory(this.getSnapshot());
+      }
     }
     this.state = next;
     this.centerRotations = [...centers];
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("replace");
   }
 
   undo(): boolean {
+    if (this.solution && this.step > 0 && this.baseSnapshot) {
+      if (this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)) {
+        return false;
+      }
+      this.future.push(this.getSnapshot());
+      this.state = this.baseSnapshot.state;
+      this.centerRotations = turnsToCenters(this.baseSnapshot.centerTurns);
+      this.revision++;
+      this.solution = undefined;
+      this.baseSnapshot = undefined;
+      this.step = 0;
+      this.notify("undo");
+      return true;
+    }
     const prev = this.history.pop();
     if (!prev) return false;
     this.future.push(this.getSnapshot());
     this.state = prev.state;
-    this.centerRotations = centersFromInput(prev.state, prev.centerTurns);
+    this.centerRotations = turnsToCenters(prev.centerTurns);
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("undo");
     return true;
@@ -111,11 +164,20 @@ export class CubeStore {
   redo(): boolean {
     const next = this.future.pop();
     if (!next) return false;
-    this.history.push(this.getSnapshot());
+    if (
+      this.baseSnapshot &&
+      !this.isSameSnapshot(this.getSnapshot(), this.baseSnapshot)
+    ) {
+      this.appendHistory(this.baseSnapshot);
+    }
+    if (!this.isSameSnapshot(this.getSnapshot(), next)) {
+      this.appendHistory(this.getSnapshot());
+    }
     this.state = next.state;
-    this.centerRotations = centersFromInput(next.state, next.centerTurns);
+    this.centerRotations = turnsToCenters(next.centerTurns);
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("redo");
     return true;
@@ -132,8 +194,29 @@ export class CubeStore {
     this.notify("modifier");
   }
 
+  getBaseSnapshot(): CubeSnapshot | undefined {
+    return this.baseSnapshot ? { ...this.baseSnapshot } : undefined;
+  }
+
+  restoreBaseSnapshot(): boolean {
+    if (this.baseSnapshot && this.solution) {
+      this.state = this.baseSnapshot.state;
+      this.centerRotations = turnsToCenters(this.baseSnapshot.centerTurns);
+      this.step = 0;
+      this.solution = undefined;
+      this.baseSnapshot = undefined;
+      this.future = [];
+      this.revision++;
+      this.notify("solution");
+      return true;
+    }
+    return false;
+  }
+
   setSolution(solution: ResultData | undefined): void {
+    this.commitBaseSnapshotIfPreviewing();
     this.solution = solution;
+    this.baseSnapshot = solution ? this.getSnapshot() : undefined;
     this.step = 0;
     this.notify("solution");
   }
@@ -160,19 +243,20 @@ export class CubeStore {
     nextCenters: number[],
     record = true,
   ): void {
-    if (
-      record &&
-      (this.state !== nextState ||
-        nextCenters.some((angle, i) => angle !== this.centerRotations[i]))
-    ) {
-      this.history.push(this.getSnapshot());
-      if (this.history.length > 200) this.history.shift();
-      this.future = [];
+    if (record) {
+      this.commitBaseSnapshotIfPreviewing();
+      if (
+        this.state !== nextState ||
+        nextCenters.some((angle, i) => angle !== this.centerRotations[i])
+      ) {
+        this.pushHistory(this.getSnapshot());
+      }
     }
     this.state = nextState;
     this.centerRotations = [...nextCenters];
     this.revision++;
     this.solution = undefined;
+    this.baseSnapshot = undefined;
     this.step = 0;
     this.notify("algorithm");
   }

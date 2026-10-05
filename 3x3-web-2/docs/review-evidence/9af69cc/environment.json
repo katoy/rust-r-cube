@@ -1,0 +1,19 @@
+{
+  "completedAt": "2026-09-22T16:09:48.539Z",
+  "commit": "9af69cc8176ce63b55704f4af6d7b59b2b35150f",
+  "node": "v26.7.0",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "playwright": "1.63.0",
+  "sha256": {
+    "web/main.ts": "0efe884facdec26f20f48af43c991ac5a263a2a3bf2b26e9a94f7fc9eae0865f",
+    "web/camera.ts": "ca4ee95fa0cd395d2a4ed23d90c02e756f0c1c6f74fd32d8c3b1751e7cb48628",
+    "web/camera-geometry.ts": "ad5d9053f60aba87ae7e07e227bdc5f35b1fe49a382273cfff41d1ca9f38a0d8",
+    "web/camera-results-ui.ts": "8222e16979181d70fd7d0058c47c530b4481a11263ce7781eef692a9075f2900",
+    "web/pwa.ts": "dcf51aa0dc32675e96beebedb7fbf2f0793238ced8333063ddd86e16e6031c9e",
+    "src/lib.rs": "c6d4da1f85b3f38159eb5a4c056352633b28b336cadffddd624d3e2f2d892f65",
+    "src/cfop.rs": "d2f60eb0df3f136cd8707594bb707d82c139aa8e1eb7fe6f71b4559eed7789ce",
+    "package-lock.json": "4b84d0387eb13ae6171ec2f1a98af139dcd9b62c87a7426b7839ff1c1a18f383",
+    "Cargo.lock": "80dc62dcd8eeb40023cca6774c5764cd35e2631f73e4b06f43a457867d48a4d8",
+    "pkg/cube_studio_bg.wasm": "ad6e889889ba6bda9bb414986561660084b94362e20da2531fe0feeeaa09c926"
+  }
+}

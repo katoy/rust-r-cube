@@ -1,0 +1,6 @@
+{"name":"playback_persistence","scrambled":{"state":"UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB","centerTurns":[1,1,1,0,0,0]},"finished":{"shown":{"state":"UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB","centerTurns":[0,0,0,0,0,0]},"saved":{"version":1,"state":"UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB","centerTurns":[1,1,1,0,0,0],"reducedMotion":true,"speed":"500","solverAlgorithm":"kociemba"}},"restored":{"state":"UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB","centerTurns":[1,1,1,0,0,0]}}
+{"name":"unrelated_service_worker_unregistered","before":["http://127.0.0.1:5183/other-app/"],"after":[]}
+{"name":"undo_during_animation","during":{"state":"UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB","animationActive":true},"after":{"state":"UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB","animationActive":false}}
+{"name":"camera_sticker_keyboard_focus","before":{"tag":"BUTTON","face":"F","index":"2"},"after":{"tag":"BODY","id":""},"nextTab":{"tag":"BUTTON","id":"","face":"U","index":"0","label":"上面 1行1列 白"},"painted":"U"}
+{"name":"camera_palette_arrow_navigation","activeIndex":0,"selected":"白を選択"}
+{"name":"old_capture_overwrites_new_file","afterNewFile":"読込完了 (640×480)","afterOldCapture":"読込完了 (1280×960)"}

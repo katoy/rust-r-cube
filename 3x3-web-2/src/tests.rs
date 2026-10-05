@@ -1732,8 +1732,8 @@ fn test_superflip_cfop_move_counts_match_implementation_values() {
             .unwrap();
     assert_eq!(
         sol_orient.moves.len(),
-        178,
-        "This CFOP implementation solves Superflip in 178 moves (136 color + 42 center with commutative cancellation)"
+        169,
+        "This CFOP implementation solves Superflip in 169 moves (136 color + 42 center with inter-phase cancellation)"
     );
     assert!(
         sol_orient.moves.len() >= sol_no_orient.moves.len(),
@@ -1751,17 +1751,7 @@ fn test_superflip_cfop_move_counts_match_implementation_values() {
     let solved_cube = apply(&cube, &orient_moves);
     assert_eq!(solved_cube, RawCube::default());
 
-    let mut final_centers = initial_centers;
-    for &m in &orient_moves {
-        let f = m / 3;
-        let t = match m % 3 {
-            0 => 1,
-            1 => 2,
-            2 => -1,
-            _ => 0,
-        };
-        final_centers[f] = (final_centers[f] + t).rem_euclid(4);
-    }
+    let final_centers = supercube::apply_moves_to_centers(initial_centers, &orient_moves);
     assert_eq!(final_centers, [0; 6], "All centers must be oriented to 0");
 }
 

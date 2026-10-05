@@ -82,52 +82,6 @@ fn is_opposite_face(f1: usize, f2: usize) -> bool {
     )
 }
 
-fn cancel_redundant_moves_single_pass(moves: &[usize]) -> Vec<usize> {
-    let mut reduced: Vec<usize> = Vec::new();
-    for &m in moves {
-        let face = m / 3;
-        let mut turns = m % 3 + 1;
-        let mut i = reduced.len();
-        let mut matched = false;
-
-        while i > 0 {
-            let prev_face = reduced[i - 1] / 3;
-            if prev_face == face {
-                let prev_turns = reduced[i - 1] % 3 + 1;
-                turns = (prev_turns + turns) % 4;
-                reduced.remove(i - 1);
-                if turns != 0 {
-                    reduced.insert(i - 1, face * 3 + turns - 1);
-                }
-                matched = true;
-                break;
-            } else if is_opposite_face(prev_face, face) {
-                i -= 1;
-            } else {
-                break;
-            }
-        }
-        if !matched && turns != 0 {
-            reduced.push(face * 3 + turns - 1);
-        }
-    }
-    reduced
-}
-
-/// 隣接する冗長回転および可換な対向面の相殺（例: R R' -> 除去、U D U' -> D）。
-/// 固定点反復（fixed-point iteration）を用いて、多重にネストしたカスケード相殺を網羅的に解決します。
-pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
-    let mut current = moves.to_vec();
-    loop {
-        let prev_len = current.len();
-        current = cancel_redundant_moves_single_pass(&current);
-        if current.len() == prev_len {
-            break;
-        }
-    }
-    current
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TaggedMove {
     pub mv: usize,
@@ -183,6 +137,33 @@ pub fn cancel_tagged_moves(moves: &[TaggedMove]) -> Vec<TaggedMove> {
         }
     }
     current
+}
+
+/// 隣接する冗長回転および可換な対向面の相殺（例: R R' -> 除去、U D U' -> D）。
+/// 固定点反復（fixed-point iteration）を用いて、多重にネストしたカスケード相殺を網羅的に解決します。
+pub fn cancel_redundant_moves(moves: &[usize]) -> Vec<usize> {
+    let tagged: Vec<TaggedMove> = moves
+        .iter()
+        .map(|&mv| TaggedMove { mv, phase: 0 })
+        .collect();
+    cancel_tagged_moves(&tagged)
+        .into_iter()
+        .map(|tm| tm.mv)
+        .collect()
+}
+
+/// 手順列（3x3 の各手）を適用した後の 6 面のセンター回転角度（0: 0°, 1: 90°, 2: 180°, 3: 270°）を計算します。
+pub fn apply_moves_to_centers(mut centers: [i32; 6], moves: &[usize]) -> [i32; 6] {
+    for &m in moves {
+        let f = m / 3;
+        let t = match m % 3 {
+            0 => 1,
+            1 => 2,
+            _ => -1,
+        };
+        centers[f] = (centers[f] + t).rem_euclid(4);
+    }
+    centers
 }
 
 /// 手順列とフェーズ情報を受け取り、フェーズ境界をまたぐ冗長手や可換対向面を相殺・統合した上で、
@@ -250,16 +231,8 @@ fn generate_perfect_matchings(faces: &[usize]) -> Vec<Vec<(usize, usize)>> {
 fn evaluate_matching(mut cur: [i32; 6], matching: &[(usize, usize)]) -> Vec<usize> {
     let mut moves = Vec::new();
     for &(a, b) in matching {
-        let (delta_a, delta_b) = if (cur[a] == 1 && cur[b] == 3) || (cur[a] == 3 && cur[b] == 1) {
-            if cur[a] == 1 {
-                (1, -1)
-            } else {
-                (-1, 1)
-            }
-        } else {
-            let da = if cur[a] == 1 { 1 } else { -1 };
-            (da, -da)
-        };
+        let da = if cur[a] == 1 { 1 } else { -1 };
+        let (delta_a, delta_b) = (da, -da);
         moves.extend(rotate_two_centers(a, delta_a, b, delta_b));
         cur[a] = (cur[a] - delta_a).rem_euclid(4);
         cur[b] = (cur[b] - delta_b).rem_euclid(4);

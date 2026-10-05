@@ -1087,11 +1087,88 @@ const presets = [
   { id: "seed-1-scramble", label: "ランダム（seed=1）", emoji: "🎲" },
 ];
 
+interface PresetData {
+  scramble_seed?: number;
+  scramble?: string;
+  state?: string;
+  centerTurns?: unknown;
+}
+
+function applyPresetMoves(algorithm: string) {
+  const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
+  replace(result.state, true, rotateCenters([0, 0, 0, 0, 0, 0], result.moves));
+  $("scramble-text").textContent = algorithm;
+}
+
+function applyPresetData(data: PresetData) {
+  if (typeof data.scramble_seed === "number") {
+    try {
+      applyPresetMoves(scramble(data.scramble_seed));
+    } catch (e) {
+      throw new Error(
+        `シードスクランブル実行エラー: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  } else if (typeof data.scramble === "string" && data.scramble.trim()) {
+    try {
+      const cleaned = data.scramble.replace(/(\b[URFDLB])\s+(\d|')/g, "$1$2");
+      applyPresetMoves(cleaned);
+    } catch (e) {
+      throw new Error(
+        `スクランブル実行エラー: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  } else if (typeof data.state === "string" && data.state.trim()) {
+    validate(data.state);
+    replace(data.state, true, centersFromInput(data.state, data.centerTurns));
+  } else {
+    throw new Error(
+      `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
+    );
+  }
+}
+
+let presetRequestId = 0;
+
+async function loadPreset(
+  preset: (typeof presets)[number],
+  requestId: number,
+  initialRevision: number,
+) {
+  const presetStatus = $("preset-status");
+  presetStatus.textContent = "読み込み中…";
+  const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`;
+  const response = await fetch(`${baseUrl}cubes/${preset.id}.json`);
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status}: ファイルが見つかりません (${response.url})`,
+    );
+  }
+  const data: PresetData = await response.json();
+
+  if (requestId !== presetRequestId) return;
+
+  if (
+    !appState.getState().canModifyCube() ||
+    store.getRevision() !== initialRevision
+  ) {
+    presetStatus.textContent =
+      "⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました";
+    return;
+  }
+
+  appState.runCubeMutation(() => {
+    applyPresetData(data);
+  });
+  presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
+}
+
 // プリセットボタンを生成
 async function initializePresets() {
   const presetButtons = $("preset-buttons");
   const presetStatus = $("preset-status");
-  let presetRequestId = 0;
 
   try {
     for (const preset of presets) {
@@ -1106,101 +1183,13 @@ async function initializePresets() {
         const requestId = ++presetRequestId;
         const initialRevision = store.getRevision();
         try {
-          presetStatus.textContent = "読み込み中…";
-          const baseUrl = import.meta.env.BASE_URL.endsWith("/")
-            ? import.meta.env.BASE_URL
-            : `${import.meta.env.BASE_URL}/`;
-          const response = await fetch(`${baseUrl}cubes/${preset.id}.json`);
-          if (!response.ok) {
-            throw new Error(
-              `HTTP ${response.status}: ファイルが見つかりません (${response.url})`,
-            );
-          }
-          const data = await response.json();
-
-          // 後から別のプリセットリクエストが発行されていた場合は破棄
-          if (requestId !== presetRequestId) {
-            return;
-          }
-
-          // 取得中にユーザーが手動でキューブを操作していた、または探索を開始していた場合は上書きを防止
-          if (
-            !appState.getState().canModifyCube() ||
-            store.getRevision() !== initialRevision
-          ) {
-            presetStatus.textContent = `⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました`;
-            return;
-          }
-
-          appState.runCubeMutation(() => {
-            // scramble_seed がある場合は WASM の scramble() で生成
-            if (typeof data.scramble_seed === "number") {
-              try {
-                const algorithm = scramble(data.scramble_seed);
-                const result: ResultData = JSON.parse(
-                  apply_moves(SOLVED, algorithm),
-                );
-                replace(
-                  result.state,
-                  true,
-                  rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
-                );
-                $("scramble-text").textContent = algorithm;
-              } catch (scrambleError) {
-                throw new Error(
-                  `シードスクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
-                );
-              }
-            }
-            // scramble 文字列がある場合
-            else if (
-              typeof data.scramble === "string" &&
-              data.scramble.trim()
-            ) {
-              try {
-                const cleanedScramble = data.scramble.replace(
-                  /(\b[URFDLB])\s+(\d|')/g,
-                  "$1$2",
-                );
-                const result: ResultData = JSON.parse(
-                  apply_moves(SOLVED, cleanedScramble),
-                );
-                replace(
-                  result.state,
-                  true,
-                  rotateCenters([0, 0, 0, 0, 0, 0], result.moves),
-                );
-                $("scramble-text").textContent = cleanedScramble;
-              } catch (scrambleError) {
-                throw new Error(
-                  `スクランブル実行エラー: ${scrambleError instanceof Error ? scrambleError.message : String(scrambleError)}`,
-                );
-              }
-            }
-            // state 文字列がある場合
-            else if (typeof data.state === "string" && data.state.trim()) {
-              validate(data.state);
-              replace(
-                data.state,
-                true,
-                centersFromInput(data.state, data.centerTurns),
-              );
-            } else {
-              throw new Error(
-                `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
-              );
-            }
-          });
-
-          presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
+          await loadPreset(preset, requestId, initialRevision);
         } catch (error) {
-          // 後から別のプリセットリクエストが発行されていた場合は破棄
-          if (requestId !== presetRequestId) {
-            return;
+          if (requestId === presetRequestId) {
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
           }
-          const errorMsg =
-            error instanceof Error ? error.message : String(error);
-          presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
         }
       };
       presetButtons.append(button);

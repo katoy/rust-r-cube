@@ -47,8 +47,8 @@ test.describe("HEAD 0139c65 Code Review Regressions", () => {
   }) => {
     await ready(page);
 
-    // 1手回して解法を見つける
-    await page.locator('button[data-move="R"]').click();
+    // 十分な手数の解法を生成するためにスクランブルして解く
+    await page.locator("#scramble").click();
     await page.locator("#solve").click();
     await expect(page.locator("#solution-content")).toBeVisible();
 

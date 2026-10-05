@@ -82,6 +82,36 @@ pub fn solve_state_with_centers(
     )
 }
 
+fn apply_center_orientation_fix(
+    mut moves: Vec<usize>,
+    mut phase_infos: Vec<PhaseInfo>,
+    initial_centers: Option<[i32; 6]>,
+) -> Result<(Vec<usize>, Vec<PhaseInfo>), String> {
+    let already_oriented = phase_infos
+        .iter()
+        .any(|p| p.name.contains("センター") || p.name.contains("同時最適化"));
+    if !already_oriented {
+        if let Some(initial) = initial_centers {
+            let centers = supercube::apply_moves_to_centers(initial, &moves);
+            let center_fixes = supercube::solve_center_orientations(centers)?;
+            if !center_fixes.is_empty() {
+                let start_idx = moves.len();
+                moves.extend(center_fixes);
+                phase_infos.push(PhaseInfo {
+                    name: "センター向き解決".to_string(),
+                    start: start_idx,
+                    end: moves.len(),
+                });
+                let (opt_moves, opt_phases) =
+                    supercube::cancel_redundant_moves_with_phases(moves, phase_infos);
+                moves = opt_moves;
+                phase_infos = opt_phases;
+            }
+        }
+    }
+    Ok((moves, phase_infos))
+}
+
 pub fn solve_state_with_algorithm(
     state: &str,
     budget_ms: u32,
@@ -184,16 +214,7 @@ pub fn solve_state_with_algorithm(
                     total_nodes += search_color.nodes;
 
                     let (seq_len, seq_moves, p1_len) = if let Some(ref cm) = color_moves {
-                        let mut c_sim = centers;
-                        for &m in cm {
-                            let f = m / 3;
-                            let t = match m % 3 {
-                                0 => 1,
-                                1 => 2,
-                                _ => -1,
-                            };
-                            c_sim[f] = (c_sim[f] + t).rem_euclid(4);
-                        }
+                        let c_sim = supercube::apply_moves_to_centers(centers, cm);
                         let fixes = supercube::solve_center_orientations(c_sim).unwrap_or_default();
                         let total_l = cm.len() + fixes.len();
                         let p1 = search_color.best_phase1_len;
@@ -301,37 +322,10 @@ pub fn solve_state_with_algorithm(
     };
 
     if include_orientation {
-        let already_oriented = phase_infos
-            .iter()
-            .any(|p| p.name.contains("センター") || p.name.contains("同時最適化"));
-        if !already_oriented {
-            if let Some(initial) = initial_centers {
-                let mut centers = initial;
-                for &m in &moves {
-                    let f = m / 3;
-                    let t = match m % 3 {
-                        0 => 1,
-                        1 => 2,
-                        _ => -1,
-                    };
-                    centers[f] = (centers[f] + t).rem_euclid(4);
-                }
-                let center_fixes = supercube::solve_center_orientations(centers)?;
-                if !center_fixes.is_empty() {
-                    let start_idx = moves.len();
-                    moves.extend(center_fixes);
-                    phase_infos.push(PhaseInfo {
-                        name: "センター向き解決".to_string(),
-                        start: start_idx,
-                        end: moves.len(),
-                    });
-                    let (opt_moves, opt_phases) =
-                        supercube::cancel_redundant_moves_with_phases(moves, phase_infos);
-                    moves = opt_moves;
-                    phase_infos = opt_phases;
-                }
-            }
-        }
+        let (opt_moves, opt_phases) =
+            apply_center_orientation_fix(moves, phase_infos, initial_centers)?;
+        moves = opt_moves;
+        phase_infos = opt_phases;
     }
 
     // 解法適用後の完成状態を無条件に検証

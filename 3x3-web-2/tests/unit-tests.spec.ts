@@ -94,6 +94,8 @@ test.describe("Web Modules Unit Tests", () => {
         edgeKind: info0.kinds[1], // U面エッジ
         rotatedAngle0: infoRotated.angles[4],
         scrambledLength: infoScrambled.angles.length,
+        counts0: model.countPieceOrientations(info0),
+        countsScrambled: model.countPieceOrientations(infoScrambled),
       };
     });
 
@@ -105,6 +107,15 @@ test.describe("Web Modules Unit Tests", () => {
     expect(arrowInfo.edgeKind).toBe("edge");
     expect(arrowInfo.rotatedAngle0).toBeCloseTo(Math.PI / 2, 4);
     expect(arrowInfo.scrambledLength).toBe(54);
+    expect(arrowInfo.counts0.normal).toBe(54);
+    expect(arrowInfo.counts0.cornerTwist).toBe(0);
+    expect(arrowInfo.counts0.edgeFlip).toBe(0);
+    expect(arrowInfo.counts0.centerRotate).toBe(0);
+    expect(
+      arrowInfo.countsScrambled.cornerTwist +
+        arrowInfo.countsScrambled.edgeFlip +
+        arrowInfo.countsScrambled.centerRotate,
+    ).toBeGreaterThan(0);
   });
 
   test("model.ts - getErrorIndices extraction", async ({ page }) => {

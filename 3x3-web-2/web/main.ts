@@ -10,6 +10,8 @@ import {
   type ResultData,
   type CubeType,
   getSolvedState,
+  getCellArrowInfo,
+  countPieceOrientations,
 } from "./model";
 import { SOLVED_2X2, PRESETS_2X2 } from "./model-2x2";
 import { mount, icon, net } from "./view";
@@ -285,6 +287,86 @@ function replace(
   store.replace(next, record, centers);
   appState.resetToIdle();
 }
+
+function setupArrowLegend() {
+  const legendBtn = $("arrow-legend-btn");
+  const popover = $("arrow-legend-popover");
+  const closeBtn = $("arrow-legend-close");
+  if (!legendBtn || !popover) return;
+
+  const togglePopover = (open?: boolean) => {
+    const willOpen = open ?? popover.hidden;
+    popover.hidden = !willOpen;
+    legendBtn.setAttribute("aria-expanded", String(willOpen));
+  };
+
+  legendBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    togglePopover();
+  });
+
+  closeBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    togglePopover(false);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!popover.hidden && !popover.contains(e.target as Node)) {
+      togglePopover(false);
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !popover.hidden) {
+      togglePopover(false);
+      legendBtn.focus();
+    }
+  });
+}
+
+function updateArrowLegend(
+  state: string,
+  centerRotations: number[],
+  is2x2: boolean,
+) {
+  const legend = $("arrow-legend");
+  if (!legend) return;
+  if (is2x2) {
+    legend.hidden = true;
+    return;
+  }
+  legend.hidden = false;
+
+  const arrowInfo = getCellArrowInfo(state, centerRotations);
+  const counts = countPieceOrientations(arrowInfo);
+
+  const countNormal = $("legend-count-normal");
+  const countCorner = $("legend-count-corner");
+  const countEdge = $("legend-count-edge");
+  const countCenter = $("legend-count-center");
+
+  if (countNormal) countNormal.textContent = String(counts.normal);
+  if (countCorner) countCorner.textContent = String(counts.cornerTwist);
+  if (countEdge) countEdge.textContent = String(counts.edgeFlip);
+  if (countCenter) countCenter.textContent = String(counts.centerRotate);
+
+  const btn = $("arrow-legend-btn");
+  if (btn) {
+    const hasIssues =
+      counts.cornerTwist > 0 || counts.edgeFlip > 0 || counts.centerRotate > 0;
+    btn.classList.toggle("has-issues", hasIssues);
+    btn.classList.toggle("is-all-normal", !hasIssues);
+  }
+
+  const pillCorner = legend.querySelector(".pill-corner");
+  const pillEdge = legend.querySelector(".pill-edge");
+  const pillCenter = legend.querySelector(".pill-center");
+
+  pillCorner?.classList.toggle("has-count", counts.cornerTwist > 0);
+  pillEdge?.classList.toggle("has-count", counts.edgeFlip > 0);
+  pillCenter?.classList.toggle("has-count", counts.centerRotate > 0);
+}
+
 let renderedSolution: ResultData | undefined = undefined;
 let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
 let lastRenderedStep: number | undefined = undefined;
@@ -322,6 +404,8 @@ function refresh() {
   }
   $("cube-status").textContent = statusText;
   $("scene").dataset.state = state;
+  updateArrowLegend(state, centerRotations, is2x2);
+
   const canModify = appState.getState().canModifyCube();
   const canSolve = appState.getState().canStartSolve();
   solving = appState.isSolving();
@@ -1123,6 +1207,7 @@ setupKeyboardShortcuts({
     refresh();
   },
 });
+setupArrowLegend();
 refresh();
 async function start(forceError = false) {
   try {

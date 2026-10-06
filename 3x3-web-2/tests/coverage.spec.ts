@@ -2676,6 +2676,9 @@ test.describe("E2E Coverage with CDP", () => {
       // JS カバレッジを停止・取得
       // @ts-ignore
       const coverage = await page.coverage.stopJSCoverage();
+      if (!fs.existsSync(COVERAGE_DIR)) {
+        fs.mkdirSync(COVERAGE_DIR, { recursive: true });
+      }
       fs.writeFileSync(
         path.join(COVERAGE_DIR, "raw-coverage.json"),
         JSON.stringify(coverage, null, 2),

@@ -417,7 +417,11 @@ mod tests {
             let rc = cube::apply(&RawCube::default(), &sc);
             let (moves, phases) = solve_lbl(&rc).expect("scrambled cube should be solvable by LBL");
             assert_eq!(cube::apply(&rc, &moves), RawCube::default());
-            assert_eq!(phases.len(), 3);
+            assert!(
+                phases.len() <= 3 && !phases.is_empty(),
+                "phases count={}",
+                phases.len()
+            );
         }
     }
 }

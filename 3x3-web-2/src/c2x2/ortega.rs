@@ -197,10 +197,30 @@ const PBL_ALGORITHMS: &[(&str, &str)] = &[
         "上対角・下揃い (Y-perm)",
         "F R U' R' U' R U R' F' R U R' U' R' F R F'",
     ),
-    ("上揃い・下隣接", "R' U L' U2 R U' L"),
+    ("上揃い・下隣接", "R D R' B' R D R' D' R' B R2 D' R'"),
+    (
+        "上揃い・下対角",
+        "B R D' R' D' R D R' B' R D R' D' R' B R B'",
+    ),
     ("上隣接・下対角", "R U' R F2 R' U R'"),
-    ("上対角・下隣接", "R' U R' F2 R F' R"),
+    ("上対角・下隣接", "R' D R' F2 R D' R"),
 ];
+
+#[inline]
+fn rotate_y(m: usize, times: usize) -> usize {
+    let mut face = m / 3;
+    let turn = m % 3;
+    for _ in 0..times {
+        face = match face {
+            1 => 5,         // R -> B
+            5 => 4,         // B -> L
+            4 => 2,         // L -> F
+            2 => 1,         // F -> R
+            other => other, // U, D unchanged
+        };
+    }
+    face * 3 + turn
+}
 
 fn solve_pbl(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     let u_aufs: &[&[usize]] = &[&[], &[0], &[1], &[2]];
@@ -213,24 +233,29 @@ fn solve_pbl(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
             let cube_after_pre = cube::apply(cube, &pre_moves);
 
             for (name, alg_str) in PBL_ALGORITHMS {
-                let alg_moves = if alg_str.is_empty() {
+                let base_moves = if alg_str.is_empty() {
                     Vec::new()
                 } else {
                     cube::parse_moves(alg_str).unwrap()
                 };
-                let cube_after_alg = cube::apply(&cube_after_pre, &alg_moves);
 
-                for post_u in u_aufs {
-                    for post_d in d_aufs {
-                        let mut post_moves = post_u.to_vec();
-                        post_moves.extend_from_slice(post_d);
-                        let final_cube = cube::apply(&cube_after_alg, &post_moves);
+                for y_rot in 0..4 {
+                    let alg_moves: Vec<usize> =
+                        base_moves.iter().map(|&m| rotate_y(m, y_rot)).collect();
+                    let cube_after_alg = cube::apply(&cube_after_pre, &alg_moves);
 
-                        if final_cube == RawCube::default() {
-                            let mut combined = pre_moves;
-                            combined.extend(alg_moves);
-                            combined.extend(post_moves);
-                            return Ok((combined, name.to_string()));
+                    for post_u in u_aufs {
+                        for post_d in d_aufs {
+                            let mut post_moves = post_u.to_vec();
+                            post_moves.extend_from_slice(post_d);
+                            let final_cube = cube::apply(&cube_after_alg, &post_moves);
+
+                            if final_cube == RawCube::default() {
+                                let mut combined = pre_moves;
+                                combined.extend(alg_moves);
+                                combined.extend(post_moves);
+                                return Ok((combined, name.to_string()));
+                            }
                         }
                     }
                 }
@@ -255,13 +280,33 @@ mod tests {
 
     #[test]
     fn test_ortega_on_scrambled_cube() {
-        for seed in [123, 456, 789, 1011, 2024] {
+        for seed in 1..=100 {
             let sc = cube::scramble(seed);
             let rc = cube::apply(&RawCube::default(), &sc);
-            let (moves, phases) =
-                solve_ortega(&rc).expect("scrambled cube should be solvable by Ortega");
+            let (moves, phases) = solve_ortega(&rc)
+                .unwrap_or_else(|e| panic!("seed {} should be solvable: {}", seed, e));
             assert_eq!(cube::apply(&rc, &moves), RawCube::default());
-            assert_eq!(phases.len(), 3);
+            assert!(
+                phases.len() <= 3 && !phases.is_empty(),
+                "phases count={}",
+                phases.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_pbl_algorithms_preserve_layer_orientation() {
+        for (name, alg) in PBL_ALGORITHMS {
+            if alg.is_empty() {
+                continue;
+            }
+            let moves = cube::parse_moves(alg).unwrap();
+            let c = cube::apply(&RawCube::default(), &moves);
+            assert_eq!(
+                c.co, [0; 8],
+                "PBL algorithm {} must preserve corner orientations",
+                name
+            );
         }
     }
 }

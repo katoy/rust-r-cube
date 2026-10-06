@@ -593,6 +593,18 @@ pub fn solve_with_algorithm(
 /// エッジの向き: 0=正常, 1=反転
 #[wasm_bindgen]
 pub fn get_orientations(state: &str) -> Result<String, JsValue> {
+    if state.len() == 24 {
+        let raw_2x2 = c2x2::cube::parse_state(state).map_err(to_js_error)?;
+        let corner_orientations: Vec<usize> = raw_2x2.co.iter().map(|&o| o as usize).collect();
+        let empty_edges: Vec<usize> = Vec::new();
+        let result = serde_json::json!({
+            "corners": corner_orientations,
+            "edges": empty_edges,
+        });
+        return serde_json::to_string(&result)
+            .map_err(|e| to_js_error(format!("JSONのシリアライズに失敗しました: {}", e)));
+    }
+
     let raw_cube = cube::parse_state(state).map_err(to_js_error)?;
 
     let corner_orientations: Vec<usize> = raw_cube.co.iter().map(|&o| o as usize).collect();

@@ -56,6 +56,7 @@ test.describe("HEAD 0139c65 Code Review Regressions", () => {
     const playBtn = page.locator("#play");
     await playBtn.click();
     await expect(playBtn).toHaveAttribute("aria-label", "一時停止");
+    await playBtn.blur();
 
     // 再生中にキーボード操作（ArrowLeft）で前の手へ戻り、stop() を契機に停止させる
     await page.keyboard.press("ArrowLeft");

@@ -2386,4 +2386,9 @@ fn test_2x2_wasm_wrappers() {
     // 統一 solve_with_algorithm で 24文字が 2x2 ソルバーで解かれること
     let sol_unified = crate::solve_with_algorithm(solved, 1000, true, None, None).unwrap();
     assert!(sol_unified.contains("\"algorithm\":\"optimal\""));
+
+    // 2x2 の get_orientations
+    let ori_json = crate::get_orientations(solved).unwrap();
+    assert!(ori_json.contains("\"corners\":[0,0,0,0,0,0,0,0]"));
+    assert!(ori_json.contains("\"edges\":[]"));
 }

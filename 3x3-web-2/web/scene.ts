@@ -373,22 +373,35 @@ export class CubeScene {
   private buildCube(type: CubeType) {
     this.finish();
 
+    const geometriesToDispose = new Set<THREE.BufferGeometry>();
+    const materialsToDispose = new Set<THREE.Material>();
+
     for (const piece of this.pieces) {
       this.root.remove(piece);
       if (piece instanceof THREE.Mesh) {
-        piece.geometry?.dispose();
+        if (piece.geometry) geometriesToDispose.add(piece.geometry);
+        if (piece.material instanceof THREE.Material) {
+          materialsToDispose.add(piece.material);
+        }
       }
     }
     this.pieces = [];
 
     for (const sticker of this.stickers) {
       this.root.remove(sticker);
-      sticker.geometry?.dispose();
+      if (sticker.geometry) geometriesToDispose.add(sticker.geometry);
       if (sticker.material instanceof THREE.Material) {
-        sticker.material.dispose();
+        materialsToDispose.add(sticker.material);
       }
     }
     this.stickers = [];
+
+    for (const geom of geometriesToDispose) {
+      geom.dispose();
+    }
+    for (const mat of materialsToDispose) {
+      mat.dispose();
+    }
 
     for (const label of this.centerLabels) {
       if (label) {

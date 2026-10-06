@@ -35,7 +35,7 @@ const TRIGGERS: { pattern: string[]; name: string }[] = [
   { pattern: ["L'", "U'", "L"], name: "レフトインサート" },
 ];
 
-const PHASE_LABEL_MAP: Record<string, string> = {
+export const PHASE_LABEL_MAP: Record<string, string> = {
   // 2x2 LBL (Rust: c2x2/lbl.rs)
   "ステップ 1: 完全1層 (First Layer)": "ステップ 1: 完全1層 (First Layer)",
   "ステップ 2: 上面色揃え (OLL)": "ステップ 2: 上面色揃え (OLL)",
@@ -87,6 +87,25 @@ const PHASE_LABEL_MAP: Record<string, string> = {
   センター向き解決: "ステップ 2: センター向き解決",
 };
 
+export function getPhaseLabel(name: string): string {
+  if (PHASE_LABEL_MAP[name]) {
+    return PHASE_LABEL_MAP[name];
+  }
+  for (const [key, label] of Object.entries(PHASE_LABEL_MAP)) {
+    if (name.startsWith(key)) {
+      return label;
+    }
+    const parenIndex = key.indexOf("(");
+    if (parenIndex !== -1) {
+      const prefix = key.slice(0, parenIndex).trim();
+      if (prefix && name.startsWith(prefix)) {
+        return name;
+      }
+    }
+  }
+  return name;
+}
+
 export function analyzeMoves(
   moves: string[],
   phases?: PhaseInfo[],
@@ -126,7 +145,7 @@ export function analyzeMoves(
         const ph = phases[p];
         if (idx >= ph.start && idx < ph.end) {
           matchedPhaseIdx = p;
-          phaseLabel = PHASE_LABEL_MAP[ph.name] || ph.name;
+          phaseLabel = getPhaseLabel(ph.name);
           break;
         }
       }

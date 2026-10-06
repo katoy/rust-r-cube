@@ -11,6 +11,14 @@ const orientation = [
   "橙の面を正面に。上は白、右は緑のセンターです。",
   "青い面を正面に。上は白、右は橙のセンターです。",
 ];
+const orientation2x2 = [
+  "白い面を正面に。上に青、下に緑が来る向きです。",
+  "赤い面を正面に。上に白、左に緑が来る向きです。",
+  "緑の面を正面に。上に白、右に赤が来る向きです。",
+  "黄色い面を正面に。上に緑、下に青が来る向きです。",
+  "橙の面を正面に。上に白、右に緑が来る向きです。",
+  "青い面を正面に。上に白、右に橙が来る向きです。",
+];
 export class ColorEditor {
   private draft = "";
   private color = "U";
@@ -168,7 +176,9 @@ export class ColorEditor {
     );
     $("guide-title").textContent =
       `${this.face + 1} / 6　${FACES[this.face]} · ${FACE_NAMES[FACES[this.face]]}`;
-    $("guide-orientation").textContent = orientation[this.face];
+    $("guide-orientation").textContent = is2x2
+      ? orientation2x2[this.face]
+      : orientation[this.face];
     const grid = $("guide-grid");
     grid.className = is2x2 ? "face-grid grid-2x2" : "face-grid";
     grid.replaceChildren();

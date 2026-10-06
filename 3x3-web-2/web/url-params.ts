@@ -9,6 +9,18 @@ export interface ParsedUrlParams {
   hasInvalidCenters?: boolean;
 }
 
+export const VALID_SOLVERS = [
+  "kociemba",
+  "cfop",
+  "thistlethwaite",
+  "korf",
+  "optimal",
+  "lbl",
+  "ortega",
+] as const;
+
+export type ValidSolverType = (typeof VALID_SOLVERS)[number];
+
 export function parseUrlParams(search: string): ParsedUrlParams {
   const params = new URLSearchParams(search);
   const result: ParsedUrlParams = {};
@@ -21,9 +33,7 @@ export function parseUrlParams(search: string): ParsedUrlParams {
   const solverParam = params.get("solver") || params.get("algorithm");
   if (
     solverParam &&
-    ["kociemba", "cfop", "thistlethwaite", "korf", "optimal"].includes(
-      solverParam,
-    )
+    (VALID_SOLVERS as readonly string[]).includes(solverParam)
   ) {
     result.solver = solverParam;
   }
@@ -67,7 +77,8 @@ export function buildShareUrl(
   url.searchParams.delete("alg");
   url.searchParams.delete("algorithm");
   url.searchParams.set("state", state);
-  if (state.length === 24 || cubeType === "2x2") {
+  const is2x2 = state.length === 24 || cubeType === "2x2";
+  if (is2x2) {
     url.searchParams.set("type", "2x2");
   } else {
     url.searchParams.delete("type");
@@ -77,10 +88,11 @@ export function buildShareUrl(
   } else {
     url.searchParams.delete("centers");
   }
+  const defaultSolver = is2x2 ? "lbl" : "kociemba";
   if (
     solver &&
-    solver !== "kociemba" &&
-    ["cfop", "thistlethwaite", "korf", "optimal"].includes(solver)
+    solver !== defaultSolver &&
+    (VALID_SOLVERS as readonly string[]).includes(solver)
   ) {
     url.searchParams.set("solver", solver);
   } else {

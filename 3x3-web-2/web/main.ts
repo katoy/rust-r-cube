@@ -30,7 +30,7 @@ import { registerServiceWorker } from "./pwa";
 import { sound } from "./sound";
 import { analyzeMoves } from "./triggers";
 import { setupKeyboardShortcuts } from "./keyboard-shortcuts";
-import { parseUrlParams, buildShareUrl } from "./url-params";
+import { parseUrlParams, buildShareUrl, VALID_SOLVERS } from "./url-params";
 import { validateAndParseCubeJson, createCubeJsonBlob } from "./file-io";
 import { AppStateMachine } from "./app-state";
 
@@ -39,6 +39,7 @@ declare global {
     cube_store?: CubeStore;
     cube_scene?: CubeScene;
     cube_studio?: typeof cubeStudio;
+    sound?: typeof sound;
   }
 }
 
@@ -50,6 +51,7 @@ const isTestOrDev =
 const store = new CubeStore();
 if (isTestOrDev) {
   window.cube_store = store;
+  window.sound = sound;
 }
 
 const appState = new AppStateMachine();
@@ -283,7 +285,7 @@ function replace(
   stop();
   cancelSearch();
   message();
-  $("solver-note").textContent = "ブラウザ内で計算 · 通常5秒以内";
+  updateSolverNote();
   store.replace(next, record, centers);
   appState.resetToIdle();
 }
@@ -736,7 +738,7 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     if (token === motion) {
       inMotion = false;
       refresh();
-      if (result.state === SOLVED) {
+      if (result.state === getSolvedState(store.getCubeType())) {
         sound.playSuccess();
       }
     }
@@ -1171,10 +1173,13 @@ $<HTMLInputElement>("file").onchange = async () => {
     if (!appState.getState().canModifyCube())
       throw new Error("探索が開始されたため、ファイル読み込みを中断しました。");
     appState.runCubeMutation(() => {
+      const is2x2 = parsed.state.length === 24;
       replace(
         parsed.state,
         true,
-        centersFromInput(parsed.state, parsed.centerTurns),
+        is2x2
+          ? [0, 0, 0, 0, 0, 0]
+          : centersFromInput(parsed.state, parsed.centerTurns),
       );
     });
   } catch (error) {
@@ -1230,18 +1235,22 @@ async function start(forceError = false) {
           reduced.checked = data.reducedMotion;
         if (["1000", "500", "250"].includes(data.speed))
           $<HTMLSelectElement>("speed").value = data.speed;
-        if (
-          ["kociemba", "cfop", "thistlethwaite", "korf", "optimal"].includes(
-            data.solverAlgorithm,
-          )
-        )
-          solverAlgo.value = data.solverAlgorithm;
         const restoredType: CubeType =
           data.cubeType === "2x2" || (data.state && data.state.length === 24)
             ? "2x2"
             : "3x3";
         store.setCubeType(restoredType);
         scene?.setCubeType(restoredType);
+        updateCubeTypeUI(restoredType);
+
+        if (
+          data.solverAlgorithm &&
+          (VALID_SOLVERS as readonly string[]).includes(data.solverAlgorithm)
+        ) {
+          solverAlgo.value = data.solverAlgorithm;
+          updateSolverNote();
+        }
+
         const restoredCenters =
           restoredType === "2x2"
             ? [0, 0, 0, 0, 0, 0]
@@ -1258,13 +1267,22 @@ async function start(forceError = false) {
     if (parsedParams.hasInvalidCenters) {
       hasInvalidParam = true;
     }
-    if (parsedParams.cubeType) {
-      store.setCubeType(parsedParams.cubeType);
-      scene?.setCubeType(parsedParams.cubeType);
+    const targetType: CubeType | undefined =
+      parsedParams.cubeType ||
+      (parsedParams.state
+        ? parsedParams.state.length === 24
+          ? "2x2"
+          : "3x3"
+        : undefined);
+    if (targetType) {
+      store.setCubeType(targetType);
+      scene?.setCubeType(targetType);
+      updateCubeTypeUI(targetType);
       paramsApplied = true;
     }
     if (parsedParams.solver) {
       solverAlgo.value = parsedParams.solver;
+      updateSolverNote();
       paramsApplied = true;
     }
     if (parsedParams.state) {
@@ -1469,6 +1487,7 @@ function renderPresetButtons(type: CubeType) {
               $("scramble-text").textContent = preset.scramble;
             } else if (preset.state) {
               replace(preset.state, true, [0, 0, 0, 0, 0, 0]);
+              $("scramble-text").textContent = "";
             }
           });
           presetStatus.textContent = `✓ ${preset.label} を読み込みました`;

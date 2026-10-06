@@ -902,6 +902,25 @@ test.describe("E2E Coverage with CDP", () => {
             { name: "Unknown Phase", start: 4, end: 4 },
           ],
         );
+        triggers.getPhaseLabel("ステップ 1: 完全1層 (First Layer)");
+        triggers.getPhaseLabel("ステップ 1: 完全1層 (First Layer) - 拡張");
+        triggers.getPhaseLabel("ステップ 2: 上面色揃え (OLL: Sune (スーネ))");
+        triggers.getPhaseLabel("未登録フェーズ");
+        triggers.analyzeMoves(
+          ["R", "U", "R'", "U'"],
+          [
+            {
+              name: "ステップ 2: 上面色揃え (OLL: Sune (スーネ))",
+              start: 0,
+              end: 2,
+            },
+            {
+              name: "ステップ 3: 上面位置揃え (PLL: T-perm (隣接交換))",
+              start: 2,
+              end: 4,
+            },
+          ],
+        );
 
         // --- cube-store.ts ---
         const { CubeStore } = await import("/web/cube-store.ts");
@@ -2631,34 +2650,42 @@ test.describe("E2E Coverage with CDP", () => {
           // プリセット・シード例外を想定
         }
 
-        // 13. localStorage 復元失敗パス (664-665行) & mainReady = false での start() (783-784行)
-        try {
-          dbg.setMainReady(true);
-          localStorage.setItem("cube-studio-v1", "{ invalid json");
-          await dbg.start();
-        } catch (_err) {
-          // 復元失敗例外を想定
-        }
-
-        try {
-          dbg.setMainReady(false);
-          await dbg.start();
-        } catch (_err) {
-          // 初期化未完了例外を想定
-        }
+        // 13. localStorage 復元失敗パス & mainReady = false での start()
         dbg.setMainReady(true);
+        localStorage.setItem("cube-studio-v1", "{ invalid json");
+        await dbg.start();
+        if (typeof dbg.store.getState() !== "string") {
+          throw new Error(
+            "store state should remain valid string after corrupt localStorage load",
+          );
+        }
 
-        // 14. Space / ArrowLeft キーによるショートカット (761-763行)
-        try {
-          document.body.dispatchEvent(
-            new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
+        dbg.setMainReady(false);
+        await dbg.start();
+        dbg.setMainReady(true);
+        if (typeof dbg.store.getState() !== "string") {
+          throw new Error(
+            "store state should remain valid string after start with mainReady=false",
           );
-          await new Promise((r) => setTimeout(r, 60));
-          document.body.dispatchEvent(
-            new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
-          );
-        } catch (_err) {
-          // キーイベント例外を想定
+        }
+
+        // 14. Space / ArrowLeft キーによるショートカット
+        const spaceEvt = new KeyboardEvent("keydown", {
+          code: "Space",
+          bubbles: true,
+        });
+        const spaceHandled = document.body.dispatchEvent(spaceEvt);
+        if (typeof spaceHandled !== "boolean") {
+          throw new Error("spaceHandled should be boolean");
+        }
+        await new Promise((r) => setTimeout(r, 60));
+        const leftEvt = new KeyboardEvent("keydown", {
+          key: "ArrowLeft",
+          bubbles: true,
+        });
+        const leftHandled = document.body.dispatchEvent(leftEvt);
+        if (typeof leftHandled !== "boolean") {
+          throw new Error("leftHandled should be boolean");
         }
 
         // fallback (240-248行)

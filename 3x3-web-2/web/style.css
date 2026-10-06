@@ -259,6 +259,169 @@ h1 {
   padding: 4px 12px;
   background: #1f271e66;
 }
+.stage-top-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+.arrow-legend {
+  position: relative;
+}
+.arrow-legend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(31, 39, 30, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid #4a5744;
+  border-radius: 20px;
+  padding: 3px 8px 3px 10px;
+  cursor: pointer;
+  color: #e2ecd9;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+.arrow-legend-btn:hover {
+  background: rgba(43, 54, 42, 0.9);
+  border-color: #6c7e63;
+}
+.arrow-legend-btn:focus-visible {
+  outline: 2px solid var(--accent, #c4ed94);
+  outline-offset: 2px;
+}
+.legend-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.legend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #aebaa6;
+  transition: color 0.2s ease;
+}
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot-normal {
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+.dot-corner {
+  background-color: #f43f5e;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.4);
+}
+.dot-edge {
+  background-color: #06b6d4;
+  box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+}
+.dot-center {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+.legend-count {
+  font-size: 9px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+.legend-pill.has-count {
+  color: #f0f6ea;
+  font-weight: 500;
+}
+.legend-pill.has-count .legend-count {
+  opacity: 1;
+  font-weight: 600;
+}
+.legend-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #c9d5bf;
+  font-size: 9px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+.arrow-legend-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 290px;
+  background: rgba(24, 30, 24, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #4f5f48;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  z-index: 50;
+  pointer-events: auto;
+  color: #dbe4d4;
+  text-align: left;
+}
+.popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #f0f8ec;
+}
+.popover-close {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #9bac93;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.popover-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.popover-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #aebda6;
+  margin-bottom: 12px;
+}
+.popover-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.popover-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.popover-item .legend-dot {
+  margin-top: 4px;
+}
+.popover-item strong {
+  color: #f0f8ec;
+}
 #scene {
   min-height: 400px;
   flex: 1;
@@ -1110,6 +1273,44 @@ dialog > p {
   font-size: 13px;
   color: var(--text-primary, #ffffff);
 }
+.help-arrow-guide {
+  margin: 16px 0;
+  padding: 14px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.help-arrow-intro {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.help-arrow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.help-arrow-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.help-arrow-card .card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #f0f8ec;
+}
+.help-arrow-card p {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 0;
+}
 #fallback {
   padding: 90px 28px 30px;
   min-height: 450px;
@@ -1211,6 +1412,22 @@ dialog > p {
   }
   .stage-top {
     padding: 8px 12px;
+  }
+  .stage-top-controls {
+    gap: 6px;
+  }
+  .arrow-legend-btn {
+    padding: 2px 6px;
+  }
+  .legend-pills {
+    gap: 5px;
+  }
+  .legend-pill .legend-label {
+    display: none;
+  }
+  .arrow-legend-popover {
+    width: min(280px, calc(100vw - 24px));
+    right: 0;
   }
   #scene {
     height: 230px;

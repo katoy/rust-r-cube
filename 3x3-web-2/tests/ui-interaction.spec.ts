@@ -185,4 +185,52 @@ test.describe("R11, R12 & Preset Metadata Fixes", () => {
       "を読み込みました",
     );
   });
+
+  test("Arrow legend: displays counts, toggles popover, and reacts to scramble and cube type", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("#engine-status")).toContainText("READY");
+
+    const legend = page.locator("#arrow-legend");
+    const legendBtn = page.locator("#arrow-legend-btn");
+    const popover = page.locator("#arrow-legend-popover");
+
+    // 1. 初期状態で表示され、全54本が正常
+    await expect(legend).toBeVisible();
+    await expect(page.locator("#legend-count-normal")).toHaveText("54");
+    await expect(page.locator("#legend-count-corner")).toHaveText("0");
+    await expect(page.locator("#legend-count-edge")).toHaveText("0");
+    await expect(page.locator("#legend-count-center")).toHaveText("0");
+    await expect(popover).toBeHidden();
+
+    // 2. ボタンクリックでポップオーバーが開く
+    await legendBtn.click();
+    await expect(popover).toBeVisible();
+    await expect(legendBtn).toHaveAttribute("aria-expanded", "true");
+
+    // 3. 閉じるボタンで閉じる
+    await page.locator("#arrow-legend-close").click();
+    await expect(popover).toBeHidden();
+    await expect(legendBtn).toHaveAttribute("aria-expanded", "false");
+
+    // 4. Escapeキーでも閉じる
+    await legendBtn.click();
+    await expect(popover).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+
+    // 5. スクランブル実行でカウントが更新される
+    await page.locator("#scramble").click();
+    const normalCount = Number(
+      await page.locator("#legend-count-normal").textContent(),
+    );
+    expect(normalCount).toBeLessThan(54);
+
+    // 6. 2x2キューブに切り替えると非表示、3x3に戻すと再表示
+    await page.locator("#cube-type-2x2").click();
+    await expect(legend).toBeHidden();
+    await page.locator("#cube-type-3x3").click();
+    await expect(legend).toBeVisible();
+  });
 });

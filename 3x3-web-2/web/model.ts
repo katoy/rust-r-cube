@@ -392,3 +392,39 @@ export function getCellArrowInfo(
 
   return { angles, colors, kinds, pieceIndices };
 }
+
+export interface PieceOrientationCounts {
+  normal: number;
+  cornerTwist: number;
+  edgeFlip: number;
+  centerRotate: number;
+}
+
+export function countPieceOrientations(
+  arrowInfo: CellArrowInfo,
+): PieceOrientationCounts {
+  let normal = 0;
+  let cornerTwist = 0;
+  let edgeFlip = 0;
+  let centerRotate = 0;
+
+  for (let i = 0; i < 54; i++) {
+    const c = arrowInfo.colors[i];
+    if (c === ARROW_COLORS.NORMAL) {
+      normal++;
+    } else if (c === ARROW_COLORS.CORNER_TWIST) {
+      cornerTwist++;
+    } else if (c === ARROW_COLORS.EDGE_FLIP) {
+      edgeFlip++;
+    } else if (c === ARROW_COLORS.CENTER_ROTATE) {
+      centerRotate++;
+    }
+  }
+
+  return {
+    normal,
+    cornerTwist: Math.floor(cornerTwist / 3),
+    edgeFlip: Math.floor(edgeFlip / 2),
+    centerRotate,
+  };
+}

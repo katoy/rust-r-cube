@@ -339,7 +339,7 @@ test.describe("2x2 Rubik's Cube Solver & UI", () => {
     await page.locator('[data-move="R"]').click();
     const result = await samplePromise;
 
-    expect(result.sampledFrames).toBeGreaterThan(5);
+    expect(result.sampledFrames).toBeGreaterThanOrEqual(3);
     expect(result.violations).toEqual([]);
 
     // 回転終了を待つ

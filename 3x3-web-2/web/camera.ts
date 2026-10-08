@@ -110,6 +110,7 @@ export class TwoViewCamera {
   private viewActionSequence = 0;
   private latestViewActivationSeq = 0;
   private loading: Record<"A" | "B", boolean> = { A: false, B: false };
+  private cubeType: "2x2" | "3x3" = "3x3";
 
   constructor(private apply: Apply) {
     const canvas = this.canvas;
@@ -349,7 +350,7 @@ export class TwoViewCamera {
         Object.keys(this.faces).length !== 6
       )
         return;
-      const state = buildState(this.faces);
+      const state = buildState(this.faces, this.cubeType);
       this.close();
       this.apply(state);
     };
@@ -400,7 +401,8 @@ export class TwoViewCamera {
     });
   }
 
-  open() {
+  open(cubeType: "2x2" | "3x3" = "3x3") {
+    this.cubeType = cubeType;
     this.stopLiveStream();
     this.error("");
     this.loading = { A: false, B: false };
@@ -421,6 +423,14 @@ export class TwoViewCamera {
     const inputB = $("camera-file-b") as HTMLInputElement | null;
     if (inputA) inputA.value = "";
     if (inputB) inputB.value = "";
+
+    const hint = document.querySelector<HTMLElement>(".camera-result-hint");
+    if (hint) {
+      hint.textContent =
+        cubeType === "2x2"
+          ? "各セルをクリックして色を修正できます"
+          : "各セル（センター除く）をクリックして色を修正できます";
+    }
 
     this.renderImage();
     this.initPalette();
@@ -748,19 +758,31 @@ export class TwoViewCamera {
               { targetFace: "B", quad: [p3, p4, center, p2] },
             ];
 
+      const is2x2 = this.cubeType === "2x2";
+      const sampleSize: 2 | 3 = is2x2 ? 2 : 3;
       let centerMismatch = false;
       for (const { targetFace, quad } of faceDefs) {
-        const sampled = sampleFaceFromPixels(pixels, quad);
-        const centerChar = sampled[4];
-        if (centerChar !== targetFace) {
-          centerMismatch = true;
+        const sampled = sampleFaceFromPixels(
+          pixels,
+          quad,
+          undefined,
+          sampleSize,
+        );
+        if (is2x2) {
+          this.faces[targetFace] = sampled;
+        } else {
+          const centerChar = sampled[4];
+          if (centerChar !== targetFace) {
+            centerMismatch = true;
+          }
+          const normalized =
+            sampled.slice(0, 4) + targetFace + sampled.slice(5);
+          this.faces[targetFace] = normalized;
         }
-        const normalized = sampled.slice(0, 4) + targetFace + sampled.slice(5);
-        this.faces[targetFace] = normalized;
         this.capturedFaces.add(targetFace);
       }
 
-      if (centerMismatch) {
+      if (!is2x2 && centerMismatch) {
         const expectedDesc =
           this.currentView === "A"
             ? "上面=白、右手前=赤、左手前=緑"
@@ -836,10 +858,23 @@ export class TwoViewCamera {
     const view = this.currentView;
     const keys =
       view === "A" ? (["U", "R", "F"] as const) : (["D", "L", "B"] as const);
+    const is2x2 = this.cubeType === "2x2";
 
-    // 1. キャプチャ済みのデータがある場合はそのセンター色を使用
+    // 1. キャプチャ済みのデータがある場合はその色を使用
     const capturedNames = keys.map((key) => {
-      const colorChar = this.faces[key]?.[4];
+      const faceState = this.faces[key];
+      if (!faceState) return undefined;
+      if (is2x2) {
+        const counts: Record<string, number> = {};
+        for (const ch of faceState) {
+          if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
+        }
+        const dominant = Object.entries(counts).sort(
+          (a, b) => b[1] - a[1],
+        )[0]?.[0];
+        return dominant && dominant !== "?" ? NAMES[dominant] : undefined;
+      }
+      const colorChar = faceState[4];
       return colorChar && colorChar !== "?" ? NAMES[colorChar] : undefined;
     });
     if (capturedNames.some((c) => c !== undefined)) {
@@ -882,8 +917,24 @@ export class TwoViewCamera {
               ];
 
         const pixels = getImagePixels(img);
+        const sampleSize: 2 | 3 = is2x2 ? 2 : 3;
         const sampledNames = quads.map((quad) => {
-          const sampled = sampleFaceFromPixels(pixels, quad);
+          const sampled = sampleFaceFromPixels(
+            pixels,
+            quad,
+            undefined,
+            sampleSize,
+          );
+          if (is2x2) {
+            const counts: Record<string, number> = {};
+            for (const ch of sampled) {
+              if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
+            }
+            const dominant = Object.entries(counts).sort(
+              (a, b) => b[1] - a[1],
+            )[0]?.[0];
+            return dominant && dominant !== "?" ? NAMES[dominant] : undefined;
+          }
           const c = sampled[4];
           return c && c !== "?" ? NAMES[c] : undefined;
         });
@@ -929,9 +980,11 @@ export class TwoViewCamera {
       faces: this.faces,
       currentView: this.currentView,
       selectedColor: this.selectedColor,
+      cubeType: this.cubeType,
       onUpdateSticker: (face, i) => {
         if (!this.capturedFaces.has(face)) return;
-        const current = this.faces[face] ?? "?????????";
+        const is2x2 = this.cubeType === "2x2";
+        const current = this.faces[face] ?? (is2x2 ? "????" : "?????????");
         const updated =
           current.substring(0, i) +
           this.selectedColor +

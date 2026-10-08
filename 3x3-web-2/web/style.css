@@ -1861,6 +1861,9 @@ dialog > p {
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
 }
+.camera-face-card .face-grid.grid-2x2 {
+  grid-template-columns: repeat(2, 1fr);
+}
 .camera-face-card .face-grid .sticker {
   aspect-ratio: 1;
   width: 100%;

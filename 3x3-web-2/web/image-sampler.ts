@@ -255,6 +255,7 @@ export function sampleFaceFromPixels(
   pixels: ImageData,
   points: Point[],
   adaptation?: ColorAdaptation,
+  size: 2 | 3 = 3,
 ): string {
   if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
   const transform = getPerspectiveTransform(points);
@@ -262,13 +263,13 @@ export function sampleFaceFromPixels(
   const [topLeft, topRight] = points;
   // 四角形の辺の長さから適切なサンプリング半径を動的決定
   const edgeLen = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
-  const radius = Math.max(3, Math.min(25, Math.round(edgeLen / 25)));
+  const radius = Math.max(3, Math.min(25, Math.round(edgeLen / (size * 8))));
 
   let result = "";
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const u = (col + 0.5) / 3;
-      const v = (row + 0.5) / 3;
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      const u = (col + 0.5) / size;
+      const v = (row + 0.5) / size;
       const pt = transform(u, v);
       result += classify(pixels, pt.x, pt.y, radius, adaptation);
     }
@@ -280,14 +281,25 @@ export function sampleFace(
   image: HTMLImageElement,
   points: Point[],
   adaptation?: ColorAdaptation,
+  size: 2 | 3 = 3,
 ): string {
   if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
-  return sampleFaceFromPixels(getImagePixels(image), points, adaptation);
+  return sampleFaceFromPixels(getImagePixels(image), points, adaptation, size);
 }
 
 export function buildState(
   faces: Partial<Record<(typeof FACES)[number], string>>,
+  cubeType: "2x2" | "3x3" = "3x3",
 ) {
+  if (cubeType === "2x2") {
+    return [...FACES]
+      .map((face) => {
+        const raw = faces[face];
+        if (!raw) return "????";
+        return raw.slice(0, 4);
+      })
+      .join("");
+  }
   return [...FACES]
     .map((face) => {
       const raw = faces[face];

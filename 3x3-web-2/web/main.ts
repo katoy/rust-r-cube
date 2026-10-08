@@ -190,7 +190,7 @@ function updateCubeTypeUI(type: CubeType) {
 
   const camColors = $("camera-colors");
   if (camColors) {
-    camColors.hidden = type === "2x2";
+    camColors.hidden = false;
   }
 
   renderPresetButtons(type);
@@ -918,9 +918,11 @@ async function getCamera(
         const { TwoViewCamera } = await loader();
         return new TwoViewCamera(async (s: string) => {
           let centers = [0, 0, 0, 0, 0, 0];
-          try {
-            centers = automaticCenters(s);
-          } catch {}
+          if (s.length !== 24) {
+            try {
+              centers = automaticCenters(s);
+            } catch {}
+          }
           await openModal(getEditor, (ed) => ed.open(s, centers));
         });
       } catch {
@@ -939,7 +941,7 @@ $("edit-colors").onclick = async () => {
   );
 };
 $("camera-colors").onclick = async () => {
-  await openModal(getCamera, (cam) => cam.open());
+  await openModal(getCamera, (cam) => cam.open(store.getCubeType()));
 };
 $("solve").onclick = () => void solve();
 $("extended").onclick = () => void solve(30000);

@@ -57,32 +57,62 @@ export interface ResultsOptions {
   currentView: "A" | "B";
   selectedColor: string;
   onUpdateSticker: (face: (typeof FACES)[number], index: number) => void;
+  cubeType?: "2x2" | "3x3";
 }
 
 /**
- * 展開図形式で読み取り結果の6面（各9ステッカー）を描画し、色の手動修正を可能にします。
+ * 展開図形式で読み取り結果の6面を描画し、色の手動修正を可能にします。
  */
 export function renderResultFaces(options: ResultsOptions): void {
-  const { host, faces, currentView, onUpdateSticker } = options;
+  const {
+    host,
+    faces,
+    currentView,
+    onUpdateSticker,
+    cubeType = "3x3",
+  } = options;
   if (!host) return;
+
+  const is2x2 = cubeType === "2x2";
+  const perFace = is2x2 ? 4 : 9;
+  const size = is2x2 ? 2 : 3;
 
   // 展開図（cube-net）と同じ URFDLB 順
   const faceOrder = ["U", "R", "F", "D", "L", "B"] as const;
   const existingCards =
     host.querySelectorAll<HTMLDivElement>(".camera-face-card");
+  const existingCells = host.querySelectorAll<HTMLButtonElement>(".sticker");
 
-  if (existingCards.length === faceOrder.length) {
+  if (
+    existingCards.length === faceOrder.length &&
+    existingCells.length === faceOrder.length * perFace
+  ) {
     existingCards.forEach((card, faceIdx) => {
       const face = faceOrder[faceIdx];
       const viewOfFace = ["U", "R", "F"].includes(face) ? "A" : "B";
       card.classList.toggle("is-active-view", currentView === viewOfFace);
 
-      const faceState = faces[face] ?? "?????????";
-      const centerColor = faceState[4];
-      const centerName =
-        centerColor && centerColor !== "?"
-          ? `${NAMES[centerColor]}面`
-          : FACE_NAMES[face];
+      const faceState = faces[face] ?? (is2x2 ? "????" : "?????????");
+      let centerName: string;
+      if (is2x2) {
+        const counts: Record<string, number> = {};
+        for (const ch of faceState) {
+          if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
+        }
+        const dominant = Object.entries(counts).sort(
+          (a, b) => b[1] - a[1],
+        )[0]?.[0];
+        centerName =
+          dominant && dominant !== "?"
+            ? `${NAMES[dominant]}面`
+            : FACE_NAMES[face];
+      } else {
+        const centerColor = faceState[4];
+        centerName =
+          centerColor && centerColor !== "?"
+            ? `${NAMES[centerColor]}面`
+            : FACE_NAMES[face];
+      }
 
       const title = card.querySelector(".camera-face-title");
       if (title) {
@@ -91,13 +121,16 @@ export function renderResultFaces(options: ResultsOptions): void {
 
       const cells = card.querySelectorAll<HTMLButtonElement>(".sticker");
       cells.forEach((cell, i) => {
-        const color = i === 4 ? face : faceState[i];
+        const isCenter = !is2x2 && i === 4;
+        const color = isCenter ? face : faceState[i];
         cell.dataset.color = color;
+        const row = Math.floor(i / size) + 1;
+        const col = (i % size) + 1;
         cell.setAttribute(
           "aria-label",
-          `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[color]}${i === 4 ? "（センター）" : ""}`,
+          `${FACE_NAMES[face]} ${row}行${col}列 ${NAMES[color] ?? "未入力"}${isCenter ? "（センター）" : ""}`,
         );
-        if (i !== 4) {
+        if (!isCenter) {
           cell.onclick = () => {
             onUpdateSticker(face, i);
           };
@@ -118,12 +151,27 @@ export function renderResultFaces(options: ResultsOptions): void {
       card.classList.add("is-active-view");
     }
 
-    const faceState = faces[face] ?? "?????????";
-    const centerColor = faceState[4];
-    const centerName =
-      centerColor && centerColor !== "?"
-        ? `${NAMES[centerColor]}面`
-        : FACE_NAMES[face];
+    const faceState = faces[face] ?? (is2x2 ? "????" : "?????????");
+    let centerName: string;
+    if (is2x2) {
+      const counts: Record<string, number> = {};
+      for (const ch of faceState) {
+        if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
+      }
+      const dominant = Object.entries(counts).sort(
+        (a, b) => b[1] - a[1],
+      )[0]?.[0];
+      centerName =
+        dominant && dominant !== "?"
+          ? `${NAMES[dominant]}面`
+          : FACE_NAMES[face];
+    } else {
+      const centerColor = faceState[4];
+      centerName =
+        centerColor && centerColor !== "?"
+          ? `${NAMES[centerColor]}面`
+          : FACE_NAMES[face];
+    }
 
     const title = document.createElement("span");
     title.className = "net-label camera-face-title";
@@ -131,27 +179,30 @@ export function renderResultFaces(options: ResultsOptions): void {
     card.append(title);
 
     const grid = document.createElement("div");
-    grid.className = "face-grid";
+    grid.className = is2x2 ? "face-grid grid-2x2" : "face-grid";
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < perFace; i++) {
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "sticker";
-      const color = i === 4 ? face : faceState[i];
+      const isCenter = !is2x2 && i === 4;
+      const color = isCenter ? face : faceState[i];
       cell.dataset.color = color;
       cell.dataset.index = String(i);
       cell.dataset.face = face;
-      if (i === 4) {
+      if (isCenter) {
         cell.dataset.center = "true";
         cell.disabled = true;
         cell.textContent = face;
       }
+      const row = Math.floor(i / size) + 1;
+      const col = (i % size) + 1;
       cell.setAttribute(
         "aria-label",
-        `${FACE_NAMES[face]} ${Math.floor(i / 3) + 1}行${(i % 3) + 1}列 ${NAMES[color]}${i === 4 ? "（センター）" : ""}`,
+        `${FACE_NAMES[face]} ${row}行${col}列 ${NAMES[color] ?? "未入力"}${isCenter ? "（センター）" : ""}`,
       );
 
-      if (i !== 4) {
+      if (!isCenter) {
         cell.onclick = () => {
           onUpdateSticker(face, i);
         };

@@ -762,6 +762,41 @@ test.describe("E2E Coverage with CDP", () => {
           // 単色画像でのステッカー判定例外を想定
         }
 
+        // sampleFace & getImagePixels (image-sampler.ts)
+        try {
+          const sampler = await import("/web/image-sampler.ts");
+          sampler.sampleFace(
+            redImg,
+            [
+              { x: 10, y: 10 },
+              { x: 100, y: 10 },
+              { x: 100, y: 100 },
+              { x: 10, y: 100 },
+            ],
+            undefined,
+            2,
+          );
+        } catch {}
+
+        // 2x2 モードでのキャプチャとラベル更新、ステッカー補正、apply (camera.ts)
+        (camInst as any).cubeType = "2x2";
+        (camInst as any).currentView = "A";
+        (camInst as any).imageA = redImg;
+        (camInst as any).imageB = redImg;
+        (camInst as any).faces = {};
+        (camInst as any).points = hex;
+        (camInst as any).updateDetectedLabels();
+        try {
+          (camInst as any).capture();
+        } catch {}
+        (camInst as any).updateDetectedLabels();
+        (camInst as any).renderResults();
+        const uStickerBtn = document.querySelector<HTMLButtonElement>(
+          "#camera-face-card-U .sticker",
+        );
+        uStickerBtn?.click();
+        (camInst as any).cubeType = "3x3";
+
         // capture 例外ハンドリング (588-589行)
         (camInst as any).points = [{}, {}, {}, {}, {}, {}];
         try {

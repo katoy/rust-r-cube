@@ -28,6 +28,11 @@ export interface StoreEventDetail {
 
 export type StoreListener = (store: CubeStore, event: StoreEventDetail) => void;
 
+/** 2x2（24 文字）の盤面にはセンターが無いため、センター回転を常に 0 に正規化する */
+function normalizeCenters(state: string, centers: number[]): number[] {
+  return state.length === 24 ? [0, 0, 0, 0, 0, 0] : [...centers];
+}
+
 export class CubeStore {
   private cubeType: CubeType = "3x3";
   private state: string = SOLVED;
@@ -46,8 +51,22 @@ export class CubeStore {
     return this.cubeType;
   }
 
-  setCubeType(type: CubeType): void {
+  /**
+   * キューブ種別を切り替え、盤面を新しい種別の完成状態にする。
+   *
+   * @param type 切替先のキューブ種別
+   * @param record true なら切替前の盤面を履歴に積み、Undo で元の種別・盤面へ戻せるようにする。
+   *   false（起動時の復元など）なら履歴を破棄する。
+   */
+  setCubeType(type: CubeType, record = false): void {
     if (this.cubeType === type) return;
+    if (record) {
+      this.commitBaseSnapshotIfPreviewing();
+      this.pushHistory(this.getSnapshot());
+    } else {
+      this.history = [];
+      this.future = [];
+    }
     this.cubeType = type;
     this.state = getSolvedState(type);
     this.centerRotations = [0, 0, 0, 0, 0, 0];
@@ -55,8 +74,6 @@ export class CubeStore {
     this.solution = undefined;
     this.baseSnapshot = undefined;
     this.step = 0;
-    this.history = [];
-    this.future = [];
     this.notify("cube-type");
   }
 
@@ -139,6 +156,7 @@ export class CubeStore {
   }
 
   replace(next: string, record = true, centers = automaticCenters(next)): void {
+    centers = normalizeCenters(next, centers);
     const nextTurns = centerTurns(centers);
     if (record) {
       this.commitBaseSnapshotIfPreviewing();
@@ -151,7 +169,7 @@ export class CubeStore {
     }
     this.cubeType = next.length === 24 ? "2x2" : "3x3";
     this.state = next;
-    this.centerRotations = [...centers];
+    this.centerRotations = centers;
     this.revision++;
     this.solution = undefined;
     this.baseSnapshot = undefined;
@@ -234,7 +252,7 @@ export class CubeStore {
       this.step = 0;
       this.solution = undefined;
       this.baseSnapshot = undefined;
-      this.future = [];
+      // base へ戻すだけなので Redo 履歴（future）は保持する
       this.revision++;
       this.notify("solution");
       return true;
@@ -261,7 +279,7 @@ export class CubeStore {
     step: number,
   ): void {
     this.state = nextState;
-    this.centerRotations = [...nextCenterRotations];
+    this.centerRotations = normalizeCenters(nextState, nextCenterRotations);
     this.step = step;
     this.revision++;
     this.notify("seek");
@@ -272,6 +290,7 @@ export class CubeStore {
     nextCenters: number[],
     record = true,
   ): void {
+    nextCenters = normalizeCenters(nextState, nextCenters);
     if (record) {
       this.commitBaseSnapshotIfPreviewing();
       if (
@@ -283,7 +302,7 @@ export class CubeStore {
     }
     this.cubeType = nextState.length === 24 ? "2x2" : "3x3";
     this.state = nextState;
-    this.centerRotations = [...nextCenters];
+    this.centerRotations = nextCenters;
     this.revision++;
     this.solution = undefined;
     this.baseSnapshot = undefined;

@@ -54,6 +54,11 @@ impl Search {
         self
     }
     pub fn solve(&mut self, cube: &RawCube) -> Option<Vec<usize>> {
+        self.nodes = 0;
+        self.timed_out = false;
+        self.start = Instant::now();
+        self.path.clear();
+
         if *cube == RawCube::default() {
             if let Some(target) = self.target_centers {
                 if target.iter().all(|&c| c == 0) {
@@ -63,17 +68,23 @@ impl Search {
                 return Some(Vec::new());
             }
         }
+        if self.max_total == 0 {
+            return None;
+        }
+
         self.initial = *cube;
         self.best_solution = None;
         self.best_phase1_len = 0;
 
+        let initial_max = self.max_total;
+
         // 短い手数（深さ 1..=5）の直接探索（理論的最短手数を瞬時に見つける）
-        for d in 1..=5 {
+        for d in 1..=5.min(self.max_total) {
             self.path.clear();
             if let Some(target) = self.target_centers {
                 self.current_centers = target;
             }
-            if self.direct_solve(cube, d, 99) {
+            if self.direct_solve(cube, d as u8, 99) {
                 self.best_phase1_len = self.path.len();
                 return Some(self.path.clone());
             }
@@ -81,13 +92,6 @@ impl Search {
                 return None;
             }
         }
-
-        let initial_max = if self.max_total > 0 {
-            self.max_total
-        } else {
-            22
-        };
-        self.max_total = initial_max;
 
         for depth in 0..=12 {
             if depth >= self.max_total {
@@ -109,8 +113,8 @@ impl Search {
             }
         }
 
-        // もし 22 手以内で解が見つからなかった場合のみ、24, 30 と段階的に上限を緩和
-        if self.best_solution.is_none() && !self.timed_out && initial_max <= 22 {
+        // もし 22 手以内で解が見つからなかった場合のみ（上限が未設定＝22以上の探索）、24, 30 と段階的に上限を緩和
+        if self.best_solution.is_none() && !self.timed_out && initial_max >= 22 {
             for &total in &[24, 30] {
                 self.max_total = total;
                 for depth in 0..=12 {

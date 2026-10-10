@@ -1,5 +1,5 @@
 export const FACES = "URFDLB";
-import { SOLVED_2X2 } from "./model-2x2";
+import { CORNERS_2X2, SOLVED_2X2 } from "./model-2x2";
 export { SOLVED_2X2 } from "./model-2x2";
 
 export const SOLVED_3X3 = [...FACES].map((f) => f.repeat(9)).join("");
@@ -133,8 +133,22 @@ export const EDGES = [
   [48, 14],
 ];
 
-export function getErrorIndices(message?: string): number[] {
+export function getErrorIndices(
+  message?: string,
+  cubeType: CubeType = "3x3",
+): number[] {
   if (!message) return [];
+  if (cubeType === "2x2") {
+    // 2x2 のエラー文は「スロット N のコーナー配色…」形式（N は 1 始まり）
+    const slotMatch = message.match(/スロット\s*(\d+)\s*のコーナー/);
+    if (slotMatch) {
+      const slot = parseInt(slotMatch[1], 10) - 1;
+      if (slot >= 0 && slot < CORNERS_2X2.length) {
+        return [...CORNERS_2X2[slot]];
+      }
+    }
+    return [];
+  }
   const edgeMatch = message.match(/エッジ\s*(\d+)/);
   if (edgeMatch) {
     const slot = parseInt(edgeMatch[1], 10) - 1;

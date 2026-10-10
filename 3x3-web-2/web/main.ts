@@ -80,6 +80,17 @@ reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const includeOrientation = $<HTMLInputElement>("include-orientation");
 includeOrientation.checked = true;
 const solverAlgo = $<HTMLSelectElement>("solver-algorithm");
+// スクランブル手順欄の既定文言（view.ts の初期表示と同じ）
+const DEFAULT_SCRAMBLE_TEXT = "ランダムな回転で、新しい状態をつくります。";
+// 種別ごとに選択可能なソルバーと既定ソルバー
+const SOLVERS_BY_TYPE: Record<CubeType, readonly string[]> = {
+  "2x2": ["lbl", "ortega", "optimal"],
+  "3x3": ["kociemba", "cfop", "thistlethwaite", "korf"],
+};
+const DEFAULT_SOLVER: Record<CubeType, string> = {
+  "2x2": "lbl",
+  "3x3": "kociemba",
+};
 
 function updateSolverNote() {
   const note = $("solver-note");
@@ -185,6 +196,10 @@ function updateCubeTypeUI(type: CubeType) {
       }
       algoSelect.disabled = solving;
     }
+    // 選択肢に無い値が代入されてセレクトが空（selectedIndex=-1）になった場合は既定値に戻す
+    if (algoSelect.selectedIndex === -1) {
+      algoSelect.value = DEFAULT_SOLVER[type];
+    }
     updateSolverNote();
   }
 
@@ -198,14 +213,17 @@ function updateCubeTypeUI(type: CubeType) {
 
 function switchCubeType(type: CubeType) {
   if (store.getCubeType() === type) return;
-  stop();
-  cancelSearch();
-  message();
-  store.setCubeType(type);
-  scene?.setCubeType(type);
-  updateCubeTypeUI(type);
-  persist();
-  refresh();
+  // 探索中は runCubeMutation が遮断する。切替前の盤面は履歴に積み、Undo で戻せるようにする
+  appState.runCubeMutation(() => {
+    stop();
+    message();
+    store.setCubeType(type, true);
+    $("scramble-text").textContent = DEFAULT_SCRAMBLE_TEXT;
+    scene?.setCubeType(type);
+    updateCubeTypeUI(type);
+    persist();
+    refresh();
+  });
 }
 
 const cubeTypeBtn3 = $("cube-type-3x3");
@@ -264,7 +282,8 @@ function persist() {
       storageKey,
       JSON.stringify({
         version: 1,
-        ...store.getSnapshot(),
+        // シーク／プレビュー中は確定前の盤面ではなく base snapshot を保存する
+        ...(store.getBaseSnapshot() ?? store.getSnapshot()),
         cubeType: store.getCubeType(),
         reducedMotion: reduced.checked,
         speed: $<HTMLSelectElement>("speed").value,
@@ -286,6 +305,7 @@ function replace(
   cancelSearch();
   message();
   updateSolverNote();
+  $("scramble-text").textContent = DEFAULT_SCRAMBLE_TEXT;
   store.replace(next, record, centers);
   appState.resetToIdle();
 }
@@ -424,7 +444,7 @@ function refresh() {
     !mainReady || !store.canRedo() || !canModify;
   document
     .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
+      "[data-move],#scramble,#reset,#apply-algorithm,#cube-type-3x3,#cube-type-2x2,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
     )
     .forEach((b) => (b.disabled = !mainReady || !canModify));
   solverAlgo.disabled = solving;
@@ -1322,8 +1342,23 @@ async function start(forceError = false) {
         hasInvalidParam = true;
       }
     }
+    const messages: string[] = [];
     if (hasInvalidParam) {
-      message("URLパラメータで指定された盤面または手順が無効です。");
+      messages.push("URLパラメータで指定された盤面または手順が無効です。");
+    }
+    const finalType = store.getCubeType();
+    if (
+      parsedParams.solver &&
+      !SOLVERS_BY_TYPE[finalType].includes(parsedParams.solver)
+    ) {
+      // 種別に合わないソルバーは既定値へ戻し、黙って別ソルバーで解かないよう通知する
+      solverAlgo.value = DEFAULT_SOLVER[finalType];
+      messages.push(
+        `ソルバー「${parsedParams.solver}」は ${finalType} では使えないため、既定の「${DEFAULT_SOLVER[finalType]}」を使用します。`,
+      );
+    }
+    if (messages.length > 0) {
+      message(messages.join(" "));
     }
     if (paramsApplied || hasInvalidParam) {
       try {
@@ -1339,12 +1374,14 @@ async function start(forceError = false) {
           url.pathname + (newSearch ? `?${newSearch}` : "") + url.hash;
         window.history.replaceState(null, "", newUrl);
       } catch {}
-      if (paramsApplied) {
-        persist();
-      }
     }
     restoring = false;
     updateCubeTypeUI(store.getCubeType());
+    updateSolverNote();
+    // restoring=false の後でないと persist() は保存を行わない
+    if (paramsApplied) {
+      persist();
+    }
 
     solver = new SolverClient((status, text, isInitError) => {
       engineError = status === "error";
@@ -1355,9 +1392,10 @@ async function start(forceError = false) {
             ? "読み込み失敗"
             : "準備中";
       $("engine-status").classList.toggle("ready", status === "ready");
-      if (!solving || status === "error")
-        $("solver-note").textContent =
-          status === "ready" ? "ブラウザ内で計算 · 通常5秒以内" : text;
+      if (!solving || status === "error") {
+        if (status === "ready") updateSolverNote();
+        else $("solver-note").textContent = text;
+      }
       if (engineError) {
         message(text);
         if (isInitError) {

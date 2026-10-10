@@ -12,40 +12,12 @@ use crate::{PhaseInfo, ResultData};
 /// - "lbl": 初心者向け LBL法 (Layer-by-Layer: 完全1層 → OLL → PLL)
 /// - "ortega": スピード解法 Ortega法 (1面色揃え → OLL → PBL)
 /// - "optimal" (デフォルト): IDA* 最短探索 (最大11手)
-pub fn solve(
-    state: &str,
-    _budget_ms: u32,
+pub fn verify_solution(
+    rc: &coord::RawCube,
+    moves: &[usize],
     include_orientation: bool,
-    algorithm: &str,
-) -> Result<ResultData, String> {
-    let rc = cube::parse_state(state)?;
-    let start = web_time::Instant::now();
-
-    let (moves, phases, algo_name, nodes) = match algorithm {
-        "lbl" => {
-            let (m, p) = lbl::solve_lbl(&rc)?;
-            (m, p, "lbl".to_string(), 0)
-        }
-        "ortega" => {
-            let (m, p) = ortega::solve_ortega(&rc)?;
-            (m, p, "ortega".to_string(), 0)
-        }
-        _ => {
-            let mut searcher = search::Search::new();
-            let m = searcher
-                .solve(&rc, include_orientation)
-                .ok_or_else(|| "解法が見つかりませんでした。".to_string())?;
-            let p = vec![PhaseInfo {
-                name: "Optimal 最短探索 (IDA*)".to_string(),
-                start: 0,
-                end: m.len(),
-            }];
-            (m, p, "optimal".to_string(), searcher.nodes)
-        }
-    };
-
-    // ガードレール原則: Release ビルドでも無条件に解法を検証する
-    let result_cube = cube::apply(&rc, &moves);
+) -> Result<(), String> {
+    let result_cube = cube::apply(rc, moves);
     let is_solved = if include_orientation {
         result_cube == coord::RawCube::default()
     } else {
@@ -57,6 +29,72 @@ pub fn solve(
     if !is_solved {
         return Err("解法の検証に失敗しました。".into());
     }
+    Ok(())
+}
+
+pub fn solve(
+    state: &str,
+    budget_ms: u32,
+    include_orientation: bool,
+    algorithm: &str,
+) -> Result<ResultData, String> {
+    let rc = cube::parse_state(state)?;
+    let start = web_time::Instant::now();
+
+    // 向き OFF の場合、すでにいずれかの向きで完成していれば 0 手を返す
+    let is_already_solved = if include_orientation {
+        rc == coord::RawCube::default()
+    } else {
+        search::get_all_orientations()
+            .iter()
+            .any(|rot| rot.multiply(&rc) == coord::RawCube::default())
+    };
+
+    let norm_algo = match algorithm {
+        "lbl" => "lbl",
+        "ortega" => "ortega",
+        "optimal" | "" => "optimal",
+        _ => {
+            return Err(format!(
+                "2x2 キューブではアルゴリズム「{}」は利用できません（利用可能: lbl, ortega, optimal）。",
+                algorithm
+            ));
+        }
+    };
+
+    let (moves, phases, algo_name, nodes) = if is_already_solved {
+        (Vec::new(), Vec::new(), norm_algo.to_string(), 0)
+    } else {
+        match norm_algo {
+            "lbl" => {
+                let (m, p) = lbl::solve_lbl(&rc)?;
+                (m, p, "lbl".to_string(), 0)
+            }
+            "ortega" => {
+                let (m, p) = ortega::solve_ortega(&rc)?;
+                (m, p, "ortega".to_string(), 0)
+            }
+            _ => {
+                let mut searcher = search::Search::new().with_budget(budget_ms);
+                let m = searcher.solve(&rc, include_orientation).ok_or_else(|| {
+                    if searcher.timed_out {
+                        "探索時間の上限に達しました。".to_string()
+                    } else {
+                        "解法が見つかりませんでした。".to_string()
+                    }
+                })?;
+                let p = vec![PhaseInfo {
+                    name: "Optimal 最短探索 (IDA*)".to_string(),
+                    start: 0,
+                    end: m.len(),
+                }];
+                (m, p, "optimal".to_string(), searcher.nodes)
+            }
+        }
+    };
+
+    // ガードレール原則: Release ビルドでも無条件に解法を検証する
+    verify_solution(&rc, &moves, include_orientation)?;
 
     let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 

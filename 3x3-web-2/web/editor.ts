@@ -69,7 +69,10 @@ export class ColorEditor {
       } catch (error) {
         const msg = String(error);
         $("editor-error").textContent = msg;
-        this.errorIndices = getErrorIndices(msg);
+        this.errorIndices = getErrorIndices(
+          msg,
+          this.draft.length === 24 ? "2x2" : "3x3",
+        );
         this.render();
       }
     };

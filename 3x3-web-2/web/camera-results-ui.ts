@@ -51,6 +51,19 @@ export function renderPalette(options: PaletteOptions): void {
   });
 }
 
+/**
+ * 面の色名（例: "赤"）を返す。3x3 はセンター色で面が決まる。
+ * 2x2 はセンターが無く、最多色はスクランブル時に誤解を招くため色名を返さない（呼び出し側で位置名に固定する）。
+ */
+export function faceColorName(
+  faceState: string | undefined,
+  is2x2: boolean,
+): string | undefined {
+  if (is2x2 || !faceState) return undefined;
+  const c = faceState[4];
+  return c && c !== "?" ? NAMES[c] : undefined;
+}
+
 export interface ResultsOptions {
   host: HTMLElement | null;
   faces: Partial<Record<(typeof FACES)[number], string>>;
@@ -93,26 +106,8 @@ export function renderResultFaces(options: ResultsOptions): void {
       card.classList.toggle("is-active-view", currentView === viewOfFace);
 
       const faceState = faces[face] ?? (is2x2 ? "????" : "?????????");
-      let centerName: string;
-      if (is2x2) {
-        const counts: Record<string, number> = {};
-        for (const ch of faceState) {
-          if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
-        }
-        const dominant = Object.entries(counts).sort(
-          (a, b) => b[1] - a[1],
-        )[0]?.[0];
-        centerName =
-          dominant && dominant !== "?"
-            ? `${NAMES[dominant]}面`
-            : FACE_NAMES[face];
-      } else {
-        const centerColor = faceState[4];
-        centerName =
-          centerColor && centerColor !== "?"
-            ? `${NAMES[centerColor]}面`
-            : FACE_NAMES[face];
-      }
+      const colorName = faceColorName(faceState, is2x2);
+      const centerName = colorName ? `${colorName}面` : FACE_NAMES[face];
 
       const title = card.querySelector(".camera-face-title");
       if (title) {
@@ -152,26 +147,8 @@ export function renderResultFaces(options: ResultsOptions): void {
     }
 
     const faceState = faces[face] ?? (is2x2 ? "????" : "?????????");
-    let centerName: string;
-    if (is2x2) {
-      const counts: Record<string, number> = {};
-      for (const ch of faceState) {
-        if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
-      }
-      const dominant = Object.entries(counts).sort(
-        (a, b) => b[1] - a[1],
-      )[0]?.[0];
-      centerName =
-        dominant && dominant !== "?"
-          ? `${NAMES[dominant]}面`
-          : FACE_NAMES[face];
-    } else {
-      const centerColor = faceState[4];
-      centerName =
-        centerColor && centerColor !== "?"
-          ? `${NAMES[centerColor]}面`
-          : FACE_NAMES[face];
-    }
+    const colorName = faceColorName(faceState, is2x2);
+    const centerName = colorName ? `${colorName}面` : FACE_NAMES[face];
 
     const title = document.createElement("span");
     title.className = "net-label camera-face-title";

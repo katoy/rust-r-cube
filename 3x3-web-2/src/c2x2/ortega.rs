@@ -87,7 +87,7 @@ fn solve_first_face(cube: &RawCube) -> Result<Vec<usize>, String> {
     visited.insert(cube.hash_first_face());
 
     while let Some((cur, moves)) = q.pop_front() {
-        if moves.len() >= 5 {
+        if moves.len() >= 6 {
             break;
         }
 

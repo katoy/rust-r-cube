@@ -113,6 +113,13 @@ const CUBE_STATES = [
     // 固定センターモデルのため、エディタ反映時の期待値は未認識センターが面の色に補正される
     expectedState: "UUUUUUUUURRRRRRRRR????F????????D????LLLLLLLLL????B????",
   },
+  // 2x2（24 文字、各面 4 文字: U, R, F, D, L, B の順）
+  // 2x2 プリセット「最難関 (11手)」R U2 R' F2 R U2 R' U F' U R を完成状態に適用した既知の合法状態。
+  // 各面が多色で面内の並び替え・転置・鏡像の誤りを検出できる
+  {
+    name: "2x2-gods-number-11",
+    state: "BFRUFRRLDLLDBBDDRFLUUUFB",
+  },
 ];
 
 function interpolate(p1, p2, t) {
@@ -217,17 +224,19 @@ function renderPhotoRealisticCube(
   drawFaceBase(cornersView[face3], "#111214");
 
   // 4. 実写風ステッカー描画（写真通りの角丸＆センター八角形）
+  // 1 面あたりのマス数から 2x2 / 3x3 を判定する
+  const n = colors1.length === 4 ? 2 : 3;
   const drawStickers = (corners, faceColors) => {
     const margin = 0.07; // 実物の写真に合わせた広めの黒溝マージン
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        const colorChar = faceColors[r * 3 + c] || "?";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const colorChar = faceColors[r * n + c] || "?";
         const hex = COLORS[colorChar] || COLORS["?"];
 
-        const u0 = c / 3 + margin / 3;
-        const u1 = (c + 1) / 3 - margin / 3;
-        const v0 = r / 3 + margin / 3;
-        const v1 = (r + 1) / 3 - margin / 3;
+        const u0 = c / n + margin / n;
+        const u1 = (c + 1) / n - margin / n;
+        const v0 = r / n + margin / n;
+        const v1 = (r + 1) / n - margin / n;
 
         const p00 = getPoint(corners, u0, v0);
         const p10 = getPoint(corners, u1, v0);
@@ -235,7 +244,7 @@ function renderPhotoRealisticCube(
         const p01 = getPoint(corners, u0, v1);
 
         // 写真の特徴：センターピース(r=1, c=1)は丸みが大きく八角形/楕円風、周囲は角丸四角形
-        const isCenter = r === 1 && c === 1;
+        const isCenter = n === 3 && r === 1 && c === 1;
         const roundness = isCenter ? 0.38 : 0.22;
 
         ctx.save();
@@ -285,12 +294,11 @@ function renderPhotoRealisticCube(
 }
 
 function generateTwoViewImage(state) {
-  const faceU = state.slice(0, 9);
-  const faceR = state.slice(9, 18);
-  const faceF = state.slice(18, 27);
-  const faceD = state.slice(27, 36);
-  const faceL = state.slice(36, 45);
-  const faceB = state.slice(45, 54);
+  // 54 文字なら 3x3（各面 9 文字）、24 文字なら 2x2（各面 4 文字）
+  const k = state.length / 6;
+  const [faceU, faceR, faceF, faceD, faceL, faceB] = [0, 1, 2, 3, 4, 5].map(
+    (i) => state.slice(i * k, (i + 1) * k),
+  );
 
   // ビュー A: 上面=U, 前面左=F, 前面右=R
   const canvasA = createCanvas(WIDTH, HEIGHT);

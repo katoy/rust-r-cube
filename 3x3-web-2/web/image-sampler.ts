@@ -2,6 +2,12 @@ import { FACES } from "./model";
 
 type Point = { x: number; y: number };
 
+/**
+ * サンプリング半径 = 辺の長さ / この値。3x3 は従来どおり /25（1 マスの 12%）、
+ * 2x2 は 1 マスに対する比率をほぼ揃えた /16（1 マスの 12.5%）。
+ */
+const SAMPLE_RADIUS_DIVISOR: Record<2 | 3, number> = { 2: 16, 3: 25 };
+
 export function rgbToHsv(r: number, g: number, b: number) {
   r /= 255;
   g /= 255;
@@ -263,7 +269,10 @@ export function sampleFaceFromPixels(
   const [topLeft, topRight] = points;
   // 四角形の辺の長さから適切なサンプリング半径を動的決定
   const edgeLen = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
-  const radius = Math.max(3, Math.min(25, Math.round(edgeLen / (size * 8))));
+  const radius = Math.max(
+    3,
+    Math.min(25, Math.round(edgeLen / SAMPLE_RADIUS_DIVISOR[size])),
+  );
 
   let result = "";
   for (let row = 0; row < size; row++) {
@@ -296,7 +305,8 @@ export function buildState(
       .map((face) => {
         const raw = faces[face];
         if (!raw) return "????";
-        return raw.slice(0, 4);
+        // 短い入力でも 24 文字を保証する（不足分は未入力扱い）
+        return raw.slice(0, 4).padEnd(4, "?");
       })
       .join("");
   }

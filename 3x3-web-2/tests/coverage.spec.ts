@@ -58,15 +58,31 @@ test.describe("E2E Coverage with CDP", () => {
         const view = await import("/web/view.ts");
         const appStateModule = await import("/web/app-state.ts");
 
-        const assertThrows = (fn: () => any) => {
+        const assertThrows = (fn: () => any, expected?: RegExp | string) => {
           let threw = false;
+          let thrownError: any = null;
           try {
             fn();
-          } catch {
+          } catch (e) {
             threw = true;
+            thrownError = e;
           }
           if (!threw)
             throw new Error("Expected function to throw, but it succeeded");
+          if (expected) {
+            const msg = String(thrownError?.message || thrownError || "");
+            if (expected instanceof RegExp) {
+              if (!expected.test(msg)) {
+                throw new Error(
+                  `Expected error matching ${expected}, got: ${msg}`,
+                );
+              }
+            } else if (!msg.includes(expected)) {
+              throw new Error(
+                `Expected error containing "${expected}", got: ${msg}`,
+              );
+            }
+          }
         };
 
         const assertTrue = (cond: boolean, msg = "Assertion failed") => {
@@ -585,20 +601,36 @@ test.describe("E2E Coverage with CDP", () => {
 
         // --- file-io.ts ---
         const fileIo = await import("/web/file-io.ts");
-        assertThrows(() => fileIo.validateAndParseCubeJson("{}", 70000));
-        assertThrows(() => fileIo.validateAndParseCubeJson("null", 100));
-        assertThrows(() => fileIo.validateAndParseCubeJson("{}", 100));
-        assertThrows(() =>
-          fileIo.validateAndParseCubeJson(
-            '{"version":2,"state":"' + solved + '"}',
-            100,
-          ),
+        const validJson = JSON.stringify({ version: 1, state: solved });
+        // 有効な JSON でもサイズ上限 (64KB) を超える場合は確実に 64KB エラーとなること
+        assertThrows(
+          () => fileIo.validateAndParseCubeJson(validJson, 70000),
+          /64KB/,
         );
-        assertThrows(() =>
-          fileIo.validateAndParseCubeJson('{"version":1}', 100),
+        assertThrows(
+          () => fileIo.validateAndParseCubeJson("null", 100),
+          /Cube Studio v1/,
         );
-        assertThrows(() =>
-          fileIo.validateAndParseCubeJson('{"version":1,"state":123}', 100),
+        assertThrows(
+          () => fileIo.validateAndParseCubeJson("{}", 100),
+          /Cube Studio v1/,
+        );
+        assertThrows(
+          () =>
+            fileIo.validateAndParseCubeJson(
+              '{"version":2,"state":"' + solved + '"}',
+              100,
+            ),
+          /Cube Studio v1/,
+        );
+        assertThrows(
+          () => fileIo.validateAndParseCubeJson('{"version":1}', 100),
+          /Cube Studio v1/,
+        );
+        assertThrows(
+          () =>
+            fileIo.validateAndParseCubeJson('{"version":1,"state":123}', 100),
+          /Cube Studio v1/,
         );
         fileIo.validateAndParseCubeJson(
           JSON.stringify({
@@ -681,6 +713,227 @@ test.describe("E2E Coverage with CDP", () => {
         await (camInst as any).processFile(bigFile, "A");
         await (camInst as any).processFile(bigFile, "B");
 
+        // camera.ts: readImageDimensions & checkImagePixelCount の画像ヘッダ解析網羅
+        const makeBlob = (bytes: number[]) => {
+          const arr = new Uint8Array(Math.max(bytes.length, 32));
+          arr.set(bytes);
+          return new Blob([arr]);
+        };
+        // 1. PNG (32バイト)
+        const pngBytes = [
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
+          0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00,
+          0x00, 0xc8, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        const pngDim = await camera.readImageDimensions(makeBlob(pngBytes));
+        assertEqual(pngDim?.width, 100, "PNG width");
+        assertEqual(pngDim?.height, 200, "PNG height");
+
+        // 2. JPEG (SOF0, フィルバイト 0xFF, 単独マーカー RST)
+        const jpegBytes = [
+          0xff,
+          0xd8, // SOI
+          0xff,
+          0xff,
+          0xd0, // フィルバイト + RST0
+          0xff,
+          0xe0,
+          0x00,
+          0x10,
+          0x4a,
+          0x46,
+          0x49,
+          0x46,
+          0x00,
+          0x01,
+          0x01,
+          0x00,
+          0x00,
+          0x01,
+          0x00,
+          0x01,
+          0x00,
+          0x00, // APP0
+          0xff,
+          0xc0,
+          0x00,
+          0x11,
+          0x08,
+          0x00,
+          0xc8,
+          0x01,
+          0x2c, // SOF0: height=200, width=300
+        ];
+        const jpegDim = await camera.readImageDimensions(makeBlob(jpegBytes));
+        assertEqual(jpegDim?.width, 300, "JPEG width");
+        assertEqual(jpegDim?.height, 200, "JPEG height");
+
+        // JPEG SOFなし/不正
+        const badJpeg = [0xff, 0xd8, 0xff, 0xda, 0x00, 0x08, 0x00, 0x00];
+        const badJpegDim = await camera.readImageDimensions(makeBlob(badJpeg));
+        assertEqual(badJpegDim, null, "bad JPEG should be null");
+
+        // 3. WebP VP8X
+        const webpVP8X = [
+          0x52, 0x49, 0x46, 0x46, 0x20, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42,
+          0x50, 0x56, 0x50, 0x38, 0x58, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x63, 0x00, 0x00, 0xc7, 0x00, 0x00,
+        ];
+        const vp8xDim = await camera.readImageDimensions(makeBlob(webpVP8X));
+        assertEqual(vp8xDim?.width, 100, "VP8X width");
+        assertEqual(vp8xDim?.height, 200, "VP8X height");
+
+        // 4. WebP VP8
+        const webpVP8 = [
+          0x52, 0x49, 0x46, 0x46, 0x20, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42,
+          0x50, 0x56, 0x50, 0x38, 0x20, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x9d, 0x01, 0x2a, 0x64, 0x00, 0xc8, 0x00,
+        ];
+        const vp8Dim = await camera.readImageDimensions(makeBlob(webpVP8));
+        assertEqual(vp8Dim?.width, 100, "VP8 width");
+        assertEqual(vp8Dim?.height, 200, "VP8 height");
+
+        // 5. WebP VP8L
+        const wVal = 99;
+        const hVal = 199;
+        const bits = (wVal & 0x3fff) | ((hVal & 0x3fff) << 14);
+        const webpVP8L = [
+          0x52,
+          0x49,
+          0x46,
+          0x46,
+          0x20,
+          0x00,
+          0x00,
+          0x00,
+          0x57,
+          0x45,
+          0x42,
+          0x50,
+          0x56,
+          0x50,
+          0x38,
+          0x4c,
+          0x0a,
+          0x00,
+          0x00,
+          0x00,
+          0x2f,
+          bits & 0xff,
+          (bits >> 8) & 0xff,
+          (bits >> 16) & 0xff,
+          (bits >> 24) & 0xff,
+        ];
+        const vp8lDim = await camera.readImageDimensions(makeBlob(webpVP8L));
+        assertEqual(vp8lDim?.width, 100, "VP8L width");
+        assertEqual(vp8lDim?.height, 200, "VP8L height");
+
+        // 6. GIF
+        const gifBytes = [
+          0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x64, 0x00, 0xc8, 0x00,
+        ];
+        const gifDim = await camera.readImageDimensions(makeBlob(gifBytes));
+        assertEqual(gifDim?.width, 100, "GIF width");
+        assertEqual(gifDim?.height, 200, "GIF height");
+
+        // 7. BMP (標準 BITMAPINFOHEADER)
+        const bmpBytes = new Array(30).fill(0);
+        bmpBytes[0] = 0x42;
+        bmpBytes[1] = 0x4d;
+        bmpBytes[14] = 40;
+        bmpBytes[18] = 100;
+        bmpBytes[22] = 200;
+        const bmpDim = await camera.readImageDimensions(makeBlob(bmpBytes));
+        assertEqual(bmpDim?.width, 100, "BMP width");
+        assertEqual(bmpDim?.height, 200, "BMP height");
+
+        // 8. BMP (BITMAPCOREHEADER: size 12)
+        const bmpCoreBytes = new Array(26).fill(0);
+        bmpCoreBytes[0] = 0x42;
+        bmpCoreBytes[1] = 0x4d;
+        bmpCoreBytes[14] = 12;
+        bmpCoreBytes[18] = 50;
+        bmpCoreBytes[20] = 60;
+        const bmpCoreDim = await camera.readImageDimensions(
+          makeBlob(bmpCoreBytes),
+        );
+        assertEqual(bmpCoreDim?.width, 50, "BMP CORE width");
+        assertEqual(bmpCoreDim?.height, 60, "BMP CORE height");
+
+        // 9. 不明形式 / 短いヘッダ
+        const unknownDim = await camera.readImageDimensions(
+          makeBlob([1, 2, 3]),
+        );
+        assertEqual(unknownDim, null);
+
+        // 10. checkImagePixelCount
+        await camera.checkImagePixelCount(makeBlob(pngBytes));
+        await (async () => {
+          let err: any = null;
+          try {
+            await camera.checkImagePixelCount(makeBlob([0, 0, 0]));
+          } catch (e) {
+            err = e;
+          }
+          assertTrue(!!err, "Invalid format should throw");
+        })();
+        await (async () => {
+          let err: any = null;
+          try {
+            await camera.checkImagePixelCount(makeBlob(pngBytes), 50);
+          } catch (e) {
+            err = e;
+          }
+          assertTrue(!!err, "Exceeded pixels should throw");
+        })();
+
+        // 11. 2x2 validate2x2Faces のエラー分岐 & holdGuide2x2
+        (camInst as any).cubeType = "2x2";
+        (camInst as any).capturedFaces = new Set([
+          "U",
+          "R",
+          "F",
+          "D",
+          "L",
+          "B",
+        ]);
+        (camInst as any).faces = {
+          U: "UUUU",
+          R: "RRRR",
+          F: "FFFF",
+          D: "DDDD",
+          L: "LLLL",
+          B: "BBBR",
+        };
+        (camInst as any).validate2x2Faces();
+        const val2x2Err = document.querySelector("#camera-error");
+        assertTrue(
+          (val2x2Err?.textContent || "").length > 0,
+          "validate2x2Faces should set error on illegal cube",
+        );
+        (camInst as any).faces = {
+          U: "BFRU",
+          R: "FRRL",
+          F: "DLLD",
+          D: "BBDD",
+          L: "RFLU",
+          B: "UUFB",
+        };
+        (camInst as any).validate2x2Faces();
+        assertEqual(
+          val2x2Err?.textContent,
+          "",
+          "validate2x2Faces should clear error on legal cube",
+        );
+        (camInst as any).cubeType = "3x3";
+
+        // holdGuide2x2
+        assertEqual(typeof (camInst as any).holdGuide2x2("A"), "string");
+        assertEqual(typeof (camInst as any).holdGuide2x2("B"), "string");
+
+        // visibilitychange でのストリーム停止
+        document.dispatchEvent(new Event("visibilitychange"));
+
         // pointercancel での pointer capture 解除 (150-151行)
         const camCanvas = (camInst as any).canvas as HTMLCanvasElement;
         if (camCanvas) {
@@ -756,27 +1009,29 @@ test.describe("E2E Coverage with CDP", () => {
         (camInst as any).imageB = redImg;
         (camInst as any).faces = {};
         (camInst as any).points = hex;
-        try {
-          (camInst as any).capture();
-        } catch (_err) {
-          // 単色画像でのステッカー判定例外を想定
-        }
+        (camInst as any).capture();
+        assertTrue(
+          (camInst as any).capturedFaces.has("U"),
+          "Face U should be captured for 3x3",
+        );
 
         // sampleFace & getImagePixels (image-sampler.ts)
-        try {
-          const sampler = await import("/web/image-sampler.ts");
-          sampler.sampleFace(
-            redImg,
-            [
-              { x: 10, y: 10 },
-              { x: 100, y: 10 },
-              { x: 100, y: 100 },
-              { x: 10, y: 100 },
-            ],
-            undefined,
-            2,
-          );
-        } catch {}
+        const sampled2x2 = sampler.sampleFace(
+          redImg,
+          [
+            { x: 10, y: 10 },
+            { x: 100, y: 10 },
+            { x: 100, y: 100 },
+            { x: 10, y: 100 },
+          ],
+          undefined,
+          2,
+        );
+        assertEqual(
+          sampled2x2,
+          "RRRR",
+          "sampleFace should classify all stickers as R for red image",
+        );
 
         // 2x2 モードでのキャプチャとラベル更新、ステッカー補正、apply (camera.ts)
         (camInst as any).cubeType = "2x2";
@@ -786,24 +1041,40 @@ test.describe("E2E Coverage with CDP", () => {
         (camInst as any).faces = {};
         (camInst as any).points = hex;
         (camInst as any).updateDetectedLabels();
-        try {
-          (camInst as any).capture();
-        } catch {}
+        (camInst as any).capture();
+        assertEqual(
+          (camInst as any).faces.U,
+          "RRRR",
+          "2x2 capture should sample 4 stickers for face U",
+        );
+        assertTrue(
+          (camInst as any).capturedFaces.has("U"),
+          "Face U should be marked captured",
+        );
         (camInst as any).updateDetectedLabels();
         (camInst as any).renderResults();
         const uStickerBtn = document.querySelector<HTMLButtonElement>(
           "#camera-face-card-U .sticker",
         );
+        assertTrue(!!uStickerBtn, "U sticker button should exist");
         uStickerBtn?.click();
         (camInst as any).cubeType = "3x3";
 
-        // capture 例外ハンドリング (588-589行)
-        (camInst as any).points = [{}, {}, {}, {}, {}, {}];
-        try {
-          (camInst as any).capture();
-        } catch (_err) {
-          // 不正な頂点形式による例外を想定
-        }
+        // 不正な頂点形式による capture エラーハンドリング (空 catch ではなくエラー状態の検証)
+        (camInst as any).points = [
+          { x: NaN, y: NaN },
+          { x: NaN, y: NaN },
+          { x: NaN, y: NaN },
+          { x: NaN, y: NaN },
+          { x: NaN, y: NaN },
+          { x: NaN, y: NaN },
+        ];
+        (camInst as any).capture();
+        const camErrEl = document.querySelector("#camera-error");
+        assertTrue(
+          (camErrEl?.textContent || "").length > 0,
+          "Invalid points should trigger error display in camera modal",
+        );
         (camInst as any).points = [];
 
         // detectedLabels 未検出パス (705行)

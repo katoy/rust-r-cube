@@ -65,6 +65,10 @@ const PRECACHE_URLS = new Set(
   ),
 );
 
+// クエリ付きランタイムキャッシュ（Vite dev での ?url, ?worker 等）の上限数
+const MAX_QUERY_ENTRIES = 50;
+const queryKeysQueue = [];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -103,11 +107,15 @@ self.addEventListener("activate", (event) => {
 
           for (const req of requests) {
             if (migratedCount >= MAX_MIGRATED_ITEMS) break;
-            const alreadyCached = await ownCache.match(req);
+            // 旧世代のクエリ付きキーは移行せず、正規化した URL のみを保存キーにする
+            const reqUrl = new URL(req.url);
+            if (reqUrl.search) continue;
+            const canonicalKey = reqUrl.origin + reqUrl.pathname;
+            const alreadyCached = await ownCache.match(canonicalKey);
             if (!alreadyCached) {
               const res = await oldCache.match(req);
               if (res && res.ok) {
-                await ownCache.put(req, res); // ignore-guardrail: SW cache migration preserves existing cached request keys
+                await ownCache.put(canonicalKey, res);
                 migratedCount++;
               }
             }
@@ -201,8 +209,16 @@ self.addEventListener("fetch", (event) => {
           if (networkResponse.ok && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {
-              const cacheKey = url.search ? url.href : canonicalKey;
-              await ownCache.put(cacheKey, clone); // ignore-guardrail: static asset queries (e.g. Vite ?url or ?v=) require full URL keying to prevent binary collisions
+              if (url.search) {
+                // クエリ付き（Vite の ?url や ?worker 等）は上限管理し無制限蓄積を防止
+                queryKeysQueue.push(url.href);
+                if (queryKeysQueue.length > MAX_QUERY_ENTRIES) {
+                  const oldest = queryKeysQueue.shift();
+                  if (oldest) await ownCache.delete(oldest);
+                }
+              }
+              const boundedCacheKey = url.search ? url.href : canonicalKey;
+              await ownCache.put(boundedCacheKey, clone);
             } catch (error) {
               console.warn(
                 "[Service Worker] Runtime cache write failed:",

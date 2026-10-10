@@ -359,6 +359,8 @@ export class CubeScene {
   }
   setCubeType(type: CubeType, state?: string) {
     if (this.cubeType === type && !state) return;
+    // 再生中のアニメーションは旧サイズのまま完了させ、完了コールバックの show() が新サイズで走らないようにする
+    this.finish();
     this.cubeType = type;
     this.buildCube(type);
     if (state) {

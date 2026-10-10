@@ -40,7 +40,7 @@
   1. `web/url-params.ts` に `VALID_SOLVERS`（`["cfop", "thistlethwaite", "korf", "optimal", "lbl", "ortega"]`）を定義・エクスポート。
   2. `buildShareUrl` において、2x2x2 のデフォルト解法（`optimal`）以外のソルバー（`lbl`, `ortega`）が正しく URL パラメータに付与されるよう更新。
   3. `web/main.ts` の起動・復元処理において、`updateCubeTypeUI(restoredType)` で DOM オプションが揃った直後に `solverAlgo.value` を復元し `updateSolverNote()` を連動。
-- **検証エビデンス**: [`tests/code-review-4a010ac-regression.spec.ts`](../tests/code-review-4a010ac-regression.spec.ts) の H1 テストケースにおいて、`?cube=2x2&solver=ortega` での直接起動および URL 共有リンクへの反映を確認。
+- **検証エビデンス**: [`tests/code-review-4a010ac-regression.spec.ts`](../tests/code-review-4a010ac-regression.spec.ts) の H1 テストケースにおいて、`?type=2x2&solver=ortega` での直接起動および URL 共有リンクへの反映を確認。
 
 ### 2.2 H2: 2x2x2 手動回転完成時のファンファーレ発火
 - **根本原因**: `web/main.ts` の手動回転イベントハンドラにおいて、完成判定が 3x3 の 54 文字定数 `SOLVED` との直接一致（`store.getState() === SOLVED`）に固定されていたため、24 文字の 2x2 キューブを解き終えても条件が成立せず `sound.playSuccess()` が発火しませんでした。

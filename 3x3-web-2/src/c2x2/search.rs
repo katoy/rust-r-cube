@@ -1,5 +1,6 @@
 use super::coord::{
-    get_group_a_idx, get_group_b_idx, get_group_c_idx, get_group_d_idx, move_cube_18, RawCube,
+    get_group_a_idx, get_group_b_idx, get_group_c_idx, get_group_d_idx, move_cube_18, Corner,
+    RawCube,
 };
 use super::tables::PruningTable;
 use std::collections::{HashSet, VecDeque};
@@ -12,6 +13,9 @@ pub struct Search {
     pruning_table: &'static PruningTable,
     pub max_nodes: u64,
     pub nodes: u64,
+    pub timed_out: bool,
+    start: Option<web_time::Instant>,
+    budget_ms: Option<u128>,
     solution: Vec<usize>,
 }
 
@@ -27,15 +31,27 @@ impl Search {
             pruning_table: PruningTable::get(),
             max_nodes: DEFAULT_MAX_NODES,
             nodes: 0,
+            timed_out: false,
+            start: None,
+            budget_ms: None,
             solution: Vec::with_capacity(MAX_DEPTH),
         }
+    }
+
+    pub fn with_budget(mut self, budget_ms: u32) -> Self {
+        self.budget_ms = Some(budget_ms as u128);
+        self
     }
 
     /// 2x2 キューブの最短解を探索します。
     /// `include_orientation`:
     ///   - true: 標準向き（白上・赤右・緑前など）に完全一致する完成状態を目指す
-    ///   - false: 6面が揃っていればどの向きでもよい最短解を探索（24通りの向きから最小手数を採用）
+    ///   - false: 6面が揃っていればどの向きでもよい最短解を探索
     pub fn solve(&mut self, rc: &RawCube, include_orientation: bool) -> Option<Vec<usize>> {
+        self.nodes = 0;
+        self.timed_out = false;
+        self.start = Some(web_time::Instant::now());
+
         if *rc == RawCube::default() {
             return Some(Vec::new());
         }
@@ -43,43 +59,40 @@ impl Search {
         if include_orientation {
             self.solve_single_target(rc, MAX_DEPTH)
         } else {
-            // 24通りの空間向きのうち、最も手数が短い解を探索
             let orientations = get_all_orientations();
-            let mut best_solution: Option<Vec<usize>> = None;
-            let mut current_max_depth = MAX_DEPTH;
-
-            // まず、すでにいずれかの向きで完成しているかチェック
-            for rot in orientations {
-                let oriented_rc = rot.multiply(rc);
-                if oriented_rc == RawCube::default() {
-                    return Some(Vec::new());
-                }
+            // すでにいずれかの向きで完成しているかチェック
+            if orientations
+                .iter()
+                .any(|rot| rot.multiply(rc) == RawCube::default())
+            {
+                return Some(Vec::new());
             }
 
-            for rot in orientations {
-                let oriented_rc = rot.multiply(rc);
-                if let Some(sol) = self.solve_single_target(&oriented_rc, current_max_depth) {
-                    current_max_depth = sol.len().saturating_sub(1);
-                    best_solution = Some(sol);
-                    if current_max_depth == 0 {
-                        break;
-                    }
-                }
-            }
+            // 2x2 では、向きを問わない最短手数は DBL コーナーを位置 6・向き 0 に合わせたときの
+            // 最短手数と完全に一致する。24 向きのループを行わず、DBL を固定する 1 向きのみ探索する
+            let rot = orientations
+                .iter()
+                .find(|rot| {
+                    let oriented = rot.multiply(rc);
+                    oriented.cp[Corner::DBL as usize] == Corner::DBL
+                        && oriented.co[Corner::DBL as usize] == 0
+                })
+                .copied()
+                .unwrap_or_default();
 
-            best_solution
+            let oriented_rc = rot.multiply(rc);
+            self.solve_single_target(&oriented_rc, MAX_DEPTH)
         }
     }
 
     /// 単一の目標状態（RawCube::default()）に対する IDA* 最短探索
     pub fn solve_single_target(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<usize>> {
-        self.nodes = 0;
         for depth in 0..=max_depth {
             self.solution.clear();
             if self.ida_star(*rc, depth, 255) {
                 return Some(self.solution.clone());
             }
-            if self.nodes >= self.max_nodes {
+            if self.nodes >= self.max_nodes || self.timed_out {
                 break;
             }
         }
@@ -90,6 +103,14 @@ impl Search {
         self.nodes += 1;
         if self.nodes >= self.max_nodes {
             return false;
+        }
+        if self.nodes & 4095 == 0 {
+            if let (Some(start), Some(budget)) = (self.start, self.budget_ms) {
+                if start.elapsed().as_millis() >= budget {
+                    self.timed_out = true;
+                    return false;
+                }
+            }
         }
 
         let idx_a = get_group_a_idx(&rc);

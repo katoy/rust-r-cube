@@ -49,8 +49,21 @@ if [ ! -d "node_modules" ]; then
   npm ci
 fi
 
-# wasm 成果物の存在確認または再ビルド要求時
-if [ "$REBUILD_WASM" = true ] || [ ! -f "pkg/cube_studio_bg.wasm" ]; then
+# wasm 成果物の存在確認およびソース更新日時（鮮度）確認
+needs_wasm_build() {
+  if [ ! -f "pkg/cube_studio_bg.wasm" ]; then
+    return 0
+  fi
+  if [ "Cargo.toml" -nt "pkg/cube_studio_bg.wasm" ] || [ "Cargo.lock" -nt "pkg/cube_studio_bg.wasm" ]; then
+    return 0
+  fi
+  if [ -n "$(find src -type f -newer pkg/cube_studio_bg.wasm 2>/dev/null)" ]; then
+    return 0
+  fi
+  return 1
+}
+
+if [ "$REBUILD_WASM" = true ] || needs_wasm_build; then
   echo "🦀 WebAssembly (pkg/) をビルドしています..."
   npm run wasm
 fi

@@ -45,7 +45,7 @@ test.describe("カメラ入力 - 画像処理テスト", () => {
     for (const [name, images] of Object.entries(manifest)) {
       expect(images.viewA).toBeTruthy();
       expect(images.viewB).toBeTruthy();
-      expect(images.expectedState).toHaveLength(54);
+      expect([24, 54]).toContain(images.expectedState.length);
 
       const pathA = getTestImagePath(name, "A");
       const pathB = getTestImagePath(name, "B");

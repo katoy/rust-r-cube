@@ -84,14 +84,49 @@ pub fn solve_state_with_centers(
     )
 }
 
+pub fn verify_solution(
+    cube: &coord::RawCube,
+    moves: &[usize],
+    include_orientation: bool,
+    initial_centers: Option<[i32; 6]>,
+) -> Result<(), String> {
+    let result_cube = cube::apply(cube, moves);
+    let is_pieces_solved = if include_orientation {
+        result_cube == coord::RawCube::default()
+    } else {
+        cube::facelets(&result_cube) == cube::SOLVED
+    };
+
+    if !is_pieces_solved {
+        return Err("解法の検証に失敗しました。".into());
+    }
+
+    if include_orientation {
+        if let Some(initial) = initial_centers {
+            let mut final_centers = initial;
+            for &m in moves {
+                let f = m / 3;
+                let t = match m % 3 {
+                    0 => 1,
+                    1 => 2,
+                    _ => -1,
+                };
+                final_centers[f] = (final_centers[f] + t).rem_euclid(4);
+            }
+            if final_centers.iter().any(|&c| c != 0) {
+                return Err("センター向きの検証に失敗しました。".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn apply_center_orientation_fix(
     mut moves: Vec<usize>,
     mut phase_infos: Vec<PhaseInfo>,
     initial_centers: Option<[i32; 6]>,
+    already_oriented: bool,
 ) -> Result<(Vec<usize>, Vec<PhaseInfo>), String> {
-    let already_oriented = phase_infos
-        .iter()
-        .any(|p| p.name.contains("センター") || p.name.contains("同時最適化"));
     if !already_oriented {
         if let Some(initial) = initial_centers {
             let centers = supercube::apply_moves_to_centers(initial, &moves);
@@ -121,6 +156,7 @@ pub fn solve_state_with_algorithm(
     initial_centers: Option<[i32; 6]>,
     algorithm: &str,
 ) -> Result<ResultData, String> {
+    check_state_len(state)?;
     if state.len() == 24 {
         return c2x2::solve(state, budget_ms, include_orientation, algorithm);
     }
@@ -134,6 +170,32 @@ pub fn solve_state_with_algorithm(
             );
         }
     }
+    // 完成状態であれば探索を行わず 0 手を返す
+    let is_already_solved = if include_orientation {
+        cube == coord::RawCube::default()
+            && initial_centers.is_none_or(|c| c.iter().all(|&x| x == 0))
+    } else {
+        cube == coord::RawCube::default()
+    };
+    if is_already_solved {
+        return Ok(result(
+            &cube,
+            state,
+            &[],
+            0.0,
+            0,
+            match algorithm {
+                "cfop" => "cfop",
+                "thistlethwaite" => "thistlethwaite",
+                "korf" => "korf",
+                _ => "kociemba",
+            },
+            Vec::new(),
+        ));
+    }
+    if budget_ms == 0 {
+        return Err("探索時間の上限に達しました。".into());
+    }
     let start = web_time::Instant::now();
     let mut total_nodes = 0u64;
     let mut phase_infos = Vec::new();
@@ -145,6 +207,7 @@ pub fn solve_state_with_algorithm(
         _ => "kociemba",
     };
 
+    let mut moves_opt_flag = false;
     let mut moves = match normalized_algorithm {
         "cfop" => {
             let res = cfop::solve(&cube, budget_ms)?;
@@ -213,14 +276,18 @@ pub fn solve_state_with_algorithm(
                     // 2. まず色のみの解を探索し、逐次解の手数を上限として取得
                     let elapsed_ms = start.elapsed().as_millis() as u32;
                     let remaining_budget = budget_ms.saturating_sub(elapsed_ms);
-                    let color_budget = (remaining_budget / 2).clamp(100, 2000);
+                    if remaining_budget == 0 {
+                        return Err("探索時間の上限に達しました。".into());
+                    }
+                    let color_budget =
+                        (remaining_budget / 2).clamp(100.min(remaining_budget), 2000);
                     let mut search_color = search::Search::new(color_budget);
                     let color_moves = search_color.solve(&cube);
                     total_nodes += search_color.nodes;
 
                     let (seq_len, seq_moves, p1_len) = if let Some(ref cm) = color_moves {
                         let c_sim = supercube::apply_moves_to_centers(centers, cm);
-                        let fixes = supercube::solve_center_orientations(c_sim).unwrap_or_default();
+                        let fixes = supercube::solve_center_orientations(c_sim)?;
                         let total_l = cm.len() + fixes.len();
                         let p1 = search_color.best_phase1_len;
                         let mut all_m = cm.clone();
@@ -230,13 +297,13 @@ pub fn solve_state_with_algorithm(
                         (usize::MAX, Vec::new(), 0)
                     };
 
-                    // 3. 同時最適化は、逐次解より短い解（seq_len - 1 以下）のみを狙う
+                    // 3. 同時最適化は、逐次解と同等以下の手数（seq_len 以下）を探索
                     let elapsed_ms = start.elapsed().as_millis() as u32;
                     let oriented_budget = budget_ms.saturating_sub(elapsed_ms);
                     let mut search_oriented =
                         search::Search::new(oriented_budget).with_target_centers(centers);
                     if seq_len < usize::MAX {
-                        search_oriented.set_max_total(seq_len.saturating_sub(1));
+                        search_oriented.set_max_total(seq_len);
                     }
                     let res = search_oriented.solve(&cube);
                     total_nodes += search_oriented.nodes;
@@ -289,6 +356,7 @@ pub fn solve_state_with_algorithm(
             };
 
             if let Some(m) = moves_opt {
+                moves_opt_flag = true;
                 m
             } else {
                 let elapsed_ms = start.elapsed().as_millis() as u32;
@@ -328,40 +396,13 @@ pub fn solve_state_with_algorithm(
 
     if include_orientation {
         let (opt_moves, opt_phases) =
-            apply_center_orientation_fix(moves, phase_infos, initial_centers)?;
+            apply_center_orientation_fix(moves, phase_infos, initial_centers, moves_opt_flag)?;
         moves = opt_moves;
         phase_infos = opt_phases;
     }
 
-    // 解法適用後の完成状態を無条件に検証
-    let result_cube = cube::apply(&cube, &moves);
-    let is_pieces_solved = if include_orientation {
-        result_cube == coord::RawCube::default()
-    } else {
-        cube::facelets(&result_cube) == cube::SOLVED
-    };
-
-    if !is_pieces_solved {
-        return Err("解法の検証に失敗しました。".into());
-    }
-
-    if include_orientation {
-        if let Some(initial) = initial_centers {
-            let mut final_centers = initial;
-            for &m in &moves {
-                let f = m / 3;
-                let t = match m % 3 {
-                    0 => 1,
-                    1 => 2,
-                    _ => -1,
-                };
-                final_centers[f] = (final_centers[f] + t).rem_euclid(4);
-            }
-            if final_centers.iter().any(|&c| c != 0) {
-                return Err("センター向きの検証に失敗しました。".into());
-            }
-        }
-    }
+    // 解法適用後の完成状態を無条件に検証（原則 ①）
+    verify_solution(&cube, &moves, include_orientation, initial_centers)?;
 
     Ok(result(
         &cube,
@@ -393,8 +434,17 @@ fn json(value: Result<ResultData, String>) -> Result<String, JsValue> {
         Err(e) => Err(to_js_error(e)),
     }
 }
+#[inline]
+fn check_state_len(state: &str) -> Result<(), String> {
+    if state.len() != 24 && state.len() != 54 {
+        return Err("24マス（2×2）または54マス（3×3）すべての色を入力してください。".into());
+    }
+    Ok(())
+}
+
 /// 純粋な Rust 向けの内部・共通ロジック
 pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> {
+    check_state_len(state)?;
     if state.len() == 24 {
         return c2x2::apply_moves_core(state, moves);
     }
@@ -407,16 +457,14 @@ pub fn apply_moves_core(state: &str, moves: &str) -> Result<ResultData, String> 
 /// 合法だが未完成（スクランブル状態）であれば false、
 /// 不正な配色・パリティであれば Err を返します。
 pub fn validate_core(state: &str) -> Result<bool, String> {
-    if state.len() == 24 {
-        return c2x2::is_solved(state, true);
-    }
-    cube::parse_state(state).map(|c| c == coord::RawCube::default())
+    is_solved_core(state)
 }
 
 /// 状態が合法（回転可能で解法が存在する状態）であるかを検証します。
 /// 盤面が正常にパース可能で妥当なキューブ表現であれば Ok(true) を返し、
 /// 文字数不正・文字種不正・パーツ構成不正・パリティエラー等で無効な状態であれば Err を返します。
 pub fn is_valid_core(state: &str) -> Result<bool, String> {
+    check_state_len(state)?;
     if state.len() == 24 {
         return c2x2::is_valid(state);
     }
@@ -425,6 +473,7 @@ pub fn is_valid_core(state: &str) -> Result<bool, String> {
 
 /// 状態が完成状態（6面すべて揃っている状態）であるかを判定します。
 pub fn is_solved_core(state: &str) -> Result<bool, String> {
+    check_state_len(state)?;
     if state.len() == 24 {
         return c2x2::is_solved(state, true);
     }
@@ -434,7 +483,9 @@ pub fn is_solved_core(state: &str) -> Result<bool, String> {
 /// センタークォーターターンの総和パリティ（0 または 1）を返します。
 /// コーナー置換パリティとセンター回転総和パリティの偶奇は常に一致する必要があります。
 pub fn center_parity_core(state: &str) -> Result<u8, String> {
+    check_state_len(state)?;
     if state.len() == 24 {
+        c2x2::is_valid(state)?;
         return Ok(0);
     }
     cube::parse_state(state).map(|c| cube::parity(&c.cp.map(|p| p as u8)) as u8)
@@ -448,7 +499,6 @@ pub fn initialize() {
 
     let _ = tables::MoveTable::get();
     let _ = tables::PruningTable::get();
-    let _ = c2x2::tables::MoveTable::get();
     let _ = c2x2::tables::PruningTable::get();
 }
 
@@ -578,7 +628,12 @@ pub fn solve_with_algorithm(
         Ok(c) => c,
         Err(e) => return json(Err(e)),
     };
-    let alg = algorithm.as_deref().unwrap_or("kociemba");
+    let default_alg = if state.len() == 24 {
+        "optimal"
+    } else {
+        "kociemba"
+    };
+    let alg = algorithm.as_deref().unwrap_or(default_alg);
     json(solve_state_with_algorithm(
         state,
         budget_ms,

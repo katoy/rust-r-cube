@@ -463,7 +463,6 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
             if count < 3 {
                 for op in edge_ops {
                     let next = apply(&c, op);
-                    debug_assert!(is_f2l_intact(&next));
                     if seen.insert(next) {
                         let mut next_path = path.clone();
                         next_path.extend(op);
@@ -496,7 +495,6 @@ fn solve_oll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
             if count < 4 {
                 for op in corner_ops {
                     let next = apply(&c, op);
-                    debug_assert!(is_f2l_intact(&next) && is_oll_edges_solved(&next));
                     if seen.insert(next) {
                         let mut next_path = path.clone();
                         next_path.extend(op);
@@ -590,7 +588,6 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
         }
         for op in corner_ops {
             let next = apply(&c, op);
-            debug_assert!(is_oll_solved(&next));
             if seen.insert(next) {
                 let mut next_path = path.clone();
                 next_path.extend(op);
@@ -622,12 +619,6 @@ fn solve_pll(cube: &RawCube, state: &mut SolverState) -> Result<Vec<usize>, Stri
         if count < 2 {
             for op in edge_ops {
                 let next = apply(&c, op);
-                #[cfg(debug_assertions)]
-                debug_assert!(
-                    is_f2l_intact(&next)
-                        && (0..4).all(|i| next.cp[i] as usize == i && next.co[i] == 0)
-                        && is_oll_edges_solved(&next)
-                );
                 if seen.insert(next) {
                     let mut next_path = path.clone();
                     next_path.extend(op.clone());

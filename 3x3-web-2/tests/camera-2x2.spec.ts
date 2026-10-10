@@ -213,4 +213,84 @@ test.describe("2x2x2 カメラ認識機能", () => {
     expect(cubeState).toHaveLength(24);
     expect(cubeState).toBe("UUUURRRRFFFFDDDDLLLLBBBB");
   });
+
+  test("2x2カメラ: 多色スクランブル画像を取り込み、24文字の配置と手動補正が完全一致すること", async ({
+    page,
+  }) => {
+    await ready(page);
+
+    // 「色を入力」タブを選択してカメラエディタを開く
+    await page.getByRole("tab", { name: "色を入力" }).click();
+    await page.locator("#camera-colors").click();
+    await expect(page.locator("#camera-editor")).toBeVisible();
+
+    // 2x2 多色スクランブル画像Aをアップロードしてキャプチャ
+    const viewAPath = getTestImagePath("2x2-gods-number-11", "A");
+    await page.locator("#camera-file-a").setInputFiles(viewAPath);
+    await expect(page.locator("#camera-status-a")).toContainText("読込完了");
+    await captureViewOnTestImage(page, "A");
+
+    // 2x2 多色スクランブル画像Bをアップロードしてキャプチャ
+    const viewBPath = getTestImagePath("2x2-gods-number-11", "B");
+    await page.locator("#camera-file-b").setInputFiles(viewBPath);
+    await expect(page.locator("#camera-status-b")).toContainText("読込完了");
+    await captureViewOnTestImage(page, "B");
+
+    // 整合性チェック（validate2x2Faces）が通りエラーがないこと
+    await expect(page.locator("#camera-error")).toHaveText("");
+    await expect(page.locator("#camera-progress")).toContainText("6 / 6");
+
+    // 各面のステッカー認識結果（BFRUFRRLDLLDBBDDRFLUUUFB）の完全一致検証
+    const expected = "BFRUFRRLDLLDBBDDRFLUUUFB";
+    const faces = ["U", "R", "F", "D", "L", "B"];
+    let detectedState = "";
+    for (let f = 0; f < faces.length; f++) {
+      const faceName = faces[f];
+      const stickers = page.locator(`#camera-face-card-${faceName} .sticker`);
+      await expect(stickers).toHaveCount(4);
+      for (let s = 0; s < 4; s++) {
+        const color = await stickers.nth(s).getAttribute("data-color");
+        detectedState += color;
+      }
+    }
+    expect(detectedState).toBe(expected);
+
+    // 手動色補正の検証（M6 指摘: 補正したセルがエディタと盤面に正しく伝播すること）
+    // U面の第0ステッカー (初期値 'B') をパレットから 'R' に変更
+    const rChoice = page.locator(
+      '.camera-palette button[aria-label="赤を選択"]',
+    );
+    await rChoice.click();
+    const uSticker0 = page.locator("#camera-face-card-U .sticker").nth(0);
+    await uSticker0.click();
+    await expect(uSticker0).toHaveAttribute("data-color", "R");
+
+    // 反映ボタンをクリックしてカラーエディタへ遷移
+    await expect(page.locator("#camera-apply")).toBeEnabled();
+    await page.locator("#camera-apply").click();
+    await expect(page.locator("#camera-editor")).not.toBeVisible();
+    await expect(page.locator("#editor")).toBeVisible();
+
+    // エディタ内の U 面第 0 ステッカーが 'R' になっていることを確認（buildState への反映を実証）
+    const editorU0 = page.locator('#editor-net [data-index="0"]');
+    await expect(editorU0).toHaveAttribute("data-color", "R");
+
+    // エディタ上で青（B）パレットを選択し、U 面第 0 ステッカーを 'B' に戻して合法状態（各色4枚）にする
+    const bColorChoice = page.locator(
+      '#palette button[aria-label*="青を選択"]',
+    );
+    await bColorChoice.click();
+    await editorU0.click();
+    await expect(editorU0).toHaveAttribute("data-color", "B");
+
+    // エディタを適用
+    await page.locator("#editor-apply").click();
+    await expect(page.locator("#editor")).not.toBeVisible();
+
+    // 最終盤面状態がスクランブル状態（24文字）と完全一致すること
+    const cubeState =
+      (await page.locator("#scene").getAttribute("data-state")) ??
+      (await page.evaluate(() => (window as any).cube_store?.getState()));
+    expect(cubeState).toBe(expected);
+  });
 });

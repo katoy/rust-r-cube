@@ -2221,6 +2221,35 @@ fn test_f1_solution_verification_always_enforced() {
     let bad_centers =
         crate::solve_state_with_algorithm(SOLVED, 1000, true, Some([1, 0, 0, 0, 0, 0]), "kociemba");
     assert!(bad_centers.is_err());
+
+    // 4. フォールトインジェクション (L10): 壊れた解法を verify_solution に渡して確実に Err になることを検証
+    let cube = RawCube::default();
+    let broken_moves = vec![0]; // U のみ（未完成）
+    let verify_err = crate::verify_solution(&cube, &broken_moves, true, None).unwrap_err();
+    assert_eq!(verify_err, "解法の検証に失敗しました。");
+
+    // ピースは完成だがセンターが 90° ズレている解
+    let centers_err =
+        crate::verify_solution(&cube, &[], true, Some([1, 0, 0, 0, 0, 0])).unwrap_err();
+    assert_eq!(centers_err, "センター向きの検証に失敗しました。");
+
+    // 2x2 のフォールトインジェクション
+    let c2 = crate::c2x2::coord::RawCube::default();
+    let c2_err = crate::c2x2::verify_solution(&c2, &[0], true).unwrap_err();
+    assert_eq!(c2_err, "解法の検証に失敗しました。");
+
+    // 5. 2x2 center_parity のバリデーション (L22)
+    let bad_24 = "X".repeat(24);
+    assert!(crate::center_parity_core(&bad_24).is_err());
+
+    // 6. 不正な文字数のエラーメッセージ (L23)
+    let bad_len_err = crate::center_parity_core("UUUU").unwrap_err();
+    assert!(bad_len_err.contains("24マス（2×2）または54マス（3×3）"));
+
+    // 7. 2x2 アルゴリズムのバリデーション (L24)
+    let bad_algo_res = crate::c2x2::solve(crate::c2x2::cube::SOLVED, 1000, true, "cfop");
+    assert!(bad_algo_res.is_err());
+    assert!(bad_algo_res.unwrap_err().contains("cfop"));
 }
 
 // ============================================================================
@@ -2391,4 +2420,32 @@ fn test_2x2_wasm_wrappers() {
     let ori_json = crate::get_orientations(solved).unwrap();
     assert!(ori_json.contains("\"corners\":[0,0,0,0,0,0,0,0]"));
     assert!(ori_json.contains("\"edges\":[]"));
+}
+
+#[test]
+fn test_2x2_gods_number_11_antipode_and_nodes() {
+    // M8 & L21 回帰テスト:
+    // 向き OFF の最短探索で 11 手アンチポード局面が高速に（1 秒前後）解け、
+    // かつ探索ノード数が集計され、手数が理論値 11 手であることを検証
+    let antipode = "UUDBDLFUFRLLBDDFBRLUFRRB";
+    let start = web_time::Instant::now();
+    let res = crate::c2x2::solve(antipode, 5000, false, "optimal").unwrap();
+    let elapsed = start.elapsed();
+
+    assert_eq!(res.moves.len(), 11);
+    assert!(res.nodes > 0, "探索ノード数が集計されていること");
+    assert!(
+        elapsed.as_millis() < 3000,
+        "11手アンチポードが高速に解けること (実際: {:?})",
+        elapsed
+    );
+
+    // 完成状態が空間回転されていることを検証
+    let solved_rc = crate::c2x2::cube::parse_state(&res.state).unwrap();
+    assert!(
+        crate::c2x2::search::get_all_orientations()
+            .iter()
+            .any(|rot| rot.multiply(&solved_rc) == crate::c2x2::coord::RawCube::default()),
+        "解法適用後のキューブが空間回転された完成状態であること"
+    );
 }

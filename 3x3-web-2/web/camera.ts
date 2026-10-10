@@ -16,71 +16,188 @@ import {
   sampleFaceFromPixels,
   getImagePixels,
 } from "./image-sampler";
-import { FACES, FACE_NAMES, NAMES } from "./model";
-import { renderPalette, renderResultFaces } from "./camera-results-ui";
+import { FACES, FACE_NAMES } from "./model";
+import { is_valid } from "../pkg/cube_studio";
+import {
+  faceColorName,
+  renderPalette,
+  renderResultFaces,
+} from "./camera-results-ui";
 
 export { computeCenter, detectCubeOutline, normalizeOutlinePoints, type Point };
 type Apply = (state: string) => void;
 
-async function checkImagePixelCount(
-  file: File,
-  maxPixels = 50_000_000,
+/** 2x2 の画像 B の持ち方（センターが無いため、画像 A の向きを基準に説明する） */
+const HOLD_GUIDE_2X2_B =
+  "下面を上に向け、画像Aで一番下に見えていた角（前・右・下）がてっぺん、左面が左手前、後面が右手前";
+
+/** 画素数ガードの上限（5000 万画素） */
+const MAX_IMAGE_PIXELS = 50_000_000;
+/** ヘッダ読み取り時に 1 回の file.slice で読む最大バイト数 */
+const HEADER_CHUNK_BYTES = 65536;
+
+/**
+ * Blob の指定範囲を必要に応じて追加読みするヘッダリーダーを作る。
+ * ファイル全体は読まず、要求された範囲を含む 64KB 単位のチャンクだけを読む。
+ */
+function createHeaderReader(file: Blob) {
+  let chunkStart = 0;
+  let chunk = new DataView(new ArrayBuffer(0));
+  return async (offset: number, length: number): Promise<DataView | null> => {
+    if (offset < 0 || offset + length > file.size) return null;
+    if (
+      offset < chunkStart ||
+      offset + length > chunkStart + chunk.byteLength
+    ) {
+      chunkStart = offset;
+      chunk = new DataView(
+        await file
+          .slice(offset, offset + Math.max(length, HEADER_CHUNK_BYTES))
+          .arrayBuffer(),
+      );
+    }
+    return new DataView(chunk.buffer, offset - chunkStart, length);
+  };
+}
+
+/**
+ * JPEG のマーカーをセグメント長に従って辿り、SOF（C0〜CF、ただし C4・C8・CC を除く）から寸法を読む。
+ * SOS より前に SOF が見つからない場合や、構造が壊れている場合は null を返す。
+ */
+async function readJpegDimensions(
+  read: ReturnType<typeof createHeaderReader>,
+): Promise<{ width: number; height: number } | null> {
+  let offset = 2;
+  for (;;) {
+    const header = await read(offset, 2);
+    if (!header || header.getUint8(0) !== 0xff) return null;
+    const marker = header.getUint8(1);
+    // 0xFF の連続はフィルバイトなので 1 バイトずつ読み飛ばす
+    if (marker === 0xff) {
+      offset += 1;
+      continue;
+    }
+    // 長さを持たない単独マーカー（TEM・RST0〜7）は 2 バイト進める
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      offset += 2;
+      continue;
+    }
+    // SOS・EOI に到達した時点で SOF が無ければ寸法不明
+    if (marker === 0xda || marker === 0xd9) return null;
+    const lengthView = await read(offset + 2, 2);
+    if (!lengthView) return null;
+    const length = lengthView.getUint16(0);
+    if (length < 2) return null;
+    const isSof =
+      marker >= 0xc0 &&
+      marker <= 0xcf &&
+      marker !== 0xc4 &&
+      marker !== 0xc8 &&
+      marker !== 0xcc;
+    if (isSof) {
+      // SOF の中身: 精度 (1) ・高さ (2) ・幅 (2)
+      const sof = await read(offset + 4, 5);
+      if (!sof || length < 7) return null;
+      return { height: sof.getUint16(1), width: sof.getUint16(3) };
+    }
+    offset += 2 + length;
+  }
+}
+
+/**
+ * 画像のヘッダだけを読んで寸法を返す。対応形式は PNG・JPEG・WebP（VP8 / VP8L / VP8X）・GIF・BMP。
+ * 寸法を判定できない場合は null を返す（呼び出し側でデコード前に拒否する）。
+ */
+export async function readImageDimensions(
+  file: Blob,
+): Promise<{ width: number; height: number } | null> {
+  const read = createHeaderReader(file);
+  const head = await read(0, Math.min(32, file.size));
+  if (!head) return null;
+  const n = head.byteLength;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A の後に IHDR の幅・高さ
+  if (
+    n >= 24 &&
+    head.getUint32(0) === 0x89504e47 &&
+    head.getUint32(4) === 0x0d0a1a0a
+  ) {
+    return { width: head.getUint32(16), height: head.getUint32(20) };
+  }
+  // JPEG: FF D8
+  if (n >= 4 && head.getUint16(0) === 0xffd8) {
+    return readJpegDimensions(read);
+  }
+  // WebP: "RIFF" ???? "WEBP" の後に最初のチャンク
+  if (
+    n >= 30 &&
+    head.getUint32(0) === 0x52494646 &&
+    head.getUint32(8) === 0x57454250
+  ) {
+    const fourcc = head.getUint32(12);
+    // VP8X: キャンバス幅 - 1・高さ - 1 を 24 bit リトルエンディアンで保持
+    if (fourcc === 0x56503858) {
+      const w = head.getUint16(24, true) | (head.getUint8(26) << 16);
+      const h = head.getUint16(27, true) | (head.getUint8(29) << 16);
+      return { width: w + 1, height: h + 1 };
+    }
+    // VP8 (非可逆): スタートコード 9D 01 2A の後に 14 bit の幅・高さ
+    if (fourcc === 0x56503820 && head.getUint32(23) >>> 8 === 0x9d012a) {
+      return {
+        width: head.getUint16(26, true) & 0x3fff,
+        height: head.getUint16(28, true) & 0x3fff,
+      };
+    }
+    // VP8L (可逆): シグネチャ 0x2F の後に 14 bit の幅 - 1・高さ - 1
+    if (fourcc === 0x5650384c && head.getUint8(20) === 0x2f) {
+      const bits = head.getUint32(21, true);
+      return {
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >>> 14) & 0x3fff) + 1,
+      };
+    }
+    return null;
+  }
+  // GIF: "GIF8" の後に論理画面の幅・高さ（リトルエンディアン）
+  if (n >= 10 && head.getUint32(0) === 0x47494638) {
+    return { width: head.getUint16(6, true), height: head.getUint16(8, true) };
+  }
+  // BMP: "BM" の後の DIB ヘッダ（BITMAPCOREHEADER は 16 bit、それ以外は 32 bit 符号付き）
+  if (n >= 26 && head.getUint16(0) === 0x424d) {
+    if (head.getUint32(14, true) === 12) {
+      return {
+        width: head.getUint16(18, true),
+        height: head.getUint16(20, true),
+      };
+    }
+    return {
+      width: Math.abs(head.getInt32(18, true)),
+      height: Math.abs(head.getInt32(22, true)),
+    };
+  }
+  return null;
+}
+
+/**
+ * デコード前に画像の寸法をヘッダから判定し、巨大画像や判定不能な形式を拒否する（原則 ③ Fail-fast）。
+ */
+export async function checkImagePixelCount(
+  file: Blob,
+  maxPixels = MAX_IMAGE_PIXELS,
 ): Promise<void> {
-  if (file.size === 0 || file.size > 20 * 1024 * 1024) return;
-  try {
-    const slice = await file.slice(0, 65536).arrayBuffer();
-    const view = new DataView(slice);
-    // PNG: 89 50 4E 47 0D 0A 1A 0A
-    if (
-      view.byteLength >= 24 &&
-      view.getUint32(0) === 0x89504e47 &&
-      view.getUint32(4) === 0x0d0a1a0a
-    ) {
-      const width = view.getUint32(16);
-      const height = view.getUint32(20);
-      if (width === 0 || height === 0) {
-        throw new Error("画像の寸法が不正です（幅または高さが0）。");
-      }
-      if (width * height > maxPixels) {
-        throw new Error(
-          `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
-        );
-      }
-      return;
-    }
-    // JPEG: FF D8
-    if (view.byteLength >= 4 && view.getUint16(0) === 0xffd8) {
-      let offset = 2;
-      while (offset < view.byteLength - 8) {
-        const marker = view.getUint16(offset);
-        offset += 2;
-        if (marker === 0xffda || marker === 0xffd9) break;
-        const length = view.getUint16(offset);
-        if (length < 2) break;
-        if (marker >= 0xffc0 && marker <= 0xffc3) {
-          const height = view.getUint16(offset + 3);
-          const width = view.getUint16(offset + 5);
-          if (width === 0 || height === 0) {
-            throw new Error("画像の寸法が不正です（幅または高さが0）。");
-          }
-          if (width * height > maxPixels) {
-            throw new Error(
-              `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
-            );
-          }
-          return;
-        }
-        offset += length;
-      }
-    }
-  } catch (err) {
-    if (
-      err instanceof Error &&
-      (err.message.includes("画像サイズが大きすぎます") ||
-        err.message.includes("画像の寸法が不正です"))
-    ) {
-      throw err;
-    }
+  const size = await readImageDimensions(file);
+  if (!size) {
+    throw new Error(
+      "画像の形式または寸法を判別できません（PNG・JPEG・WebP・GIF・BMP を選択してください）。",
+    );
+  }
+  const { width, height } = size;
+  if (width === 0 || height === 0) {
+    throw new Error("画像の寸法が不正です（幅または高さが0）。");
+  }
+  if (width * height > maxPixels) {
+    throw new Error(
+      `画像サイズが大きすぎます（${width}×${height}、最大5000万画素以内）。`,
+    );
   }
 }
 
@@ -338,6 +455,13 @@ export class TwoViewCamera {
     const takePhotoBtn = $("camera-take-photo");
     const stopStreamBtn = $("camera-stop-stream");
 
+    // タブが非表示になったらカメラを解放する（バックグラウンドで撮影し続けない）
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && (this.isStreaming || this.isStartingStream)) {
+        this.stopLiveStream();
+      }
+    });
+
     if (liveBtn) liveBtn.onclick = () => void this.startLiveStream();
     if (takePhotoBtn) takePhotoBtn.onclick = () => this.captureLiveFrame();
     if (stopStreamBtn) stopStreamBtn.onclick = () => this.stopLiveStream();
@@ -587,7 +711,10 @@ export class TwoViewCamera {
       await checkImagePixelCount(file);
     } catch (err) {
       this.imageLoadFailed(view, generation);
-      this.error(err instanceof Error ? err.message : String(err));
+      // 判定不能形式も含め、デコード前に拒否した理由を表示する
+      this.error(
+        `画像${view}を読み込めませんでした。${err instanceof Error ? err.message : String(err)}`,
+      );
       return;
     }
 
@@ -793,6 +920,7 @@ export class TwoViewCamera {
       } else {
         this.error("");
       }
+      this.validate2x2Faces();
 
       this.updateDetectedLabels();
       this.points = [];
@@ -811,6 +939,26 @@ export class TwoViewCamera {
       }
     } catch (error) {
       this.error(String(error));
+    }
+  }
+
+  /**
+   * 2x2 で 6 面が揃ったら WASM の is_valid で盤面の整合性を検証する。
+   * 2x2 はセンター照合ができないため、画像 B の持ち方や枠の回転の誤りをここで検知して案内する。
+   * 未認識（?）のマスが残る間は手動補正を待つため検証しない。
+   */
+  private validate2x2Faces(): void {
+    if (this.cubeType !== "2x2" || this.capturedFaces.size !== 6) return;
+    const state = buildState(this.faces, "2x2");
+    if (state.includes("?")) return;
+    try {
+      is_valid(state);
+      this.error("");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.error(
+        `⚠️ 整合性チェック: ${detail} 画像Bの持ち方（${HOLD_GUIDE_2X2_B}）と枠の回転（「🔄 枠を回転」）を確認して読み取り直してください。`,
+      );
     }
   }
 
@@ -863,19 +1011,7 @@ export class TwoViewCamera {
     // 1. キャプチャ済みのデータがある場合はその色を使用
     const capturedNames = keys.map((key) => {
       const faceState = this.faces[key];
-      if (!faceState) return undefined;
-      if (is2x2) {
-        const counts: Record<string, number> = {};
-        for (const ch of faceState) {
-          if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
-        }
-        const dominant = Object.entries(counts).sort(
-          (a, b) => b[1] - a[1],
-        )[0]?.[0];
-        return dominant && dominant !== "?" ? NAMES[dominant] : undefined;
-      }
-      const colorChar = faceState[4];
-      return colorChar && colorChar !== "?" ? NAMES[colorChar] : undefined;
+      return faceColorName(faceState, is2x2);
     });
     if (capturedNames.some((c) => c !== undefined)) {
       this.detectedLabels[view] = keys
@@ -886,9 +1022,9 @@ export class TwoViewCamera {
       return;
     }
 
-    // 2. 現在アクティブな画像と6点が揃っていればサンプリング
+    // 2. 現在アクティブな画像と6点が揃っていればサンプリング（2x2 は位置名固定のため不要）
     const img = this.activeImage;
-    if (img && this.points.length === 6) {
+    if (!is2x2 && img && this.points.length === 6) {
       try {
         const scaleX = img.naturalWidth / this.canvas.width;
         const scaleY = img.naturalHeight / this.canvas.height;
@@ -917,27 +1053,9 @@ export class TwoViewCamera {
               ];
 
         const pixels = getImagePixels(img);
-        const sampleSize: 2 | 3 = is2x2 ? 2 : 3;
-        const sampledNames = quads.map((quad) => {
-          const sampled = sampleFaceFromPixels(
-            pixels,
-            quad,
-            undefined,
-            sampleSize,
-          );
-          if (is2x2) {
-            const counts: Record<string, number> = {};
-            for (const ch of sampled) {
-              if (ch !== "?") counts[ch] = (counts[ch] || 0) + 1;
-            }
-            const dominant = Object.entries(counts).sort(
-              (a, b) => b[1] - a[1],
-            )[0]?.[0];
-            return dominant && dominant !== "?" ? NAMES[dominant] : undefined;
-          }
-          const c = sampled[4];
-          return c && c !== "?" ? NAMES[c] : undefined;
-        });
+        const sampledNames = quads.map((quad) =>
+          faceColorName(sampleFaceFromPixels(pixels, quad), is2x2),
+        );
 
         if (sampledNames.some((c) => c !== undefined)) {
           this.detectedLabels[view] = keys
@@ -990,6 +1108,7 @@ export class TwoViewCamera {
           this.selectedColor +
           current.substring(i + 1);
         this.faces[face] = updated;
+        this.validate2x2Faces();
 
         this.renderResults();
         this.update();
@@ -1066,12 +1185,20 @@ export class TwoViewCamera {
         `画像${this.currentView}が未選択です。画像Aまたは画像Bを選択してください。`;
     } else if (this.points.length < 6) {
       $("camera-help").textContent =
-        `画像${this.currentView}：上面のてっぺんから時計回りにキューブ外周の6角をクリックしてください (${this.points.length}/6点)。`;
+        `画像${this.currentView}：上面のてっぺんから時計回りにキューブ外周の6角をクリックしてください (${this.points.length}/6点)。${this.holdGuide2x2()}`;
     } else {
       const facesText = this.getViewFacesLabel(this.currentView);
       $("camera-help").textContent =
-        `画像${this.currentView}の6角と中心点を自動検出しました（枠の向きが合わない場合は「🔄 枠を回転」で60°調整可能。頂点・中心ドラッグで微調整）。「この3面を読み取る」を押すと3面（${facesText}）を一括認識します。`;
+        `画像${this.currentView}の6角と中心点を自動検出しました（枠の向きが合わない場合は「🔄 枠を回転」で60°調整可能。頂点・中心ドラッグで微調整）。「この3面を読み取る」を押すと3面（${facesText}）を一括認識します。${this.holdGuide2x2()}`;
     }
+  }
+
+  /** 2x2 の持ち方説明（センターが無いため、面の向きは撮影時の持ち方だけで決まる） */
+  private holdGuide2x2(): string {
+    if (this.cubeType !== "2x2") return "";
+    return this.currentView === "A"
+      ? "【2x2の持ち方】上面を上、前面を左手前、右面を右手前に向けて撮影します。"
+      : `【2x2の持ち方】${HOLD_GUIDE_2X2_B}に見えるように持ち替えて撮影します。`;
   }
 
   private error(message: string) {
@@ -1117,6 +1244,17 @@ export class TwoViewCamera {
         return;
       }
       this.mediaStream = stream;
+      // カメラの切断・他アプリによる占有などでトラックが終了したらストリームを停止する
+      const endedStream = stream;
+      for (const track of stream.getVideoTracks()) {
+        track.addEventListener("ended", () => {
+          if (this.mediaStream !== endedStream) return;
+          this.stopLiveStream();
+          this.error(
+            "カメラの映像が途切れました。もう一度ライブカメラを起動してください。",
+          );
+        });
+      }
       const video = $("camera-video") as HTMLVideoElement;
       video.srcObject = this.mediaStream;
       await video.play();

@@ -65,7 +65,8 @@ jobs:
         if: steps.sccache-bin.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          cargo install sccache --locked
+          # restore-keys の部分一致で sccache が復元済みの場合は再インストールしない
+          command -v sccache || cargo install sccache --locked
 
       - name: Show rustc and sccache
         shell: bash
@@ -109,4 +110,5 @@ jobs:
           cd 2x2 && cargo test --verbose
           cd ../2x2-web && cargo test --verbose
           cd ../3x3-web && cargo test --verbose
-          cd ../3x3-web-2 && cargo test --verbose
+          # 探索時間予算を前提としたテストがあるため release で実行する
+          cd ../3x3-web-2 && cargo test --release --verbose

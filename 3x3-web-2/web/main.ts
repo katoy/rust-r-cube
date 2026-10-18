@@ -13,7 +13,7 @@ import {
   getCellArrowInfo,
   countPieceOrientations,
 } from "./model";
-import { SOLVED_2X2, PRESETS_2X2 } from "./model-2x2";
+import { SOLVED_2X2, PRESETS_2X2, isUniformSolved2x2 } from "./model-2x2";
 import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
 import { SolverClient } from "./solver-client";
@@ -135,6 +135,9 @@ function updateSolverNote() {
 solverAlgo.onchange = () => {
   updateSolverNote();
   persist();
+};
+includeOrientation.onchange = () => {
+  refresh();
 };
 
 function updateCubeTypeUI(type: CubeType) {
@@ -401,14 +404,22 @@ function refresh() {
   const next = solution?.moves[step] || "";
   const is2x2 = state.length === 24;
   const solved = getSolvedState(is2x2 ? "2x2" : "3x3");
-  const isSolved = state === solved;
-  const statusText = isSolved
-    ? !is2x2 && store.getCenterTurns().some((t) => t !== 0)
-      ? "色は完成・センターの向きあり"
-      : "完成状態"
-    : solution
-      ? `${step} / ${solution.moves.length} 手`
-      : "スクランブル状態";
+  const isRotatedSolved2x2 =
+    is2x2 && state !== solved && isUniformSolved2x2(state);
+  const isSolved =
+    state === solved || (isRotatedSolved2x2 && !includeOrientation.checked);
+  const statusText =
+    state === solved
+      ? !is2x2 && store.getCenterTurns().some((t) => t !== 0)
+        ? "色は完成・センターの向きあり"
+        : "完成状態"
+      : isRotatedSolved2x2
+        ? includeOrientation.checked
+          ? "6面完成（標準の向きと異なります）"
+          : "完成状態"
+        : solution
+          ? `${step} / ${solution.moves.length} 手`
+          : "スクランブル状態";
   if (scene) {
     scene.centerRotations = [...centerRotations];
     if (!inMotion) scene.show(state, next);
@@ -758,7 +769,13 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     if (token === motion) {
       inMotion = false;
       refresh();
-      if (result.state === getSolvedState(store.getCubeType())) {
+      const is2x2Now = store.getCubeType() === "2x2";
+      const isNowSolved =
+        result.state === getSolvedState(store.getCubeType()) ||
+        (is2x2Now &&
+          !includeOrientation.checked &&
+          isUniformSolved2x2(result.state));
+      if (isNowSolved) {
         sound.playSuccess();
       }
     }
@@ -889,7 +906,12 @@ async function openModal<T>(
       message("読込中に状態が変わったため、色入力の起動を中断しました。");
       return;
     }
-    if (trigger) {
+    const triggerDialog = trigger?.closest("dialog");
+    if (
+      trigger &&
+      trigger !== document.body &&
+      (!triggerDialog || triggerDialog.open)
+    ) {
       lastTriggerElement = trigger;
     }
     open(modal);
@@ -1109,6 +1131,7 @@ $("help-close").onclick = () => $<HTMLDialogElement>("help-dialog").close();
 ["help-dialog", "editor", "camera-editor"].forEach((id) => {
   const dialog = document.getElementById(id) as HTMLDialogElement | null;
   dialog?.addEventListener("close", () => {
+    if (document.querySelector("dialog[open]")) return;
     if (lastTriggerElement && typeof lastTriggerElement.focus === "function") {
       lastTriggerElement.focus();
     }

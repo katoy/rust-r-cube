@@ -65,13 +65,28 @@ pub fn solve(
     let (moves, phases, algo_name, nodes) = if is_already_solved {
         (Vec::new(), Vec::new(), norm_algo.to_string(), 0)
     } else {
+        // 向き OFF の場合、DBL コーナー（位置 6・向き 0）基準の空間回転に正規化して解く
+        let target_rc = if include_orientation {
+            rc
+        } else {
+            search::get_all_orientations()
+                .iter()
+                .find(|rot| {
+                    let oriented = rot.multiply(&rc);
+                    oriented.cp[coord::Corner::DBL as usize] == coord::Corner::DBL
+                        && oriented.co[coord::Corner::DBL as usize] == 0
+                })
+                .copied()
+                .unwrap_or_default()
+                .multiply(&rc)
+        };
         match norm_algo {
             "lbl" => {
-                let (m, p) = lbl::solve_lbl(&rc)?;
+                let (m, p) = lbl::solve_lbl(&target_rc)?;
                 (m, p, "lbl".to_string(), 0)
             }
             "ortega" => {
-                let (m, p) = ortega::solve_ortega(&rc)?;
+                let (m, p) = ortega::solve_ortega(&target_rc)?;
                 (m, p, "ortega".to_string(), 0)
             }
             _ => {

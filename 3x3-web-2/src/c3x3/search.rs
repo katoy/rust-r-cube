@@ -12,6 +12,8 @@ pub struct Search {
     pub path: Vec<usize>,
     initial: RawCube,
     max_total: usize,
+    has_custom_max: bool,
+    allow_deep_phase2: bool,
     target_centers: Option<[i32; 6]>,
     current_centers: [i32; 6],
     best_solution: Option<Vec<usize>>,
@@ -30,6 +32,8 @@ impl Search {
             path: Vec::with_capacity(32),
             initial: RawCube::default(),
             max_total: 22,
+            has_custom_max: false,
+            allow_deep_phase2: false,
             target_centers: None,
             current_centers: [0; 6],
             best_solution: None,
@@ -48,14 +52,17 @@ impl Search {
     }
     pub fn set_max_total(&mut self, max: usize) {
         self.max_total = max;
+        self.has_custom_max = true;
     }
     pub fn with_max_total(mut self, max: usize) -> Self {
         self.max_total = max;
+        self.has_custom_max = true;
         self
     }
     pub fn solve(&mut self, cube: &RawCube) -> Option<Vec<usize>> {
         self.nodes = 0;
         self.timed_out = false;
+        self.allow_deep_phase2 = false;
         self.start = Instant::now();
         self.path.clear();
 
@@ -113,10 +120,25 @@ impl Search {
             }
         }
 
-        // もし 22 手以内で解が見つからなかった場合のみ（上限が未設定＝22以上の探索）、24, 30 と段階的に上限を緩和
+        // 1回目の探索（Phase 2 上限 12）で解が見つからなかった場合、段階的に上限を緩和する。
+        // initial_max >= 24 の場合、total == 24（Phase 2 上限 12）は1回目のループで既に網羅されているためスキップし、
+        // 重複走査によるタイムアウトを防いで即座に Phase 2 上限 18 の探索へ進む。
         if self.best_solution.is_none() && !self.timed_out && initial_max >= 22 {
             for &total in &[24, 30] {
-                self.max_total = total;
+                if self.has_custom_max && total > initial_max && initial_max <= 24 {
+                    continue;
+                }
+                if total == 24 && initial_max >= 24 {
+                    continue;
+                }
+                if total == 30 {
+                    self.allow_deep_phase2 = true;
+                }
+                self.max_total = if self.has_custom_max {
+                    total.min(initial_max)
+                } else {
+                    total
+                };
                 for depth in 0..=12 {
                     if depth >= self.max_total {
                         break;
@@ -249,8 +271,13 @@ impl Search {
                 .path
                 .iter()
                 .fold(self.initial, |c, m| c.multiply(move_cube_18(*m)));
-            let max =
-                (self.max_total - self.path.len()).min(if self.max_total == 30 { 18 } else { 12 });
+            let max = (self.max_total - self.path.len()).min(
+                if self.allow_deep_phase2 || self.max_total == 30 {
+                    18
+                } else {
+                    12
+                },
+            );
             let min_d = if self.target_centers.is_some() {
                 self.min_phase2_center_moves() as usize
             } else {

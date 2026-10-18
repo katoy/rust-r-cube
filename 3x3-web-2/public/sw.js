@@ -209,16 +209,36 @@ self.addEventListener("fetch", (event) => {
           if (networkResponse.ok && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {
-              if (url.search) {
-                // クエリ付き（Vite の ?url や ?worker 等）は上限管理し無制限蓄積を防止
-                queryKeysQueue.push(url.href);
-                if (queryKeysQueue.length > MAX_QUERY_ENTRIES) {
-                  const oldest = queryKeysQueue.shift();
-                  if (oldest) await ownCache.delete(oldest);
-                }
-              }
               const boundedCacheKey = url.search ? url.href : canonicalKey;
               await ownCache.put(boundedCacheKey, clone);
+              if (url.search) {
+                // クエリ付き（Vite の ?url や ?worker 等）は重複排除＋永続キャッシュ実体の照合で上限管理し、
+                // SW 再起動後の蓄積や同一 URL 再取得による自己削除を防止
+                const existingIdx = queryKeysQueue.indexOf(url.href);
+                if (existingIdx !== -1) {
+                  queryKeysQueue.splice(existingIdx, 1);
+                }
+                queryKeysQueue.push(url.href);
+                while (queryKeysQueue.length > MAX_QUERY_ENTRIES) {
+                  const oldest = queryKeysQueue.shift();
+                  if (oldest && oldest !== url.href) {
+                    await ownCache.delete(oldest);
+                  }
+                }
+                const allReqs = await ownCache.keys();
+                const queryReqs = allReqs.filter((req) => {
+                  try {
+                    return new URL(req.url).search !== "";
+                  } catch {
+                    return false;
+                  }
+                });
+                for (let i = 0; i + MAX_QUERY_ENTRIES < queryReqs.length; i++) {
+                  if (queryReqs[i].url !== url.href) {
+                    await ownCache.delete(queryReqs[i]);
+                  }
+                }
+              }
             } catch (error) {
               console.warn(
                 "[Service Worker] Runtime cache write failed:",

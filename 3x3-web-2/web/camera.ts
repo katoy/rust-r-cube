@@ -858,19 +858,6 @@ export class TwoViewCamera {
       };
       const [p1, p2, p3, p4, p5, p6] = pts;
 
-      const rawQuads =
-        this.currentView === "A"
-          ? [
-              { defaultFace: "U", quad: [p1, p2, center, p6] },
-              { defaultFace: "R", quad: [center, p2, p3, p4] },
-              { defaultFace: "F", quad: [p6, center, p4, p5] },
-            ]
-          : [
-              { defaultFace: "D", quad: [p6, p1, p2, center] },
-              { defaultFace: "L", quad: [p4, p5, p6, center] },
-              { defaultFace: "B", quad: [p3, p4, center, p2] },
-            ];
-
       // 3面の各面をサンプリング（同一画像からのImageData抽出を1回に集約してGPU同期とメモリ確保を削減）
       const pixels = getImagePixels(activeImage);
       const faceDefs: {

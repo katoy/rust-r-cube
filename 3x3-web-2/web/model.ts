@@ -214,7 +214,7 @@ export function getCellArrowInfo(
   centerRotations: number[] = [0, 0, 0, 0, 0, 0],
 ): CellArrowInfo {
   const angles = new Array<number>(54).fill(0);
-  const colors = new Array<number>(54).fill(0x2ecc71);
+  const colors = new Array<number>(54).fill(ARROW_COLORS.NORMAL);
   const kinds = new Array<"corner" | "edge" | "center">(54).fill("center");
   const pieceIndices = new Array<number>(54).fill(0);
 

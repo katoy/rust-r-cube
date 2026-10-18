@@ -1713,8 +1713,8 @@ fn test_superflip_cfop_move_counts_match_implementation_values() {
         crate::solve_state_with_algorithm(&state, 5000, false, None, "cfop").unwrap();
     assert_eq!(
         sol_no_orient.moves.len(),
-        136,
-        "This CFOP implementation solves Superflip colors in 136 moves"
+        127,
+        "This CFOP implementation solves Superflip colors in 127 moves"
     );
     assert!(
         sol_no_orient.moves.len() >= 20,
@@ -2448,4 +2448,170 @@ fn test_2x2_gods_number_11_antipode_and_nodes() {
             .any(|rot| rot.multiply(&solved_rc) == crate::c2x2::coord::RawCube::default()),
         "解法適用後のキューブが空間回転された完成状態であること"
     );
+}
+
+// =========================================================================
+// 2026-10-18 コードレビュー指摘事項 回帰テスト (H1, M1, M2, M3, L1, L4)
+// =========================================================================
+
+#[test]
+fn test_h1_2x2_first_layer_and_face_finds_u_move() {
+    // H1 回帰テスト:
+    // 完成状態に R U' R' を適用した状態から、第1層/第1面が U 回転（R U R' など）を含む最短 3 手で揃えられること。
+    let solved = crate::c2x2::coord::RawCube::default();
+    // R U' R' (R: 3, U': 2, R': 5)
+    let scramble = [3, 2, 5];
+    let scrambled = crate::c2x2::cube::apply(&solved, &scramble);
+
+    // 1. LBL の解法
+    let (lbl_moves, lbl_phases) =
+        crate::c2x2::lbl::solve_lbl(&scrambled).expect("LBL should solve 3-move scramble");
+    assert!(!lbl_moves.is_empty());
+    // 第1層フェーズの最初の手順が 3手で発見されていること（U回転が枝刈りされない）
+    let first_phase = &lbl_phases[0];
+    assert_eq!(first_phase.name, "ステップ 1: 完全1層 (First Layer)");
+    assert_eq!(first_phase.end - first_phase.start, 3);
+    assert_eq!(
+        crate::c2x2::cube::apply(&scrambled, &lbl_moves),
+        crate::c2x2::coord::RawCube::default()
+    );
+
+    // 2. Ortega の解法
+    let (ortega_moves, ortega_phases) =
+        crate::c2x2::ortega::solve_ortega(&scrambled).expect("Ortega should solve 3-move scramble");
+    assert!(!ortega_moves.is_empty());
+    let ortega_p1 = &ortega_phases[0];
+    assert_eq!(ortega_p1.name, "ステップ 1: 最初の1面 (First Face)");
+    assert_eq!(ortega_p1.end - ortega_p1.start, 3);
+    assert_eq!(
+        crate::c2x2::cube::apply(&scrambled, &ortega_moves),
+        crate::c2x2::coord::RawCube::default()
+    );
+}
+
+#[test]
+fn test_m1_search_max_total_deep_phase2() {
+    // M1 回帰テスト:
+    // Search::solve で set_max_total(23) を指定した場合に、Phase 2 上限 18（total == 30）の探索がスキップされずに実行されること
+    let mut search = crate::search::Search::new(3000);
+    search.set_max_total(23);
+    // Superflip (理論最短 20 手、Phase 1: 12, Phase 2: 8)
+    let moves = superflip_preset_moves();
+    let cube = apply(&RawCube::default(), &moves);
+    let sol = search.solve(&cube);
+    assert!(
+        sol.is_some(),
+        "Superflip should be solvable within 23 moves"
+    );
+    let sol_moves = sol.unwrap();
+    assert!(sol_moves.len() <= 23);
+    assert_eq!(facelets(&apply(&cube, &sol_moves)), SOLVED);
+}
+
+#[test]
+fn test_m2_cfop_redundant_moves_cancelled_and_no_empty_phases() {
+    // M2 回帰テスト:
+    // 3x3 CFOP でフェーズ境界の冗長手が相殺され、0手の空フェーズが除去されること
+    // U2 R U R' U' (Cross はすでに完成しているスクランブル)
+    let cube = apply(&RawCube::default(), &[1, 3, 0, 5, 2]);
+    let state = facelets(&cube);
+    let res = crate::solve_state_with_algorithm(&state, 5000, false, None, "cfop").unwrap();
+
+    assert_eq!(res.state, SOLVED);
+    // 空フェーズ（start == end）が一切存在しないこと
+    for p in &res.phases {
+        assert!(
+            p.end > p.start,
+            "Phase '{}' should not be empty: {}..{}",
+            p.name,
+            p.start,
+            p.end
+        );
+    }
+}
+
+#[test]
+fn test_m3_2x2_cancel_redundant_moves_with_phases() {
+    // M3 回帰テスト:
+    // 2x2 cancel_redundant_moves_with_phases が先行フェーズを保持し、対向面相殺を行うこと
+    let moves = vec![3, 3]; // R + R -> R2
+    let phases = vec![
+        crate::PhaseInfo {
+            name: "Phase 1".to_string(),
+            start: 0,
+            end: 1,
+        },
+        crate::PhaseInfo {
+            name: "Phase 2".to_string(),
+            start: 1,
+            end: 2,
+        },
+    ];
+    let (opt_moves, opt_phases) =
+        crate::c2x2::lbl::cancel_redundant_moves_with_phases(moves, phases);
+    assert_eq!(opt_moves.len(), 1);
+    assert_eq!(opt_moves[0], 4); // R2
+    assert_eq!(opt_phases.len(), 1);
+    assert_eq!(
+        opt_phases[0].name, "Phase 1",
+        "先行フェーズ名が保持されること"
+    );
+    assert_eq!(opt_phases[0].start, 0);
+    assert_eq!(opt_phases[0].end, 1);
+
+    // 対向面可換相殺 (D U D -> U D2)
+    // 9: D, 0: U, 9: D
+    let opp_moves = vec![9, 0, 9];
+    let opp_phases = vec![crate::PhaseInfo {
+        name: "All".to_string(),
+        start: 0,
+        end: 3,
+    }];
+    let (res_moves, res_phases) =
+        crate::c2x2::lbl::cancel_redundant_moves_with_phases(opp_moves, opp_phases);
+    assert_eq!(res_moves, vec![10, 0]); // D2, U
+    assert_eq!(res_phases.len(), 1);
+    assert_eq!(res_phases[0].start, 0);
+    assert_eq!(res_phases[0].end, 2);
+}
+
+#[test]
+fn test_l1_2x2_zero_budget_timeout() {
+    // L1 回帰テスト:
+    // 2x2 solve に未完成状態で budget_ms = 0 を渡したとき即座にタイムアウトエラーになること
+    let scramble = "UUUURRRRFFFFDDDDLLLLBBBB";
+    let rc = crate::c2x2::coord::RawCube::default().multiply(crate::c2x2::coord::move_cube_18(3));
+    let scrambled_state = crate::c2x2::cube::facelets(&rc);
+
+    let err = crate::c2x2::solve(&scrambled_state, 0, true, "optimal")
+        .expect_err("budget 0 on unsolved cube should fail");
+    assert_eq!(err, "探索時間の上限に達しました。");
+
+    let err_lbl = crate::c2x2::solve(&scrambled_state, 0, true, "lbl")
+        .expect_err("budget 0 on unsolved cube with lbl should fail");
+    assert_eq!(err_lbl, "探索時間の上限に達しました。");
+
+    // 完成状態では 0 手を正常に返すこと
+    let solved_res = crate::c2x2::solve(scramble, 0, true, "optimal")
+        .expect("budget 0 on solved cube should succeed");
+    assert!(solved_res.moves.is_empty());
+}
+
+#[test]
+fn test_l4_get_orientations_invalid_length_error_message() {
+    // L4 回帰テスト:
+    // get_orientations に不正文字数の入力を渡した際、check_state_len の統一メッセージが返ること
+    let err = crate::get_orientations("UUUU").expect_err("Invalid state length should fail");
+    #[cfg(target_arch = "wasm32")]
+    {
+        // wasm32 では JsValue
+        assert_eq!(
+            err.as_string().unwrap(),
+            "24マス（2×2）または54マス（3×3）すべての色を入力してください。"
+        );
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = err;
+    }
 }

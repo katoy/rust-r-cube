@@ -121,16 +121,25 @@ impl Search {
         }
 
         // 1回目の探索（Phase 2 上限 12）で解が見つからなかった場合、段階的に上限を緩和する。
-        // initial_max >= 24 の場合、total == 24（Phase 2 上限 12）は1回目のループで既に網羅されているためスキップし、
-        // 重複走査によるタイムアウトを防いで即座に Phase 2 上限 18 の探索へ進む。
-        if self.best_solution.is_none() && !self.timed_out && initial_max >= 22 {
-            for &total in &[24, 30] {
-                if self.has_custom_max && total > initial_max && initial_max <= 24 {
-                    continue;
+        // has_custom_max の場合、1回目のループですでに initial_max までの探索は完了しているため、
+        // Phase 2 上限 12 のままの total == 24 はスキップし、initial_max > 12 であれば
+        // 即座に Phase 2 上限 18（total == 30）の探索へ進む。
+        if self.best_solution.is_none() && !self.timed_out {
+            let totals: &[usize] = if self.has_custom_max {
+                if initial_max > 12 {
+                    &[30]
+                } else {
+                    &[]
                 }
-                if total == 24 && initial_max >= 24 {
-                    continue;
-                }
+            } else if initial_max >= 24 {
+                &[30]
+            } else if initial_max >= 22 {
+                &[24, 30]
+            } else {
+                &[]
+            };
+
+            for &total in totals {
                 if total == 30 {
                     self.allow_deep_phase2 = true;
                 }
@@ -212,6 +221,9 @@ impl Search {
         false
     }
     fn exhausted(&mut self) -> bool {
+        if self.timed_out {
+            return true;
+        }
         if self.budget_ms == 0 {
             self.timed_out = true;
             return true;
@@ -298,6 +310,9 @@ impl Search {
                     // 見つかった解で max_total が縮小されたので、これ以上大きい d は探索不要
                     break;
                 }
+                if self.timed_out {
+                    break;
+                }
             }
             return found;
         }
@@ -380,6 +395,9 @@ impl Search {
             }
             self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
             self.path.pop();
+            if self.timed_out {
+                return false;
+            }
         }
         false
     }

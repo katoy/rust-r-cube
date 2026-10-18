@@ -178,7 +178,7 @@ impl RawCube {
     #[inline]
     fn hash_first_layer(&self) -> u64 {
         let mut h = 0u64;
-        for i in 4..8 {
+        for i in 0..8 {
             h = (h << 3) | (self.cp[i] as u64);
             h = (h << 2) | (self.co[i] as u64);
         }
@@ -324,78 +324,7 @@ pub fn cancel_redundant_moves_with_phases(
     moves: Vec<usize>,
     phases: Vec<PhaseInfo>,
 ) -> (Vec<usize>, Vec<PhaseInfo>) {
-    if moves.is_empty() {
-        return (moves, phases);
-    }
-
-    // フェーズ境界を追跡しながらキャンセル
-    let mut move_phase_map: Vec<usize> = Vec::with_capacity(moves.len());
-    for (p_idx, p) in phases.iter().enumerate() {
-        for _ in p.start..p.end {
-            move_phase_map.push(p_idx);
-        }
-    }
-
-    let mut out_moves: Vec<usize> = Vec::new();
-    let mut out_phases: Vec<usize> = Vec::new();
-
-    for (m, p_idx) in moves.into_iter().zip(move_phase_map) {
-        if let Some(&last_m) = out_moves.last() {
-            let last_face = last_m / 3;
-            let cur_face = m / 3;
-
-            if last_face == cur_face {
-                let t1 = match last_m % 3 {
-                    0 => 1,
-                    1 => 2,
-                    _ => 3,
-                };
-                let t2 = match m % 3 {
-                    0 => 1,
-                    1 => 2,
-                    _ => 3,
-                };
-                let total_t = (t1 + t2) % 4;
-
-                out_moves.pop();
-                out_phases.pop();
-
-                if total_t > 0 {
-                    let new_m = match total_t {
-                        1 => cur_face * 3,
-                        2 => cur_face * 3 + 1,
-                        _ => cur_face * 3 + 2,
-                    };
-                    out_moves.push(new_m);
-                    out_phases.push(p_idx);
-                }
-                continue;
-            }
-        }
-        out_moves.push(m);
-        out_phases.push(p_idx);
-    }
-
-    // 補正されたフェーズ情報を再構成
-    let mut new_phases = Vec::new();
-    for (p_idx, old_phase) in phases.into_iter().enumerate() {
-        let indices: Vec<usize> = out_phases
-            .iter()
-            .enumerate()
-            .filter(|(_, &p)| p == p_idx)
-            .map(|(i, _)| i)
-            .collect();
-
-        if !indices.is_empty() {
-            new_phases.push(PhaseInfo {
-                name: old_phase.name,
-                start: *indices.first().unwrap(),
-                end: *indices.last().unwrap() + 1,
-            });
-        }
-    }
-
-    (out_moves, new_phases)
+    crate::supercube::cancel_redundant_moves_with_phases(moves, phases)
 }
 
 #[cfg(test)]

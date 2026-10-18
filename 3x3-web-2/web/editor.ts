@@ -93,7 +93,18 @@ export class ColorEditor {
     }
     this.draft = fixedDraft;
     this.turns = centerTurns(centers);
-    this.manualCenters = false;
+    let isManual = false;
+    if (!is2x2 && !fixedDraft.includes("?")) {
+      try {
+        const autoTurns = centerTurns(automaticCenters(fixedDraft));
+        if (autoTurns.some((val, idx) => val !== this.turns[idx])) {
+          isManual = true;
+        }
+      } catch {
+        // 編集中などで不完全な場合は手動フラグを変更しない
+      }
+    }
+    this.manualCenters = isManual;
     this.face = 0;
     this.errorIndices = [];
     $("editor-error").textContent = "";

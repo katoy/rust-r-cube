@@ -312,8 +312,15 @@ test.describe("E2E Coverage with CDP", () => {
           ),
         );
         assertTrue(!model2x2.isUniformSolved2x2("U".repeat(24)));
-        // 空間回転された完成状態（6面単色かつ6色存在）
-        assertTrue(model2x2.isUniformSolved2x2("RRRRFFFFDDDDLLLLBBBBUUUU"));
+        // 空間回転された完成状態（正当な右手系 3D 回転: Y軸90°回転）
+        assertTrue(model2x2.isUniformSolved2x2("UUUUFFFFLLLLDDDDBBBBRRRR"));
+        // 物理的に不可能な空間回転（対向関係は合っていてもカイラリティが不正な盤面）は弾かれる
+        assertTrue(!model2x2.isUniformSolved2x2("RRRRFFFFDDDDLLLLBBBBUUUU"));
+        // 鏡像反転（右手系で物理的に不可能な盤面）は完成とみなさない (H2)
+        const mirrorState = "UUUULLLLFFFFDDDDRRRRBBBB";
+        assertTrue(!model2x2.isUniformSolved2x2(mirrorState));
+        assertEqual(model2x2.relabel2x2ForDbl(mirrorState), mirrorState);
+        assertEqual(model2x2.VALID_CORNER_TRIPLES.size, 24);
 
         // relabel2x2ForDbl
         assertEqual(model2x2.relabel2x2ForDbl("short"), "short");
@@ -1303,6 +1310,18 @@ test.describe("E2E Coverage with CDP", () => {
         triggers.getPhaseLabel("ステップ 1: 完全1層 (First Layer)");
         triggers.getPhaseLabel("ステップ 1: 完全1層 (First Layer) - 拡張");
         triggers.getPhaseLabel("ステップ 2: 上面色揃え (OLL: Sune (スーネ))");
+        assertEqual(
+          triggers.getPhaseLabel("Phase 1以降 Kociemba フォールバック"),
+          "第1段階以降 Kociemba フォールバック",
+        );
+        assertEqual(
+          triggers.getPhaseLabel("Phase 2以降 Kociemba フォールバック"),
+          "第2段階以降 Kociemba フォールバック",
+        );
+        assertEqual(
+          triggers.getPhaseLabel("Phase 3以降 Kociemba フォールバック"),
+          "第3段階以降 Kociemba フォールバック",
+        );
         triggers.getPhaseLabel("未登録フェーズ");
         triggers.analyzeMoves(
           ["R", "U", "R'", "U'"],
@@ -1687,6 +1706,12 @@ test.describe("E2E Coverage with CDP", () => {
         );
         // センターが "?" のドラフト（74-75行）
         ed.open("?".repeat(54), [0, 0, 0, 0, 0, 0]);
+        // 自動計算と異なるセンターで open -> manualCenters = true (M4)
+        ed.open(model.SOLVED, [1, 0, 0, 0, 0, 0]);
+        assertTrue((ed as any).manualCenters === true);
+        // 自動計算と一致するセンターで open -> manualCenters = false
+        ed.open(model.SOLVED, [0, 0, 0, 0, 0, 0]);
+        assertTrue((ed as any).manualCenters === false);
         // エラーインデックスあり描画（131-132行: is-error）
         (ed as any).errorIndices = [0, 1];
         (ed as any).paint(0, "editor-net");

@@ -568,6 +568,7 @@ export class CubeScene {
       const angle = this.centerRotations[f] ?? 0;
       const rotMatrix = rotationMatrixForFaceAngle(f, angle);
       label.quaternion.setFromRotationMatrix(rotMatrix);
+      if (label.userData) label.userData.rotation = label.quaternion.clone();
     }
   }
 

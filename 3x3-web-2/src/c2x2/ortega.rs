@@ -114,7 +114,7 @@ fn solve_first_face(cube: &RawCube) -> Result<Vec<usize>, String> {
                     return Ok(res);
                 }
 
-                if moves.len() + 1 < 5 {
+                if moves.len() + 1 < 6 {
                     let key = next_cube.hash_first_face();
                     if visited.insert(key) {
                         let mut next_moves = moves.clone();

@@ -54,7 +54,7 @@ needs_wasm_build() {
   if [ ! -f "pkg/cube_studio_bg.wasm" ]; then
     return 0
   fi
-  if [ "Cargo.toml" -nt "pkg/cube_studio_bg.wasm" ] || [ "Cargo.lock" -nt "pkg/cube_studio_bg.wasm" ]; then
+  if [ "Cargo.toml" -nt "pkg/cube_studio_bg.wasm" ] || [ "Cargo.lock" -nt "pkg/cube_studio_bg.wasm" ] || [ "build.rs" -nt "pkg/cube_studio_bg.wasm" ]; then
     return 0
   fi
   if [ -n "$(find src -type f -newer pkg/cube_studio_bg.wasm 2>/dev/null)" ]; then

@@ -9,8 +9,6 @@
  * 4. [F5] Service Worker の cache.put で許可リスト（正規化キー）以外が保存キーになっている
  * 5. [F6] Three.js のジオメトリ・マテリアル・テクスチャを生成するのに dispose() が無い
  * 6. [F7] スクリプトが成果物の存在チェックだけでビルドを省略している
- *
- * すり抜けパターンは tests/fixtures/guardrails/ に置き、tests/scripts-regression.spec.ts で検出を回帰テストする。
  */
 
 import fs from "fs";
@@ -289,17 +287,17 @@ function checkServiceWorkerCache() {
     }
   }
 
-  // boundedCacheKey を使用する場合は、MAX_QUERY_ENTRIES による上限管理があることを確認
+  // boundedCacheKey を使用する場合は、MAX_QUERY_ENTRIES による ownCache.delete 上限管理があることを確認
   if (content.includes("boundedCacheKey")) {
     if (
       !content.includes("MAX_QUERY_ENTRIES") ||
-      !content.includes(".delete(")
+      !content.includes("ownCache.delete(")
     ) {
       reportError(
         "F5-SW-QUERY-CACHE",
         "public/sw.js",
         1,
-        "boundedCacheKey を使用する場合は MAX_QUERY_ENTRIES 定義と古いキーの delete による上限管理を実装してください。",
+        "boundedCacheKey を使用する場合は MAX_QUERY_ENTRIES 定義と ownCache.delete による上限管理を実装してください。",
       );
     }
   }

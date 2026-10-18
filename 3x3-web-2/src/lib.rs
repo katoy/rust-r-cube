@@ -273,7 +273,7 @@ pub fn solve_state_with_algorithm(
                     }
                     Some(center_fixes)
                 } else {
-                    // 2. まず色のみの解を探索し、逐次解の手数を上限として取得
+                    // 2. まず色のみの解を探索し、相殺済み逐次解の手数を上限として取得
                     let elapsed_ms = start.elapsed().as_millis() as u32;
                     let remaining_budget = budget_ms.saturating_sub(elapsed_ms);
                     if remaining_budget == 0 {
@@ -285,70 +285,77 @@ pub fn solve_state_with_algorithm(
                     let color_moves = search_color.solve(&cube);
                     total_nodes += search_color.nodes;
 
-                    let (seq_len, seq_moves, p1_len) = if let Some(ref cm) = color_moves {
-                        let c_sim = supercube::apply_moves_to_centers(centers, cm);
-                        let fixes = supercube::solve_center_orientations(c_sim)?;
-                        let total_l = cm.len() + fixes.len();
-                        let p1 = search_color.best_phase1_len;
-                        let mut all_m = cm.clone();
-                        all_m.extend(fixes);
-                        (total_l, all_m, p1)
-                    } else {
-                        (usize::MAX, Vec::new(), 0)
-                    };
+                    let (seq_len, seq_moves, seq_phases, fixes_empty) =
+                        if let Some(ref cm) = color_moves {
+                            let c_sim = supercube::apply_moves_to_centers(centers, cm);
+                            let fixes = supercube::solve_center_orientations(c_sim)?;
+                            let fixes_empty = fixes.is_empty();
+                            let p1 = search_color.best_phase1_len;
+                            let cm_len = cm.len();
+                            let mut s_phases = Vec::new();
+                            if p1 > 0 && p1 < cm_len {
+                                s_phases.push(PhaseInfo {
+                                    name: "Kociemba Phase 1 (G1縮約)".to_string(),
+                                    start: 0,
+                                    end: p1,
+                                });
+                                s_phases.push(PhaseInfo {
+                                    name: "Kociemba Phase 2 (群解決)".to_string(),
+                                    start: p1,
+                                    end: cm_len,
+                                });
+                            } else if cm_len > 0 {
+                                s_phases.push(PhaseInfo {
+                                    name: "Kociemba 直接解決".to_string(),
+                                    start: 0,
+                                    end: cm_len,
+                                });
+                            }
+                            let mut all_m = cm.clone();
+                            if !fixes_empty {
+                                all_m.extend(fixes);
+                                s_phases.push(PhaseInfo {
+                                    name: "センター向き解決".to_string(),
+                                    start: cm_len,
+                                    end: all_m.len(),
+                                });
+                            }
+                            let (opt_moves, opt_phases) =
+                                supercube::cancel_redundant_moves_with_phases(all_m, s_phases);
+                            (opt_moves.len(), opt_moves, opt_phases, fixes_empty)
+                        } else {
+                            (usize::MAX, Vec::new(), Vec::new(), false)
+                        };
 
-                    // 3. 同時最適化は、逐次解と同等以下の手数（seq_len 以下）を探索
-                    let elapsed_ms = start.elapsed().as_millis() as u32;
-                    let oriented_budget = budget_ms.saturating_sub(elapsed_ms);
-                    let mut search_oriented =
-                        search::Search::new(oriented_budget).with_target_centers(centers);
-                    if seq_len < usize::MAX {
-                        search_oriented.set_max_total(seq_len);
-                    }
-                    let res = search_oriented.solve(&cube);
-                    total_nodes += search_oriented.nodes;
-
-                    if let Some(m) = res {
-                        phase_infos.push(PhaseInfo {
-                            name: "同時最適化 (色＆センター)".to_string(),
-                            start: 0,
-                            end: m.len(),
-                        });
-                        Some(m)
-                    } else if !seq_moves.is_empty() {
-                        // 逐次解を採用
-                        let cm_len = color_moves.as_ref().map(|v| v.len()).unwrap_or(0);
-                        if p1_len > 0 && p1_len < cm_len {
-                            phase_infos.push(PhaseInfo {
-                                name: "Kociemba Phase 1 (G1縮約)".to_string(),
-                                start: 0,
-                                end: p1_len,
-                            });
-                            phase_infos.push(PhaseInfo {
-                                name: "Kociemba Phase 2 (群解決)".to_string(),
-                                start: p1_len,
-                                end: cm_len,
-                            });
-                        } else if cm_len > 0 {
-                            phase_infos.push(PhaseInfo {
-                                name: "Kociemba 直接解決".to_string(),
-                                start: 0,
-                                end: cm_len,
-                            });
-                        }
-                        if seq_moves.len() > cm_len {
-                            phase_infos.push(PhaseInfo {
-                                name: "センター向き解決".to_string(),
-                                start: cm_len,
-                                end: seq_moves.len(),
-                            });
-                        }
-                        let (opt_moves, opt_phases) =
-                            supercube::cancel_redundant_moves_with_phases(seq_moves, phase_infos);
-                        phase_infos = opt_phases;
-                        Some(opt_moves)
+                    if fixes_empty && !seq_moves.is_empty() {
+                        phase_infos = seq_phases;
+                        Some(seq_moves)
                     } else {
-                        None
+                        // 3. 同時最適化は、相殺済み逐次解と同等以下の手数を探索
+                        let elapsed_ms = start.elapsed().as_millis() as u32;
+                        let oriented_budget = budget_ms.saturating_sub(elapsed_ms);
+                        let mut search_oriented =
+                            search::Search::new(oriented_budget).with_target_centers(centers);
+                        if seq_len < usize::MAX {
+                            search_oriented.set_max_total(seq_len);
+                        }
+                        let res = search_oriented.solve(&cube);
+                        total_nodes += search_oriented.nodes;
+
+                        if let Some(m) = res {
+                            phase_infos.push(PhaseInfo {
+                                name: "同時最適化 (色＆センター)".to_string(),
+                                start: 0,
+                                end: m.len(),
+                            });
+                            Some(m)
+                        } else if !seq_moves.is_empty() {
+                            // 逐次解を採用
+                            phase_infos = seq_phases;
+                            Some(seq_moves)
+                        } else {
+                            None
+                        }
                     }
                 }
             } else {
@@ -397,6 +404,13 @@ pub fn solve_state_with_algorithm(
     if include_orientation {
         let (opt_moves, opt_phases) =
             apply_center_orientation_fix(moves, phase_infos, initial_centers, moves_opt_flag)?;
+        moves = opt_moves;
+        phase_infos = opt_phases;
+    }
+
+    if normalized_algorithm == "thistlethwaite" {
+        let (opt_moves, opt_phases) =
+            supercube::cancel_redundant_moves_with_phases(moves, phase_infos);
         moves = opt_moves;
         phase_infos = opt_phases;
     }

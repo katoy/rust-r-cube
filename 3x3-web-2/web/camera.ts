@@ -127,21 +127,25 @@ export async function readImageDimensions(
   if (n >= 4 && head.getUint16(0) === 0xffd8) {
     return readJpegDimensions(read);
   }
-  // WebP: "RIFF" ???? "WEBP" の後に最初のチャンク
+  // WebP: "RIFF" ???? "WEBP" の後に最初のチャンク（VP8L は 25 バイト〜、VP8/VP8X は 30 バイト〜）
   if (
-    n >= 30 &&
+    n >= 25 &&
     head.getUint32(0) === 0x52494646 &&
     head.getUint32(8) === 0x57454250
   ) {
     const fourcc = head.getUint32(12);
     // VP8X: キャンバス幅 - 1・高さ - 1 を 24 bit リトルエンディアンで保持
-    if (fourcc === 0x56503858) {
+    if (fourcc === 0x56503858 && n >= 30) {
       const w = head.getUint16(24, true) | (head.getUint8(26) << 16);
       const h = head.getUint16(27, true) | (head.getUint8(29) << 16);
       return { width: w + 1, height: h + 1 };
     }
     // VP8 (非可逆): スタートコード 9D 01 2A の後に 14 bit の幅・高さ
-    if (fourcc === 0x56503820 && head.getUint32(23) >>> 8 === 0x9d012a) {
+    if (
+      fourcc === 0x56503820 &&
+      n >= 30 &&
+      head.getUint32(23) >>> 8 === 0x9d012a
+    ) {
       return {
         width: head.getUint16(26, true) & 0x3fff,
         height: head.getUint16(28, true) & 0x3fff,
@@ -950,7 +954,10 @@ export class TwoViewCamera {
   private validate2x2Faces(): void {
     if (this.cubeType !== "2x2" || this.capturedFaces.size !== 6) return;
     const state = buildState(this.faces, "2x2");
-    if (state.includes("?")) return;
+    if (state.includes("?")) {
+      this.error("");
+      return;
+    }
     try {
       is_valid(state);
       this.error("");

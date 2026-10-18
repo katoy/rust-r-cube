@@ -52,6 +52,7 @@ test.describe("E2E Coverage with CDP", () => {
       // ==========================================
       await page.evaluate(async () => {
         const model = await import("/web/model.ts");
+        const model2x2 = await import("/web/model-2x2.ts");
         const sampler = await import("/web/image-sampler.ts");
         const centers = await import("/web/centers.ts");
         const camera = await import("/web/camera.ts");
@@ -269,6 +270,92 @@ test.describe("E2E Coverage with CDP", () => {
         model.getStickerCount("3x3");
         model.getGridSize("2x2");
         model.getGridSize("3x3");
+        assertEqual(model.CORNERS.length, 8);
+        assertEqual(model.EDGES.length, 12);
+        model.CORNERS.forEach((c) => c.forEach((idx) => assertTrue(idx >= 0)));
+        model.EDGES.forEach((e) => e.forEach((idx) => assertTrue(idx >= 0)));
+
+        // --- model-2x2.ts ---
+        assertEqual(model2x2.SOLVED_2X2, "UUUURRRRFFFFDDDDLLLLBBBB");
+        // isUniformSolved2x2
+        assertTrue(model2x2.isUniformSolved2x2(model2x2.SOLVED_2X2));
+        assertTrue(!model2x2.isUniformSolved2x2("short"));
+        assertTrue(!model2x2.isUniformSolved2x2("X".repeat(24)));
+        assertTrue(
+          !model2x2.isUniformSolved2x2(
+            "URUU" +
+              "R".repeat(4) +
+              "F".repeat(4) +
+              "D".repeat(4) +
+              "L".repeat(4) +
+              "B".repeat(4),
+          ),
+        );
+        assertTrue(
+          !model2x2.isUniformSolved2x2(
+            "UURU" +
+              "R".repeat(4) +
+              "F".repeat(4) +
+              "D".repeat(4) +
+              "L".repeat(4) +
+              "B".repeat(4),
+          ),
+        );
+        assertTrue(
+          !model2x2.isUniformSolved2x2(
+            "UUUR" +
+              "R".repeat(4) +
+              "F".repeat(4) +
+              "D".repeat(4) +
+              "L".repeat(4) +
+              "B".repeat(4),
+          ),
+        );
+        assertTrue(!model2x2.isUniformSolved2x2("U".repeat(24)));
+        // 空間回転された完成状態（6面単色かつ6色存在）
+        assertTrue(model2x2.isUniformSolved2x2("RRRRFFFFDDDDLLLLBBBBUUUU"));
+
+        // relabel2x2ForDbl
+        assertEqual(model2x2.relabel2x2ForDbl("short"), "short");
+        assertEqual(
+          model2x2.relabel2x2ForDbl("U".repeat(14) + "X" + "U".repeat(9)),
+          "U".repeat(14) + "X" + "U".repeat(9),
+        );
+        assertEqual(
+          model2x2.relabel2x2ForDbl("U".repeat(23) + "X"),
+          "U".repeat(23) + "X",
+        );
+        assertEqual(
+          model2x2.relabel2x2ForDbl("U".repeat(18) + "X" + "U".repeat(5)),
+          "U".repeat(18) + "X" + "U".repeat(5),
+        );
+        // mapキー数不足（対向面同士がDBLコーナーにある異常状態）
+        const badCorners =
+          "U".repeat(14) + "D" + "U".repeat(3) + "L" + "U".repeat(4) + "U";
+        assertEqual(model2x2.relabel2x2ForDbl(badCorners), badCorners);
+        // 標準配置のまま
+        assertEqual(
+          model2x2.relabel2x2ForDbl(model2x2.SOLVED_2X2),
+          model2x2.SOLVED_2X2,
+        );
+        // DBLが別の色（例えば DBL が U, F, R）
+        let rotatedState = [...model2x2.SOLVED_2X2];
+        rotatedState[14] = "U";
+        rotatedState[23] = "F";
+        rotatedState[18] = "R";
+        const relabeled = model2x2.relabel2x2ForDbl(rotatedState.join(""));
+        assertTrue(relabeled.length === 24);
+        // 未知文字を含む場合 (map[ch] ?? ch)
+        let unkState = [...model2x2.SOLVED_2X2];
+        unkState[0] = "?";
+        assertEqual(model2x2.relabel2x2ForDbl(unkState.join(""))[0], "?");
+
+        // CORNERS_2X2 & PRESETS_2X2
+        assertEqual(model2x2.CORNERS_2X2.length, 8);
+        assertTrue(model2x2.PRESETS_2X2.length >= 4);
+        for (const p of model2x2.PRESETS_2X2) {
+          assertTrue(Boolean(p.id && p.label && p.description));
+        }
 
         // --- image-sampler.ts ---
         sampler.rgbToHsv(0, 0, 0); // max === min
@@ -602,9 +689,14 @@ test.describe("E2E Coverage with CDP", () => {
         // --- file-io.ts ---
         const fileIo = await import("/web/file-io.ts");
         const validJson = JSON.stringify({ version: 1, state: solved });
-        // 有効な JSON でもサイズ上限 (64KB) を超える場合は確実に 64KB エラーとなること
+        const hugeJson = JSON.stringify({
+          version: 1,
+          state: solved,
+          padding: "x".repeat(70000),
+        });
+        // 実際に64KBを超えるJSONペイロードを渡した場合に確実に64KBエラーとなること
         assertThrows(
-          () => fileIo.validateAndParseCubeJson(validJson, 70000),
+          () => fileIo.validateAndParseCubeJson(hugeJson, hugeJson.length),
           /64KB/,
         );
         assertThrows(

@@ -274,7 +274,9 @@ test.describe("011a7b9 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
     // 開始位置（step = 0）: 次の1手目を示す
     expect(await timeline.getAttribute("aria-valuenow")).toBe("0");
     const val0 = await timeline.getAttribute("aria-valuetext");
-    expect(val0).toBe("開始状態。次は1手目 U' (同時最適化: 色＆センター向き)");
+    expect(val0).toMatch(
+      /^開始状態。次は1手目 U' \((直接探索解決|同時最適化: 色＆センター向き)\)$/,
+    );
 
     // 1手進める（step = 1）: 1手完了し、次は2手目 R'
     await page.locator("#next").click();
@@ -284,7 +286,9 @@ test.describe("011a7b9 レビュー指摘点 (F1〜F4) 回帰テスト", () => {
 
     expect(await timeline.getAttribute("aria-valuenow")).toBe("1");
     const val1 = await timeline.getAttribute("aria-valuetext");
-    expect(val1).toBe("1手完了。次は2手目 R' (同時最適化: 色＆センター向き)");
+    expect(val1).toMatch(
+      /^1手完了。次は2手目 R' \((直接探索解決|同時最適化: 色＆センター向き)\)$/,
+    );
 
     // 2手進める（step = 2, 完成状態）: 完成（2手）
     await page.locator("#next").click();

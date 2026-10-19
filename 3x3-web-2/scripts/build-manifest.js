@@ -36,6 +36,9 @@ export function collectInputFiles(rootDir) {
   scanDir(path.join(rootDir, "src"), "src");
   scanDir(path.join(rootDir, "web"), "web");
   scanDir(path.join(rootDir, "public"), "public");
+  if (fs.existsSync(path.join(rootDir, "pkg"))) {
+    scanDir(path.join(rootDir, "pkg"), "pkg");
+  }
 
   const configFiles = [
     "vite.config.ts",

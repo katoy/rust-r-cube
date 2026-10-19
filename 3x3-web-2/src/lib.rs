@@ -408,7 +408,7 @@ pub fn solve_state_with_algorithm(
         phase_infos = opt_phases;
     }
 
-    if normalized_algorithm == "thistlethwaite" {
+    if normalized_algorithm == "thistlethwaite" || normalized_algorithm == "cfop" {
         let (opt_moves, opt_phases) =
             supercube::cancel_redundant_moves_with_phases(moves, phase_infos);
         moves = opt_moves;
@@ -662,6 +662,7 @@ pub fn solve_with_algorithm(
 /// エッジの向き: 0=正常, 1=反転
 #[wasm_bindgen]
 pub fn get_orientations(state: &str) -> Result<String, JsValue> {
+    check_state_len(state).map_err(to_js_error)?;
     if state.len() == 24 {
         let raw_2x2 = c2x2::cube::parse_state(state).map_err(to_js_error)?;
         let corner_orientations: Vec<usize> = raw_2x2.co.iter().map(|&o| o as usize).collect();

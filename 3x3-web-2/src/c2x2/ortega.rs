@@ -133,7 +133,7 @@ impl RawCube {
     #[inline]
     fn hash_first_face(&self) -> u64 {
         let mut h = 0u64;
-        for i in 4..8 {
+        for i in 0..8 {
             h = (h << 3) | (self.cp[i] as u64);
             h = (h << 2) | (self.co[i] as u64);
         }

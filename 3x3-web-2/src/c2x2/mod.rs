@@ -50,6 +50,10 @@ pub fn solve(
             .any(|rot| rot.multiply(&rc) == coord::RawCube::default())
     };
 
+    if !is_already_solved && budget_ms == 0 {
+        return Err("探索時間の上限に達しました。".into());
+    }
+
     let norm_algo = match algorithm {
         "lbl" => "lbl",
         "ortega" => "ortega",

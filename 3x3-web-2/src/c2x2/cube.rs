@@ -80,14 +80,6 @@ pub fn parse_state(text: &str) -> Result<RawCube, String> {
     Ok(cube)
 }
 
-/// 置換の転倒数を数え、偶奇パリティ（偶置換=0, 奇置換=1）を計算します。
-pub fn parity(p: &[u8]) -> usize {
-    (0..p.len())
-        .map(|i| (i + 1..p.len()).filter(|j| p[i] > p[*j]).count())
-        .sum::<usize>()
-        % 2
-}
-
 /// `RawCube` 構造体の内部状態から、24文字の展開図文字列を生成します。
 pub fn facelets(cube: &RawCube) -> String {
     let mut f = [0u8; 24];

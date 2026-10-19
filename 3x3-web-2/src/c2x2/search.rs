@@ -100,6 +100,10 @@ impl Search {
     }
 
     fn ida_star(&mut self, rc: RawCube, depth: usize, last_face: usize) -> bool {
+        if self.budget_ms == Some(0) || self.timed_out {
+            self.timed_out = true;
+            return false;
+        }
         self.nodes += 1;
         if self.nodes >= self.max_nodes {
             return false;

@@ -11,7 +11,37 @@ const OPPOSITE_FACE: Record<string, string> = {
 };
 
 /**
+ * 2x2 の8個のコーナースロットにある3枚のステッカーのインデックス
+ * 順序: [U/D面, 他の面1, 他の面2]
+ */
+export const CORNERS_2X2 = [
+  [3, 4, 9], // 0: UFR (U, R, F)
+  [2, 8, 17], // 1: UFL (U, F, L)
+  [0, 16, 21], // 2: ULB (U, L, B)
+  [1, 20, 5], // 3: UBR (U, B, R)
+  [13, 11, 6], // 4: DFR (D, F, R)
+  [12, 19, 10], // 5: DLF (D, L, F)
+  [14, 23, 18], // 6: DBL (D, B, L)
+  [15, 7, 22], // 7: DRB (D, R, B)
+];
+
+/**
+ * 2x2 標準配色において物理的に存在する 24 通りの右手系コーナートリプル
+ * （8 コーナー × 時計回りの 3 向き）
+ */
+export const VALID_CORNER_TRIPLES = new Set<string>();
+for (const [i0, i1, i2] of CORNERS_2X2) {
+  const c0 = SOLVED_2X2[i0];
+  const c1 = SOLVED_2X2[i1];
+  const c2 = SOLVED_2X2[i2];
+  VALID_CORNER_TRIPLES.add(c0 + c1 + c2);
+  VALID_CORNER_TRIPLES.add(c1 + c2 + c0);
+  VALID_CORNER_TRIPLES.add(c2 + c0 + c1);
+}
+
+/**
  * 2x2 盤面（24文字）が空間回転を含めて6面すべて単色で揃っているかを判定します。
+ * 物理的に正当な 24 通りの完成状態のみを true と判定します。
  */
 export function isUniformSolved2x2(state: string): boolean {
   if (state.length !== 24) return false;
@@ -29,12 +59,17 @@ export function isUniformSolved2x2(state: string): boolean {
     }
     seenFaces.add(c);
   }
-  return seenFaces.size === 6;
+  if (seenFaces.size !== 6) return false;
+  const triple = state[14] + state[23] + state[18];
+  return (
+    VALID_CORNER_TRIPLES.has(triple) && relabel2x2ForDbl(state) === SOLVED_2X2
+  );
 }
 
 /**
  * 2x2 の DBL スロット（インデックス 14, 23, 18）にあるコーナーの色が
  * (D, B, L) になるように6面の色文字を再ラベリングした24文字盤面を返します。
+ * 右手系の正当なコーナー配色でない場合は再ラベリングを行わず元の盤面を返します。
  */
 export function relabel2x2ForDbl(state: string): string {
   if (state.length !== 24) return state;
@@ -46,6 +81,9 @@ export function relabel2x2ForDbl(state: string): string {
     !VALID_FACE_SET.has(bCol) ||
     !VALID_FACE_SET.has(lCol)
   ) {
+    return state;
+  }
+  if (!VALID_CORNER_TRIPLES.has(dCol + bCol + lCol)) {
     return state;
   }
   const uCol = OPPOSITE_FACE[dCol];
@@ -62,21 +100,6 @@ export function relabel2x2ForDbl(state: string): string {
   if (Object.keys(map).length !== 6) return state;
   return [...state].map((ch) => map[ch] ?? ch).join("");
 }
-
-/**
- * 2x2 の8個のコーナースロットにある3枚のステッカーのインデックス
- * 順序: [U/D面, 他の面1, 他の面2]
- */
-export const CORNERS_2X2 = [
-  [3, 4, 9], // 0: UFR (U, R, F)
-  [2, 8, 17], // 1: UFL (U, F, L)
-  [0, 16, 21], // 2: ULB (U, L, B)
-  [1, 20, 5], // 3: UBR (U, B, R)
-  [13, 11, 6], // 4: DFR (D, F, R)
-  [12, 19, 10], // 5: DLF (D, L, F)
-  [14, 23, 18], // 6: DBL (D, B, L)
-  [15, 7, 22], // 7: DRB (D, R, B)
-];
 
 export interface Preset2x2 {
   id: string;

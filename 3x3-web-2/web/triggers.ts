@@ -62,6 +62,9 @@ export const PHASE_LABEL_MAP: Record<string, string> = {
   PLL: "ステップ 5: 上面完全配置 (PLL)",
 
   // Thistlethwaite (Rust: thistlethwaite.rs)
+  "Phase 1以降 Kociemba フォールバック": "第1段階以降 Kociemba フォールバック",
+  "Phase 2以降 Kociemba フォールバック": "第2段階以降 Kociemba フォールバック",
+  "Phase 3以降 Kociemba フォールバック": "第3段階以降 Kociemba フォールバック",
   "Phase 1 (G0→G1: エッジ向き)": "第1段階: G0→G1 (エッジ反転解消)",
   "Phase 2 (G1→G2: コーナー向き&Eスライス)":
     "第2段階: G1→G2 (コーナー向き+中層)",

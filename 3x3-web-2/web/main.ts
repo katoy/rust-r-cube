@@ -813,9 +813,17 @@ async function solve(budget = 5000) {
     const at = store.getRevision();
     const start = performance.now();
     refresh();
+    // センター向きを考慮しない 3x3 Kociemba は、20 手以内の解が見つかるまで予算を超えて探索を続ける
+    const extendsToGodsNumber =
+      store.getCubeType() === "3x3" &&
+      solverAlgo.value === "kociemba" &&
+      !includeOrientation.checked;
     interval = window.setInterval(() => {
+      const elapsed = performance.now() - start;
       $("solver-note").textContent =
-        `探索中 · ${((performance.now() - start) / 1000).toFixed(1)} 秒 / ${budget / 1000} 秒`;
+        extendsToGodsNumber && elapsed > budget
+          ? `探索中 · ${(elapsed / 1000).toFixed(1)} 秒（20 手以内の解が見つかるまで延長中）`
+          : `探索中 · ${(elapsed / 1000).toFixed(1)} 秒 / ${budget / 1000} 秒`;
     }, 100);
     const result = await solver.solve(
       currentState,

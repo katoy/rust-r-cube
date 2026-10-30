@@ -2,6 +2,9 @@ use crate::coord::{move_cube_18, RawCube};
 use crate::tables::{MoveTable, PruningTable};
 use web_time::Instant;
 
+/// 神の数字（HTM）。どの状態も 20 手以内で解けることが証明されている
+pub const GODS_NUMBER: usize = 20;
+
 pub struct Search {
     mt: &'static MoveTable,
     pt: &'static PruningTable,
@@ -13,12 +16,20 @@ pub struct Search {
     initial: RawCube,
     max_total: usize,
     has_custom_max: bool,
+    /// 20 手以内の解が得られるまで時間予算を超えて探索を続けるか
+    gods_guarantee: bool,
     allow_deep_phase2: bool,
     target_centers: Option<[i32; 6]>,
     current_centers: [i32; 6],
     best_solution: Option<Vec<usize>>,
     pub best_phase1_len: usize,
     current_p1_len: usize,
+    /// 探索中の G1 基準軸（0: UD, 1: RL, 2: FB）
+    axis: usize,
+    /// 逆状態を探索中か（見つかった解は逆順・逆回転にして元の状態の解へ戻す）
+    inverse: bool,
+    /// 最良解が逆状態の探索から得られたか（Phase 1 / Phase 2 の区切りは無意味になる）
+    pub best_from_inverse: bool,
 }
 impl Search {
     pub fn new(budget_ms: u32) -> Self {
@@ -33,12 +44,16 @@ impl Search {
             initial: RawCube::default(),
             max_total: 22,
             has_custom_max: false,
+            gods_guarantee: false,
             allow_deep_phase2: false,
             target_centers: None,
             current_centers: [0; 6],
             best_solution: None,
             best_phase1_len: 0,
             current_p1_len: 0,
+            axis: 0,
+            inverse: false,
+            best_from_inverse: false,
         }
     }
     pub fn with_target_centers(mut self, centers: [i32; 6]) -> Self {
@@ -53,6 +68,18 @@ impl Search {
     pub fn set_max_total(&mut self, max: usize) {
         self.max_total = max;
         self.has_custom_max = true;
+    }
+    /// 神の数字（20 手）以内の解が見つかるまで、時間予算を超えても探索を継続する。
+    /// どの状態にも 20 手以内の解が存在し、Phase 1 を深さ 20 まで探索すればその解自体が Phase 1 の解として
+    /// 列挙されるため、探索は必ず終了する。センター向き指定（`with_target_centers`）とは併用しない。
+    pub fn with_gods_number_guarantee(mut self) -> Self {
+        self.gods_guarantee = true;
+        self
+    }
+    fn has_gods_solution(&self) -> bool {
+        self.best_solution
+            .as_ref()
+            .is_some_and(|b| b.len() <= GODS_NUMBER)
     }
     pub fn with_max_total(mut self, max: usize) -> Self {
         self.max_total = max;
@@ -82,6 +109,7 @@ impl Search {
         self.initial = *cube;
         self.best_solution = None;
         self.best_phase1_len = 0;
+        self.best_from_inverse = false;
 
         let initial_max = self.max_total;
 
@@ -118,6 +146,48 @@ impl Search {
             if self.timed_out {
                 break;
             }
+        }
+
+        // センター向き指定なしで神の数字（20 手）以内の解が得られていない場合、
+        // UD / RL / FB の 3 軸 × 順・逆状態の 6 方向を G1 の基準とする探索を Phase 1 の深さごとに交互に行い
+        // （S_URF3 による共役変換）、20 手以内の解が見つかった時点で打ち切る。
+        // センター向き指定ありの場合は、センター回転の追跡を変換できないため対象外とする。
+        if self.target_centers.is_none() && !self.timed_out && !self.has_gods_solution() {
+            let inv = inverse_cube(cube);
+            let mut directions: Vec<(usize, bool, RawCube)> = Vec::with_capacity(6);
+            for a in 0..3 {
+                for (inverse, base) in [(false, cube), (true, &inv)] {
+                    let dir_cube = conjugate_axis(base, a);
+                    // スーパーフリップのような対称性の高い状態では変換後のキューブが一致するため、重複する方向は探索しない
+                    if directions.iter().all(|&(_, _, c)| c != dir_cube) {
+                        directions.push((a, inverse, dir_cube));
+                    }
+                }
+            }
+            'deepen: for depth in 0.. {
+                for &(axis, inverse, ref dir_cube) in &directions {
+                    if depth >= self.max_total {
+                        break 'deepen;
+                    }
+                    self.axis = axis;
+                    self.inverse = inverse;
+                    self.initial = *dir_cube;
+                    self.path.clear();
+                    self.phase1(
+                        dir_cube.get_twist(),
+                        dir_cube.get_flip(),
+                        dir_cube.get_ud_slice(),
+                        depth as u8,
+                        99,
+                    );
+                    if self.timed_out || self.has_gods_solution() {
+                        break 'deepen;
+                    }
+                }
+            }
+            self.axis = 0;
+            self.inverse = false;
+            self.initial = *cube;
         }
 
         // 1回目の探索（Phase 2 上限 12）で解が見つからなかった場合、段階的に上限を緩和する。
@@ -224,12 +294,17 @@ impl Search {
         if self.timed_out {
             return true;
         }
-        if self.budget_ms == 0 {
+        // 20 手保証モードでは、20 手以内の解が得られるまで時間予算を無視して探索を続ける
+        let extending = self.gods_guarantee && !self.has_gods_solution();
+        if self.budget_ms == 0 && !extending {
             self.timed_out = true;
             return true;
         }
         self.nodes += 1;
-        if self.nodes & 1023 == 0 && self.start.elapsed().as_millis() >= self.budget_ms {
+        if !extending
+            && self.nodes & 1023 == 0
+            && self.start.elapsed().as_millis() >= self.budget_ms
+        {
             self.timed_out = true;
         }
         self.timed_out
@@ -367,8 +442,18 @@ impl Search {
             }
         }
         if depth == 0 {
-            self.best_solution = Some(self.path.clone());
-            self.best_phase1_len = self.current_p1_len;
+            let table = &axis_tables().unconj_move[self.axis];
+            let mut sol: Vec<usize> = self.path.iter().map(|&m| table[m]).collect();
+            if self.inverse {
+                // 逆状態の解 M に対し、元の状態の解は M⁻¹（逆順・各手を逆回転）
+                sol.reverse();
+                for m in sol.iter_mut() {
+                    *m = *m / 3 * 3 + 2 - *m % 3;
+                }
+            }
+            self.best_solution = Some(sol);
+            self.best_from_inverse = self.inverse;
+            self.best_phase1_len = if self.inverse { 0 } else { self.current_p1_len };
             self.max_total = self.path.len().saturating_sub(1);
             return true;
         }
@@ -404,6 +489,96 @@ impl Search {
 }
 fn redundant(face: usize, last: usize) -> bool {
     face == last || ((3..6).contains(&last) && face + 3 == last)
+}
+
+/// 軸変換用の対称操作と手の対応表
+struct AxisTables {
+    /// S_URF3 の 0 / 1 / 2 乗
+    sym: [RawCube; 3],
+    /// 各対称操作の逆元
+    sym_inv: [RawCube; 3],
+    /// 変換後の座標系での手 m を、元の座標系での手に戻す対応表（S⁻¹·m·S）
+    unconj_move: [[usize; 18]; 3],
+}
+
+/// URF-DBL 対角軸まわりの 120° 回転 S_URF3（Kociemba の定義）を返す。
+/// 共役変換 S·C·S⁻¹ により、UD 軸 → RL 軸 → FB 軸と G1 の基準軸を切り替える。
+fn sym_urf3() -> RawCube {
+    use crate::coord::{Corner as C, Edge as E};
+    RawCube {
+        cp: [
+            C::UFR,
+            C::DFR,
+            C::DLF,
+            C::UFL,
+            C::UBR,
+            C::DRB,
+            C::DBL,
+            C::ULB,
+        ],
+        co: [1, 2, 1, 2, 2, 1, 2, 1],
+        ep: [
+            E::UF,
+            E::FR,
+            E::DF,
+            E::FL,
+            E::UB,
+            E::BR,
+            E::DB,
+            E::BL,
+            E::UR,
+            E::DR,
+            E::DL,
+            E::UL,
+        ],
+        eo: [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1],
+    }
+}
+
+fn axis_tables() -> &'static AxisTables {
+    static TABLES: std::sync::OnceLock<AxisTables> = std::sync::OnceLock::new();
+    TABLES.get_or_init(|| {
+        let s1 = sym_urf3();
+        let s2 = s1.multiply(&s1);
+        let sym = [RawCube::default(), s1, s2];
+        let sym_inv = [RawCube::default(), s2, s1];
+        let mut unconj_move = [[0usize; 18]; 3];
+        for a in 0..3 {
+            for (m, slot) in unconj_move[a].iter_mut().enumerate() {
+                let target = sym_inv[a].multiply(move_cube_18(m)).multiply(&sym[a]);
+                *slot = (0..18)
+                    .find(|&k| *move_cube_18(k) == target)
+                    .expect("共役変換後の手が基本手に一致しない");
+            }
+        }
+        AxisTables {
+            sym,
+            sym_inv,
+            unconj_move,
+        }
+    })
+}
+
+/// キューブの逆元（C·C⁻¹ = 単位元）を返す
+fn inverse_cube(cube: &RawCube) -> RawCube {
+    let mut inv = RawCube::default();
+    for i in 0..8 {
+        let c = cube.cp[i] as usize;
+        inv.cp[c] = RawCube::default().cp[i];
+        inv.co[c] = (3 - cube.co[i]) % 3;
+    }
+    for i in 0..12 {
+        let e = cube.ep[i] as usize;
+        inv.ep[e] = RawCube::default().ep[i];
+        inv.eo[e] = (2 - cube.eo[i]) % 2;
+    }
+    inv
+}
+
+/// キューブを指定軸の座標系へ共役変換する（S·C·S⁻¹）
+fn conjugate_axis(cube: &RawCube, axis: usize) -> RawCube {
+    let t = axis_tables();
+    t.sym[axis].multiply(cube).multiply(&t.sym_inv[axis])
 }
 
 #[cfg(test)]
@@ -515,5 +690,94 @@ mod tests {
         let scrambled = crate::cube::apply(&RawCube::default(), &sc);
         let mut search = Search::new(0);
         assert!(search.solve(&scrambled).is_none());
+    }
+
+    #[test]
+    fn test_inverse_cube() {
+        let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(3));
+        let inv = inverse_cube(&cube);
+        assert_eq!(cube.multiply(&inv), RawCube::default());
+        assert_eq!(inv.multiply(&cube), RawCube::default());
+        assert_eq!(inverse_cube(&RawCube::default()), RawCube::default());
+    }
+
+    #[test]
+    fn test_sym_urf3_has_order_three() {
+        let s1 = sym_urf3();
+        assert_ne!(s1, RawCube::default());
+        assert_eq!(s1.multiply(&s1).multiply(&s1), RawCube::default());
+    }
+
+    #[test]
+    fn test_unconj_move_maps_faces_to_other_axes() {
+        let t = axis_tables();
+        for a in 0..3 {
+            // 対応表は 18 手の全単射で、回転量（90° / 180° / 270°）を保存する
+            let mut seen = t.unconj_move[a];
+            seen.sort_unstable();
+            assert_eq!(seen.to_vec(), (0..18).collect::<Vec<_>>());
+            for m in 0..18 {
+                assert_eq!(t.unconj_move[a][m] % 3, m % 3);
+            }
+        }
+        // 軸 0 は恒等、軸 1 / 2 では U がそれぞれ別の軸の手へ移る（面 % 3 = 0: UD, 1: RL, 2: FB）
+        let axis_of_u = |a: usize| t.unconj_move[a][0] / 3 % 3;
+        assert_eq!(t.unconj_move[0], std::array::from_fn::<usize, 18, _>(|m| m));
+        let mut axes = [axis_of_u(0), axis_of_u(1), axis_of_u(2)];
+        axes.sort_unstable();
+        assert_eq!(axes, [0, 1, 2]);
+    }
+
+    #[test]
+    fn test_conjugated_solution_maps_back_to_original() {
+        // 変換後の座標系で手順 M' を適用した結果は、元の座標系で対応手順を適用した結果の共役に一致する
+        let t = axis_tables();
+        let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(7));
+        let seq = crate::cube::scramble(11);
+        for a in 0..3 {
+            let mapped: Vec<usize> = seq.iter().map(|&m| t.unconj_move[a][m]).collect();
+            assert_eq!(
+                crate::cube::apply(&conjugate_axis(&cube, a), &seq),
+                conjugate_axis(&crate::cube::apply(&cube, &mapped), a)
+            );
+        }
+    }
+
+    #[test]
+    fn test_superflip_solved_within_gods_number() {
+        // スーパーフリップの最短手数は 20 手。予算を極小にしても保証モードなら 20 手（= 最短）の解を返すこと
+        let sc =
+            crate::cube::parse_moves("U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2").unwrap();
+        let cube = crate::cube::apply(&RawCube::default(), &sc);
+        let sol = Search::new(1)
+            .with_gods_number_guarantee()
+            .solve(&cube)
+            .unwrap();
+        assert_eq!(crate::cube::apply(&cube, &sol), RawCube::default());
+        assert_eq!(sol.len(), GODS_NUMBER);
+    }
+
+    #[test]
+    fn test_random_states_solved_within_gods_number() {
+        // 6 方向探索の導入前は約 3 割の状態で 21〜22 手を返していた。
+        // 予算 0 でも保証モードなら全状態で 20 手以内の解を返すこと（時間に依存しない決定的な検証）
+        for seed in 1..=10 {
+            let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(seed));
+            let mut search = Search::new(0).with_gods_number_guarantee();
+            let sol = search.solve(&cube).unwrap();
+            assert_eq!(crate::cube::apply(&cube, &sol), RawCube::default());
+            assert!(sol.len() <= GODS_NUMBER, "seed {seed}: {} 手", sol.len());
+            // 逆状態から得た解では Phase 1 / 2 の区切りを報告しない
+            if search.best_from_inverse {
+                assert_eq!(search.best_phase1_len, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_budget_without_guarantee_still_times_out() {
+        // 保証モードを指定しない場合は、従来どおり予算 0 で探索しない
+        let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(5));
+        assert!(Search::new(0).solve(&cube).is_none());
     }
 }

@@ -96,13 +96,21 @@ export class SolverClient {
     return new Promise<ResultData>((resolve, reject) => {
       const id = ++this.nextId;
       this.pending = { id, revision, resolve, reject };
-      this.timer = window.setTimeout(
-        () =>
-          this.fail(
-            "探索時間の上限に達しました。エンジンを再起動してください。",
-          ),
-        Math.max(budget * 1.5, budget + 4000),
-      );
+      // 3x3 の Kociemba でセンター向きを考慮しない場合、エンジンは 20 手以内の解が見つかるまで
+      // 予算を超えて探索を続けるため、強制終了せず取り消し操作（cancel）にのみ委ねる
+      const guaranteesGodsNumber =
+        cubeType !== "2x2" &&
+        (algorithm === undefined || algorithm === "kociemba") &&
+        !includeOrientation;
+      if (!guaranteesGodsNumber) {
+        this.timer = window.setTimeout(
+          () =>
+            this.fail(
+              "探索時間の上限に達しました。エンジンを再起動してください。",
+            ),
+          Math.max(budget * 1.5, budget + 4000),
+        );
+      }
       this.worker!.postMessage({
         kind: "solve",
         id,

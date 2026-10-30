@@ -466,6 +466,22 @@ fn superflip_preset_flips_all_edges_without_moving_pieces() {
 }
 
 #[test]
+fn kociemba_without_orientation_extends_budget_to_gods_number() {
+    // センター向きを考慮しない Kociemba は、予算 1ms でも 20 手以内の解が見つかるまで探索を続ける
+    let superflip = facelets(&apply(&RawCube::default(), &superflip_preset_moves()));
+    let res = crate::solve_state_with_algorithm(&superflip, 1, false, None, "kociemba").unwrap();
+    assert_eq!(res.state, SOLVED);
+    assert_eq!(res.moves.len(), crate::search::GODS_NUMBER);
+
+    for seed in 1..=5 {
+        let state = facelets(&apply(&RawCube::default(), &scramble(seed)));
+        let res = crate::solve_state_with_algorithm(&state, 1, false, None, "kociemba").unwrap();
+        assert_eq!(res.state, SOLVED);
+        assert!(res.moves.len() <= crate::search::GODS_NUMBER);
+    }
+}
+
+#[test]
 fn superflip_solver_returns_valid_solution() {
     let moves = superflip_preset_moves();
     let superflip_cube = apply(&RawCube::default(), &moves);

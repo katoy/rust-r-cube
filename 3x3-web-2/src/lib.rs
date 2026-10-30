@@ -306,7 +306,13 @@ pub fn solve_state_with_algorithm(
                                 });
                             } else if cm_len > 0 {
                                 s_phases.push(PhaseInfo {
-                                    name: "Kociemba 直接解決".to_string(),
+                                    // 逆状態から得た解は Phase 1 / 2 の区切りが無意味なため 1 区間として表示する
+                                    name: if search_color.best_from_inverse {
+                                        "Kociemba 2段階探索 (逆方向)"
+                                    } else {
+                                        "Kociemba 直接解決"
+                                    }
+                                    .to_string(),
                                     start: 0,
                                     end: cm_len,
                                 });
@@ -371,6 +377,10 @@ pub fn solve_state_with_algorithm(
                     .saturating_sub(elapsed_ms)
                     .max(if budget_ms > 5000 { 3000 } else { 0 });
                 let mut search = search::Search::new(remaining_budget);
+                // センター向きを考慮しない場合は、20 手以内の解が見つかるまで予算を超えて探索を継続する
+                if !(include_orientation && initial_centers.is_some()) {
+                    search = search.with_gods_number_guarantee();
+                }
                 let m = search.solve(&cube).ok_or_else(|| {
                     "探索時間の上限に達しました。30秒の延長探索を試してください。".to_owned()
                 })?;
@@ -390,7 +400,13 @@ pub fn solve_state_with_algorithm(
                     });
                 } else if total_len > 0 {
                     phase_infos.push(PhaseInfo {
-                        name: "Kociemba 直接解決".to_string(),
+                        // 逆状態から得た解は Phase 1 / 2 の区切りが無意味なため 1 区間として表示する
+                        name: if search.best_from_inverse {
+                            "Kociemba 2段階探索 (逆方向)"
+                        } else {
+                            "Kociemba 直接解決"
+                        }
+                        .to_string(),
                         start: 0,
                         end: total_len,
                     });

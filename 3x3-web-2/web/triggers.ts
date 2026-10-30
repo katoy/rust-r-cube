@@ -87,6 +87,7 @@ export const PHASE_LABEL_MAP: Record<string, string> = {
   "Kociemba Phase 1 (G1縮約)": "Phase 1: G1部分群縮約",
   "Kociemba Phase 2 (群解決)": "Phase 2: 解決手順",
   "Kociemba 直接解決": "直接探索解決",
+  "Kociemba 2段階探索 (逆方向)": "2段階探索 (逆方向から構築)",
   センター向き解決: "ステップ 2: センター向き解決",
 };
 

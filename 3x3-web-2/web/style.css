@@ -1922,3 +1922,83 @@ dialog > p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* 2 カラム表示（741px 以上）ではページ全体を 1 画面に収め、縦スクロールを出さない */
+@media (min-width: 741px) {
+  body {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #app {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .topbar {
+    height: 56px;
+    flex: none;
+    padding: 0 3%;
+  }
+  .brand small {
+    display: none;
+  }
+  main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 14px 3% 0;
+  }
+  .page-heading {
+    flex: none;
+    margin-bottom: 12px;
+  }
+  .page-heading .eyebrow,
+  .page-heading .lead {
+    display: none;
+  }
+  h1 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .stage {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #scene {
+    min-height: 200px;
+  }
+  .manual-controls {
+    padding: 12px 24px 10px;
+  }
+  .panel {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .panel-section {
+    padding: 16px 22px;
+  }
+  .section-title {
+    margin-bottom: 12px;
+  }
+  .solution {
+    min-height: 0;
+  }
+  .workspace-footer {
+    flex: none;
+    padding: 8px 0;
+  }
+  footer {
+    flex: none;
+    margin-top: 0;
+    padding: 8px 0;
+  }
+}

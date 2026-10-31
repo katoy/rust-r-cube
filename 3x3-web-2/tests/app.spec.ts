@@ -227,6 +227,36 @@ test("mobile layout keeps 3D scene and solution controls visible simultaneously"
     await page.locator("#reset").click();
   }
 });
+test("desktop layout fits the viewport without page scrolling", async ({
+  page,
+}) => {
+  const fitsViewport = () =>
+    page.evaluate(
+      () => document.documentElement.scrollHeight <= window.innerHeight,
+    );
+  for (const { width, height } of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await ready(page);
+    expect(await fitsViewport()).toBe(true);
+
+    await page.locator("#scramble").click();
+    await page.locator("#solve").click();
+    await expect(page.locator("#solution-content")).toBeVisible();
+    expect(await fitsViewport()).toBe(true);
+
+    const sceneBox = await page.locator("#scene").boundingBox();
+    expect(sceneBox!.height).toBeGreaterThanOrEqual(200);
+    await page.locator("#play").scrollIntoViewIfNeeded();
+    const playBox = await page.locator("#play").boundingBox();
+    expect(playBox!.y + playBox!.height).toBeLessThanOrEqual(height);
+    expect(await fitsViewport()).toBe(true);
+  }
+});
 test("production assets and worker load under a subdirectory", async ({
   page,
 }) => {

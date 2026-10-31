@@ -2631,3 +2631,38 @@ fn test_l4_get_orientations_invalid_length_error_message() {
         let _ = err;
     }
 }
+
+/// 全コーナーをその場でひねった 2x2 局面（3x3 のスーパーフリップのコーナー版）が、
+/// 神の数（HTM 11 手）以内で解けることを確認する
+#[test]
+fn test_2x2_all_corners_twisted_solved_within_gods_number() {
+    /// 2x2x2 の神の数（HTM）
+    const GODS_NUMBER_HTM: usize = 11;
+    /// 全コーナーひねり局面の最短手数（HTM）
+    const ALL_CORNERS_TWISTED_OPTIMAL: usize = 8;
+
+    // 上段 4 コーナーを時計回り（1）、下段 4 コーナーを反時計回り（2）にひねる
+    // ひねりの合計は 4 × 1 + 4 × 2 = 12 ≡ 0 (mod 3) なので到達可能な局面になる
+    let twisted = crate::c2x2::coord::RawCube {
+        co: [1, 1, 1, 1, 2, 2, 2, 2],
+        ..Default::default()
+    };
+    let state = crate::c2x2::cube::facelets(&twisted);
+    assert!(
+        crate::c2x2::is_valid(&state).unwrap(),
+        "到達可能な局面のはず"
+    );
+    assert!(!crate::c2x2::is_solved(&state, true).unwrap());
+
+    let res = crate::c2x2::solve(&state, 30_000, true, "optimal").unwrap();
+    println!(
+        "全コーナーひねり局面の解（{} 手）: {:?}",
+        res.moves.len(),
+        res.moves
+    );
+
+    assert!(res.moves.len() <= GODS_NUMBER_HTM);
+    // optimal は IDA* による最短探索なので、ちょうど最短手数になる
+    assert_eq!(res.moves.len(), ALL_CORNERS_TWISTED_OPTIMAL);
+    assert_eq!(res.state, crate::c2x2::cube::SOLVED);
+}

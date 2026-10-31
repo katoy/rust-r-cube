@@ -142,6 +142,9 @@ GGGG RRRR BBBB OOOO
 - **非常に難しい状態 (10手)**:
   - 状態: `WWWW / OOOO GGGR RRBG BBRB / YYYY`
   - 解法: `R2 B D' R' F2 R2 U' R' F R'`
+- **全コーナーひねり (8手)**:
+  - 状態: 8 個のコーナーを位置はそのままに、上段 4 個を時計回り・下段 4 個を反時計回りにひねった局面（3x3 のスーパーフリップのコーナー版。2x2 にはエッジがないためスーパーフリップ自体は存在しない）
+  - 解法: `U L2 F R2 F2 L' F2 D`（最短 8 手。7 手以下では解けない）
 
 #### R U パターンの周期性
 
@@ -154,6 +157,7 @@ GGGG RRRR BBBB OOOO
 - `tests/file_io_tests.rs`: 保存・読み込みの整合性、パース。
 - `tests/orientation_tests.rs`: 物理回転、方位不変モデルの検証。
 - `tests/end_to_end_tests.rs`: 実機再現、神の数、ユーザー指定状態。
+- `tests/corner_twist_tests.rs`: 全コーナーひねり局面が神の数（11手）以内、かつ最短 8 手で解けること。
 - `tests/workflow_tests.rs`: ファイル操作から解決までの一連の流れ。
 - `tests/coverage_tests.rs`: 異常系、エッジケース。
 - `tests/regression_tests.rs`: 過去の不具合の再発防止。

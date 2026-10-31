@@ -101,6 +101,8 @@ trunk build --release
 
 2x2x2ルービックキューブは HTM (Half Turn Metric) 基準で最大 **11手** で解けることが証明されています。本ツールは最短手数の解法を探索します。
 
+例えば、全コーナーをその場でひねった局面（上段 4 個を時計回り・下段 4 個を反時計回り。3x3 のスーパーフリップのコーナー版）は、最短 **8手** で解けます（`tests/corner_twist_tests.rs`）。
+
 ### 解法ステップ操作
 
 解法が見つかると、一歩ずつ進めたり戻したりできるコントローラーが表示されます。
@@ -291,6 +293,7 @@ cargo llvm-cov --summary-only --ignore-filename-regex "gui|bin"
 - `tests/solver_search.rs`: 探索エンジン
 - `tests/solver_tables.rs`: 枝刈りテーブル
 - `tests/integration.rs`: 結合テスト、リグレッション、ワークフロー
+- `tests/corner_twist_tests.rs`: 全コーナーひねり局面が神の数（11手）以内、かつ最短 8 手で解けること
 - `tests/wasm_core.rs`: WASM環境動作検証
 - `tests/wasm_web_ui.rs`: Web UI 関連
 

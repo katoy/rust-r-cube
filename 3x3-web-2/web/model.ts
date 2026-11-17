@@ -442,3 +442,23 @@ export function countPieceOrientations(
     centerRotate,
   };
 }
+
+export interface SolverMeta {
+  id: SolverAlgorithm;
+  label: string;
+  shortDesc: string;
+}
+
+export const SOLVER_META_BY_TYPE: Record<CubeType, readonly SolverMeta[]> = {
+  "3x3": [
+    { id: "kociemba", label: "Kociemba", shortDesc: "2段階探索" },
+    { id: "cfop", label: "LBL / CFOP", shortDesc: "人間向け階層解法" },
+    { id: "thistlethwaite", label: "Thistlethwaite", shortDesc: "4段階群縮小" },
+    { id: "korf", label: "Korf (IDA*)", shortDesc: "最短探索+フォールバック" },
+  ],
+  "2x2": [
+    { id: "optimal", label: "Optimal (IDA*)", shortDesc: "完全最短 (≤11手)" },
+    { id: "ortega", label: "Ortega法", shortDesc: "スピード3ステップ" },
+    { id: "lbl", label: "LBL法", shortDesc: "初心者向け3ステップ" },
+  ],
+};

@@ -1922,3 +1922,133 @@ dialog > p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.solve-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.solver-compare-panel {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: #181d1a;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.solver-compare-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.solver-compare-header strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.solver-compare-summary {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.solver-compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.solver-compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.solver-compare-row:hover:not(:disabled) {
+  border-color: #54634f;
+  background: var(--surface-raised);
+}
+
+.solver-compare-row.is-active {
+  background: #222b22;
+  border-color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.compare-algo-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.compare-algo-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compare-algo-desc {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.compare-algo-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-moves {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.compare-metrics {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.compare-badge-shortest {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  background: #233320;
+  border: 1px solid #597c46;
+  color: var(--accent);
+}
+
+.compare-status-pending {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.compare-status-error {
+  font-size: 11px;
+  color: var(--danger);
+}

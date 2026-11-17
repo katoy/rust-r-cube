@@ -9,6 +9,8 @@ import {
   instruction,
   type ResultData,
   type CubeType,
+  type SolverAlgorithm,
+  SOLVER_META_BY_TYPE,
   getSolvedState,
   getCellArrowInfo,
   countPieceOrientations,
@@ -306,6 +308,7 @@ function replace(
 ) {
   stop();
   cancelSearch();
+  clearComparison();
   message();
   updateSolverNote();
   $("scramble-text").textContent = DEFAULT_SCRAMBLE_TEXT;
@@ -396,6 +399,137 @@ let renderedSolution: ResultData | undefined = undefined;
 let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
 let lastRenderedStep: number | undefined = undefined;
 
+type CompareEntry =
+  | { status: "pending" }
+  | { status: "done"; result: ResultData }
+  | { status: "error"; error: string };
+
+const compareEntries = new Map<SolverAlgorithm, CompareEntry>();
+let activeComparedAlgo: SolverAlgorithm | undefined = undefined;
+let compareVersion = 0;
+let lastRenderedCompareVersion = -1;
+
+function clearComparison() {
+  if (compareEntries.size === 0 && activeComparedAlgo === undefined) return;
+  compareEntries.clear();
+  activeComparedAlgo = undefined;
+  compareVersion++;
+}
+
+function renderComparisonPanel() {
+  const panel = $("solver-compare-panel");
+  const list = $("solver-compare-list");
+  const summary = $("solver-compare-summary");
+  if (!panel || !list || !summary) return;
+
+  if (compareEntries.size === 0) {
+    panel.hidden = true;
+    list.replaceChildren();
+    summary.textContent = "";
+    lastRenderedCompareVersion = compareVersion;
+    return;
+  }
+
+  panel.hidden = false;
+  const cubeType = store.getCubeType();
+  const metas = SOLVER_META_BY_TYPE[cubeType];
+
+  let doneCount = 0;
+  let minMoves = Infinity;
+  for (const meta of metas) {
+    const entry = compareEntries.get(meta.id);
+    if (entry?.status === "done") {
+      doneCount++;
+      if (entry.result.moves.length < minMoves) {
+        minMoves = entry.result.moves.length;
+      }
+    }
+  }
+
+  summary.textContent = solving
+    ? `${doneCount} / ${metas.length} 完了…`
+    : `${doneCount} / ${metas.length} 解法 · 行をクリックして再生`;
+
+  if (lastRenderedCompareVersion !== compareVersion) {
+    lastRenderedCompareVersion = compareVersion;
+    list.replaceChildren();
+    for (const meta of metas) {
+      const entry = compareEntries.get(meta.id) ?? {
+        status: "pending" as const,
+      };
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "solver-compare-row";
+      button.dataset.solver = meta.id;
+
+      const info = document.createElement("div");
+      info.className = "compare-algo-info";
+
+      const nameRow = document.createElement("span");
+      nameRow.className = "compare-algo-name";
+      nameRow.textContent = meta.label;
+
+      if (entry.status === "done" && entry.result.moves.length === minMoves) {
+        const badge = document.createElement("span");
+        badge.className = "compare-badge-shortest";
+        badge.textContent = "最短";
+        nameRow.append(badge);
+      }
+
+      const desc = document.createElement("span");
+      desc.className = "compare-algo-desc";
+      desc.textContent = meta.shortDesc;
+      info.append(nameRow, desc);
+
+      const stats = document.createElement("div");
+      stats.className = "compare-algo-stats";
+      if (entry.status === "pending") {
+        const pendingSpan = document.createElement("span");
+        pendingSpan.className = "compare-status-pending";
+        pendingSpan.textContent = "計算中…";
+        stats.append(pendingSpan);
+      } else if (entry.status === "error") {
+        const errSpan = document.createElement("span");
+        errSpan.className = "compare-status-error";
+        errSpan.textContent = "失敗";
+        errSpan.title = entry.error;
+        stats.append(errSpan);
+      } else {
+        const movesSpan = document.createElement("span");
+        movesSpan.className = "compare-moves";
+        movesSpan.textContent = `${entry.result.moves.length} 手`;
+
+        const timeStr =
+          entry.result.elapsed_ms < 1000
+            ? `${Math.round(entry.result.elapsed_ms)} ms`
+            : `${(entry.result.elapsed_ms / 1000).toFixed(2)} s`;
+        const metricsSpan = document.createElement("span");
+        metricsSpan.className = "compare-metrics";
+        metricsSpan.textContent = `${timeStr} · ${entry.result.nodes.toLocaleString()} nodes`;
+
+        stats.append(movesSpan, metricsSpan);
+      }
+
+      button.append(info, stats);
+      if (entry.status === "done") {
+        button.onclick = () => selectComparedSolver(meta.id);
+      }
+      list.append(button);
+    }
+  }
+
+  list
+    .querySelectorAll<HTMLButtonElement>(".solver-compare-row")
+    .forEach((button) => {
+      const algo = button.dataset.solver as SolverAlgorithm;
+      const entry = compareEntries.get(algo);
+      const isActive = entry?.status === "done" && activeComparedAlgo === algo;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+      button.disabled = solving || entry?.status !== "done";
+    });
+}
+
 function refresh() {
   const state = store.getState();
   const solution = store.getSolution();
@@ -446,6 +580,9 @@ function refresh() {
   $<HTMLButtonElement>("solve").disabled =
     !mainReady || (!solver?.ready && !engineError) || !canSolve;
   $("solve").hidden = solving;
+  $<HTMLButtonElement>("compare-solvers").disabled =
+    !mainReady || (!solver?.ready && !engineError) || !canSolve;
+  $("compare-solvers").hidden = solving;
   $("cancel").hidden = !solving;
   $("solve").innerHTML =
     `<span>${engineError ? "エンジンを再試行" : isSolved ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
@@ -460,11 +597,13 @@ function refresh() {
     .forEach((b) => (b.disabled = !mainReady || !canModify));
   solverAlgo.disabled = solving;
   includeOrientation.disabled = solving;
-  $("solution-empty").hidden = !!solution;
+  const hasCompare = compareEntries.size > 0;
+  $("solution-empty").hidden = !!solution || hasCompare;
   $("solution-content").hidden = !solution;
-  document.body.classList.toggle("has-solution", !!solution);
+  document.body.classList.toggle("has-solution", !!solution || hasCompare);
   $<HTMLButtonElement>("copy").disabled = !solution;
-  $("solution-close").hidden = !solution;
+  $("solution-close").hidden = solving || (!solution && !hasCompare);
+  renderComparisonPanel();
   if (solution) {
     $("move-count").textContent = `${solution.moves.length} 手`;
     $("solve-time").textContent =
@@ -607,6 +746,7 @@ store.subscribe((_s, { type }) => {
     return;
   }
   if (type === "cube-type") {
+    clearComparison();
     updateCubeTypeUI(store.getCubeType());
     scene?.setCubeType(store.getCubeType());
     persist();
@@ -616,6 +756,7 @@ store.subscribe((_s, { type }) => {
     type === "redo" ||
     type === "algorithm"
   ) {
+    clearComparison();
     updateCubeTypeUI(store.getCubeType());
     scene?.setCubeType(store.getCubeType());
     persist();
@@ -783,9 +924,9 @@ async function applyAlgorithm(algorithm: string, animate = true) {
     message(String(error));
   }
 }
-async function solve(budget = 5000) {
+async function ensureSolverReady(): Promise<boolean> {
   if (engineError || !solver?.ready) {
-    if (!solver) return;
+    if (!solver) return false;
     engineError = false;
     $("solver-note").textContent = "エンジンを準備中…";
     refresh();
@@ -795,13 +936,18 @@ async function solve(budget = 5000) {
       engineError = true;
       message("エンジンの起動に失敗しました。ページを再読み込みしてください。");
       refresh();
-      return;
+      return false;
     }
   }
-  if (!solver?.ready) return;
+  return Boolean(solver?.ready);
+}
+
+async function solve(budget = 5000) {
+  if (!(await ensureSolverReady()) || !solver) return;
   if (!appState.startSolving()) return;
   solving = true;
   stop();
+  clearComparison();
   message();
   $("extended").hidden = true;
   if (!store.restoreBaseSnapshot()) {
@@ -831,7 +977,7 @@ async function solve(budget = 5000) {
       budget,
       includeOrientation.checked,
       store.getCenterRotations(),
-      solverAlgo.value as import("./model").SolverAlgorithm,
+      solverAlgo.value as SolverAlgorithm,
       store.getCubeType(),
     );
 
@@ -861,6 +1007,154 @@ async function solve(budget = 5000) {
       $("extended").hidden = true;
       $("solver-note").textContent = "探索できませんでした";
     }
+  } finally {
+    if (appState.isSolving()) {
+      appState.cancelSolving();
+    }
+    solving = false;
+    clearInterval(interval);
+    refresh();
+  }
+}
+
+function selectComparedSolver(algo: SolverAlgorithm) {
+  if (solving) return;
+  const entry = compareEntries.get(algo);
+  if (!entry || entry.status !== "done") return;
+  stop();
+  message();
+  activeComparedAlgo = algo;
+  solverAlgo.value = algo;
+  updateSolverNote();
+  store.restoreBaseSnapshot();
+  store.setSolution(entry.result);
+  appState.setPreviewing();
+  if (entry.result.moves.length === 0) {
+    message("すでに6面が揃っています。");
+  }
+  $("solver-note").textContent =
+    `${entry.result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
+  persist();
+  refresh();
+}
+
+async function compareAllSolvers(budget = 5000) {
+  if (!(await ensureSolverReady()) || !solver) return;
+  if (!appState.startSolving()) return;
+  solving = true;
+  stop();
+  message();
+  $("extended").hidden = true;
+  if (!store.restoreBaseSnapshot()) {
+    store.setSolution(undefined);
+  }
+  clearComparison();
+  try {
+    const currentState = store.getState();
+    validate(currentState);
+    const at = store.getRevision();
+    const cubeType = store.getCubeType();
+    const centers = store.getCenterRotations();
+    const metas = SOLVER_META_BY_TYPE[cubeType];
+    for (const meta of metas) {
+      compareEntries.set(meta.id, { status: "pending" });
+    }
+    compareVersion++;
+    const start = performance.now();
+    let currentIdx = 0;
+    let currentLabel = metas[0]?.label || "";
+    interval = window.setInterval(() => {
+      const elapsed = performance.now() - start;
+      $("solver-note").textContent =
+        `比較中 (${currentIdx + 1}/${metas.length}: ${currentLabel}) · ${(elapsed / 1000).toFixed(1)} 秒`;
+    }, 100);
+    refresh();
+
+    for (let i = 0; i < metas.length; i++) {
+      const meta = metas[i];
+      currentIdx = i;
+      currentLabel = meta.label;
+      if (!appState.isSolving() || store.getRevision() !== at) return;
+      try {
+        const result = await solver.solve(
+          currentState,
+          at,
+          budget,
+          includeOrientation.checked,
+          centers,
+          meta.id,
+          cubeType,
+        );
+        if (!appState.isSolving() || store.getRevision() !== at) return;
+        compareEntries.set(meta.id, { status: "done", result });
+      } catch (error) {
+        if (String(error).includes("cancelled")) {
+          throw error;
+        }
+        if (!appState.isSolving() || store.getRevision() !== at) return;
+        compareEntries.set(meta.id, {
+          status: "error",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      compareVersion++;
+      refresh();
+    }
+
+    if (!appState.isSolving() || store.getRevision() !== at) return;
+    const preferredId = solverAlgo.value as SolverAlgorithm;
+    const preferredEntry = compareEntries.get(preferredId);
+    let chosenAlgo: SolverAlgorithm | undefined;
+    let chosenResult: ResultData | undefined;
+    if (preferredEntry?.status === "done") {
+      chosenAlgo = preferredId;
+      chosenResult = preferredEntry.result;
+    } else {
+      for (const meta of metas) {
+        const entry = compareEntries.get(meta.id);
+        if (entry?.status === "done") {
+          chosenAlgo = meta.id;
+          chosenResult = entry.result;
+          break;
+        }
+      }
+    }
+
+    if (chosenAlgo && chosenResult) {
+      activeComparedAlgo = chosenAlgo;
+      solverAlgo.value = chosenAlgo;
+      updateSolverNote();
+      store.setSolution(chosenResult);
+      appState.finishSolving(true);
+      if (window.innerWidth <= 740) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      $("solver-note").textContent =
+        `${chosenResult.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
+      if (chosenResult.moves.length === 0) {
+        message("すでに6面が揃っています。");
+      }
+    } else {
+      appState.finishSolving(false);
+      const firstError = metas
+        .map((m) => compareEntries.get(m.id))
+        .find(
+          (e): e is { status: "error"; error: string } => e?.status === "error",
+        );
+      message(firstError?.error || "すべての解法で探索に失敗しました。");
+      $("solver-note").textContent = "探索できませんでした";
+    }
+  } catch (error) {
+    if (String(error).includes("cancelled")) {
+      clearComparison();
+      appState.cancelSolving();
+      return;
+    }
+    clearComparison();
+    appState.finishSolving(false);
+    message(error instanceof Error ? error.message : String(error));
+    $("extended").hidden = true;
+    $("solver-note").textContent = "探索できませんでした";
   } finally {
     if (appState.isSolving()) {
       appState.cancelSolving();
@@ -994,9 +1288,11 @@ $("camera-colors").onclick = async () => {
   await openModal(getCamera, (cam) => cam.open(store.getCubeType()));
 };
 $("solve").onclick = () => void solve();
+$("compare-solvers").onclick = () => void compareAllSolvers();
 $("extended").onclick = () => void solve(30000);
 $("cancel").onclick = () => {
   cancelSearch();
+  clearComparison();
   message("探索を中止しました。");
   $("solver-note").textContent = "エンジンを再準備しています";
   refresh();
@@ -1120,6 +1416,7 @@ $("copy").onclick = async () => {
 };
 $("solution-close").onclick = () => {
   stop();
+  clearComparison();
   store.setSolution(undefined);
   appState.closeSolution();
   persist();
@@ -1622,6 +1919,8 @@ if (
     cancelSearch,
     fallback,
     solve,
+    compareAllSolvers,
+    selectComparedSolver,
     play,
     stop,
     seek,

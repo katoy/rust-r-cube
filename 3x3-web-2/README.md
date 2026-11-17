@@ -7,7 +7,7 @@ Rust で実装された各種探索エンジン（3×3×3 の Kociemba 2段階�
 [![CI](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml/badge.svg)](https://github.com/katoy/rust-r-cube/actions/workflows/3x3-web-2.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r186-black)](https://threejs.org/)
-[![Rust](https://img.shields.io/badge/Rust-1.87+-orange)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.100.0+-orange)](https://www.rust-lang.org/)
 
 ---
 
@@ -318,7 +318,7 @@ Cube Studio は **PWA (Progressive Web App)** に完全対応しており、通�
 ### 前提環境
 
 - **Node.js**: `^20.19.0 || >=22.12.0`（Vite 8 / TypeScript 7 / 依存ツールの要求バージョン）
-- **Rust**: 1.87 以上 (`wasm32-unknown-unknown` ターゲット)。`Cargo.toml` の `rust-version` と一致し、CI で Rust 1.87.0 / ロック済み依存関係の native・WASM コンパイルを検証します。
+- **Rust**: 1.100.0 以上 (`wasm32-unknown-unknown` ターゲット)。`Cargo.toml` の `rust-version` と一致し、CI で Rust 1.100.0 / ロック済み依存関係の native・WASM コンパイルを検証します。
 - **wasm-pack**: 最新版 (`cargo install wasm-pack` または `npm install -g wasm-pack`)
 - **npm**: v10 以上
 

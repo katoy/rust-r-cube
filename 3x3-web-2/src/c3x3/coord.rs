@@ -254,8 +254,8 @@ impl RawCube {
     /// Twist (コーナーの向き) を取得 (0..2186)
     pub fn get_twist(&self) -> u16 {
         let mut twist = 0u16;
-        for i in 0..7 {
-            twist = twist * 3 + self.co[i] as u16;
+        for &co in self.co.iter().take(7) {
+            twist = twist * 3 + co as u16;
         }
         twist
     }
@@ -274,8 +274,8 @@ impl RawCube {
     /// Flip (エッジの向き) を取得 (0..2047)
     pub fn get_flip(&self) -> u16 {
         let mut flip = 0u16;
-        for i in 0..11 {
-            flip = flip * 2 + self.eo[i] as u16;
+        for &eo in self.eo.iter().take(11) {
+            flip = flip * 2 + eo as u16;
         }
         flip
     }
@@ -361,9 +361,9 @@ impl RawCube {
         let mut ep8 = 0u32;
         let mut p = [0u8; 8];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) < 8 {
-                p[count] = self.ep[i] as u8;
+        for &ep in &self.ep {
+            if (ep as u8) < 8 {
+                p[count] = ep as u8;
                 count += 1;
             }
         }
@@ -393,9 +393,9 @@ impl RawCube {
         res[7] = available[0];
         // U/D面の8箇所に配置
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) < 8 {
-                self.ep[i] = Self::default().ep[res[count] as usize];
+        for ep in &mut self.ep {
+            if (*ep as u8) < 8 {
+                *ep = Self::default().ep[res[count] as usize];
                 count += 1;
             }
         }
@@ -406,9 +406,9 @@ impl RawCube {
         let mut slice_p = 0u32;
         let mut p = [0u8; 4];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) >= 8 {
-                p[count] = self.ep[i] as u8 - 8;
+        for &ep in &self.ep {
+            if (ep as u8) >= 8 {
+                p[count] = ep as u8 - 8;
                 count += 1;
             }
         }
@@ -437,9 +437,9 @@ impl RawCube {
         }
         res[3] = available[0];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) >= 8 {
-                self.ep[i] = Self::default().ep[res[count] as usize + 8];
+        for ep in &mut self.ep {
+            if (*ep as u8) >= 8 {
+                *ep = Self::default().ep[res[count] as usize + 8];
                 count += 1;
             }
         }

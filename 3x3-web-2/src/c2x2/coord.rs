@@ -89,11 +89,11 @@ impl RawCube {
     pub fn set_cp(&mut self, idx: u16) {
         let mut val = idx as usize;
         let mut available = [0, 1, 2, 3, 4, 5, 6, 7];
-        for i in 0..8 {
+        for (i, cp) in self.cp.iter_mut().enumerate() {
             let fact = (1..=(7 - i)).product::<usize>().max(1);
             let p = val / fact;
             val %= fact;
-            self.cp[i] = Corner::from_u8(available[p]);
+            *cp = Corner::from_u8(available[p]);
             for k in p..7 - i {
                 available[k] = available[k + 1];
             }
@@ -103,8 +103,8 @@ impl RawCube {
     /// Twist (Corner Orientation: 0..2186) を取得します。
     pub fn get_twist(&self) -> u16 {
         let mut idx = 0;
-        for i in 0..7 {
-            idx = idx * 3 + self.co[i] as usize;
+        for &co in self.co.iter().take(7) {
+            idx = idx * 3 + co as usize;
         }
         idx as u16
     }

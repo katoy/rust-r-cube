@@ -294,16 +294,14 @@ fn tables_extensive_consistency_checks() {
 
     // Move Table のすべての座標で遷移が有効であることを確認
     for twist in 0..2187 {
-        for move_idx in 0..18 {
-            let next = mt.twist[twist][move_idx];
+        for &next in &mt.twist[twist] {
             assert!(next < 2187, "Invalid twist at {}", twist);
         }
     }
 
     // Flip テーブルでサンプリングテスト
     for i in (0..2048).step_by(128) {
-        for move_idx in 0..18 {
-            let next = mt.flip[i][move_idx];
+        for &next in &mt.flip[i] {
             assert!(next < 2048, "Invalid flip at {}", i);
         }
     }
@@ -357,16 +355,14 @@ fn tables_move_table_consistency() {
 
     // twist テーブルの基本チェック
     for coord in 0..100 {
-        for move_idx in 0..18 {
-            let next = mt.twist[coord][move_idx];
+        for &next in &mt.twist[coord] {
             assert!(next < 2187, "Invalid twist coordinate");
         }
     }
 
     // flip テーブルの基本チェック
     for coord in 0..100 {
-        for move_idx in 0..18 {
-            let next = mt.flip[coord][move_idx];
+        for &next in &mt.flip[coord] {
             assert!(next < 2048, "Invalid flip coordinate");
         }
     }
@@ -1246,20 +1242,14 @@ fn corner_and_edge_consistency() {
 
     assert_eq!(scrambled.cp.len(), 8, "Should have 8 corners");
     assert_eq!(scrambled.co.len(), 8, "Should have 8 corner orientations");
-    for i in 0..8 {
-        assert!(
-            scrambled.co[i] < 3,
-            "Corner orientation must be in range 0..3"
-        );
+    for &co in &scrambled.co {
+        assert!(co < 3, "Corner orientation must be in range 0..3");
     }
 
     assert_eq!(scrambled.ep.len(), 12, "Should have 12 edges");
     assert_eq!(scrambled.eo.len(), 12, "Should have 12 edge orientations");
-    for i in 0..12 {
-        assert!(
-            scrambled.eo[i] < 2,
-            "Edge orientation must be in range 0..2"
-        );
+    for &eo in &scrambled.eo {
+        assert!(eo < 2, "Edge orientation must be in range 0..2");
     }
 
     // スクランブル後の状態が有効であることを確認

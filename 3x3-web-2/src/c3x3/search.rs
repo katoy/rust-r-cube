@@ -711,13 +711,13 @@ mod tests {
     #[test]
     fn test_unconj_move_maps_faces_to_other_axes() {
         let t = axis_tables();
-        for a in 0..3 {
+        for &unconj in &t.unconj_move {
             // 対応表は 18 手の全単射で、回転量（90° / 180° / 270°）を保存する
-            let mut seen = t.unconj_move[a];
+            let mut seen = unconj;
             seen.sort_unstable();
             assert_eq!(seen.to_vec(), (0..18).collect::<Vec<_>>());
-            for m in 0..18 {
-                assert_eq!(t.unconj_move[a][m] % 3, m % 3);
+            for (m, &mapped) in unconj.iter().enumerate() {
+                assert_eq!(mapped % 3, m % 3);
             }
         }
         // 軸 0 は恒等、軸 1 / 2 では U がそれぞれ別の軸の手へ移る（面 % 3 = 0: UD, 1: RL, 2: FB）
@@ -734,8 +734,8 @@ mod tests {
         let t = axis_tables();
         let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(7));
         let seq = crate::cube::scramble(11);
-        for a in 0..3 {
-            let mapped: Vec<usize> = seq.iter().map(|&m| t.unconj_move[a][m]).collect();
+        for (a, unconj) in t.unconj_move.iter().enumerate() {
+            let mapped: Vec<usize> = seq.iter().map(|&m| unconj[m]).collect();
             assert_eq!(
                 crate::cube::apply(&conjugate_axis(&cube, a), &seq),
                 conjugate_axis(&crate::cube::apply(&cube, &mapped), a)

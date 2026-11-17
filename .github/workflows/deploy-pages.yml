@@ -34,14 +34,14 @@ jobs:
           components: rustfmt, clippy
 
       - name: Install MSRV toolchain
-        uses: dtolnay/rust-toolchain@1.87.0
+        uses: dtolnay/rust-toolchain@1.100.0
         with:
           targets: wasm32-unknown-unknown
 
       - name: Check locked dependencies on MSRV
         run: |
-          cargo +1.87.0 check --locked --all-targets
-          cargo +1.87.0 check --locked --lib --target wasm32-unknown-unknown
+          cargo +1.100.0 check --locked --all-targets
+          cargo +1.100.0 check --locked --lib --target wasm32-unknown-unknown
 
       - name: Restore stable default toolchain
         run: rustup default stable

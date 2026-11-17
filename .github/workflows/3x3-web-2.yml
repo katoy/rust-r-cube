@@ -15,14 +15,14 @@ on:
 
 jobs:
   msrv:
-    name: Rust 1.87 compatibility (native and WASM)
+    name: Rust 1.100.0 compatibility (native and WASM)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: 3x3-web-2
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.87.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           targets: wasm32-unknown-unknown
       - name: Check locked dependencies on MSRV

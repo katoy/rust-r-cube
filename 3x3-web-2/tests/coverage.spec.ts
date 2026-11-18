@@ -2021,6 +2021,20 @@ test.describe("E2E Coverage with CDP", () => {
       });
       await expect(page.locator(".phase-badge").first()).toBeVisible();
 
+      // 全解法一括比較モードと解法切替再生の網羅
+      await page.locator("#compare-solvers").click();
+      await expect(page.locator("#solver-compare-panel")).toBeVisible();
+      await expect(
+        page.locator(
+          '#solver-compare-list .solver-compare-row[data-solver="kociemba"]',
+        ),
+      ).toBeEnabled({ timeout: 20000 });
+      await page
+        .locator(
+          '#solver-compare-list .solver-compare-row[data-solver="kociemba"]',
+        )
+        .click();
+
       // 探索中止 (cancel) および 30秒再探索 (extended) テスト
       await page.evaluate(() => {
         document.getElementById("cancel")?.click();

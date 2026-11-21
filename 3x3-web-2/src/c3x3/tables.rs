@@ -125,6 +125,7 @@ pub(crate) fn build_pruning_table(move_table: &MoveTable) -> PruningTable {
 }
 
 impl PruningTable {
+    #[inline(always)]
     pub fn get_twist_slice(&self, twist: usize, slice: usize) -> u8 {
         let c = self.twist_class[twist] as usize;
         let s = if self.twist_self_sym[twist] {
@@ -137,6 +138,7 @@ impl PruningTable {
         self.twist_slice[c * 495 + s]
     }
 
+    #[inline(always)]
     pub fn get_flip_slice(&self, flip: usize, slice: usize) -> u8 {
         let c = self.flip_class[flip] as usize;
         let s = if self.flip_self_sym[flip] {

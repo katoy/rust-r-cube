@@ -529,7 +529,7 @@ pub fn initialize() {
 
     let _ = tables::MoveTable::get();
     let _ = tables::PruningTable::get();
-    let _ = c2x2::tables::PruningTable::get();
+    // 2x2 用 PruningTable は初回 2x2 探索時に OnceLock で遅延初期化する
 }
 
 /// 2x2 キューブ用のスクランブル文字列を生成します。

@@ -6,6 +6,7 @@ import {
   FACES,
   getCellArrowInfo,
   ARROW_COLORS,
+  type CellArrowInfo,
   type CubeType,
 } from "./model";
 
@@ -53,17 +54,23 @@ function position2x2(face: number, row: number, col: number) {
   );
 }
 
+const scratchTargetDir = new THREE.Vector3();
+const scratchZAxis = new THREE.Vector3();
+const scratchYAxis = new THREE.Vector3();
+const scratchXAxis = new THREE.Vector3();
+const scratchRotMatrix = new THREE.Matrix4();
+
 function rotationMatrixForFaceAngle(
   faceIdx: number,
   clockwiseAngle: number,
 ): THREE.Matrix4 {
   const n = normal[faceIdx];
   // 外向き法線に対する右手系回転では時計回り回転角は -clockwiseAngle
-  const targetDir = faceUp[faceIdx].clone().applyAxisAngle(n, -clockwiseAngle);
-  const zAxis = n.clone().normalize();
-  const yAxis = targetDir.clone().normalize();
-  const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
-  return new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+  scratchTargetDir.copy(faceUp[faceIdx]).applyAxisAngle(n, -clockwiseAngle);
+  scratchZAxis.copy(n).normalize();
+  scratchYAxis.copy(scratchTargetDir).normalize();
+  scratchXAxis.crossVectors(scratchYAxis, scratchZAxis).normalize();
+  return scratchRotMatrix.makeBasis(scratchXAxis, scratchYAxis, scratchZAxis);
 }
 
 export class CubeScene {
@@ -453,7 +460,7 @@ export class CubeScene {
             new THREE.Vector3(0, 0, 1),
             normal[f],
           );
-          mesh.castShadow = true;
+          mesh.castShadow = false;
           mesh.receiveShadow = true;
           this.stickers.push(mesh);
           this.add(mesh);
@@ -491,7 +498,7 @@ export class CubeScene {
             new THREE.Vector3(0, 0, 1),
             normal[f],
           );
-          mesh.castShadow = true;
+          mesh.castShadow = false;
           mesh.receiveShadow = true;
           this.stickers.push(mesh);
           this.add(mesh);
@@ -533,7 +540,7 @@ export class CubeScene {
     this.dirty = true;
   }
 
-  show(state: string, next = "") {
+  show(state: string, next = "", precomputedArrowInfo?: CellArrowInfo) {
     this.dirty = true;
     this.next = next;
     const perFace = this.cubeType === "2x2" ? 4 : 9;
@@ -546,7 +553,7 @@ export class CubeScene {
       );
     });
     if (this.cubeType === "3x3") {
-      this.updateArrows(state);
+      this.updateArrows(state, precomputedArrowInfo);
     } else {
       this.arrowGroup.visible = false;
     }
@@ -568,11 +575,17 @@ export class CubeScene {
       const angle = this.centerRotations[f] ?? 0;
       const rotMatrix = rotationMatrixForFaceAngle(f, angle);
       label.quaternion.setFromRotationMatrix(rotMatrix);
-      if (label.userData) label.userData.rotation = label.quaternion.clone();
+      if (label.userData) {
+        if (label.userData.rotation instanceof THREE.Quaternion) {
+          label.userData.rotation.copy(label.quaternion);
+        } else {
+          label.userData.rotation = label.quaternion.clone();
+        }
+      }
     }
   }
 
-  private updateArrows(state?: string) {
+  private updateArrows(state?: string, precomputedArrowInfo?: CellArrowInfo) {
     if (this.cubeType === "2x2" || !state || state.length < 54) {
       this.arrowGroup.visible = false;
       for (const m of this.arrowMeshes) m.visible = false;
@@ -585,7 +598,12 @@ export class CubeScene {
 
     this.updateCenterLabels();
 
-    const arrowInfo = getCellArrowInfo(state, this.centerRotations);
+    const arrowInfo =
+      precomputedArrowInfo &&
+      !Array.isArray(precomputedArrowInfo) &&
+      Array.isArray(precomputedArrowInfo.angles)
+        ? precomputedArrowInfo
+        : getCellArrowInfo(state, this.centerRotations);
 
     // 全54セルの矢印を配置（各セルの表面に印刷された向き・角度）
     for (let i = 0; i < 54; i++) {
@@ -604,23 +622,41 @@ export class CubeScene {
       const outlineMesh = this.outlineMeshes[i];
       outlineMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.015);
       outlineMesh.quaternion.setFromRotationMatrix(rotMatrix);
-      outlineMesh.userData.origin = outlineMesh.position.clone();
-      outlineMesh.userData.rotation = outlineMesh.quaternion.clone();
+      if (outlineMesh.userData.origin instanceof THREE.Vector3) {
+        outlineMesh.userData.origin.copy(outlineMesh.position);
+      } else {
+        outlineMesh.userData.origin = outlineMesh.position.clone();
+      }
+      if (outlineMesh.userData.rotation instanceof THREE.Quaternion) {
+        outlineMesh.userData.rotation.copy(outlineMesh.quaternion);
+      } else {
+        outlineMesh.userData.rotation = outlineMesh.quaternion.clone();
+      }
 
       // 2. 内側のカラー矢印メッシュ（マテリアルはキャッシュを再利用）
       const arrowMesh = this.arrowMeshes[i];
       arrowMesh.material = this.getColorMaterial(color);
       arrowMesh.position.copy(stickerMesh.position).addScaledVector(n, 0.017);
       arrowMesh.quaternion.setFromRotationMatrix(rotMatrix);
-      arrowMesh.userData = {
-        stickerIdx: i,
-        color,
-        rotAngle: angle,
-        kind,
-        pieceIdx,
-        origin: arrowMesh.position.clone(),
-        rotation: arrowMesh.quaternion.clone(),
-      };
+      if (arrowMesh.userData.origin instanceof THREE.Vector3) {
+        arrowMesh.userData.stickerIdx = i;
+        arrowMesh.userData.color = color;
+        arrowMesh.userData.rotAngle = angle;
+        arrowMesh.userData.kind = kind;
+        arrowMesh.userData.pieceIdx = pieceIdx;
+        arrowMesh.userData.origin.copy(arrowMesh.position);
+        arrowMesh.userData.rotation.copy(arrowMesh.quaternion);
+      } else {
+        arrowMesh.userData = {
+          stickerIdx: i,
+          color,
+          rotAngle: angle,
+          kind,
+          pieceIdx,
+          origin: arrowMesh.position.clone(),
+          rotation: arrowMesh.quaternion.clone(),
+        };
+      }
     }
   }
 

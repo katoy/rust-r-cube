@@ -2656,3 +2656,68 @@ fn test_2x2_all_corners_twisted_solved_within_gods_number() {
     assert_eq!(res.moves.len(), ALL_CORNERS_TWISTED_OPTIMAL);
     assert_eq!(res.state, crate::c2x2::cube::SOLVED);
 }
+
+#[test]
+fn test_phase1_perf_optimizations_correctness() {
+    // P4: get_all_group_indices が個別の get_group_*_idx と 50 状態すべてで一致すること
+    for seed in 1u32..=50 {
+        let sc = crate::c2x2::cube::scramble(seed);
+        let rc = crate::c2x2::cube::apply(&crate::c2x2::coord::RawCube::default(), &sc);
+        assert_eq!(
+            crate::c2x2::coord::get_all_group_indices(&rc),
+            [
+                crate::c2x2::coord::get_group_a_idx(&rc),
+                crate::c2x2::coord::get_group_b_idx(&rc),
+                crate::c2x2::coord::get_group_c_idx(&rc),
+                crate::c2x2::coord::get_group_d_idx(&rc),
+            ]
+        );
+
+        // P4: 距離テーブル降下による LBL 第1層が最短距離テーブル以下であり、完全に解決できること
+        let expected_l1_dist = crate::c2x2::tables::PruningTable::group_b()
+            [crate::c2x2::coord::get_group_b_idx(&rc)] as usize;
+        let (lbl_moves, lbl_phases) =
+            crate::c2x2::lbl::solve_lbl(&rc).expect("LBL should solve any valid scramble");
+        assert_eq!(
+            crate::c2x2::cube::apply(&rc, &lbl_moves),
+            crate::c2x2::coord::RawCube::default()
+        );
+        if let Some(p0) = lbl_phases.first() {
+            if p0.name == "ステップ 1: 完全1層 (First Layer)" {
+                assert!(
+                    p0.end - p0.start <= expected_l1_dist,
+                    "seed {seed}: phase1 len {} exceeded exact group_b dist {}",
+                    p0.end - p0.start,
+                    expected_l1_dist
+                );
+            }
+        }
+    }
+
+    // P4: <U, R, F> 制限による 2x2 アンチポード 11手探索が極少ノードで完了すること
+    let antipode = "UUDBDLFUFRLLBDDFBRLUFRRB";
+    let res = crate::c2x2::solve(antipode, 5000, false, "optimal").unwrap();
+    assert_eq!(res.moves.len(), 11);
+    assert!(
+        res.nodes < 200_000,
+        "2x2 URF antipode search should stay under 200k nodes, got {}",
+        res.nodes
+    );
+
+    // P2: G1 内にある局面（R2 U2 F2 D2 L2 B2）を 3x3 Kociemba（色のみ・センターあり）が正しく解けること
+    let g1_moves = parse_moves("R2 U2 F2 D2 L2 B2").unwrap();
+    let g1_cube = apply(&RawCube::default(), &g1_moves);
+    let mut search = crate::search::Search::new(3000).with_gods_number_guarantee();
+    let sol = search.solve(&g1_cube).unwrap();
+    assert_eq!(apply(&g1_cube, &sol), RawCube::default());
+
+    let mut g1_centers = [0i32; 6];
+    for &m in &g1_moves {
+        g1_centers[m / 3] = (g1_centers[m / 3] + 2) & 3;
+    }
+    let state = facelets(&g1_cube);
+    let sol_centers =
+        crate::solve_state_with_algorithm(&state, 5000, true, Some(g1_centers), "kociemba")
+            .unwrap();
+    assert_eq!(sol_centers.state, SOLVED);
+}

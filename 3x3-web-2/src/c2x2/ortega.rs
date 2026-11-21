@@ -153,6 +153,19 @@ const ORTEGA_OLL_ALGS: &[(&str, &str)] = &[
     ("L型 (ボウタイ)", "F R' F' R U R U' R'"),
 ];
 
+fn parsed_ortega_oll_algs() -> &'static [(&'static str, Vec<usize>)] {
+    static PARSED: std::sync::OnceLock<Vec<(&'static str, Vec<usize>)>> =
+        std::sync::OnceLock::new();
+    PARSED
+        .get_or_init(|| {
+            ORTEGA_OLL_ALGS
+                .iter()
+                .map(|&(name, alg_str)| (name, cube::parse_moves(alg_str).unwrap()))
+                .collect()
+        })
+        .as_slice()
+}
+
 fn solve_ortega_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     if is_ortega_oll_solved(cube) {
         return Ok((Vec::new(), "完成 (スキップ)".to_string()));
@@ -163,14 +176,14 @@ fn solve_ortega_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     for auf in auf_choices {
         let cube_after_auf = cube::apply(cube, auf);
 
-        for (name, alg_str) in ORTEGA_OLL_ALGS {
-            let alg_moves = cube::parse_moves(alg_str).unwrap();
-            let result_cube = cube::apply(&cube_after_auf, &alg_moves);
+        for (name, alg_moves) in parsed_ortega_oll_algs() {
+            let result_cube = cube::apply(&cube_after_auf, alg_moves);
 
             if is_ortega_oll_solved(&result_cube) && is_first_face_solved(&result_cube) {
-                let mut combined = auf.to_vec();
-                combined.extend(alg_moves);
-                return Ok((combined, name.to_string()));
+                let mut combined = Vec::with_capacity(auf.len() + alg_moves.len());
+                combined.extend_from_slice(auf);
+                combined.extend_from_slice(alg_moves);
+                return Ok((combined, (*name).to_string()));
             }
         }
     }
@@ -222,39 +235,60 @@ fn rotate_y(m: usize, times: usize) -> usize {
     face * 3 + turn
 }
 
+type ParsedPblEntry = (&'static str, [Vec<usize>; 4]);
+
+fn parsed_pbl_algs() -> &'static [ParsedPblEntry] {
+    static PARSED: std::sync::OnceLock<Vec<ParsedPblEntry>> = std::sync::OnceLock::new();
+    PARSED
+        .get_or_init(|| {
+            PBL_ALGORITHMS
+                .iter()
+                .map(|&(name, alg_str)| {
+                    let base = if alg_str.is_empty() {
+                        Vec::new()
+                    } else {
+                        cube::parse_moves(alg_str).unwrap()
+                    };
+                    let rots = std::array::from_fn(|y_rot| {
+                        base.iter().map(|&m| rotate_y(m, y_rot)).collect()
+                    });
+                    (name, rots)
+                })
+                .collect()
+        })
+        .as_slice()
+}
+
 fn solve_pbl(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     let u_aufs: &[&[usize]] = &[&[], &[0], &[1], &[2]];
     let d_aufs: &[&[usize]] = &[&[], &[9], &[10], &[11]]; // 9: D, 10: D2, 11: D'
 
     for pre_u in u_aufs {
         for pre_d in d_aufs {
-            let mut pre_moves = pre_u.to_vec();
+            let mut pre_moves = Vec::with_capacity(pre_u.len() + pre_d.len());
+            pre_moves.extend_from_slice(pre_u);
             pre_moves.extend_from_slice(pre_d);
             let cube_after_pre = cube::apply(cube, &pre_moves);
 
-            for (name, alg_str) in PBL_ALGORITHMS {
-                let base_moves = if alg_str.is_empty() {
-                    Vec::new()
-                } else {
-                    cube::parse_moves(alg_str).unwrap()
-                };
-
-                for y_rot in 0..4 {
-                    let alg_moves: Vec<usize> =
-                        base_moves.iter().map(|&m| rotate_y(m, y_rot)).collect();
-                    let cube_after_alg = cube::apply(&cube_after_pre, &alg_moves);
+            for (name, rots) in parsed_pbl_algs() {
+                for alg_moves in rots {
+                    let cube_after_alg = cube::apply(&cube_after_pre, alg_moves);
 
                     for post_u in u_aufs {
                         for post_d in d_aufs {
-                            let mut post_moves = post_u.to_vec();
+                            let mut post_moves = Vec::with_capacity(post_u.len() + post_d.len());
+                            post_moves.extend_from_slice(post_u);
                             post_moves.extend_from_slice(post_d);
                             let final_cube = cube::apply(&cube_after_alg, &post_moves);
 
                             if final_cube == RawCube::default() {
-                                let mut combined = pre_moves;
-                                combined.extend(alg_moves);
-                                combined.extend(post_moves);
-                                return Ok((combined, name.to_string()));
+                                let mut combined = Vec::with_capacity(
+                                    pre_moves.len() + alg_moves.len() + post_moves.len(),
+                                );
+                                combined.extend_from_slice(&pre_moves);
+                                combined.extend_from_slice(alg_moves);
+                                combined.extend_from_slice(&post_moves);
+                                return Ok((combined, (*name).to_string()));
                             }
                         }
                     }

@@ -188,6 +188,24 @@ self.addEventListener("fetch", (event) => {
       : undefined;
   if (selfOrigin && url.origin !== selfOrigin) return;
 
+  // SW スコープ配下のリクエストのみ代行・キャッシュする（同一オリジンの別アプリ混入防止）
+  const rawScope =
+    self.registration && self.registration.scope
+      ? new URL(self.registration.scope).href
+      : undefined;
+  const scopePrefix = rawScope
+    ? rawScope.endsWith("/")
+      ? rawScope
+      : rawScope + "/"
+    : undefined;
+  if (
+    scopePrefix &&
+    url.href !== scopePrefix.slice(0, -1) &&
+    !url.href.startsWith(scopePrefix)
+  ) {
+    return;
+  }
+
   event.respondWith(
     (async () => {
       const ownCache = await caches.open(CACHE_NAME);
@@ -206,7 +224,11 @@ self.addEventListener("fetch", (event) => {
 
       const updatePromise = fetch(request)
         .then(async (networkResponse) => {
-          if (networkResponse.ok && !PRECACHE_URLS.has(canonicalKey)) {
+          const isCacheableResponse =
+            networkResponse.status === 200 &&
+            (networkResponse.type === "basic" ||
+              networkResponse.type === "default");
+          if (isCacheableResponse && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {
               const boundedCacheKey = url.search ? url.href : canonicalKey;

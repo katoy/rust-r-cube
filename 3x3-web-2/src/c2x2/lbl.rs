@@ -1,7 +1,8 @@
-use super::coord::{move_cube_18, Corner, RawCube};
+use super::coord::{get_group_b_idx, move_cube_18, Corner, RawCube};
 use super::cube;
+use super::tables::PruningTable;
 use crate::PhaseInfo;
-use std::collections::{HashSet, VecDeque};
+use std::sync::OnceLock;
 
 /// LBL法 (Layer-by-Layer) による 2x2x2 キューブ解法。
 /// 3つの明確な教育的ステップでキューブを解きます:
@@ -74,28 +75,21 @@ pub fn is_first_layer_solved(cube: &RawCube) -> bool {
         && cube.co[7] == 0
 }
 
-/// 幅優先探索 (BFS) で完全1層を揃える最短手順を探索 (深さ 0〜6 程度で即座に発見)
+/// Group B 距離テーブル（下面4コーナーの厳密最短距離）に沿って第1層をO(d)で解決
 fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
     if is_first_layer_solved(cube) {
         return Ok(Vec::new());
     }
 
-    // 2x2 で通常用いる回転面: U, R, F, D, L, B
-    let mut q = VecDeque::new();
-    let mut visited = HashSet::new();
+    let group_b = PruningTable::group_b();
+    let mut cur = *cube;
+    let mut dist = group_b[get_group_b_idx(&cur)];
+    let mut moves = Vec::with_capacity(dist as usize);
+    let mut last_face = 255usize;
 
-    // (現在のキューブ, 手順)
-    q.push_back((*cube, Vec::new()));
-    visited.insert((*cube).hash_first_layer());
-
-    while let Some((cur, moves)) = q.pop_front() {
-        if moves.len() >= 7 {
-            break;
-        }
-
-        let last_face = moves.last().map(|m| m / 3).unwrap_or(255);
-
-        for face in 0..6 {
+    while dist > 0 {
+        let mut next_step = None;
+        'search: for face in 0..6 {
             if face == last_face {
                 continue;
             }
@@ -105,85 +99,29 @@ fn solve_first_layer(cube: &RawCube) -> Result<Vec<usize>, String> {
             {
                 continue;
             }
-
             for turn in 0..3 {
                 let m = face * 3 + turn;
-                let next_cube = cur.multiply(move_cube_18(m));
-
-                if is_first_layer_solved(&next_cube) {
-                    let mut res = moves.clone();
-                    res.push(m);
-                    return Ok(res);
-                }
-
-                if moves.len() + 1 < 7 {
-                    let key = next_cube.hash_first_layer();
-                    if visited.insert(key) {
-                        let mut next_moves = moves.clone();
-                        next_moves.push(m);
-                        q.push_back((next_cube, next_moves));
-                    }
+                let candidate = cur.multiply(move_cube_18(m));
+                if group_b[get_group_b_idx(&candidate)] == dist - 1 {
+                    next_step = Some((m, face, candidate));
+                    break 'search;
                 }
             }
         }
+        let Some((m, face, next_cube)) = next_step else {
+            return Err("完全1層の手順が見つかりませんでした。".into());
+        };
+        moves.push(m);
+        cur = next_cube;
+        last_face = face;
+        dist -= 1;
     }
 
-    // BFS で見つからなかった場合は IDA* でフォールバック
-    solve_first_layer_ida(cube)
-}
-
-fn solve_first_layer_ida(cube: &RawCube) -> Result<Vec<usize>, String> {
-    for depth in 1..=10 {
-        let mut path = Vec::new();
-        if ida_first_layer(*cube, depth, 255, &mut path) {
-            return Ok(path);
-        }
-    }
-    Err("完全1層の手順が見つかりませんでした。".into())
-}
-
-fn ida_first_layer(cube: RawCube, depth: usize, last_face: usize, path: &mut Vec<usize>) -> bool {
-    if is_first_layer_solved(&cube) {
-        return true;
-    }
-    if depth == 0 {
-        return false;
+    if !is_first_layer_solved(&cur) {
+        return Err("完全1層の手順が見つかりませんでした。".into());
     }
 
-    for face in 0..6 {
-        if face == last_face {
-            continue;
-        }
-        if (face == 3 && last_face == 0)
-            || (face == 4 && last_face == 1)
-            || (face == 5 && last_face == 2)
-        {
-            continue;
-        }
-
-        for turn in 0..3 {
-            let m = face * 3 + turn;
-            let next = cube.multiply(move_cube_18(m));
-            path.push(m);
-            if ida_first_layer(next, depth - 1, face, path) {
-                return true;
-            }
-            path.pop();
-        }
-    }
-    false
-}
-
-impl RawCube {
-    #[inline]
-    fn hash_first_layer(&self) -> u64 {
-        let mut h = 0u64;
-        for i in 0..8 {
-            h = (h << 3) | (self.cp[i] as u64);
-            h = (h << 2) | (self.co[i] as u64);
-        }
-        h
-    }
+    Ok(moves)
 }
 
 // --- ステップ 2: OLL (Orientation of Last Layer) ---
@@ -230,6 +168,18 @@ const OLL_ALGORITHMS: &[OllAlgorithm] = &[
     },
 ];
 
+fn parsed_oll_algorithms() -> &'static [(&'static str, Vec<usize>)] {
+    static PARSED: OnceLock<Vec<(&'static str, Vec<usize>)>> = OnceLock::new();
+    PARSED
+        .get_or_init(|| {
+            OLL_ALGORITHMS
+                .iter()
+                .map(|alg| (alg.name, cube::parse_moves(alg.moves).unwrap()))
+                .collect()
+        })
+        .as_slice()
+}
+
 fn solve_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     if is_oll_solved(cube) {
         return Ok((Vec::new(), "完成 (スキップ)".to_string()));
@@ -246,15 +196,15 @@ fn solve_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     for auf in auf_moves {
         let cube_after_auf = cube::apply(cube, auf);
 
-        for alg in OLL_ALGORITHMS {
-            let alg_moves = cube::parse_moves(alg.moves).unwrap();
-            let result_cube = cube::apply(&cube_after_auf, &alg_moves);
+        for (name, alg_moves) in parsed_oll_algorithms() {
+            let result_cube = cube::apply(&cube_after_auf, alg_moves);
 
             // 上面向きが揃い、かつ第1層が維持されていること
             if is_oll_solved(&result_cube) && is_first_layer_solved(&result_cube) {
-                let mut combined = auf.to_vec();
-                combined.extend(alg_moves);
-                return Ok((combined, alg.name.to_string()));
+                let mut combined = Vec::with_capacity(auf.len() + alg_moves.len());
+                combined.extend_from_slice(auf);
+                combined.extend_from_slice(alg_moves);
+                return Ok((combined, (*name).to_string()));
             }
         }
     }
@@ -284,6 +234,25 @@ const PLL_ALGORITHMS: &[PllAlgorithm] = &[
     },
 ];
 
+fn parsed_pll_algorithms() -> &'static [(&'static str, Vec<usize>)] {
+    static PARSED: OnceLock<Vec<(&'static str, Vec<usize>)>> = OnceLock::new();
+    PARSED
+        .get_or_init(|| {
+            PLL_ALGORITHMS
+                .iter()
+                .map(|alg| {
+                    let moves = if alg.moves.is_empty() {
+                        Vec::new()
+                    } else {
+                        cube::parse_moves(alg.moves).unwrap()
+                    };
+                    (alg.name, moves)
+                })
+                .collect()
+        })
+        .as_slice()
+}
+
 fn solve_pll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     let auf_choices: &[&[usize]] = &[
         &[],
@@ -295,22 +264,19 @@ fn solve_pll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     for pre_auf in auf_choices {
         let cube_after_pre = cube::apply(cube, pre_auf);
 
-        for alg in PLL_ALGORITHMS {
-            let alg_moves = if alg.moves.is_empty() {
-                Vec::new()
-            } else {
-                cube::parse_moves(alg.moves).unwrap()
-            };
-            let cube_after_alg = cube::apply(&cube_after_pre, &alg_moves);
+        for (name, alg_moves) in parsed_pll_algorithms() {
+            let cube_after_alg = cube::apply(&cube_after_pre, alg_moves);
 
             for post_auf in auf_choices {
                 let final_cube = cube::apply(&cube_after_alg, post_auf);
 
                 if final_cube == RawCube::default() {
-                    let mut combined = pre_auf.to_vec();
-                    combined.extend(alg_moves);
+                    let mut combined =
+                        Vec::with_capacity(pre_auf.len() + alg_moves.len() + post_auf.len());
+                    combined.extend_from_slice(pre_auf);
+                    combined.extend_from_slice(alg_moves);
                     combined.extend_from_slice(post_auf);
-                    return Ok((combined, alg.name.to_string()));
+                    return Ok((combined, (*name).to_string()));
                 }
             }
         }

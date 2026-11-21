@@ -1,13 +1,12 @@
-use super::coord::{
-    get_group_a_idx, get_group_b_idx, get_group_c_idx, get_group_d_idx, move_cube_18, Corner,
-    RawCube,
-};
+use super::coord::{get_all_group_indices, move_cube_18, Corner, RawCube};
 use super::tables::PruningTable;
 use std::collections::{HashSet, VecDeque};
 use std::sync::OnceLock;
 
 pub const DEFAULT_MAX_NODES: u64 = 10_000_000;
 pub const MAX_DEPTH: usize = 14;
+/// 向き固定なし（DBL コーナー固定・<U, R, F> のみ）のときの 2x2 神の数字（HTM）
+pub const MAX_DEPTH_URF: usize = 11;
 
 pub struct Search {
     pruning_table: &'static PruningTable,
@@ -81,15 +80,25 @@ impl Search {
                 .unwrap_or_default();
 
             let oriented_rc = rot.multiply(rc);
-            self.solve_single_target(&oriented_rc, MAX_DEPTH)
+            // DBL コーナーが固定されているため、<U, R, F>（face 0..3）のみで理論最短手数（最大 11 手）と一致する
+            self.solve_single_target_with_faces(&oriented_rc, MAX_DEPTH_URF, 3)
         }
     }
 
     /// 単一の目標状態（RawCube::default()）に対する IDA* 最短探索
     pub fn solve_single_target(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<usize>> {
+        self.solve_single_target_with_faces(rc, max_depth, 6)
+    }
+
+    fn solve_single_target_with_faces(
+        &mut self,
+        rc: &RawCube,
+        max_depth: usize,
+        max_faces: usize,
+    ) -> Option<Vec<usize>> {
         for depth in 0..=max_depth {
             self.solution.clear();
-            if self.ida_star(*rc, depth, 255) {
+            if self.ida_star(*rc, depth, 255, max_faces) {
                 return Some(self.solution.clone());
             }
             if self.nodes >= self.max_nodes || self.timed_out {
@@ -99,7 +108,7 @@ impl Search {
         None
     }
 
-    fn ida_star(&mut self, rc: RawCube, depth: usize, last_face: usize) -> bool {
+    fn ida_star(&mut self, rc: RawCube, depth: usize, last_face: usize, max_faces: usize) -> bool {
         if self.budget_ms == Some(0) || self.timed_out {
             self.timed_out = true;
             return false;
@@ -117,10 +126,7 @@ impl Search {
             }
         }
 
-        let idx_a = get_group_a_idx(&rc);
-        let idx_b = get_group_b_idx(&rc);
-        let idx_c = get_group_c_idx(&rc);
-        let idx_d = get_group_d_idx(&rc);
+        let [idx_a, idx_b, idx_c, idx_d] = get_all_group_indices(&rc);
 
         let h_a = self.pruning_table.group_a[idx_a] as usize;
         let h_b = self.pruning_table.group_b[idx_b] as usize;
@@ -136,7 +142,7 @@ impl Search {
             return false;
         }
 
-        for face in 0..6 {
+        for face in 0..max_faces {
             // 同一面の連続回転を排除
             if face == last_face {
                 continue;
@@ -155,10 +161,13 @@ impl Search {
                 let next_rc = rc.multiply(move_cube_18(m));
 
                 self.solution.push(m);
-                if self.ida_star(next_rc, depth - 1, face) {
+                if self.ida_star(next_rc, depth - 1, face, max_faces) {
                     return true;
                 }
                 self.solution.pop();
+                if self.timed_out || self.nodes >= self.max_nodes {
+                    return false;
+                }
             }
         }
 

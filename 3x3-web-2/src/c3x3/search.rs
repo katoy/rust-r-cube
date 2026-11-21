@@ -76,10 +76,19 @@ impl Search {
         self.gods_guarantee = true;
         self
     }
+    #[inline]
     fn has_gods_solution(&self) -> bool {
         self.best_solution
             .as_ref()
             .is_some_and(|b| b.len() <= GODS_NUMBER)
+    }
+    #[inline]
+    fn has_acceptable_solution(&self) -> bool {
+        if self.target_centers.is_some() {
+            self.best_solution.is_some()
+        } else {
+            self.has_gods_solution()
+        }
     }
     pub fn with_max_total(mut self, max: usize) -> Self {
         self.max_total = max;
@@ -143,7 +152,7 @@ impl Search {
                 depth as u8,
                 99,
             );
-            if self.timed_out {
+            if self.timed_out || self.has_acceptable_solution() {
                 break;
             }
         }
@@ -168,6 +177,10 @@ impl Search {
                 for &(axis, inverse, ref dir_cube) in &directions {
                     if depth >= self.max_total {
                         break 'deepen;
+                    }
+                    // axis == 0 かつ順方向は depth <= 12 まで最初のループで探索済み
+                    if axis == 0 && !inverse && depth <= 12 {
+                        continue;
                     }
                     self.axis = axis;
                     self.inverse = inverse;
@@ -370,17 +383,24 @@ impl Search {
             } else {
                 0
             };
+            let max_d = max.min(self.max_total.saturating_sub(self.path.len()));
+            if min_d > max_d {
+                return false;
+            }
+            let cp = cube.get_cp();
+            let ep = cube.get_ep8();
+            let sp = cube.get_slice_p();
+            let h2 = self.pt.cp_slice[cp as usize * 24 + sp as usize]
+                .max(self.pt.ep8_slice[ep as usize * 24 + sp as usize])
+                as usize;
+            let start_d = min_d.max(h2);
+            if start_d > max_d {
+                return false;
+            }
             self.current_p1_len = self.path.len();
             let mut found = false;
-            let max_d = max.min(self.max_total.saturating_sub(self.path.len()));
-            for d in min_d..=max_d {
-                if self.phase2(
-                    cube.get_cp(),
-                    cube.get_ep8(),
-                    cube.get_slice_p(),
-                    d as u8,
-                    last,
-                ) {
+            for d in start_d..=max_d {
+                if self.phase2(cp, ep, sp, d as u8, last) {
                     found = true;
                     // 見つかった解で max_total が縮小されたので、これ以上大きい d は探索不要
                     break;
@@ -390,6 +410,18 @@ impl Search {
                 }
             }
             return found;
+        }
+        // depth == 1 で既に G1 に入っている場合、あと 1 手 G1 の手を足しても
+        // 前の深さ（depth == 0）の Phase 2 探索で同じ手順が網羅済み（max_total の残り <= phase2_cap のとき）
+        if depth == 1 && twist == 0 && flip == 0 && slice == 0 {
+            let phase2_cap = if self.allow_deep_phase2 || self.max_total == 30 {
+                18
+            } else {
+                12
+            };
+            if self.path.len() + phase2_cap >= self.max_total {
+                return false;
+            }
         }
         for face in 0..6 {
             if redundant(face, last) {
@@ -413,8 +445,8 @@ impl Search {
                 );
                 self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
                 self.path.pop();
-                if self.timed_out {
-                    return false;
+                if self.timed_out || self.has_acceptable_solution() {
+                    return self.best_solution.is_some();
                 }
             }
         }
@@ -487,6 +519,7 @@ impl Search {
         false
     }
 }
+#[inline(always)]
 fn redundant(face: usize, last: usize) -> bool {
     face == last || ((3..6).contains(&last) && face + 3 == last)
 }

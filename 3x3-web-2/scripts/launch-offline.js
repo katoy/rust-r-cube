@@ -395,35 +395,45 @@ async function main() {
       { timeout: 10000 },
     );
 
-    // 画面上にオフライン通知トースト/バナーを表示
+    // 画面上にオフライン通知トースト/バナーを表示（CSP style-src 'self' に準拠するため CSSOM でスタイルを設定）
     await page.evaluate(() => {
       const banner = document.createElement("div");
       banner.id = "offline-demo-banner";
-      banner.innerHTML = `
-        <div style="
-          position: fixed;
-          top: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 99999;
-          background: rgba(20, 23, 22, 0.92);
-          border: 1px solid #10b981;
-          color: #f3f4f6;
-          padding: 10px 20px;
-          border-radius: 9999px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          pointer-events: auto;
-        ">
-          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; animation: pulse 1.5s infinite;"></span>
-          <span>⚡ <strong>オフラインモードで動作中</strong> (ネットワーク完全遮断済み)</span>
-        </div>
-      `;
+      const box = document.createElement("div");
+      Object.assign(box.style, {
+        position: "fixed",
+        top: "12px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: "99999",
+        background: "rgba(20, 23, 22, 0.92)",
+        border: "1px solid #10b981",
+        color: "#f3f4f6",
+        padding: "10px 20px",
+        borderRadius: "9999px",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontSize: "13px",
+        fontWeight: "500",
+        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        pointerEvents: "auto",
+      });
+      const dot = document.createElement("span");
+      Object.assign(dot.style, {
+        display: "inline-block",
+        width: "8px",
+        height: "8px",
+        borderRadius: "50%",
+        background: "#10b981",
+      });
+      const textSpan = document.createElement("span");
+      const strong = document.createElement("strong");
+      strong.textContent = "オフラインモードで動作中";
+      textSpan.append("⚡ ", strong, " (ネットワーク完全遮断済み)");
+      box.append(dot, textSpan);
+      banner.appendChild(box);
       document.body.appendChild(banner);
     });
 

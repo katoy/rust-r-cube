@@ -13,8 +13,12 @@ export function registerServiceWorker(swUrl = "./sw.js") {
 
     // 開発環境 (Vite dev) では、自動テスト中または ?force-sw が明示されない限り
     // ローカルキャッシュ汚染と HMR 阻害を防ぐため登録をスキップし既存 SW を解除
+    // 本番環境では ?no-sw / __DISABLE_SW__ による一般利用者の SW 無効化を抑止する
+    const allowTestOverrides = isDev || isAutomatedTest;
     const isDevSuppressed = isDev && !isAutomatedTest && !forceSw;
-    const isExplicitlyDisabled = params.has("no-sw") || window.__DISABLE_SW__;
+    const isExplicitlyDisabled =
+      allowTestOverrides &&
+      (params.has("no-sw") || Boolean(window.__DISABLE_SW__));
 
     if (isDevSuppressed || isExplicitlyDisabled) {
       const targetScope = new URL("./", window.location.href).href;

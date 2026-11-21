@@ -219,50 +219,101 @@ pub fn move_cube_18(mv: usize) -> &'static RawCube {
 // ----------------------------------------------------------------------------
 
 #[inline]
-fn get_group_idx(rc: &RawCube, corners: [Corner; 4]) -> usize {
-    // 1. corners の各ピースが現在のどの位置にあるかを探す
-    let mut pos = [0usize; 4];
-    let mut ori = [0usize; 4];
-    for (idx, &c) in corners.iter().enumerate() {
-        let p = rc.cp.iter().position(|&x| x == c).unwrap();
-        pos[idx] = p;
-        ori[idx] = rc.co[p] as usize;
+fn corner_positions(rc: &RawCube) -> [usize; 8] {
+    let mut pos_of = [0usize; 8];
+    for (p, &c) in rc.cp.iter().enumerate() {
+        pos_of[c as usize] = p;
     }
+    pos_of
+}
 
-    // 2. 8P4 の配置インデックス (0..1679)
-    let mut perm_idx = 0;
-    for i in 0..4 {
-        let mut k = pos[i];
-        for j in 0..i {
-            if pos[j] < pos[i] {
-                k -= 1;
-            }
-        }
-        perm_idx = perm_idx * (8 - i) + k;
-    }
+#[inline]
+fn group_idx_from_pos(rc: &RawCube, pos_of: &[usize; 8], corners: [Corner; 4]) -> usize {
+    let p0 = pos_of[corners[0] as usize];
+    let p1 = pos_of[corners[1] as usize];
+    let p2 = pos_of[corners[2] as usize];
+    let p3 = pos_of[corners[3] as usize];
 
-    // 3. 3^4 の向きインデックス (0..80)
-    let twist_idx = ori[0] * 27 + ori[1] * 9 + ori[2] * 3 + ori[3];
+    // 8P4 の配置インデックス (0..1679)
+    let k0 = p0;
+    let k1 = p1 - usize::from(p0 < p1);
+    let k2 = p2 - usize::from(p0 < p2) - usize::from(p1 < p2);
+    let k3 = p3 - usize::from(p0 < p3) - usize::from(p1 < p3) - usize::from(p2 < p3);
+    let perm_idx = ((k0 * 7 + k1) * 6 + k2) * 5 + k3;
+
+    // 3^4 の向きインデックス (0..80)
+    let twist_idx = rc.co[p0] as usize * 27
+        + rc.co[p1] as usize * 9
+        + rc.co[p2] as usize * 3
+        + rc.co[p3] as usize;
 
     perm_idx * 81 + twist_idx
 }
 
+/// 4グループすべての Pruning Table インデックスを 1 回の逆置換構築で算出
+#[inline]
+pub fn get_all_group_indices(rc: &RawCube) -> [usize; 4] {
+    let pos_of = corner_positions(rc);
+    [
+        group_idx_from_pos(
+            rc,
+            &pos_of,
+            [Corner::UFR, Corner::UFL, Corner::ULB, Corner::UBR],
+        ),
+        group_idx_from_pos(
+            rc,
+            &pos_of,
+            [Corner::DFR, Corner::DLF, Corner::DBL, Corner::DRB],
+        ),
+        group_idx_from_pos(
+            rc,
+            &pos_of,
+            [Corner::UFL, Corner::DFR, Corner::DLF, Corner::UBR],
+        ),
+        group_idx_from_pos(
+            rc,
+            &pos_of,
+            [Corner::UFR, Corner::ULB, Corner::DBL, Corner::DRB],
+        ),
+    ]
+}
+
 /// Group A: UFR, UFL, ULB, UBR (上面4コーナー)
 pub fn get_group_a_idx(rc: &RawCube) -> usize {
-    get_group_idx(rc, [Corner::UFR, Corner::UFL, Corner::ULB, Corner::UBR])
+    let pos_of = corner_positions(rc);
+    group_idx_from_pos(
+        rc,
+        &pos_of,
+        [Corner::UFR, Corner::UFL, Corner::ULB, Corner::UBR],
+    )
 }
 
 /// Group B: DFR, DLF, DBL, DRB (下面4コーナー)
 pub fn get_group_b_idx(rc: &RawCube) -> usize {
-    get_group_idx(rc, [Corner::DFR, Corner::DLF, Corner::DBL, Corner::DRB])
+    let pos_of = corner_positions(rc);
+    group_idx_from_pos(
+        rc,
+        &pos_of,
+        [Corner::DFR, Corner::DLF, Corner::DBL, Corner::DRB],
+    )
 }
 
 /// Group C: UFL, DFR, DLF, UBR (斜向4コーナー)
 pub fn get_group_c_idx(rc: &RawCube) -> usize {
-    get_group_idx(rc, [Corner::UFL, Corner::DFR, Corner::DLF, Corner::UBR])
+    let pos_of = corner_positions(rc);
+    group_idx_from_pos(
+        rc,
+        &pos_of,
+        [Corner::UFL, Corner::DFR, Corner::DLF, Corner::UBR],
+    )
 }
 
 /// Group D: UFR, ULB, DBL, DRB (対角4コーナー)
 pub fn get_group_d_idx(rc: &RawCube) -> usize {
-    get_group_idx(rc, [Corner::UFR, Corner::ULB, Corner::DBL, Corner::DRB])
+    let pos_of = corner_positions(rc);
+    group_idx_from_pos(
+        rc,
+        &pos_of,
+        [Corner::UFR, Corner::ULB, Corner::DBL, Corner::DRB],
+    )
 }

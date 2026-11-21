@@ -35,6 +35,10 @@ const HOLD_GUIDE_2X2_B =
 const MAX_IMAGE_PIXELS = 50_000_000;
 /** ヘッダ読み取り時に 1 回の file.slice で読む最大バイト数 */
 const HEADER_CHUNK_BYTES = 65536;
+/** JPEG ヘッダ走査の上限（細切れマーカー / 連続 0xFF による DoS 防止） */
+const MAX_JPEG_MARKERS = 1024;
+const MAX_JPEG_SCAN_BYTES = 2 * 1024 * 1024;
+const MAX_JPEG_FILL_BYTES = 1024;
 
 /**
  * Blob の指定範囲を必要に応じて追加読みするヘッダリーダーを作る。
@@ -68,15 +72,22 @@ async function readJpegDimensions(
   read: ReturnType<typeof createHeaderReader>,
 ): Promise<{ width: number; height: number } | null> {
   let offset = 2;
-  for (;;) {
+  let markers = 0;
+  let fillBytes = 0;
+  while (offset < MAX_JPEG_SCAN_BYTES && markers < MAX_JPEG_MARKERS) {
     const header = await read(offset, 2);
     if (!header || header.getUint8(0) !== 0xff) return null;
     const marker = header.getUint8(1);
-    // 0xFF の連続はフィルバイトなので 1 バイトずつ読み飛ばす
+    // 0xFF の連続はフィルバイト（上限付きで読み飛ばす）
     if (marker === 0xff) {
+      fillBytes += 1;
+      if (fillBytes > MAX_JPEG_FILL_BYTES) return null;
       offset += 1;
       continue;
     }
+    // SOS より前にバイトスタッフィング 0x00 が出現した場合は不正
+    if (marker === 0x00) return null;
+    markers += 1;
     // 長さを持たない単独マーカー（TEM・RST0〜7）は 2 バイト進める
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       offset += 2;
@@ -102,6 +113,7 @@ async function readJpegDimensions(
     }
     offset += 2 + length;
   }
+  return null;
 }
 
 /**
@@ -485,7 +497,9 @@ export class TwoViewCamera {
 
     this.initPalette();
     this.renderResults();
-    (window as any).__lastCamera = this;
+    if (import.meta.env.DEV) {
+      (window as any).__lastCamera = this;
+    }
   }
 
   private setupDropZone(

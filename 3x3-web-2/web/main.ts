@@ -10,6 +10,7 @@ import {
   type ResultData,
   type CubeType,
   type SolverAlgorithm,
+  type CellArrowInfo,
   SOLVER_META_BY_TYPE,
   getSolvedState,
   getCellArrowInfo,
@@ -45,10 +46,7 @@ declare global {
   }
 }
 
-const isTestOrDev =
-  import.meta.env.DEV ||
-  Boolean((window as any).__TEST_ENV__) ||
-  Boolean(navigator.webdriver);
+const isTestOrDev = import.meta.env.DEV;
 
 const store = new CubeStore();
 if (isTestOrDev) {
@@ -356,6 +354,7 @@ function updateArrowLegend(
   state: string,
   centerRotations: number[],
   is2x2: boolean,
+  precomputedArrowInfo?: CellArrowInfo,
 ) {
   const legend = $("arrow-legend");
   if (!legend) return;
@@ -365,7 +364,8 @@ function updateArrowLegend(
   }
   legend.hidden = false;
 
-  const arrowInfo = getCellArrowInfo(state, centerRotations);
+  const arrowInfo =
+    precomputedArrowInfo ?? getCellArrowInfo(state, centerRotations);
   const counts = countPieceOrientations(arrowInfo);
 
   const countNormal = $("legend-count-normal");
@@ -530,6 +530,20 @@ function renderComparisonPanel() {
     });
 }
 
+let lastSolveLabel: string | undefined = undefined;
+let lastPlayIcon: string | undefined = undefined;
+
+function renderFallbackNet(state: string, is2x2: boolean) {
+  net(
+    $("fallback-net"),
+    state,
+    false,
+    undefined,
+    -1,
+    is2x2 ? undefined : store.getCenterTurns(),
+  );
+}
+
 function refresh() {
   const state = store.getState();
   const solution = store.getSolution();
@@ -554,24 +568,20 @@ function refresh() {
         : solution
           ? `${step} / ${solution.moves.length} 手`
           : "スクランブル状態";
+  const arrowInfo = is2x2
+    ? undefined
+    : getCellArrowInfo(state, centerRotations);
   if (scene) {
     scene.centerRotations = [...centerRotations];
-    if (!inMotion) scene.show(state, next);
+    if (!inMotion) scene.show(state, next, arrowInfo);
     scene.updateAriaLabel(statusText);
   }
-  if (!inMotion) {
-    net(
-      $("fallback-net"),
-      state,
-      false,
-      undefined,
-      -1,
-      is2x2 ? undefined : store.getCenterTurns(),
-    );
+  if (!inMotion && !$("fallback").hidden) {
+    renderFallbackNet(state, is2x2);
   }
   $("cube-status").textContent = statusText;
   $("scene").dataset.state = state;
-  updateArrowLegend(state, centerRotations, is2x2);
+  updateArrowLegend(state, centerRotations, is2x2, arrowInfo);
 
   const canModify = appState.getState().canModifyCube();
   const canSolve = appState.getState().canStartSolve();
@@ -584,8 +594,15 @@ function refresh() {
     !mainReady || (!solver?.ready && !engineError) || !canSolve;
   $("compare-solvers").hidden = solving;
   $("cancel").hidden = !solving;
-  $("solve").innerHTML =
-    `<span>${engineError ? "エンジンを再試行" : isSolved ? "完成状態を確認" : "解法を探す"}</span>${icon("arrow")}`;
+  const solveLabel = engineError
+    ? "エンジンを再試行"
+    : isSolved
+      ? "完成状態を確認"
+      : "解法を探す";
+  if (solveLabel !== lastSolveLabel) {
+    lastSolveLabel = solveLabel;
+    $("solve").innerHTML = `<span>${solveLabel}</span>${icon("arrow")}`;
+  }
   $<HTMLButtonElement>("undo").disabled =
     !mainReady || !store.canUndo() || !canModify;
   $<HTMLButtonElement>("redo").disabled =
@@ -682,7 +699,11 @@ function refresh() {
       ? `${phasePrefix}${instruction(next)}`
       : "6面が揃いました。おつかれさまでした。";
     $("step-count").textContent = `${step} / ${solution.moves.length}`;
-    $("play").innerHTML = icon(playing ? "pause" : "play");
+    const playIcon = playing ? "pause" : "play";
+    if (playIcon !== lastPlayIcon) {
+      lastPlayIcon = playIcon;
+      $("play").innerHTML = icon(playIcon);
+    }
     $("play").setAttribute("aria-label", playing ? "一時停止" : "自動再生");
     $<HTMLButtonElement>("play").disabled =
       solution.moves.length === 0 || solving;
@@ -769,6 +790,8 @@ function fallback() {
   delete window.cube_scene;
   $("scene").hidden = true;
   $("fallback").hidden = false;
+  const fallbackState = store.getState();
+  renderFallbackNet(fallbackState, fallbackState.length === 24);
   $("view-reset").hidden = true;
   document
     .querySelector<HTMLElement>(".view-presets")

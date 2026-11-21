@@ -7,17 +7,25 @@ use std::sync::OnceLock;
 /// 4グループ統合 Pruning Table
 pub struct PruningTable {
     pub group_a: Box<[u8]>,
-    pub group_b: Box<[u8]>,
+    pub group_b: &'static [u8],
     pub group_c: Box<[u8]>,
     pub group_d: Box<[u8]>,
 }
 
 impl PruningTable {
+    /// Group B（下面4コーナー）のみを単体で遅延初期化して取得する（LBL 第1層用）
+    pub fn group_b() -> &'static [u8] {
+        static GROUP_B: OnceLock<Box<[u8]>> = OnceLock::new();
+        GROUP_B
+            .get_or_init(|| generate_group_pruning_table(get_group_b_idx))
+            .as_ref()
+    }
+
     pub fn get() -> &'static PruningTable {
         static TABLE: OnceLock<PruningTable> = OnceLock::new();
         TABLE.get_or_init(|| PruningTable {
             group_a: generate_group_pruning_table(get_group_a_idx),
-            group_b: generate_group_pruning_table(get_group_b_idx),
+            group_b: Self::group_b(),
             group_c: generate_group_pruning_table(get_group_c_idx),
             group_d: generate_group_pruning_table(get_group_d_idx),
         })

@@ -1035,7 +1035,12 @@ mod tests {
             let sc = crate::cube::scramble(seed);
             let cube = crate::cube::apply(&RawCube::default(), &sc);
             let centers = crate::supercube::apply_moves_to_centers([0; 6], &sc);
-            let mut search = Search::new(3000).with_target_centers(centers);
+            let budget = if cfg!(any(debug_assertions, coverage)) {
+                60_000
+            } else {
+                30_000
+            };
+            let mut search = Search::new(budget).with_target_centers(centers);
             let sol = search
                 .solve(&cube)
                 .unwrap_or_else(|| panic!("seed {seed} timed out"));

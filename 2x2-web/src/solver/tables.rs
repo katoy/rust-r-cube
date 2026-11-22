@@ -90,8 +90,8 @@ fn generate_cp_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     while count < 40320 {
         for i in 0..40320 {
             if table[i] == distance {
-                for m in 0..18 {
-                    let next = mt.cp[i][m] as usize;
+                for &next_cp in &mt.cp[i] {
+                    let next = next_cp as usize;
                     if table[next] == 255 {
                         table[next] = distance + 1;
                         count += 1;
@@ -113,8 +113,8 @@ fn generate_twist_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     while count < 2187 {
         for i in 0..2187 {
             if table[i] == distance {
-                for m in 0..18 {
-                    let next = mt.twist[i][m] as usize;
+                for &next_twist in &mt.twist[i] {
+                    let next = next_twist as usize;
                     if table[next] == 255 {
                         table[next] = distance + 1;
                         count += 1;

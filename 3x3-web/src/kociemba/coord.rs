@@ -402,8 +402,8 @@ impl RawCube {
     /// Twist (コーナーの向き) を取得 (0..2186)
     pub fn get_twist(&self) -> u16 {
         let mut twist = 0u16;
-        for i in 0..7 {
-            twist = twist * 3 + self.co[i] as u16;
+        for &co in &self.co[..7] {
+            twist = twist * 3 + co as u16;
         }
         twist
     }
@@ -422,8 +422,8 @@ impl RawCube {
     /// Flip (エッジの向き) を取得 (0..2047)
     pub fn get_flip(&self) -> u16 {
         let mut flip = 0u16;
-        for i in 0..11 {
-            flip = flip * 2 + self.eo[i] as u16;
+        for &eo in &self.eo[..11] {
+            flip = flip * 2 + eo as u16;
         }
         flip
     }
@@ -510,9 +510,9 @@ impl RawCube {
         let mut ep8 = 0u32;
         let mut p = [0u8; 8];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) < 8 {
-                p[count] = self.ep[i] as u8;
+        for &edge in &self.ep {
+            if (edge as u8) < 8 {
+                p[count] = edge as u8;
                 count += 1;
             }
         }
@@ -542,10 +542,10 @@ impl RawCube {
         res[7] = available[0];
         // U/D面の8箇所に配置
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) < 8 {
+        for edge in &mut self.ep {
+            if (*edge as u8) < 8 {
                 // SAFETY: res[count] は 0..7 の範囲内の値で、Edge enum の判別値 (0..7) と一致するため、transmute は安全
-                self.ep[i] = unsafe { std::mem::transmute::<u8, Edge>(res[count]) };
+                *edge = unsafe { std::mem::transmute::<u8, Edge>(res[count]) };
                 count += 1;
             }
         }
@@ -556,9 +556,9 @@ impl RawCube {
         let mut slice_p = 0u32;
         let mut p = [0u8; 4];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) >= 8 {
-                p[count] = self.ep[i] as u8 - 8;
+        for &edge in &self.ep {
+            if (edge as u8) >= 8 {
+                p[count] = edge as u8 - 8;
                 count += 1;
             }
         }
@@ -587,10 +587,10 @@ impl RawCube {
         }
         res[3] = available[0];
         let mut count = 0;
-        for i in 0..12 {
-            if (self.ep[i] as u8) >= 8 {
+        for edge in &mut self.ep {
+            if (*edge as u8) >= 8 {
                 // SAFETY: res[count] + 8 は 8..11 の範囲内の値で、Edge enum の判別値 (8:FR, 9:FL, 10:BL, 11:BR) と一致するため、transmute は安全
-                self.ep[i] = unsafe { std::mem::transmute::<u8, Edge>(res[count] + 8) };
+                *edge = unsafe { std::mem::transmute::<u8, Edge>(res[count] + 8) };
                 count += 1;
             }
         }

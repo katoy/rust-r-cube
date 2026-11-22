@@ -2,7 +2,8 @@
 
 Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速なパターンデータベース（枝刈りテーブル）と IDA* ソルバー機能を搭載しています。
 
-![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
+[![Build & Test](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml/badge.svg)](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml)
+[![Lint & Format](https://github.com/katoy/rust-r-cube/actions/workflows/lint.yml/badge.svg)](https://github.com/katoy/rust-r-cube/actions/workflows/lint.yml)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-100%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -138,7 +139,7 @@ GGGG RRRR BBBB OOOO
 
 - **最遠状態 (11手)**:
   - スクランブル: `F U' F2 R' U R2 U' R' F U' F'` (一例)
-  - 状態: `WGWG / GRWY BYBR ROBO YOBG / OYRW` ([cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2/cubes/cube_god.txt))
+  - 状態: `WGWG / GRWY BYBR ROBO YOBG / OYRW` ([cube_god.txt](./cubes/cube_god.txt))
 - **非常に難しい状態 (10手)**:
   - 状態: `WWWW / OOOO GGGR RRBG BBRB / YYYY`
   - 解法: `R2 B D' R' F2 R2 U' R' F R'`
@@ -245,7 +246,7 @@ src/
 - **Clippy 警告ゼロ**: `cargo clippy` で警告が出ないクリーンなコード
 - **`#[must_use]` 属性**: 戻り値を持つ重要なメソッドに `#[must_use]` 属性を付与し、値の使い忘れを防止
 - **充実したドキュメント**: 全ての公開APIに Rustdoc コメントを記述
-- **包括的なテストスイート**: 約100件のテストで機能を網羅的に検証
+- **包括的なテストスイート**: 148件のテスト（単体・統合テスト 139件 + Doc-test 9件）で機能を網羅的に検証
 
 ## ライセンス
 

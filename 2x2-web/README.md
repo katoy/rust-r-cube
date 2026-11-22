@@ -3,7 +3,8 @@
 Rustで実装した2x2ルービックキューブのGUIプログラムです。超高速なパターンデータベース（枝刈りテーブル）と IDA* ソルバー機能を搭載しています。
 
 [![Demo](https://img.shields.io/badge/demo-live-success)](https://katoy.github.io/rust-r-cube/)
-![CI](https://github.com/katoy/rust-r-cube/actions/workflows/ci.yml/badge.svg)
+[![Build & Test](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml/badge.svg)](https://github.com/katoy/rust-r-cube/actions/workflows/build.yml)
+[![Lint & Format](https://github.com/katoy/rust-r-cube/actions/workflows/lint.yml/badge.svg)](https://github.com/katoy/rust-r-cube/actions/workflows/lint.yml)
 ![Core Coverage](https://img.shields.io/badge/core_coverage-100.00%25-brightgreen)
 ![Rust Version](https://img.shields.io/badge/rust-1.92%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -95,7 +96,7 @@ trunk build --release
 
 プロジェクトには、様々な状態のサンプルファイルが `cubes/` ディレクトリに含まれています：
 
-- [cube_god.txt](file:///Users/katoy/github/study-rust/rust-r-cube/2x2-web/cubes/cube_god.txt) - 11手必要な最難関状態
+- [cube_god.txt](./cubes/cube_god.txt) - 11手必要な最難関状態
 
 ### 神の数 (God's Number)
 

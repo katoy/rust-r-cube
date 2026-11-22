@@ -105,8 +105,8 @@ impl RawCube {
 
     pub fn get_twist(&self) -> u16 {
         let mut twist = 0u16;
-        for i in 0..7 {
-            twist = twist * 3 + self.co[i] as u16;
+        for &co in &self.co[..7] {
+            twist = twist * 3 + co as u16;
         }
         twist
     }

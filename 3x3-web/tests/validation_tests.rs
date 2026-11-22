@@ -183,8 +183,8 @@ fn test_all_global_moves() {
 fn test_color_not_found_error() {
     let mut cube = Cube::new();
     // 白の面（0..9）をすべて黄色に書き換えて、白を0個にする
-    for i in 0..9 {
-        cube.stickers[i].color = Color::Yellow;
+    for sticker in &mut cube.stickers[..9] {
+        sticker.color = Color::Yellow;
     }
     let res = cube.is_valid_state();
     assert!(res.is_err());

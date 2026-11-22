@@ -11,12 +11,10 @@ import {
   type CubeType,
   type SolverAlgorithm,
   type CellArrowInfo,
-  SOLVER_META_BY_TYPE,
   getSolvedState,
   getCellArrowInfo,
-  countPieceOrientations,
 } from "./model";
-import { SOLVED_2X2, PRESETS_2X2, isUniformSolved2x2 } from "./model-2x2";
+import { SOLVED_2X2, isUniformSolved2x2 } from "./model-2x2";
 import { mount, icon, net } from "./view";
 import { CubeScene } from "./scene";
 import { SolverClient } from "./solver-client";
@@ -36,6 +34,9 @@ import { setupKeyboardShortcuts } from "./keyboard-shortcuts";
 import { parseUrlParams, buildShareUrl, VALID_SOLVERS } from "./url-params";
 import { validateAndParseCubeJson, createCubeJsonBlob } from "./file-io";
 import { AppStateMachine } from "./app-state";
+import { setupArrowLegend, updateArrowLegend } from "./arrow-legend";
+import { createCompareController } from "./compare-controller";
+import { createPresetsController } from "./presets-controller";
 
 declare global {
   interface Window {
@@ -140,7 +141,17 @@ includeOrientation.onchange = () => {
   refresh();
 };
 
+let lastRenderedCubeType: CubeType | undefined = undefined;
+let lastArrowInfo: CellArrowInfo | undefined = undefined;
+let cachedSolutionButtons: HTMLButtonElement[] = [];
+let lastControlsDisabled: boolean | undefined = undefined;
+let lastControlsCubeType: CubeType | undefined = undefined;
+
 function updateCubeTypeUI(type: CubeType) {
+  if (lastRenderedCubeType === type) return;
+  lastRenderedCubeType = type;
+  lastControlsCubeType = undefined;
+
   const btn3 = $("cube-type-3x3");
   const btn2 = $("cube-type-2x2");
   if (btn3 && btn2) {
@@ -211,7 +222,7 @@ function updateCubeTypeUI(type: CubeType) {
     camColors.hidden = false;
   }
 
-  renderPresetButtons(type);
+  presetsController.renderPresetButtons(type);
 }
 
 function switchCubeType(type: CubeType) {
@@ -220,12 +231,8 @@ function switchCubeType(type: CubeType) {
   appState.runCubeMutation(() => {
     stop();
     message();
-    store.setCubeType(type, true);
     $("scramble-text").textContent = DEFAULT_SCRAMBLE_TEXT;
-    scene?.setCubeType(type);
-    updateCubeTypeUI(type);
-    persist();
-    refresh();
+    store.setCubeType(type, true);
   });
 }
 
@@ -306,7 +313,7 @@ function replace(
 ) {
   stop();
   cancelSearch();
-  clearComparison();
+  compareController.clearComparison();
   message();
   updateSolverNote();
   $("scramble-text").textContent = DEFAULT_SCRAMBLE_TEXT;
@@ -314,221 +321,54 @@ function replace(
   appState.resetToIdle();
 }
 
-function setupArrowLegend() {
-  const legendBtn = $("arrow-legend-btn");
-  const popover = $("arrow-legend-popover");
-  const closeBtn = $("arrow-legend-close");
-  if (!legendBtn || !popover) return;
-
-  const togglePopover = (open?: boolean) => {
-    const willOpen = open ?? popover.hidden;
-    popover.hidden = !willOpen;
-    legendBtn.setAttribute("aria-expanded", String(willOpen));
-  };
-
-  legendBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    togglePopover();
-  });
-
-  closeBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    togglePopover(false);
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!popover.hidden && !popover.contains(e.target as Node)) {
-      togglePopover(false);
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !popover.hidden) {
-      togglePopover(false);
-      legendBtn.focus();
-    }
-  });
-}
-
-function updateArrowLegend(
-  state: string,
-  centerRotations: number[],
-  is2x2: boolean,
-  precomputedArrowInfo?: CellArrowInfo,
-) {
-  const legend = $("arrow-legend");
-  if (!legend) return;
-  if (is2x2) {
-    legend.hidden = true;
-    return;
-  }
-  legend.hidden = false;
-
-  const arrowInfo =
-    precomputedArrowInfo ?? getCellArrowInfo(state, centerRotations);
-  const counts = countPieceOrientations(arrowInfo);
-
-  const countNormal = $("legend-count-normal");
-  const countCorner = $("legend-count-corner");
-  const countEdge = $("legend-count-edge");
-  const countCenter = $("legend-count-center");
-
-  if (countNormal) countNormal.textContent = String(counts.normal);
-  if (countCorner) countCorner.textContent = String(counts.cornerTwist);
-  if (countEdge) countEdge.textContent = String(counts.edgeFlip);
-  if (countCenter) countCenter.textContent = String(counts.centerRotate);
-
-  const btn = $("arrow-legend-btn");
-  if (btn) {
-    const hasIssues =
-      counts.cornerTwist > 0 || counts.edgeFlip > 0 || counts.centerRotate > 0;
-    btn.classList.toggle("has-issues", hasIssues);
-    btn.classList.toggle("is-all-normal", !hasIssues);
-  }
-
-  const pillCorner = legend.querySelector(".pill-corner");
-  const pillEdge = legend.querySelector(".pill-edge");
-  const pillCenter = legend.querySelector(".pill-center");
-
-  pillCorner?.classList.toggle("has-count", counts.cornerTwist > 0);
-  pillEdge?.classList.toggle("has-count", counts.edgeFlip > 0);
-  pillCenter?.classList.toggle("has-count", counts.centerRotate > 0);
-}
-
 let renderedSolution: ResultData | undefined = undefined;
 let cachedAnalyzedMoves: ReturnType<typeof analyzeMoves> = [];
 let lastRenderedStep: number | undefined = undefined;
 
-type CompareEntry =
-  | { status: "pending" }
-  | { status: "done"; result: ResultData }
-  | { status: "error"; error: string };
+const compareController = createCompareController({
+  store,
+  appState,
+  getSolver: () => solver,
+  ensureSolverReady,
+  validateState: (s) => validate(s),
+  stop,
+  message,
+  persist,
+  refresh,
+  updateSolverNote,
+  isSolving: () => solving,
+  setSolving: (val) => {
+    solving = val;
+  },
+  setIntervalId: (id) => {
+    interval = id;
+  },
+  clearIntervalId: () => {
+    clearInterval(interval);
+  },
+  getIncludeOrientation: () => includeOrientation.checked,
+  getSolverAlgoEl: () => solverAlgo,
+  getSolverNoteEl: () => $("solver-note"),
+  getExtendedEl: () => $("extended"),
+  getComparePanelEl: () => $("solver-compare-panel"),
+  getCompareListEl: () => $("solver-compare-list"),
+  getCompareSummaryEl: () => $("solver-compare-summary"),
+});
 
-const compareEntries = new Map<SolverAlgorithm, CompareEntry>();
-let activeComparedAlgo: SolverAlgorithm | undefined = undefined;
-let compareVersion = 0;
-let lastRenderedCompareVersion = -1;
-
-function clearComparison() {
-  if (compareEntries.size === 0 && activeComparedAlgo === undefined) return;
-  compareEntries.clear();
-  activeComparedAlgo = undefined;
-  compareVersion++;
-}
-
-function renderComparisonPanel() {
-  const panel = $("solver-compare-panel");
-  const list = $("solver-compare-list");
-  const summary = $("solver-compare-summary");
-  if (!panel || !list || !summary) return;
-
-  if (compareEntries.size === 0) {
-    panel.hidden = true;
-    list.replaceChildren();
-    summary.textContent = "";
-    lastRenderedCompareVersion = compareVersion;
-    return;
-  }
-
-  panel.hidden = false;
-  const cubeType = store.getCubeType();
-  const metas = SOLVER_META_BY_TYPE[cubeType];
-
-  let doneCount = 0;
-  let minMoves = Infinity;
-  for (const meta of metas) {
-    const entry = compareEntries.get(meta.id);
-    if (entry?.status === "done") {
-      doneCount++;
-      if (entry.result.moves.length < minMoves) {
-        minMoves = entry.result.moves.length;
-      }
-    }
-  }
-
-  summary.textContent = solving
-    ? `${doneCount} / ${metas.length} 完了…`
-    : `${doneCount} / ${metas.length} 解法 · 行をクリックして再生`;
-
-  if (lastRenderedCompareVersion !== compareVersion) {
-    lastRenderedCompareVersion = compareVersion;
-    list.replaceChildren();
-    for (const meta of metas) {
-      const entry = compareEntries.get(meta.id) ?? {
-        status: "pending" as const,
-      };
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "solver-compare-row";
-      button.dataset.solver = meta.id;
-
-      const info = document.createElement("div");
-      info.className = "compare-algo-info";
-
-      const nameRow = document.createElement("span");
-      nameRow.className = "compare-algo-name";
-      nameRow.textContent = meta.label;
-
-      if (entry.status === "done" && entry.result.moves.length === minMoves) {
-        const badge = document.createElement("span");
-        badge.className = "compare-badge-shortest";
-        badge.textContent = "最短";
-        nameRow.append(badge);
-      }
-
-      const desc = document.createElement("span");
-      desc.className = "compare-algo-desc";
-      desc.textContent = meta.shortDesc;
-      info.append(nameRow, desc);
-
-      const stats = document.createElement("div");
-      stats.className = "compare-algo-stats";
-      if (entry.status === "pending") {
-        const pendingSpan = document.createElement("span");
-        pendingSpan.className = "compare-status-pending";
-        pendingSpan.textContent = "計算中…";
-        stats.append(pendingSpan);
-      } else if (entry.status === "error") {
-        const errSpan = document.createElement("span");
-        errSpan.className = "compare-status-error";
-        errSpan.textContent = "失敗";
-        errSpan.title = entry.error;
-        stats.append(errSpan);
-      } else {
-        const movesSpan = document.createElement("span");
-        movesSpan.className = "compare-moves";
-        movesSpan.textContent = `${entry.result.moves.length} 手`;
-
-        const timeStr =
-          entry.result.elapsed_ms < 1000
-            ? `${Math.round(entry.result.elapsed_ms)} ms`
-            : `${(entry.result.elapsed_ms / 1000).toFixed(2)} s`;
-        const metricsSpan = document.createElement("span");
-        metricsSpan.className = "compare-metrics";
-        metricsSpan.textContent = `${timeStr} · ${entry.result.nodes.toLocaleString()} nodes`;
-
-        stats.append(movesSpan, metricsSpan);
-      }
-
-      button.append(info, stats);
-      if (entry.status === "done") {
-        button.onclick = () => selectComparedSolver(meta.id);
-      }
-      list.append(button);
-    }
-  }
-
-  list
-    .querySelectorAll<HTMLButtonElement>(".solver-compare-row")
-    .forEach((button) => {
-      const algo = button.dataset.solver as SolverAlgorithm;
-      const entry = compareEntries.get(algo);
-      const isActive = entry?.status === "done" && activeComparedAlgo === algo;
-      button.classList.toggle("is-active", isActive);
-      button.setAttribute("aria-pressed", String(isActive));
-      button.disabled = solving || entry?.status !== "done";
-    });
-}
+const presetsController = createPresetsController({
+  store,
+  appState,
+  isMainReady: () => mainReady,
+  stop,
+  cancelSearch,
+  replace,
+  applyMoves: (s, m) => apply_moves(s, m),
+  validateState: (s) => validate(s),
+  scrambleMoves: (seed) => scramble(seed),
+  getScrambleTextEl: () => $("scramble-text"),
+  getPresetButtonsEl: () => $("preset-buttons"),
+  getPresetStatusEl: () => $("preset-status"),
+});
 
 let lastSolveLabel: string | undefined = undefined;
 let lastPlayIcon: string | undefined = undefined;
@@ -571,6 +411,7 @@ function refresh() {
   const arrowInfo = is2x2
     ? undefined
     : getCellArrowInfo(state, centerRotations);
+  lastArrowInfo = arrowInfo;
   if (scene) {
     scene.centerRotations = [...centerRotations];
     if (!inMotion) scene.show(state, next, arrowInfo);
@@ -607,20 +448,29 @@ function refresh() {
     !mainReady || !store.canUndo() || !canModify;
   $<HTMLButtonElement>("redo").disabled =
     !mainReady || !store.canRedo() || !canModify;
-  document
-    .querySelectorAll<HTMLButtonElement>(
-      "[data-move],#scramble,#reset,#apply-algorithm,#cube-type-3x3,#cube-type-2x2,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
-    )
-    .forEach((b) => (b.disabled = !mainReady || !canModify));
+  const controlsDisabled = !mainReady || !canModify;
+  const currentCubeType: CubeType = is2x2 ? "2x2" : "3x3";
+  if (
+    lastControlsDisabled !== controlsDisabled ||
+    lastControlsCubeType !== currentCubeType
+  ) {
+    lastControlsDisabled = controlsDisabled;
+    lastControlsCubeType = currentCubeType;
+    document
+      .querySelectorAll<HTMLButtonElement>(
+        "[data-move],#scramble,#reset,#apply-algorithm,#cube-type-3x3,#cube-type-2x2,#edit-colors,#camera-colors,#save,#load,#share-link,#preset-buttons button,#prime,#double",
+      )
+      .forEach((b) => (b.disabled = controlsDisabled));
+  }
   solverAlgo.disabled = solving;
   includeOrientation.disabled = solving;
-  const hasCompare = compareEntries.size > 0;
+  const hasCompare = compareController.hasComparison();
   $("solution-empty").hidden = !!solution || hasCompare;
   $("solution-content").hidden = !solution;
   document.body.classList.toggle("has-solution", !!solution || hasCompare);
   $<HTMLButtonElement>("copy").disabled = !solution;
   $("solution-close").hidden = solving || (!solution && !hasCompare);
-  renderComparisonPanel();
+  compareController.renderComparisonPanel();
   if (solution) {
     $("move-count").textContent = `${solution.moves.length} 手`;
     $("solve-time").textContent =
@@ -630,6 +480,7 @@ function refresh() {
     if (solutionChanged) {
       renderedSolution = solution;
       cachedAnalyzedMoves = analyzeMoves(solution.moves, solution.phases);
+      cachedSolutionButtons = [];
       list.replaceChildren();
       cachedAnalyzedMoves.forEach((meta, i) => {
         if (
@@ -657,11 +508,12 @@ function refresh() {
           stop();
           void seek(i + 1, false);
         };
+        cachedSolutionButtons.push(button);
         list.append(button);
       });
     }
 
-    const buttons = list.querySelectorAll<HTMLButtonElement>(".solution-move");
+    const buttons = cachedSolutionButtons;
     if (solutionChanged || lastRenderedStep === undefined) {
       buttons.forEach((button, i) => {
         button.classList.toggle("done", i < step);
@@ -735,9 +587,7 @@ function refresh() {
     if (step === 0) {
       list.scrollTop = 0;
     } else {
-      const currentButton = list.querySelector(
-        `[data-step="${step}"]`,
-      ) as HTMLElement | null;
+      const currentButton = cachedSolutionButtons[step];
       if (currentButton) {
         currentButton.scrollIntoView({ block: "nearest", inline: "nearest" });
       } else if (step === solution.moves.length && list.lastElementChild) {
@@ -750,6 +600,7 @@ function refresh() {
   } else {
     renderedSolution = undefined;
     cachedAnalyzedMoves = [];
+    cachedSolutionButtons = [];
     lastRenderedStep = undefined;
     const timeline = $<HTMLInputElement>("timeline");
     timeline.max = "0";
@@ -767,7 +618,7 @@ store.subscribe((_s, { type }) => {
     return;
   }
   if (type === "cube-type") {
-    clearComparison();
+    compareController.clearComparison();
     updateCubeTypeUI(store.getCubeType());
     scene?.setCubeType(store.getCubeType());
     persist();
@@ -777,7 +628,7 @@ store.subscribe((_s, { type }) => {
     type === "redo" ||
     type === "algorithm"
   ) {
-    clearComparison();
+    compareController.clearComparison();
     updateCubeTypeUI(store.getCubeType());
     scene?.setCubeType(store.getCubeType());
     persist();
@@ -841,6 +692,7 @@ async function seek(target: number, animate = true) {
       move,
       nextState,
       Number($<HTMLSelectElement>("speed").value),
+      lastArrowInfo,
     );
   else if (animate && move && !scene && !reduced.checked)
     await new Promise((resolve) =>
@@ -928,6 +780,7 @@ async function applyAlgorithm(algorithm: string, animate = true) {
         result.moves[0],
         store.getState(),
         Number($<HTMLSelectElement>("speed").value),
+        lastArrowInfo,
       );
     }
     if (token === motion) {
@@ -970,7 +823,7 @@ async function solve(budget = 5000) {
   if (!appState.startSolving()) return;
   solving = true;
   stop();
-  clearComparison();
+  compareController.clearComparison();
   message();
   $("extended").hidden = true;
   if (!store.restoreBaseSnapshot()) {
@@ -1030,154 +883,6 @@ async function solve(budget = 5000) {
       $("extended").hidden = true;
       $("solver-note").textContent = "探索できませんでした";
     }
-  } finally {
-    if (appState.isSolving()) {
-      appState.cancelSolving();
-    }
-    solving = false;
-    clearInterval(interval);
-    refresh();
-  }
-}
-
-function selectComparedSolver(algo: SolverAlgorithm) {
-  if (solving) return;
-  const entry = compareEntries.get(algo);
-  if (!entry || entry.status !== "done") return;
-  stop();
-  message();
-  activeComparedAlgo = algo;
-  solverAlgo.value = algo;
-  updateSolverNote();
-  store.restoreBaseSnapshot();
-  store.setSolution(entry.result);
-  appState.setPreviewing();
-  if (entry.result.moves.length === 0) {
-    message("すでに6面が揃っています。");
-  }
-  $("solver-note").textContent =
-    `${entry.result.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
-  persist();
-  refresh();
-}
-
-async function compareAllSolvers(budget = 5000) {
-  if (!(await ensureSolverReady()) || !solver) return;
-  if (!appState.startSolving()) return;
-  solving = true;
-  stop();
-  message();
-  $("extended").hidden = true;
-  if (!store.restoreBaseSnapshot()) {
-    store.setSolution(undefined);
-  }
-  clearComparison();
-  try {
-    const currentState = store.getState();
-    validate(currentState);
-    const at = store.getRevision();
-    const cubeType = store.getCubeType();
-    const centers = store.getCenterRotations();
-    const metas = SOLVER_META_BY_TYPE[cubeType];
-    for (const meta of metas) {
-      compareEntries.set(meta.id, { status: "pending" });
-    }
-    compareVersion++;
-    const start = performance.now();
-    let currentIdx = 0;
-    let currentLabel = metas[0]?.label || "";
-    interval = window.setInterval(() => {
-      const elapsed = performance.now() - start;
-      $("solver-note").textContent =
-        `比較中 (${currentIdx + 1}/${metas.length}: ${currentLabel}) · ${(elapsed / 1000).toFixed(1)} 秒`;
-    }, 100);
-    refresh();
-
-    for (let i = 0; i < metas.length; i++) {
-      const meta = metas[i];
-      currentIdx = i;
-      currentLabel = meta.label;
-      if (!appState.isSolving() || store.getRevision() !== at) return;
-      try {
-        const result = await solver.solve(
-          currentState,
-          at,
-          budget,
-          includeOrientation.checked,
-          centers,
-          meta.id,
-          cubeType,
-        );
-        if (!appState.isSolving() || store.getRevision() !== at) return;
-        compareEntries.set(meta.id, { status: "done", result });
-      } catch (error) {
-        if (String(error).includes("cancelled")) {
-          throw error;
-        }
-        if (!appState.isSolving() || store.getRevision() !== at) return;
-        compareEntries.set(meta.id, {
-          status: "error",
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      compareVersion++;
-      refresh();
-    }
-
-    if (!appState.isSolving() || store.getRevision() !== at) return;
-    const preferredId = solverAlgo.value as SolverAlgorithm;
-    const preferredEntry = compareEntries.get(preferredId);
-    let chosenAlgo: SolverAlgorithm | undefined;
-    let chosenResult: ResultData | undefined;
-    if (preferredEntry?.status === "done") {
-      chosenAlgo = preferredId;
-      chosenResult = preferredEntry.result;
-    } else {
-      for (const meta of metas) {
-        const entry = compareEntries.get(meta.id);
-        if (entry?.status === "done") {
-          chosenAlgo = meta.id;
-          chosenResult = entry.result;
-          break;
-        }
-      }
-    }
-
-    if (chosenAlgo && chosenResult) {
-      activeComparedAlgo = chosenAlgo;
-      solverAlgo.value = chosenAlgo;
-      updateSolverNote();
-      store.setSolution(chosenResult);
-      appState.finishSolving(true);
-      if (window.innerWidth <= 740) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-      $("solver-note").textContent =
-        `${chosenResult.nodes.toLocaleString()} ノードを探索 · 完成を検証`;
-      if (chosenResult.moves.length === 0) {
-        message("すでに6面が揃っています。");
-      }
-    } else {
-      appState.finishSolving(false);
-      const firstError = metas
-        .map((m) => compareEntries.get(m.id))
-        .find(
-          (e): e is { status: "error"; error: string } => e?.status === "error",
-        );
-      message(firstError?.error || "すべての解法で探索に失敗しました。");
-      $("solver-note").textContent = "探索できませんでした";
-    }
-  } catch (error) {
-    if (String(error).includes("cancelled")) {
-      clearComparison();
-      appState.cancelSolving();
-      return;
-    }
-    clearComparison();
-    appState.finishSolving(false);
-    message(error instanceof Error ? error.message : String(error));
-    $("extended").hidden = true;
-    $("solver-note").textContent = "探索できませんでした";
   } finally {
     if (appState.isSolving()) {
       appState.cancelSolving();
@@ -1311,11 +1016,11 @@ $("camera-colors").onclick = async () => {
   await openModal(getCamera, (cam) => cam.open(store.getCubeType()));
 };
 $("solve").onclick = () => void solve();
-$("compare-solvers").onclick = () => void compareAllSolvers();
+$("compare-solvers").onclick = () => void compareController.compareAllSolvers();
 $("extended").onclick = () => void solve(30000);
 $("cancel").onclick = () => {
   cancelSearch();
-  clearComparison();
+  compareController.clearComparison();
   message("探索を中止しました。");
   $("solver-note").textContent = "エンジンを再準備しています";
   refresh();
@@ -1439,7 +1144,7 @@ $("copy").onclick = async () => {
 };
 $("solution-close").onclick = () => {
   stop();
-  clearComparison();
+  compareController.clearComparison();
   store.setSolution(undefined);
   appState.closeSolution();
   persist();
@@ -1764,171 +1469,8 @@ async function start(forceError = false) {
   }
 }
 
-// プリセット状態の定義
-const presets = [
-  { id: "solved", label: "完成状態", emoji: "✅" },
-  { id: "superflip", label: "スーパーフリップ", emoji: "⚡" },
-  { id: "easy-5-moves", label: "簡単（3手）", emoji: "🟢" },
-  { id: "t-perm", label: "T-Permutation", emoji: "🔄" },
-  { id: "seed-1-scramble", label: "ランダム（seed=1）", emoji: "🎲" },
-];
-
-interface PresetData {
-  scramble_seed?: number;
-  scramble?: string;
-  state?: string;
-  centerTurns?: unknown;
-}
-
-function applyPresetMoves(algorithm: string) {
-  const result: ResultData = JSON.parse(apply_moves(SOLVED, algorithm));
-  replace(result.state, true, rotateCenters([0, 0, 0, 0, 0, 0], result.moves));
-  $("scramble-text").textContent = algorithm;
-}
-
-function applyPresetData(data: PresetData) {
-  if (typeof data.scramble_seed === "number") {
-    try {
-      applyPresetMoves(scramble(data.scramble_seed));
-    } catch (e) {
-      throw new Error(
-        `シードスクランブル実行エラー: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-  } else if (typeof data.scramble === "string" && data.scramble.trim()) {
-    try {
-      const cleaned = data.scramble.replace(/(\b[URFDLB])\s+(\d|')/g, "$1$2");
-      applyPresetMoves(cleaned);
-    } catch (e) {
-      throw new Error(
-        `スクランブル実行エラー: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-  } else if (typeof data.state === "string" && data.state.trim()) {
-    validate(data.state);
-    replace(data.state, true, centersFromInput(data.state, data.centerTurns));
-  } else {
-    throw new Error(
-      `無効なデータ形式: state=${data.state}, scramble=${data.scramble}, scramble_seed=${data.scramble_seed}`,
-    );
-  }
-}
-
-let presetRequestId = 0;
-
-async function loadPreset(
-  preset: (typeof presets)[number],
-  requestId: number,
-  initialRevision: number,
-) {
-  const presetStatus = $("preset-status");
-  presetStatus.textContent = "読み込み中…";
-  const baseUrl = import.meta.env.BASE_URL.endsWith("/")
-    ? import.meta.env.BASE_URL
-    : `${import.meta.env.BASE_URL}/`;
-  const response = await fetch(`${baseUrl}cubes/${preset.id}.json`);
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status}: ファイルが見つかりません (${response.url})`,
-    );
-  }
-  const data: PresetData = await response.json();
-
-  if (requestId !== presetRequestId) return;
-
-  if (
-    !appState.getState().canModifyCube() ||
-    store.getRevision() !== initialRevision
-  ) {
-    presetStatus.textContent =
-      "⚠️ 読み込み中にキューブが操作されたため、現在の操作を優先しました";
-    return;
-  }
-
-  appState.runCubeMutation(() => {
-    applyPresetData(data);
-  });
-  presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
-}
-
-// プリセットボタンを生成
-function renderPresetButtons(type: CubeType) {
-  const presetButtons = $("preset-buttons");
-  const presetStatus = $("preset-status");
-  if (!presetButtons || !presetStatus) return;
-  presetButtons.replaceChildren();
-
-  if (type === "2x2") {
-    try {
-      for (const preset of PRESETS_2X2) {
-        const button = document.createElement("button");
-        button.className = "secondary";
-        button.textContent = `${preset.emoji} ${preset.label}`;
-        button.disabled = !mainReady;
-        button.onclick = () => {
-          if (!mainReady || !appState.getState().canModifyCube()) return;
-          stop();
-          cancelSearch();
-          appState.runCubeMutation(() => {
-            if (preset.scramble) {
-              const result: ResultData = JSON.parse(
-                apply_moves(SOLVED_2X2, preset.scramble),
-              );
-              replace(result.state, true, [0, 0, 0, 0, 0, 0]);
-              $("scramble-text").textContent = preset.scramble;
-            } else if (preset.state) {
-              replace(preset.state, true, [0, 0, 0, 0, 0, 0]);
-              $("scramble-text").textContent = "";
-            }
-          });
-          presetStatus.textContent = `✓ ${preset.label} を読み込みました`;
-        };
-        presetButtons.append(button);
-      }
-      presetStatus.textContent =
-        "プリセットから選択してください（下のタブから 📌 プリセット）";
-    } catch (error) {
-      presetStatus.textContent = `初期化エラー: ${String(error)}`;
-    }
-  } else {
-    try {
-      for (const preset of presets) {
-        const button = document.createElement("button");
-        button.className = "secondary";
-        button.textContent = `${preset.emoji} ${preset.label}`;
-        button.disabled = !mainReady;
-        button.onclick = async () => {
-          if (!mainReady || !appState.getState().canModifyCube()) return;
-          stop();
-          cancelSearch();
-          const requestId = ++presetRequestId;
-          const initialRevision = store.getRevision();
-          try {
-            await loadPreset(preset, requestId, initialRevision);
-          } catch (error) {
-            if (requestId === presetRequestId) {
-              const errorMsg =
-                error instanceof Error ? error.message : String(error);
-              presetStatus.textContent = `❌ 読み込み失敗 (${errorMsg})`;
-            }
-          }
-        };
-        presetButtons.append(button);
-      }
-      presetStatus.textContent =
-        "プリセットから選択してください（下のタブから 📌 プリセット）";
-    } catch (error) {
-      presetStatus.textContent = `初期化エラー: ${String(error)}`;
-    }
-  }
-}
-
-async function initializePresets() {
-  renderPresetButtons(store.getCubeType());
-}
-
 // プリセット初期化を開始
-initializePresets();
+void presetsController.initializePresets();
 
 void start();
 
@@ -1942,8 +1484,8 @@ if (
     cancelSearch,
     fallback,
     solve,
-    compareAllSolvers,
-    selectComparedSolver,
+    compareAllSolvers: compareController.compareAllSolvers,
+    selectComparedSolver: compareController.selectComparedSolver,
     play,
     stop,
     seek,
@@ -1954,7 +1496,7 @@ if (
     replace,
     getEditor,
     getCamera,
-    initializePresets,
+    initializePresets: presetsController.initializePresets,
     start,
     appState,
     getScene: () => scene,

@@ -293,9 +293,11 @@ export class CubeStore {
     nextCenters = normalizeCenters(nextState, nextCenters);
     if (record) {
       this.commitBaseSnapshotIfPreviewing();
+      const nextTurns = centerTurns(nextCenters);
+      const currentTurns = this.getCenterTurns();
       if (
         this.state !== nextState ||
-        nextCenters.some((angle, i) => angle !== this.centerRotations[i])
+        nextTurns.some((t, i) => t !== currentTurns[i])
       ) {
         this.pushHistory(this.getSnapshot());
       }

@@ -1,32 +1,164 @@
-use crate::coord::{move_cube_18, RawCube};
+use crate::coord::{move_cube_18, rank_perm8, unrank_perm8, RawCube};
 use crate::cube::apply;
+use crate::tables::{MoveTable, PruningTable, PHASE2_MOVES};
+use std::collections::VecDeque;
 use std::sync::OnceLock;
 use web_time::Instant;
 
-fn is_valid_g3_corner_permutation(cp: u16) -> bool {
-    static G3_CP_SET: OnceLock<[bool; 40320]> = OnceLock::new();
-    let set = G3_CP_SET.get_or_init(|| {
-        let mut table = [false; 40320];
-        let mut queue = std::collections::VecDeque::new();
-        let g3_half_turns = [1, 4, 7, 10, 13, 16]; // U2, R2, F2, D2, L2, B2
+/// Phase 2 (G1 -> G2) で許可される 14 通りの基本手: U, D, R, L, F2, B2
+const G1_MOVES: [usize; 14] = [0, 1, 2, 3, 4, 5, 7, 9, 10, 11, 12, 13, 14, 16];
+/// Phase 4 (G3 -> G4) で許可される 6 通りの半回転（PHASE2_MOVES 内のインデックス: U2, R2, F2, D2, L2, B2）
+const G3_P2_INDICES: [usize; 6] = [1, 3, 4, 6, 8, 9];
 
-        let solved = RawCube::default();
-        table[solved.get_cp() as usize] = true;
-        queue.push_back(solved);
-
-        while let Some(c) = queue.pop_front() {
-            for &m in &g3_half_turns {
-                let next = c.multiply(move_cube_18(m));
-                let next_cp = next.get_cp() as usize;
-                if !table[next_cp] {
-                    table[next_cp] = true;
-                    queue.push_back(next);
+fn g1_eo_dist() -> &'static [u8; 2048] {
+    static G1_EO_DIST: OnceLock<[u8; 2048]> = OnceLock::new();
+    G1_EO_DIST.get_or_init(|| {
+        let mt = MoveTable::get();
+        let mut dist = [255u8; 2048];
+        dist[0] = 0;
+        let mut q = VecDeque::with_capacity(2048);
+        q.push_back(0u16);
+        while let Some(f) = q.pop_front() {
+            let d = dist[f as usize];
+            for &nf in &mt.flip[f as usize] {
+                if dist[nf as usize] == 255 {
+                    dist[nf as usize] = d + 1;
+                    q.push_back(nf);
                 }
             }
         }
-        table
-    });
-    set[cp as usize]
+        dist
+    })
+}
+
+struct G3Table {
+    cp_coset: Box<[u16; 40320]>,
+    coset_move: Box<[[u16; 10]; 420]>,
+    edge_id: [u8; 256],
+    edge_move: [[u8; 10]; 70],
+    dist: Box<[u8; 29400]>,
+}
+
+fn g3_table() -> &'static G3Table {
+    static G3_TABLE: OnceLock<G3Table> = OnceLock::new();
+    G3_TABLE.get_or_init(|| {
+        let mt = MoveTable::get();
+        let h_gens: [[u8; 8]; 6] = std::array::from_fn(|i| {
+            let mc = move_cube_18(PHASE2_MOVES[G3_P2_INDICES[i]]);
+            mc.cp.map(|c| c as u8)
+        });
+
+        // 1. H = <U2, R2, F2, D2, L2, B2> による 40320 個のコーナー置換の 420 右コセット H*c 分割
+        let mut cp_coset = Box::new([u16::MAX; 40320]);
+        let mut coset_repr = [0u16; 420];
+        let mut num_cosets = 0usize;
+        let mut q_cp = VecDeque::with_capacity(96);
+
+        for start in 0..40320u16 {
+            if cp_coset[start as usize] != u16::MAX {
+                continue;
+            }
+            let cid = num_cosets as u16;
+            coset_repr[num_cosets] = start;
+            num_cosets += 1;
+            cp_coset[start as usize] = cid;
+            q_cp.push_back(start);
+
+            while let Some(c) = q_cp.pop_front() {
+                let p = unrank_perm8(c);
+                for gen in &h_gens {
+                    let q = [
+                        gen[p[0] as usize],
+                        gen[p[1] as usize],
+                        gen[p[2] as usize],
+                        gen[p[3] as usize],
+                        gen[p[4] as usize],
+                        gen[p[5] as usize],
+                        gen[p[6] as usize],
+                        gen[p[7] as usize],
+                    ];
+                    let nc = rank_perm8(&q);
+                    if cp_coset[nc as usize] == u16::MAX {
+                        cp_coset[nc as usize] = cid;
+                        q_cp.push_back(nc);
+                    }
+                }
+            }
+        }
+        assert_eq!(num_cosets, 420, "G3 corner cosets must be 420");
+
+        let mut coset_move = Box::new([[0u16; 10]; 420]);
+        for (cid, &repr) in coset_repr.iter().enumerate() {
+            for k in 0..10 {
+                coset_move[cid][k] = cp_coset[mt.cp[repr as usize][k] as usize];
+            }
+        }
+
+        // 2. 8-bit S/M スライスマスク（popcount == 4、計 70 状態）への遷移表
+        let mut edge_id = [255u8; 256];
+        let mut id_to_mask = [0u8; 70];
+        edge_id[0x55] = 0;
+        id_to_mask[0] = 0x55;
+        let mut next_eid = 1usize;
+        for mask in 0u16..256 {
+            if mask != 0x55 && mask.count_ones() == 4 {
+                edge_id[mask as usize] = next_eid as u8;
+                id_to_mask[next_eid] = mask as u8;
+                next_eid += 1;
+            }
+        }
+        assert_eq!(next_eid, 70, "G3 S/M slice states must be 70");
+
+        let ep_moves: [[u8; 8]; 10] = std::array::from_fn(|k| {
+            let mc = move_cube_18(PHASE2_MOVES[k]);
+            std::array::from_fn(|i| mc.ep[i] as u8)
+        });
+        let mut edge_move = [[0u8; 10]; 70];
+        for (eid, &mask) in id_to_mask.iter().enumerate() {
+            for (k, mv) in ep_moves.iter().enumerate() {
+                let mut nmask = 0u8;
+                for (i, &src) in mv.iter().enumerate() {
+                    if ((mask >> src) & 1) != 0 {
+                        nmask |= 1u8 << i;
+                    }
+                }
+                edge_move[eid][k] = edge_id[nmask as usize];
+            }
+        }
+
+        // 3. 420 * 70 = 29,400 状態の厳密最短距離 BFS（G2 -> G3）
+        let mut dist = Box::new([255u8; 29400]);
+        dist[0] = 0;
+        let mut q = VecDeque::with_capacity(29400);
+        q.push_back((0u16, 0u8));
+        let mut visited = 1usize;
+        while let Some((cid, eid)) = q.pop_front() {
+            let d = dist[cid as usize * 70 + eid as usize];
+            for k in 0..10 {
+                let ncid = coset_move[cid as usize][k];
+                let neid = edge_move[eid as usize][k];
+                let nidx = ncid as usize * 70 + neid as usize;
+                if dist[nidx] == 255 {
+                    dist[nidx] = d + 1;
+                    visited += 1;
+                    q.push_back((ncid, neid));
+                }
+            }
+        }
+        assert_eq!(visited, 29400, "G2->G3 coset BFS incomplete");
+
+        G3Table {
+            cp_coset,
+            coset_move,
+            edge_id,
+            edge_move,
+            dist,
+        }
+    })
+}
+
+fn is_valid_g3_corner_permutation(cp: u16) -> bool {
+    g3_table().cp_coset[cp as usize] == 0
 }
 
 #[derive(Debug, Clone)]
@@ -174,7 +306,7 @@ impl ThistlethwaiteSearch {
         })
     }
 
-    // Phase 1: G0 -> G1 (すべての手OK)
+    // Phase 1: G0 -> G1 (すべての手OK): flip 表 + BFS 距離による O(d) 貪欲降下
     fn is_g1(&self, c: &RawCube) -> bool {
         c.eo.iter().all(|&o| o == 0)
     }
@@ -183,55 +315,45 @@ impl ThistlethwaiteSearch {
         if self.is_g1(cube) {
             return Ok(Vec::new());
         }
-        for depth in 1..=8 {
-            let mut path = Vec::new();
-            if self.search_g1(cube, depth, 99, &mut path) {
-                return Ok(path);
-            }
-            if self.exhausted() {
-                break;
-            }
-        }
-        Err("Phase 1の探索に失敗しました。".into())
-    }
-
-    fn search_g1(
-        &mut self,
-        c: &RawCube,
-        depth: u8,
-        last_face: usize,
-        path: &mut Vec<usize>,
-    ) -> bool {
-        self.nodes += 1;
         if self.exhausted() {
-            return false;
+            return Err("Phase 1の探索に失敗しました。".into());
         }
-        if depth == 0 {
-            return self.is_g1(c);
-        }
-        let bad_eo = c.eo.iter().filter(|&&o| o != 0).count() as u8;
-        if bad_eo.div_ceil(4) > depth {
-            return false;
-        }
+        let dist = g1_eo_dist();
+        let mt = MoveTable::get();
+        let mut flip = cube.get_flip() as usize;
+        let mut cur_d = dist[flip];
+        let mut last_face = 99usize;
+        let mut path = Vec::with_capacity(cur_d as usize);
 
-        for face in 0..6 {
-            if redundant(face, last_face) {
-                continue;
+        while flip != 0 {
+            self.nodes += 1;
+            if self.exhausted() {
+                return Err("Phase 1の探索に失敗しました。".into());
             }
-            for turn in 0..3 {
-                let m = face * 3 + turn;
-                let next = c.multiply(move_cube_18(m));
-                path.push(m);
-                if self.search_g1(&next, depth - 1, face, path) {
-                    return true;
+            let mut stepped = false;
+            for (m, &nf_u16) in mt.flip[flip].iter().enumerate() {
+                let face = m / 3;
+                if face == last_face {
+                    continue;
                 }
-                path.pop();
+                let nf = nf_u16 as usize;
+                if dist[nf] < cur_d {
+                    path.push(m);
+                    flip = nf;
+                    cur_d = dist[nf];
+                    last_face = face;
+                    stepped = true;
+                    break;
+                }
+            }
+            if !stepped {
+                return Err("Phase 1の探索に失敗しました。".into());
             }
         }
-        false
+        Ok(path)
     }
 
-    // Phase 2: G1 -> G2 (許可手: U, D, L, R, F2, B2)
+    // Phase 2: G1 -> G2 (許可手: U, D, L, R, F2, B2): 座標のみ IDA*
     fn is_g2(&self, c: &RawCube) -> bool {
         self.is_g1(c)
             && c.co.iter().all(|&o| o == 0)
@@ -245,18 +367,18 @@ impl ThistlethwaiteSearch {
         if self.is_g2(cube) {
             return Ok(Vec::new());
         }
-        let g1_moves: Vec<usize> = (0..18)
-            .filter(|&m| {
-                let f = m / 3;
-                let t = m % 3;
-                // F(2), B(5) は半回転のみ (t == 1)
-                (f != 2 && f != 5) || t == 1
-            })
-            .collect();
+        if !self.is_g1(cube) || self.exhausted() {
+            return Err("Phase 2の探索に失敗しました。".into());
+        }
+        let twist = cube.get_twist() as usize;
+        let slice = cube.get_ud_slice() as usize;
+        let mt = MoveTable::get();
+        let pt = PruningTable::get();
+        let start_d = pt.get_twist_slice(twist, slice).max(1);
 
-        for depth in 1..=12 {
-            let mut path = Vec::new();
-            if self.search_g2(cube, depth, 99, &g1_moves, &mut path) {
+        for depth in start_d..=12 {
+            let mut path = Vec::with_capacity(depth as usize);
+            if self.search_g2_coords(mt, pt, twist, slice, depth, 99, &mut path) {
                 return Ok(path);
             }
             if self.exhausted() {
@@ -266,12 +388,15 @@ impl ThistlethwaiteSearch {
         Err("Phase 2の探索に失敗しました。".into())
     }
 
-    fn search_g2(
+    #[allow(clippy::too_many_arguments)]
+    fn search_g2_coords(
         &mut self,
-        c: &RawCube,
+        mt: &MoveTable,
+        pt: &PruningTable,
+        twist: usize,
+        slice: usize,
         depth: u8,
         last_face: usize,
-        allowed: &[usize],
         path: &mut Vec<usize>,
     ) -> bool {
         self.nodes += 1;
@@ -279,25 +404,31 @@ impl ThistlethwaiteSearch {
             return false;
         }
         if depth == 0 {
-            return self.is_g2(c);
+            return twist == 0 && slice == 0;
         }
-        let bad_co = c.co.iter().filter(|&&o| o != 0).count() as u8;
-        let bad_eslice = (8..12).filter(|&i| (c.ep[i] as usize) < 8).count() as u8;
-        if bad_co.div_ceil(4) > depth || bad_eslice.div_ceil(2) > depth {
-            return false;
-        }
-
-        for &m in allowed {
+        let next_depth = depth - 1;
+        for &m in &G1_MOVES {
             let face = m / 3;
             if redundant(face, last_face) {
                 continue;
             }
-            let next = c.multiply(move_cube_18(m));
+            let nt = mt.twist[twist][m] as usize;
+            let ns = mt.ud_slice[slice][m] as usize;
+            if next_depth == 0 {
+                if nt != 0 || ns != 0 {
+                    continue;
+                }
+            } else if pt.get_twist_slice(nt, ns) > next_depth {
+                continue;
+            }
             path.push(m);
-            if self.search_g2(&next, depth - 1, face, allowed, path) {
+            if self.search_g2_coords(mt, pt, nt, ns, next_depth, face, path) {
                 return true;
             }
             path.pop();
+            if self.timed_out {
+                return false;
+            }
         }
         false
     }
@@ -339,68 +470,74 @@ impl ThistlethwaiteSearch {
         if self.is_g3(cube) {
             return Ok(Vec::new());
         }
-        let g2_moves: Vec<usize> = (0..18)
-            .filter(|&m| {
-                let f = m / 3;
-                let t = m % 3;
-                // U(0), D(3) は全回転、他は半回転のみ
-                (f == 0 || f == 3) || t == 1
-            })
-            .collect();
-
-        for depth in 1..=14 {
-            let mut path = Vec::new();
-            if self.search_g3(cube, depth, 99, &g2_moves, &mut path) {
-                return Ok(path);
+        if !self.is_g2(cube) || self.exhausted() {
+            return Err("Phase 3の探索に失敗しました。".into());
+        }
+        let g3 = g3_table();
+        let mut cid = g3.cp_coset[cube.get_cp() as usize];
+        let mut mask = 0u8;
+        for (i, &ep) in cube.ep.iter().enumerate().take(8) {
+            if ((ep as u8) & 1) == 0 {
+                mask |= 1u8 << i;
             }
+        }
+        let mut eid = g3.edge_id[mask as usize];
+        if eid >= 70 {
+            return Err("Phase 3の探索に失敗しました。".into());
+        }
+        let mut cur_d = g3.dist[cid as usize * 70 + eid as usize];
+        let mut last_face = 99usize;
+        let mut path = Vec::with_capacity(cur_d as usize);
+
+        while cid != 0 || eid != 0 {
+            self.nodes += 1;
             if self.exhausted() {
-                break;
+                return Err("Phase 3の探索に失敗しました。".into());
+            }
+            let mut stepped = false;
+            for (k, &m) in PHASE2_MOVES.iter().enumerate() {
+                let face = m / 3;
+                if face == last_face {
+                    continue;
+                }
+                let ncid = g3.coset_move[cid as usize][k];
+                let neid = g3.edge_move[eid as usize][k];
+                let nd = g3.dist[ncid as usize * 70 + neid as usize];
+                if nd < cur_d {
+                    path.push(m);
+                    cid = ncid;
+                    eid = neid;
+                    cur_d = nd;
+                    last_face = face;
+                    stepped = true;
+                    break;
+                }
+            }
+            if !stepped {
+                return Err("Phase 3の探索に失敗しました。".into());
             }
         }
-        Err("Phase 3の探索に失敗しました。".into())
+        Ok(path)
     }
 
-    fn search_g3(
-        &mut self,
-        c: &RawCube,
-        depth: u8,
-        last_face: usize,
-        allowed: &[usize],
-        path: &mut Vec<usize>,
-    ) -> bool {
-        self.nodes += 1;
-        if self.exhausted() {
-            return false;
-        }
-        if depth == 0 {
-            return self.is_g3(c);
-        }
-
-        for &m in allowed {
-            let face = m / 3;
-            if redundant(face, last_face) {
-                continue;
-            }
-            let next = c.multiply(move_cube_18(m));
-            path.push(m);
-            if self.search_g3(&next, depth - 1, face, allowed, path) {
-                return true;
-            }
-            path.pop();
-        }
-        false
-    }
-
-    // Phase 4: G3 -> G4 (許可手: U2, D2, L2, R2, F2, B2)
+    // Phase 4: G3 -> G4 (許可手: U2, D2, L2, R2, F2, B2): 座標のみ IDA*
     fn solve_phase4(&mut self, cube: &RawCube) -> Result<Vec<usize>, String> {
         if *cube == RawCube::default() {
             return Ok(Vec::new());
         }
-        let g3_moves: Vec<usize> = (0..6).map(|f| f * 3 + 1).collect(); // すべての面の半回転 (2)
+        if !self.is_g3(cube) || self.exhausted() {
+            return Err("Phase 4の探索に失敗しました。".into());
+        }
+        let cp = cube.get_cp() as usize;
+        let ep = cube.get_ep8() as usize;
+        let sp = cube.get_slice_p() as usize;
+        let mt = MoveTable::get();
+        let pt = PruningTable::get();
+        let start_d = pt.get_cp_slice(cp, sp).max(pt.get_ep8_slice(ep, sp)).max(1);
 
-        for depth in 1..=15 {
-            let mut path = Vec::new();
-            if self.search_g4(cube, depth, 99, &g3_moves, &mut path) {
+        for depth in start_d..=15 {
+            let mut path = Vec::with_capacity(depth as usize);
+            if self.search_g4_coords(mt, pt, cp, ep, sp, depth, 99, &mut path) {
                 return Ok(path);
             }
             if self.exhausted() {
@@ -410,12 +547,16 @@ impl ThistlethwaiteSearch {
         Err("Phase 4の探索に失敗しました。".into())
     }
 
-    fn search_g4(
+    #[allow(clippy::too_many_arguments)]
+    fn search_g4_coords(
         &mut self,
-        c: &RawCube,
+        mt: &MoveTable,
+        pt: &PruningTable,
+        cp: usize,
+        ep: usize,
+        sp: usize,
         depth: u8,
         last_face: usize,
-        allowed: &[usize],
         path: &mut Vec<usize>,
     ) -> bool {
         self.nodes += 1;
@@ -423,25 +564,43 @@ impl ThistlethwaiteSearch {
             return false;
         }
         if depth == 0 {
-            return *c == RawCube::default();
+            return cp == 0 && ep == 0 && sp == 0;
         }
-        let bad_cp = (0..8).filter(|&i| c.cp[i] as usize != i).count() as u8;
-        let bad_ep = (0..12).filter(|&i| c.ep[i] as usize != i).count() as u8;
-        if bad_cp.div_ceil(4) > depth || bad_ep.div_ceil(4) > depth {
-            return false;
-        }
-
-        for &m in allowed {
+        let next_depth = depth - 1;
+        for &p2_idx in &G3_P2_INDICES {
+            let m = PHASE2_MOVES[p2_idx];
             let face = m / 3;
             if redundant(face, last_face) {
                 continue;
             }
-            let next = c.multiply(move_cube_18(m));
+            let ncp = mt.cp[cp][p2_idx] as usize;
+            let nsp = mt.slice_p[sp][p2_idx] as usize;
+            let nep;
+            if next_depth == 0 {
+                if ncp != 0 || nsp != 0 {
+                    continue;
+                }
+                nep = mt.ep8[ep][p2_idx] as usize;
+                if nep != 0 {
+                    continue;
+                }
+            } else {
+                if pt.get_cp_slice(ncp, nsp) > next_depth {
+                    continue;
+                }
+                nep = mt.ep8[ep][p2_idx] as usize;
+                if pt.get_ep8_slice(nep, nsp) > next_depth {
+                    continue;
+                }
+            }
             path.push(m);
-            if self.search_g4(&next, depth - 1, face, allowed, path) {
+            if self.search_g4_coords(mt, pt, ncp, nep, nsp, next_depth, face, path) {
                 return true;
             }
             path.pop();
+            if self.timed_out {
+                return false;
+            }
         }
         false
     }
@@ -454,7 +613,7 @@ fn redundant(face: usize, last: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cube::{apply, parse_moves};
+    use crate::cube::{apply, parse_moves, scramble};
 
     #[test]
     fn test_thistlethwaite_solved() {
@@ -554,6 +713,26 @@ mod tests {
         assert!(res.moves.len() <= 45);
         let final_cube = apply(&cube, &res.moves);
         assert_eq!(final_cube, RawCube::default(), "Cube must be fully solved");
+    }
+
+    #[test]
+    fn test_thistlethwaite_20_random_seeds_no_fallback() {
+        for seed in 1..=20 {
+            let cube = apply(&RawCube::default(), &scramble(seed));
+            let mut th = ThistlethwaiteSearch::new(3000);
+            let res = th
+                .solve(&cube)
+                .unwrap_or_else(|e| panic!("seed {seed} failed: {e}"));
+            assert_eq!(res.phases.len(), 4, "seed {seed} phases != 4");
+            for p in &res.phases {
+                assert!(
+                    !p.name.contains("フォールバック"),
+                    "seed {seed} used fallback: {}",
+                    p.name
+                );
+            }
+            assert_eq!(apply(&cube, &res.moves), RawCube::default());
+        }
     }
 
     #[test]

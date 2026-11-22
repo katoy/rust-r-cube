@@ -1,8 +1,9 @@
 use super::coord::{move_cube_18, Corner, RawCube};
 use super::cube;
-use super::lbl::cancel_redundant_moves_with_phases;
+use super::lbl::{cancel_redundant_moves_with_phases, parsed_oll_algorithms};
 use crate::PhaseInfo;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
+use std::sync::OnceLock;
 
 /// Ortega法による 2x2x2 キューブ解法。
 /// スピードキュービングで最も人気の高い3ステップ解法:
@@ -74,97 +75,104 @@ pub fn is_first_face_solved(cube: &RawCube) -> bool {
     true
 }
 
-/// 幅優先探索 (BFS) で最初の1面の色を揃える手順を探索 (深さ 0〜4 程度で即座に発見)
+const FIRST_FACE_GOAL: u16 = 0x5500;
+
+/// 最初の1面判定用の 16bit キーを計算する。
+/// 各スロット i (0..8) について 2bit を割り当て、Uピース=0、Dピース=(1 + co[i]) を格納する。
+/// スロット 4..7 がすべて D ピースかつ向き 0 のときに FIRST_FACE_GOAL (0x5500) と一致する。
+#[inline]
+fn first_face_key(cube: &RawCube) -> u16 {
+    let mut key = 0u16;
+    for i in 0..8 {
+        if (cube.cp[i] as u8) >= 4 {
+            key |= ((cube.co[i] as u16) + 1) << (i * 2);
+        }
+    }
+    key
+}
+
+#[inline]
+fn apply_move_to_first_face_key(key: u16, m: usize) -> u16 {
+    let mv = move_cube_18(m);
+    let mut next_key = 0u16;
+    for i in 0..8 {
+        let src = mv.cp[i] as usize;
+        let code = (key >> (src * 2)) & 3;
+        if code != 0 {
+            let new_co = (code as u8 - 1 + mv.co[i]) % 3;
+            next_key |= ((new_co as u16) + 1) << (i * 2);
+        }
+    }
+    next_key
+}
+
+fn first_face_table() -> &'static [u8] {
+    static TABLE: OnceLock<Box<[u8]>> = OnceLock::new();
+    TABLE
+        .get_or_init(|| {
+            let mut table = vec![u8::MAX; 65536].into_boxed_slice();
+            let mut q = VecDeque::with_capacity(5670);
+            table[FIRST_FACE_GOAL as usize] = 0;
+            q.push_back(FIRST_FACE_GOAL);
+            while let Some(key) = q.pop_front() {
+                let next_dist = table[key as usize] + 1;
+                for m in 0..18 {
+                    let next_key = apply_move_to_first_face_key(key, m);
+                    if table[next_key as usize] == u8::MAX {
+                        table[next_key as usize] = next_dist;
+                        q.push_back(next_key);
+                    }
+                }
+            }
+            table
+        })
+        .as_ref()
+}
+
+/// 事前計算済みの距離テーブルに沿って最初の1面の色を O(d) で解決
 fn solve_first_face(cube: &RawCube) -> Result<Vec<usize>, String> {
     if is_first_face_solved(cube) {
         return Ok(Vec::new());
     }
 
-    let mut q = VecDeque::new();
-    let mut visited = HashSet::new();
+    let table = first_face_table();
+    let mut key = first_face_key(cube);
+    let mut dist = table[key as usize];
+    if dist == u8::MAX {
+        return Err("最初の1面の手順が見つかりませんでした。".into());
+    }
 
-    q.push_back((*cube, Vec::new()));
-    visited.insert(cube.hash_first_face());
-
-    while let Some((cur, moves)) = q.pop_front() {
-        if moves.len() >= 6 {
-            break;
-        }
-
-        let last_face = moves.last().map(|m| m / 3).unwrap_or(255);
-
-        for face in 0..6 {
+    let mut moves = Vec::with_capacity(dist as usize);
+    let mut last_face = usize::MAX;
+    while dist > 0 {
+        let mut found = None;
+        'step: for face in 0..6 {
+            // U/D 等の可換な手を含む最短経路を塞がないよう、同一面連続のみスキップ
             if face == last_face {
                 continue;
             }
-            if (face == 3 && last_face == 0)
-                || (face == 4 && last_face == 1)
-                || (face == 5 && last_face == 2)
-            {
-                continue;
-            }
-
             for turn in 0..3 {
                 let m = face * 3 + turn;
-                let next_cube = cur.multiply(move_cube_18(m));
-
-                if is_first_face_solved(&next_cube) {
-                    let mut res = moves.clone();
-                    res.push(m);
-                    return Ok(res);
-                }
-
-                if moves.len() + 1 < 6 {
-                    let key = next_cube.hash_first_face();
-                    if visited.insert(key) {
-                        let mut next_moves = moves.clone();
-                        next_moves.push(m);
-                        q.push_back((next_cube, next_moves));
-                    }
+                let next_key = apply_move_to_first_face_key(key, m);
+                if table[next_key as usize] == dist - 1 {
+                    found = Some((m, face, next_key));
+                    break 'step;
                 }
             }
         }
+        let Some((m, face, next_key)) = found else {
+            return Err("最初の1面の手順が見つかりませんでした。".into());
+        };
+        moves.push(m);
+        key = next_key;
+        last_face = face;
+        dist -= 1;
     }
 
-    Err("最初の1面の手順が見つかりませんでした。".into())
-}
-
-impl RawCube {
-    #[inline]
-    fn hash_first_face(&self) -> u64 {
-        let mut h = 0u64;
-        for i in 0..8 {
-            h = (h << 3) | (self.cp[i] as u64);
-            h = (h << 2) | (self.co[i] as u64);
-        }
-        h
-    }
+    Ok(moves)
 }
 
 // --- ステップ 2: OLL ---
-
-const ORTEGA_OLL_ALGS: &[(&str, &str)] = &[
-    ("Sune (スーネ)", "R U R' U R U2 R'"),
-    ("Anti-Sune (アンチスーネ)", "R U2 R' U' R U' R'"),
-    ("H型 (4角反転)", "R2 U2 R U2 R2"),
-    ("Pi型 (側面前後)", "F R U R' U' R U R' U' F'"),
-    ("T型 (2角外向き)", "R U R' U' R' F R F'"),
-    ("U型 (2角前向き)", "F R U R' U' F'"),
-    ("L型 (ボウタイ)", "F R' F' R U R U' R'"),
-];
-
-fn parsed_ortega_oll_algs() -> &'static [(&'static str, Vec<usize>)] {
-    static PARSED: std::sync::OnceLock<Vec<(&'static str, Vec<usize>)>> =
-        std::sync::OnceLock::new();
-    PARSED
-        .get_or_init(|| {
-            ORTEGA_OLL_ALGS
-                .iter()
-                .map(|&(name, alg_str)| (name, cube::parse_moves(alg_str).unwrap()))
-                .collect()
-        })
-        .as_slice()
-}
 
 fn solve_ortega_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     if is_ortega_oll_solved(cube) {
@@ -176,7 +184,7 @@ fn solve_ortega_oll(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
     for auf in auf_choices {
         let cube_after_auf = cube::apply(cube, auf);
 
-        for (name, alg_moves) in parsed_ortega_oll_algs() {
+        for (name, alg_moves) in parsed_oll_algorithms() {
             let result_cube = cube::apply(&cube_after_auf, alg_moves);
 
             if is_ortega_oll_solved(&result_cube) && is_first_face_solved(&result_cube) {
@@ -235,10 +243,10 @@ fn rotate_y(m: usize, times: usize) -> usize {
     face * 3 + turn
 }
 
-type ParsedPblEntry = (&'static str, [Vec<usize>; 4]);
+type ParsedPblEntry = (&'static str, [(Vec<usize>, RawCube); 4]);
 
 fn parsed_pbl_algs() -> &'static [ParsedPblEntry] {
-    static PARSED: std::sync::OnceLock<Vec<ParsedPblEntry>> = std::sync::OnceLock::new();
+    static PARSED: OnceLock<Vec<ParsedPblEntry>> = OnceLock::new();
     PARSED
         .get_or_init(|| {
             PBL_ALGORITHMS
@@ -250,7 +258,9 @@ fn parsed_pbl_algs() -> &'static [ParsedPblEntry] {
                         cube::parse_moves(alg_str).unwrap()
                     };
                     let rots = std::array::from_fn(|y_rot| {
-                        base.iter().map(|&m| rotate_y(m, y_rot)).collect()
+                        let moves: Vec<usize> = base.iter().map(|&m| rotate_y(m, y_rot)).collect();
+                        let rc = cube::apply(&RawCube::default(), &moves);
+                        (moves, rc)
                     });
                     (name, rots)
                 })
@@ -259,39 +269,84 @@ fn parsed_pbl_algs() -> &'static [ParsedPblEntry] {
         .as_slice()
 }
 
-fn solve_pbl(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
-    let u_aufs: &[&[usize]] = &[&[], &[0], &[1], &[2]];
-    let d_aufs: &[&[usize]] = &[&[], &[9], &[10], &[11]]; // 9: D, 10: D2, 11: D'
+const U_AUFS: [Option<usize>; 4] = [None, Some(0), Some(1), Some(2)];
+const D_AUFS: [Option<usize>; 4] = [None, Some(9), Some(10), Some(11)]; // 9: D, 10: D2, 11: D'
+const SOLVED_U_CP: [Corner; 4] = [Corner::UFR, Corner::UFL, Corner::ULB, Corner::UBR];
+const SOLVED_D_CP: [Corner; 4] = [Corner::DFR, Corner::DLF, Corner::DBL, Corner::DRB];
 
-    for pre_u in u_aufs {
-        for pre_d in d_aufs {
-            let mut pre_moves = Vec::with_capacity(pre_u.len() + pre_d.len());
-            pre_moves.extend_from_slice(pre_u);
-            pre_moves.extend_from_slice(pre_d);
-            let cube_after_pre = cube::apply(cube, &pre_moves);
+#[inline]
+fn find_post_u(c: &RawCube) -> Option<Option<usize>> {
+    for &mv in &U_AUFS {
+        let after = if let Some(m) = mv {
+            c.multiply(move_cube_18(m))
+        } else {
+            *c
+        };
+        if after.cp[0..4] == SOLVED_U_CP {
+            return Some(mv);
+        }
+    }
+    None
+}
+
+#[inline]
+fn find_post_d(c: &RawCube) -> Option<Option<usize>> {
+    for &mv in &D_AUFS {
+        let after = if let Some(m) = mv {
+            c.multiply(move_cube_18(m))
+        } else {
+            *c
+        };
+        if after.cp[4..8] == SOLVED_D_CP {
+            return Some(mv);
+        }
+    }
+    None
+}
+
+fn solve_pbl(cube: &RawCube) -> Result<(Vec<usize>, String), String> {
+    for &pre_u in &U_AUFS {
+        let after_u = if let Some(m) = pre_u {
+            cube.multiply(move_cube_18(m))
+        } else {
+            *cube
+        };
+        for &pre_d in &D_AUFS {
+            let after_pre = if let Some(m) = pre_d {
+                after_u.multiply(move_cube_18(m))
+            } else {
+                after_u
+            };
 
             for (name, rots) in parsed_pbl_algs() {
-                for alg_moves in rots {
-                    let cube_after_alg = cube::apply(&cube_after_pre, alg_moves);
-
-                    for post_u in u_aufs {
-                        for post_d in d_aufs {
-                            let mut post_moves = Vec::with_capacity(post_u.len() + post_d.len());
-                            post_moves.extend_from_slice(post_u);
-                            post_moves.extend_from_slice(post_d);
-                            let final_cube = cube::apply(&cube_after_alg, &post_moves);
-
-                            if final_cube == RawCube::default() {
-                                let mut combined = Vec::with_capacity(
-                                    pre_moves.len() + alg_moves.len() + post_moves.len(),
-                                );
-                                combined.extend_from_slice(&pre_moves);
-                                combined.extend_from_slice(alg_moves);
-                                combined.extend_from_slice(&post_moves);
-                                return Ok((combined, (*name).to_string()));
-                            }
-                        }
+                for (alg_moves, alg_cube) in rots {
+                    let after_alg = after_pre.multiply(alg_cube);
+                    // U / D の post-AUF はコーナーの向きを変えないため co != 0 は即枝刈りし、U 層と D 層を独立判定
+                    if after_alg.co != [0; 8] {
+                        continue;
                     }
+                    let Some(post_u) = find_post_u(&after_alg) else {
+                        continue;
+                    };
+                    let Some(post_d) = find_post_d(&after_alg) else {
+                        continue;
+                    };
+
+                    let mut combined = Vec::with_capacity(alg_moves.len() + 4);
+                    if let Some(m) = pre_u {
+                        combined.push(m);
+                    }
+                    if let Some(m) = pre_d {
+                        combined.push(m);
+                    }
+                    combined.extend_from_slice(alg_moves);
+                    if let Some(m) = post_u {
+                        combined.push(m);
+                    }
+                    if let Some(m) = post_d {
+                        combined.push(m);
+                    }
+                    return Ok((combined, (*name).to_string()));
                 }
             }
         }
@@ -325,6 +380,25 @@ mod tests {
                 "phases count={}",
                 phases.len()
             );
+        }
+    }
+
+    #[test]
+    fn test_first_face_table_reaches_all_5670_states_and_solves_them() {
+        let table = first_face_table();
+        let reachable = table.iter().filter(|&&d| d != u8::MAX).count();
+        assert_eq!(reachable, 5670);
+
+        for seed in 1..=200 {
+            let sc = cube::scramble(seed);
+            let rc = cube::apply(&RawCube::default(), &sc);
+            let moves = solve_first_face(&rc).expect("first face must be solvable");
+            let solved = cube::apply(&rc, &moves);
+            assert!(
+                is_first_face_solved(&solved),
+                "seed {seed} failed first face"
+            );
+            assert_eq!(moves.len(), table[first_face_key(&rc) as usize] as usize);
         }
     }
 

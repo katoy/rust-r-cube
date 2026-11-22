@@ -266,22 +266,27 @@ fn tables_generation_functions_exist() {
 
     let cp_table = generate_cp_move_table();
     assert_eq!(cp_table.len(), 40320);
+    assert_eq!(cp_table[0].len(), 10);
     assert!(cp_table[0][0] < 40320);
 
     let ep8_table = generate_ep8_move_table();
     assert_eq!(ep8_table.len(), 40320);
+    assert_eq!(ep8_table[0].len(), 10);
     assert!(ep8_table[0][0] < 40320);
 
     let slice_p_table = generate_slice_p_move_table();
     assert_eq!(slice_p_table.len(), 24);
+    assert_eq!(slice_p_table[0].len(), 10);
     assert!(slice_p_table[0][0] < 24);
 
-    // フル MoveTable および PruningTable 生成関数のテスト
+    // フル MoveTable および 4-bit パック PruningTable 生成関数のテスト
     let move_table = build_move_table();
     assert_eq!(move_table.twist.len(), 2187);
     let pruning_table = build_pruning_table(&move_table);
-    assert!(!pruning_table.twist_slice.is_empty());
-    assert!(!pruning_table.flip_slice.is_empty());
+    assert_eq!(pruning_table.twist_slice.len(), TWIST_SLICE_PACKED_LEN);
+    assert_eq!(pruning_table.flip_slice.len(), FLIP_SLICE_PACKED_LEN);
+    assert_eq!(pruning_table.cp_slice.len(), CP_SLICE_PACKED_LEN);
+    assert_eq!(pruning_table.ep8_slice.len(), EP8_SLICE_PACKED_LEN);
 }
 
 #[test]
@@ -306,28 +311,63 @@ fn tables_extensive_consistency_checks() {
         }
     }
 
-    // Pruning table の値が正当な範囲内（0-11 または初期化値255）
-    for &val in pt.twist_slice.iter().take(1000) {
-        assert!(val <= 11 || val == 255, "Invalid pruning value: {}", val);
+    // 4-bit Pruning table の論理値が正当な範囲内（twist/flip: 0-9, cp: 0-14, ep8: 0-12）
+    for t in (0..2187).step_by(13) {
+        for s in (0..495).step_by(7) {
+            assert!(pt.get_twist_slice(t, s) <= 9);
+        }
+    }
+    for f in (0..2048).step_by(13) {
+        for s in (0..495).step_by(7) {
+            assert!(pt.get_flip_slice(f, s) <= 9);
+        }
     }
 }
 
 #[test]
 fn tables_symmetry_maps_generation() {
-    // Symmetry maps の生成をテスト
-    use crate::tables::generate_x2_maps;
+    // 直接 4-bit テーブル & Phase 2 10手 MoveTable の整合性をテスト
+    use crate::coord::move_cube_18;
+    use crate::tables::{MoveTable, PruningTable, PHASE2_MOVES};
+    use std::borrow::Cow;
 
-    let (twist_class, twist_sym, twist_self_sym, flip_class, flip_sym, flip_self_sym, ud_slice_x2) =
-        generate_x2_maps();
+    let mt = MoveTable::get();
+    let pt = PruningTable::get();
 
-    // 配列のサイズを確認
-    assert_eq!(twist_class.len(), 2187);
-    assert_eq!(twist_sym.len(), 2187);
-    assert_eq!(twist_self_sym.len(), 2187);
-    assert_eq!(flip_class.len(), 2048);
-    assert_eq!(flip_sym.len(), 2048);
-    assert_eq!(flip_self_sym.len(), 2048);
-    assert_eq!(ud_slice_x2.len(), 495);
+    // WASM 埋め込みアセットからはゼロコピー参照であること
+    assert!(matches!(pt.twist_slice, Cow::Borrowed(_)));
+    assert!(matches!(pt.flip_slice, Cow::Borrowed(_)));
+    assert!(matches!(pt.cp_slice, Cow::Borrowed(_)));
+    assert!(matches!(pt.ep8_slice, Cow::Borrowed(_)));
+
+    assert_eq!(pt.get_cp_slice(0, 0), 0);
+    assert_eq!(pt.get_ep8_slice(0, 0), 0);
+
+    // 10手 Phase 2 MoveTable が RawCube::multiply と一致すること
+    let mut rc = RawCube::default();
+    for &cp in &[0u16, 1, 123, 20000, 40319] {
+        rc.set_cp(cp);
+        for (p2_idx, &m) in PHASE2_MOVES.iter().enumerate() {
+            let next = rc.multiply(move_cube_18(m));
+            assert_eq!(mt.cp[cp as usize][p2_idx], next.get_cp());
+        }
+    }
+    for &ep8 in &[0u16, 1, 456, 30000, 40319] {
+        rc = RawCube::default();
+        rc.set_ep8(ep8);
+        for (p2_idx, &m) in PHASE2_MOVES.iter().enumerate() {
+            let next = rc.multiply(move_cube_18(m));
+            assert_eq!(mt.ep8[ep8 as usize][p2_idx], next.get_ep8());
+        }
+    }
+    for sp in 0..24u16 {
+        rc = RawCube::default();
+        rc.set_slice_p(sp);
+        for (p2_idx, &m) in PHASE2_MOVES.iter().enumerate() {
+            let next = rc.multiply(move_cube_18(m));
+            assert_eq!(mt.slice_p[sp as usize][p2_idx], next.get_slice_p());
+        }
+    }
 }
 
 #[test]
@@ -1049,9 +1089,15 @@ fn test_tables_encode_and_decode() {
     // encode() でテーブルを符号化し、復号化して検証
     let encoded = crate::tables::encode();
 
-    // エンコード結果は "CUBE0001" ヘッダと チェックサムを含む
-    assert!(encoded.len() > 16);
-    assert_eq!(&encoded[..8], b"CUBE0001");
+    // エンコード結果は "CUBE0002" ヘッダと 4-bit 直接 4 テーブル＋チェックサムを含む
+    assert_eq!(&encoded[..8], b"CUBE0002");
+    let expected_len = 16
+        + 4 * 4
+        + crate::tables::TWIST_SLICE_PACKED_LEN
+        + crate::tables::FLIP_SLICE_PACKED_LEN
+        + crate::tables::CP_SLICE_PACKED_LEN
+        + crate::tables::EP8_SLICE_PACKED_LEN;
+    assert_eq!(encoded.len(), expected_len);
 
     // 正常データのチェックサム検証が成功すること
     assert!(crate::tables::verify_table_data(&encoded).is_ok());
@@ -1103,22 +1149,22 @@ fn test_move_table_integrity() {
         assert_eq!(row.len(), 18);
     }
 
-    // cp テーブルのサイズ確認 (40320 * 18)
+    // cp テーブルのサイズ確認 (40320 * 10: Phase 2 専用)
     assert_eq!(mt.cp.len(), 40320);
     for row in mt.cp.iter() {
-        assert_eq!(row.len(), 18);
+        assert_eq!(row.len(), 10);
     }
 
-    // ep8 テーブルのサイズ確認 (40320 * 18)
+    // ep8 テーブルのサイズ確認 (40320 * 10: Phase 2 専用)
     assert_eq!(mt.ep8.len(), 40320);
     for row in mt.ep8.iter() {
-        assert_eq!(row.len(), 18);
+        assert_eq!(row.len(), 10);
     }
 
-    // slice_p テーブルのサイズ確認 (24 * 18)
+    // slice_p テーブルのサイズ確認 (24 * 10: Phase 2 専用)
     assert_eq!(mt.slice_p.len(), 24);
     for row in mt.slice_p.iter() {
-        assert_eq!(row.len(), 18);
+        assert_eq!(row.len(), 10);
     }
 }
 
@@ -1127,26 +1173,14 @@ fn test_pruning_table_integrity() {
     // PruningTable が正しく初期化されている
     let pt = crate::tables::PruningTable::get();
 
-    // twist_slice テーブルのサイズ確認
-    assert!(!pt.twist_slice.is_empty());
-
-    // flip_slice テーブルのサイズ確認
-    assert!(!pt.flip_slice.is_empty());
-
-    // cp_slice テーブルのサイズ確認
-    assert!(!pt.cp_slice.is_empty());
-
-    // ep8_slice テーブルのサイズ確認
-    assert!(!pt.ep8_slice.is_empty());
-
-    // 対称性マップのサイズ確認
-    assert_eq!(pt.twist_class.len(), 2187);
-    assert_eq!(pt.twist_sym.len(), 2187);
-    assert_eq!(pt.twist_self_sym.len(), 2187);
-    assert_eq!(pt.flip_class.len(), 2048);
-    assert_eq!(pt.flip_sym.len(), 2048);
-    assert_eq!(pt.flip_self_sym.len(), 2048);
-    assert_eq!(pt.ud_slice_x2.len(), 495);
+    assert_eq!(pt.twist_slice.len(), crate::tables::TWIST_SLICE_PACKED_LEN);
+    assert_eq!(pt.flip_slice.len(), crate::tables::FLIP_SLICE_PACKED_LEN);
+    assert_eq!(pt.cp_slice.len(), crate::tables::CP_SLICE_PACKED_LEN);
+    assert_eq!(pt.ep8_slice.len(), crate::tables::EP8_SLICE_PACKED_LEN);
+    assert!(matches!(pt.twist_slice, std::borrow::Cow::Borrowed(_)));
+    assert!(matches!(pt.flip_slice, std::borrow::Cow::Borrowed(_)));
+    assert!(matches!(pt.cp_slice, std::borrow::Cow::Borrowed(_)));
+    assert!(matches!(pt.ep8_slice, std::borrow::Cow::Borrowed(_)));
 }
 
 #[test]
@@ -1997,6 +2031,42 @@ fn test_r01_twist_slice_all_admissible() {
         overestimates, 0,
         "Twist/slice pruning table must NEVER overestimate exact distance! Found {} overestimates",
         overestimates
+    );
+}
+
+#[test]
+fn test_r01_flip_slice_all_admissible() {
+    let mt = crate::tables::MoveTable::get();
+    let pt = crate::tables::PruningTable::get();
+
+    let mut dist = vec![255u8; 2048 * 495];
+    dist[0] = 0;
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back((0usize, 0usize));
+    while let Some((f, s)) = queue.pop_front() {
+        let d = dist[f * 495 + s];
+        for m in 0..18 {
+            let nf = mt.flip[f][m] as usize;
+            let ns = mt.ud_slice[s][m] as usize;
+            let idx = nf * 495 + ns;
+            if dist[idx] == 255 {
+                dist[idx] = d + 1;
+                queue.push_back((nf, ns));
+            }
+        }
+    }
+
+    let mut overestimates = 0;
+    for f in 0..2048 {
+        for s in 0..495 {
+            if pt.get_flip_slice(f, s) > dist[f * 495 + s] {
+                overestimates += 1;
+            }
+        }
+    }
+    assert_eq!(
+        overestimates, 0,
+        "Flip/slice pruning table must NEVER overestimate exact distance!"
     );
 }
 

@@ -103,16 +103,7 @@ pub fn verify_solution(
 
     if include_orientation {
         if let Some(initial) = initial_centers {
-            let mut final_centers = initial;
-            for &m in moves {
-                let f = m / 3;
-                let t = match m % 3 {
-                    0 => 1,
-                    1 => 2,
-                    _ => -1,
-                };
-                final_centers[f] = (final_centers[f] + t).rem_euclid(4);
-            }
+            let final_centers = supercube::apply_moves_to_centers(initial, moves);
             if final_centers.iter().any(|&c| c != 0) {
                 return Err("センター向きの検証に失敗しました。".into());
             }

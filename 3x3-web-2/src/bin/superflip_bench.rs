@@ -10,17 +10,7 @@ fn main() {
     let state = cube_studio::cube::facelets(&cube);
 
     // スクランブル手順によるセンター累積回転を計算
-    let mut initial_centers = [0i32; 6];
-    for &m in &moves {
-        let f = m / 3;
-        let t: i32 = match m % 3 {
-            0 => 1,
-            1 => 2,
-            2 => -1,
-            _ => 0,
-        };
-        initial_centers[f] = (initial_centers[f] + t).rem_euclid(4);
-    }
+    let initial_centers = cube_studio::supercube::apply_moves_to_centers([0i32; 6], &moves);
     println!("スクランブルシーケンス: {superflip_seq}");
     println!("initial_centers (センター累積回転): {initial_centers:?}");
     println!();
@@ -50,17 +40,7 @@ fn main() {
                 println!("  手順: {}", notations.join(" "));
 
                 // 検証: センターが全て 0 になるか
-                let mut centers = initial_centers;
-                for &m in &sol {
-                    let f = m / 3;
-                    let t: i32 = match m % 3 {
-                        0 => 1,
-                        1 => 2,
-                        2 => -1,
-                        _ => 0,
-                    };
-                    centers[f] = (centers[f] + t).rem_euclid(4);
-                }
+                let centers = cube_studio::supercube::apply_moves_to_centers(initial_centers, &sol);
                 println!(
                     "  最終センター: {centers:?} (全て0 = {})",
                     centers.iter().all(|&c| c == 0)
@@ -96,17 +76,8 @@ fn main() {
             Ok(color_res) => {
                 let parsed_moves =
                     cube_studio::cube::parse_moves(&color_res.moves.join(" ")).unwrap();
-                let mut current_centers = initial_centers;
-                for &m in &parsed_moves {
-                    let f = m / 3;
-                    let t = match m % 3 {
-                        0 => 1,
-                        1 => 2,
-                        2 => -1,
-                        _ => 0,
-                    };
-                    current_centers[f] = (current_centers[f] + t).rem_euclid(4);
-                }
+                let current_centers =
+                    cube_studio::supercube::apply_moves_to_centers(initial_centers, &parsed_moves);
                 let center_fixes =
                     cube_studio::supercube::solve_center_orientations(current_centers)
                         .unwrap_or_default();
@@ -117,17 +88,8 @@ fn main() {
                 }
 
                 // センター検証
-                let mut final_centers = current_centers;
-                for &m in &center_fixes {
-                    let f = m / 3;
-                    let t = match m % 3 {
-                        0 => 1,
-                        1 => 2,
-                        2 => -1,
-                        _ => 0,
-                    };
-                    final_centers[f] = (final_centers[f] + t).rem_euclid(4);
-                }
+                let final_centers =
+                    cube_studio::supercube::apply_moves_to_centers(current_centers, &center_fixes);
                 let mut all_moves = parsed_moves;
                 all_moves.extend(center_fixes);
                 let final_cube = cube_studio::cube::apply(&cube, &all_moves);

@@ -81,7 +81,6 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const ownCache = await caches.open(CACHE_NAME);
       const keys = await caches.keys();
       const oldKeys = keys.filter(
         (key) =>
@@ -92,48 +91,9 @@ self.addEventListener("activate", (event) => {
           ),
       );
 
-      // 直近 1 世代の旧キャッシュのみを移行対象とし、無制限な旧資産コピーによるキャッシュ肥大化（Cache Bloat）を防止
-      const sortedOldKeys = [...oldKeys].sort((a, b) =>
-        a.localeCompare(b, undefined, { numeric: true }),
+      await Promise.all(
+        oldKeys.map((oldKey) => caches.delete(oldKey).catch(() => false)),
       );
-      const mostRecentOldKey = sortedOldKeys.pop();
-
-      if (mostRecentOldKey) {
-        try {
-          const oldCache = await caches.open(mostRecentOldKey);
-          const requests = await oldCache.keys();
-          let migratedCount = 0;
-          const MAX_MIGRATED_ITEMS = 15;
-
-          for (const req of requests) {
-            if (migratedCount >= MAX_MIGRATED_ITEMS) break;
-            // 旧世代のクエリ付きキーは移行せず、正規化した URL のみを保存キーにする
-            const reqUrl = new URL(req.url);
-            if (reqUrl.search) continue;
-            const canonicalKey = reqUrl.origin + reqUrl.pathname;
-            const alreadyCached = await ownCache.match(canonicalKey);
-            if (!alreadyCached) {
-              const res = await oldCache.match(req);
-              if (res && res.ok) {
-                await ownCache.put(canonicalKey, res);
-                migratedCount++;
-              }
-            }
-          }
-        } catch {
-          // 旧キャッシュアクセスエラーは無視
-        }
-        await caches.delete(mostRecentOldKey);
-      }
-
-      // 過去全世代の古いキャッシュは移行せず安全に完全削除
-      for (const oldKey of sortedOldKeys) {
-        try {
-          await caches.delete(oldKey);
-        } catch {
-          // 削除エラーは無視
-        }
-      }
 
       await self.clients.claim();
     })(),
@@ -224,10 +184,14 @@ self.addEventListener("fetch", (event) => {
 
       const updatePromise = fetch(request)
         .then(async (networkResponse) => {
+          const cacheControl = (
+            networkResponse.headers.get("Cache-Control") || ""
+          ).toLowerCase();
           const isCacheableResponse =
             networkResponse.status === 200 &&
             (networkResponse.type === "basic" ||
-              networkResponse.type === "default");
+              networkResponse.type === "default") &&
+            !cacheControl.includes("no-store");
           if (isCacheableResponse && !PRECACHE_URLS.has(canonicalKey)) {
             const clone = networkResponse.clone();
             try {

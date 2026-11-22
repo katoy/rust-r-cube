@@ -168,7 +168,7 @@ const OLL_ALGORITHMS: &[OllAlgorithm] = &[
     },
 ];
 
-fn parsed_oll_algorithms() -> &'static [(&'static str, Vec<usize>)] {
+pub(super) fn parsed_oll_algorithms() -> &'static [(&'static str, Vec<usize>)] {
     static PARSED: OnceLock<Vec<(&'static str, Vec<usize>)>> = OnceLock::new();
     PARSED
         .get_or_init(|| {

@@ -1,6 +1,21 @@
-use super::coord::RawCube;
+use super::coord::{move_cube_18, rank_perm4, rank_perm8, unrank_perm4, unrank_perm8, RawCube};
+use std::borrow::Cow;
 use std::sync::OnceLock;
 include!("table_io.rs");
+
+/// Phase 2 で許可される 10 通りの基本手（0..18 の移動インデックス）
+/// U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
+pub const PHASE2_MOVES: [usize; 10] = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
+
+pub const TWIST_SLICE_STATES: usize = 2187 * 495; // 1_082_565
+pub const FLIP_SLICE_STATES: usize = 2048 * 495; // 1_013_760
+pub const CP_SLICE_STATES: usize = 40320 * 24; //   967_680
+pub const EP8_SLICE_STATES: usize = 40320 * 24; //   967_680
+
+pub const TWIST_SLICE_PACKED_LEN: usize = TWIST_SLICE_STATES.div_ceil(2); // 541_283
+pub const FLIP_SLICE_PACKED_LEN: usize = FLIP_SLICE_STATES.div_ceil(2); // 506_880
+pub const CP_SLICE_PACKED_LEN: usize = CP_SLICE_STATES.div_ceil(2); // 483_840
+pub const EP8_SLICE_PACKED_LEN: usize = EP8_SLICE_STATES.div_ceil(2); // 483_840
 
 /// Kociemba アルゴリズムで使用する遷移テーブル (Move Tables)。
 ///
@@ -14,62 +29,38 @@ pub struct MoveTable {
     pub flip: Box<[[u16; 18]; 2048]>,
     /// 中層エッジの所属 (12C4 = 495通り) の遷移テーブル
     pub ud_slice: Box<[[u16; 18]; 495]>,
-    /// コーナーの配置 (8! = 40320通り) の遷移テーブル
-    pub cp: Box<[[u16; 18]; 40320]>,
-    /// Phase 2 用のエッジの配置 (8! = 40320通り) の遷移テーブル
-    pub ep8: Box<[[u16; 18]; 40320]>,
-    /// Phase 2 用の Slice パーツの置換 (24通り) の遷移テーブル
-    pub slice_p: Box<[[u16; 18]; 24]>,
+    /// コーナーの配置 (8! = 40320通り) の Phase 2 (10手) 遷移テーブル
+    pub cp: Box<[[u16; 10]; 40320]>,
+    /// Phase 2 用のエッジの配置 (8! = 40320通り) の Phase 2 (10手) 遷移テーブル
+    pub ep8: Box<[[u16; 10]; 40320]>,
+    /// Phase 2 用の Slice パーツの置換 (24通り) の Phase 2 (10手) 遷移テーブル
+    pub slice_p: Box<[[u16; 10]; 24]>,
 }
 
 /// IDA* 探索で使用する枝刈りテーブル (Pruning Tables)。
 ///
-/// 各状態から完成（または目標状態）までの最短手数の「下限値」を保持します。
-/// 探索中、[現在の手数 + 枝刈りテーブルの値 > 制限手数] となった場合、
-/// その先を探索しても解が見つからないことが保証されるため、探索を打ち切ることができます。
+/// 各状態から完成（または目標状態）までの最短手数の「下限値」を 4-bit パック直接配列で保持します。
+/// WASM 本番実行時は静的バイト列からゼロコピー (`Cow::Borrowed`) で参照します。
 pub struct PruningTable {
-    /// Twist と Slice を組み合わせた Phase 1 用の枝刈りテーブル (Symmetryにより半減)
-    pub twist_slice: Box<[u8]>,
-    /// Flip と Slice を組み合わせた Phase 1 用の枝刈りテーブル (Symmetryにより半減)
-    pub flip_slice: Box<[u8]>,
-    /// コーナー配置と Slice 配置を組み合わせた Phase 2 用の枝刈りテーブル
-    pub cp_slice: Box<[u8]>,
-    /// エッジ配置と Slice 配置を組み合わせた Phase 2 用の枝刈りテーブル
-    pub ep8_slice: Box<[u8]>,
-
-    // 対称関係のマップ
-    pub twist_class: Box<[u16; 2187]>,
-    pub twist_sym: Box<[bool; 2187]>,
-    pub twist_self_sym: Box<[bool; 2187]>,
-    pub flip_class: Box<[u16; 2048]>,
-    pub flip_sym: Box<[bool; 2048]>,
-    pub flip_self_sym: Box<[bool; 2048]>,
-    pub ud_slice_x2: Box<[u16; 495]>,
+    /// Twist と Slice を組み合わせた Phase 1 用の 4-bit パック枝刈りテーブル
+    pub twist_slice: Cow<'static, [u8]>,
+    /// Flip と Slice を組み合わせた Phase 1 用の 4-bit パック枝刈りテーブル
+    pub flip_slice: Cow<'static, [u8]>,
+    /// コーナー配置と Slice 配置を組み合わせた Phase 2 用の 4-bit パック枝刈りテーブル
+    pub cp_slice: Cow<'static, [u8]>,
+    /// エッジ配置と Slice 配置を組み合わせた Phase 2 用の 4-bit パック枝刈りテーブル
+    pub ep8_slice: Cow<'static, [u8]>,
 }
 
-type SymmetryMaps = (
-    Box<[u16; 2187]>,
-    Box<[bool; 2187]>,
-    Box<[bool; 2187]>,
-    Box<[u16; 2048]>,
-    Box<[bool; 2048]>,
-    Box<[bool; 2048]>,
-    Box<[u16; 495]>,
-);
-
 impl MoveTable {
-    /// 移動テーブルを取得します。初回呼び出し時に生成（事前計算）されます。
+    /// 移動テーブルを取得します。初回呼び出し時に構築されます。
     pub fn get() -> &'static MoveTable {
         static TABLE: OnceLock<MoveTable> = OnceLock::new();
-        TABLE.get_or_init(|| {
-            crate::TABLE_BYTES
-                .map(decode_moves)
-                .unwrap_or_else(build_move_table)
-        })
+        TABLE.get_or_init(build_move_table)
     }
 }
 
-/// 移動テーブルをゼロから生成します（事前計算バイナリなし）。
+/// 移動テーブルをゼロから生成します。
 pub(crate) fn build_move_table() -> MoveTable {
     MoveTable {
         twist: generate_twist_move_table(),
@@ -82,73 +73,59 @@ pub(crate) fn build_move_table() -> MoveTable {
 }
 
 impl PruningTable {
-    /// 枝刈りテーブルを取得します。初回呼び出し時に幅優先探索（BFS）を用いて生成されます。
+    /// 枝刈りテーブルを取得します。静的アセットがあればゼロコピーで復号し、なければ BFS で構築します。
     pub fn get() -> &'static PruningTable {
         static TABLE: OnceLock<PruningTable> = OnceLock::new();
-        let move_table = MoveTable::get();
         TABLE.get_or_init(|| match crate::TABLE_BYTES {
             Some(bytes) => decode_pruning(bytes),
-            None => build_pruning_table(move_table),
+            None => build_pruning_table(MoveTable::get()),
         })
     }
 }
 
 /// 枝刈りテーブルをゼロから生成します（事前計算バイナリなし）。
 pub(crate) fn build_pruning_table(move_table: &MoveTable) -> PruningTable {
-    let (twist_class, twist_sym, twist_self_sym, flip_class, flip_sym, flip_self_sym, ud_slice_x2) =
-        generate_x2_maps();
     PruningTable {
-        twist_slice: generate_twist_slice_pruning_table(
-            move_table,
-            &twist_class,
-            &twist_sym,
-            &twist_self_sym,
-            &ud_slice_x2,
-        ),
-        flip_slice: generate_flip_slice_pruning_table(
-            move_table,
-            &flip_class,
-            &flip_sym,
-            &flip_self_sym,
-            &ud_slice_x2,
-        ),
-        cp_slice: generate_cp_slice_pruning_table(move_table),
-        ep8_slice: generate_ep8_slice_pruning_table(move_table),
-        twist_class,
-        twist_sym,
-        twist_self_sym,
-        flip_class,
-        flip_sym,
-        flip_self_sym,
-        ud_slice_x2,
+        twist_slice: Cow::Owned(generate_twist_slice_pruning_table(move_table).into_vec()),
+        flip_slice: Cow::Owned(generate_flip_slice_pruning_table(move_table).into_vec()),
+        cp_slice: Cow::Owned(generate_cp_slice_pruning_table(move_table).into_vec()),
+        ep8_slice: Cow::Owned(generate_ep8_slice_pruning_table(move_table).into_vec()),
     }
+}
+
+#[inline(always)]
+fn get_nibble(table: &[u8], idx: usize) -> u8 {
+    (table[idx >> 1] >> ((idx & 1) << 2)) & 0x0f
+}
+
+fn pack_4bit(unpacked: &[u8]) -> Box<[u8]> {
+    let mut packed = vec![0u8; unpacked.len().div_ceil(2)];
+    for (idx, &val) in unpacked.iter().enumerate() {
+        assert!(val <= 15, "4-bit pruning table value overflow: {val}");
+        packed[idx >> 1] |= val << ((idx & 1) << 2);
+    }
+    packed.into_boxed_slice()
 }
 
 impl PruningTable {
     #[inline(always)]
     pub fn get_twist_slice(&self, twist: usize, slice: usize) -> u8 {
-        let c = self.twist_class[twist] as usize;
-        let s = if self.twist_self_sym[twist] {
-            slice.min(self.ud_slice_x2[slice] as usize)
-        } else if self.twist_sym[twist] {
-            self.ud_slice_x2[slice] as usize
-        } else {
-            slice
-        };
-        self.twist_slice[c * 495 + s]
+        get_nibble(&self.twist_slice, twist * 495 + slice)
     }
 
     #[inline(always)]
     pub fn get_flip_slice(&self, flip: usize, slice: usize) -> u8 {
-        let c = self.flip_class[flip] as usize;
-        let s = if self.flip_self_sym[flip] {
-            slice.min(self.ud_slice_x2[slice] as usize)
-        } else if self.flip_sym[flip] {
-            self.ud_slice_x2[slice] as usize
-        } else {
-            slice
-        };
-        self.flip_slice[c * 495 + s]
+        get_nibble(&self.flip_slice, flip * 495 + slice)
+    }
+
+    #[inline(always)]
+    pub fn get_cp_slice(&self, cp: usize, slice_p: usize) -> u8 {
+        get_nibble(&self.cp_slice, cp * 24 + slice_p)
+    }
+
+    #[inline(always)]
+    pub fn get_ep8_slice(&self, ep8: usize, slice_p: usize) -> u8 {
+        get_nibble(&self.ep8_slice, ep8 * 24 + slice_p)
     }
 }
 
@@ -200,219 +177,86 @@ pub(crate) fn generate_ud_slice_move_table() -> Box<[[u16; 18]; 495]> {
     table.into_boxed_slice().try_into().unwrap()
 }
 
-pub(crate) fn generate_cp_move_table() -> Box<[[u16; 18]; 40320]> {
-    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
-    let mut rc = RawCube::default();
+fn generate_perm8_move_table(mv_perms: &[[u8; 8]; 10]) -> Box<[[u16; 10]; 40320]> {
+    let mut table: Vec<[u16; 10]> = vec![[0u16; 10]; 40320];
     for (i, table_i) in table.iter_mut().enumerate() {
-        rc.set_cp(i as u16);
-        for m in 0..6 {
-            let mut move_rc = rc;
-            for r in 0..3 {
-                move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table_i[m * 3 + r] = move_rc.get_cp();
-            }
+        let p = unrank_perm8(i as u16);
+        for (k, mv) in mv_perms.iter().enumerate() {
+            let q = [
+                p[mv[0] as usize],
+                p[mv[1] as usize],
+                p[mv[2] as usize],
+                p[mv[3] as usize],
+                p[mv[4] as usize],
+                p[mv[5] as usize],
+                p[mv[6] as usize],
+                p[mv[7] as usize],
+            ];
+            table_i[k] = rank_perm8(&q);
         }
     }
     table.into_boxed_slice().try_into().unwrap()
 }
 
-pub(crate) fn generate_ep8_move_table() -> Box<[[u16; 18]; 40320]> {
-    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 40320];
-    let mut rc = RawCube::default();
+pub(crate) fn generate_cp_move_table() -> Box<[[u16; 10]; 40320]> {
+    let mv_perms: [[u8; 8]; 10] = std::array::from_fn(|k| {
+        let mc = move_cube_18(PHASE2_MOVES[k]);
+        std::array::from_fn(|j| mc.cp[j] as u8)
+    });
+    generate_perm8_move_table(&mv_perms)
+}
+
+pub(crate) fn generate_ep8_move_table() -> Box<[[u16; 10]; 40320]> {
+    let mv_perms: [[u8; 8]; 10] = std::array::from_fn(|k| {
+        let mc = move_cube_18(PHASE2_MOVES[k]);
+        std::array::from_fn(|j| {
+            let e = mc.ep[j] as u8;
+            assert!(e < 8);
+            e
+        })
+    });
+    generate_perm8_move_table(&mv_perms)
+}
+
+pub(crate) fn generate_slice_p_move_table() -> Box<[[u16; 10]; 24]> {
+    let mv_perms: [[u8; 4]; 10] = std::array::from_fn(|k| {
+        let mc = move_cube_18(PHASE2_MOVES[k]);
+        std::array::from_fn(|j| mc.ep[8 + j] as u8 - 8)
+    });
+    let mut table = Box::new([[0u16; 10]; 24]);
     for (i, table_i) in table.iter_mut().enumerate() {
-        rc.set_ep8(i as u16);
-        for m in 0..6 {
-            let mut move_rc = rc;
-            for r in 0..3 {
-                move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table_i[m * 3 + r] = move_rc.get_ep8();
-            }
+        let p = unrank_perm4(i as u16);
+        for (k, mv) in mv_perms.iter().enumerate() {
+            let q = [
+                p[mv[0] as usize],
+                p[mv[1] as usize],
+                p[mv[2] as usize],
+                p[mv[3] as usize],
+            ];
+            table_i[k] = rank_perm4(&q);
         }
     }
-    table.into_boxed_slice().try_into().unwrap()
+    table
 }
 
-pub(crate) fn generate_slice_p_move_table() -> Box<[[u16; 18]; 24]> {
-    let mut table: Vec<[u16; 18]> = vec![[0u16; 18]; 24];
-    let mut rc = RawCube::default();
-    for (i, table_i) in table.iter_mut().enumerate() {
-        rc.set_slice_p(i as u16);
-        for m in 0..6 {
-            let mut move_rc = rc;
-            for r in 0..3 {
-                move_rc = move_rc.multiply(RawCube::move_cube(m));
-                table_i[m * 3 + r] = move_rc.get_slice_p();
-            }
-        }
-    }
-    table.into_boxed_slice().try_into().unwrap()
-}
-
-pub(crate) fn generate_x2_maps() -> SymmetryMaps {
-    use crate::coord::Corner;
-    use crate::coord::Edge;
-
-    let x2_cube = RawCube {
-        cp: [
-            Corner::DBL,
-            Corner::DRB,
-            Corner::DFR,
-            Corner::DLF,
-            Corner::ULB,
-            Corner::UBR,
-            Corner::UFR,
-            Corner::UFL,
-        ],
-        co: [0, 0, 0, 0, 0, 0, 0, 0],
-        ep: [
-            Edge::DL,
-            Edge::DB,
-            Edge::DR,
-            Edge::DF,
-            Edge::UL,
-            Edge::UB,
-            Edge::UR,
-            Edge::UF,
-            Edge::BL,
-            Edge::BR,
-            Edge::FR,
-            Edge::FL,
-        ],
-        eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    };
-
-    let mut twist_class = Box::new([0u16; 2187]);
-    let mut twist_sym = Box::new([false; 2187]);
-    let mut twist_self_sym = Box::new([false; 2187]);
-    let mut twist_seen = [false; 2187];
-    let mut next_twist_class = 0;
-
-    let mut rc = RawCube::default();
-    for i in 0..2187 {
-        if twist_seen[i] {
-            continue;
-        }
-        rc.set_twist(i as u16);
-        let mut sym_rc = RawCube::default();
-        for slot in 0..8 {
-            let src = x2_cube.cp[slot] as usize;
-            sym_rc.co[slot] = (3 - rc.co[src]) % 3;
-        }
-        let sym_i = sym_rc.get_twist() as usize;
-
-        twist_seen[i] = true;
-        twist_seen[sym_i] = true;
-
-        let repr = i.min(sym_i);
-        let class_id = next_twist_class;
-        next_twist_class += 1;
-
-        twist_class[i] = class_id;
-        twist_class[sym_i] = class_id;
-
-        twist_sym[i] = i != repr;
-        twist_sym[sym_i] = sym_i != repr;
-
-        twist_self_sym[i] = i == sym_i;
-        twist_self_sym[sym_i] = i == sym_i;
-    }
-
-    let mut flip_class = Box::new([0u16; 2048]);
-    let mut flip_sym = Box::new([false; 2048]);
-    let mut flip_self_sym = Box::new([false; 2048]);
-    let mut flip_seen = [false; 2048];
-    let mut next_flip_class = 0;
-
-    for i in 0..2048 {
-        if flip_seen[i] {
-            continue;
-        }
-        rc.set_flip(i as u16);
-        let sym_rc = rc.multiply(&x2_cube);
-        let sym_i = sym_rc.get_flip() as usize;
-
-        flip_seen[i] = true;
-        flip_seen[sym_i] = true;
-
-        let repr = i.min(sym_i);
-        let class_id = next_flip_class;
-        next_flip_class += 1;
-
-        flip_class[i] = class_id;
-        flip_class[sym_i] = class_id;
-
-        flip_sym[i] = i != repr;
-        flip_sym[sym_i] = sym_i != repr;
-
-        flip_self_sym[i] = i == sym_i;
-        flip_self_sym[sym_i] = i == sym_i;
-    }
-
-    let mut ud_slice_x2 = Box::new([0u16; 495]);
-    for i in 0..495 {
-        rc.set_ud_slice(i as u16);
-        let sym_rc = rc.multiply(&x2_cube);
-        ud_slice_x2[i] = sym_rc.get_ud_slice();
-    }
-
-    (
-        twist_class,
-        twist_sym,
-        twist_self_sym,
-        flip_class,
-        flip_sym,
-        flip_self_sym,
-        ud_slice_x2,
-    )
-}
-
-pub(crate) fn generate_twist_slice_pruning_table(
-    mt: &MoveTable,
-    twist_class: &[u16; 2187],
-    twist_sym: &[bool; 2187],
-    twist_self_sym: &[bool; 2187],
-    ud_slice_x2: &[u16; 495],
-) -> Box<[u8]> {
-    let num_classes = *twist_class.iter().max().unwrap() as usize + 1;
+pub(crate) fn generate_twist_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let size2 = 495;
-    let total_size = num_classes * size2;
+    let total_size = TWIST_SLICE_STATES;
     let mut table = vec![255u8; total_size];
-
-    let init_class = twist_class[0] as usize;
-    let init_slice = 0;
-    table[init_class * size2 + init_slice] = 0;
+    table[0] = 0;
 
     let mut distance = 0;
     let mut count = 1;
-
-    let mut class_to_twist = vec![0u16; num_classes];
-    for twist in 0..2187 {
-        if !twist_sym[twist] {
-            class_to_twist[twist_class[twist] as usize] = twist as u16;
-        }
-    }
-
     while count < total_size {
         let mut found = false;
-        for (c, &s1_u16) in class_to_twist.iter().enumerate() {
-            let s1 = s1_u16 as usize;
+        for s1 in 0..2187 {
+            let base = s1 * size2;
             for s2 in 0..size2 {
-                let idx = c * size2 + s2;
-                if table[idx] == distance {
+                if table[base + s2] == distance {
                     for m in 0..18 {
                         let ns1 = mt.twist[s1][m] as usize;
                         let ns2 = mt.ud_slice[s2][m] as usize;
-
-                        let nc = twist_class[ns1] as usize;
-                        let n_slice = if twist_self_sym[ns1] {
-                            ns2.min(ud_slice_x2[ns2] as usize)
-                        } else if twist_sym[ns1] {
-                            ud_slice_x2[ns2] as usize
-                        } else {
-                            ns2
-                        };
-
-                        let n_idx = nc * size2 + n_slice;
+                        let n_idx = ns1 * size2 + ns2;
                         if table[n_idx] == 255 {
                             table[n_idx] = distance + 1;
                             count += 1;
@@ -427,56 +271,28 @@ pub(crate) fn generate_twist_slice_pruning_table(
         }
         distance += 1;
     }
-    table.into_boxed_slice()
+    assert_eq!(count, total_size, "twist_slice pruning BFS incomplete");
+    pack_4bit(&table)
 }
 
-pub(crate) fn generate_flip_slice_pruning_table(
-    mt: &MoveTable,
-    flip_class: &[u16; 2048],
-    flip_sym: &[bool; 2048],
-    flip_self_sym: &[bool; 2048],
-    ud_slice_x2: &[u16; 495],
-) -> Box<[u8]> {
-    let num_classes = *flip_class.iter().max().unwrap() as usize + 1;
+pub(crate) fn generate_flip_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
     let size2 = 495;
-    let total_size = num_classes * size2;
+    let total_size = FLIP_SLICE_STATES;
     let mut table = vec![255u8; total_size];
-
-    let init_class = flip_class[0] as usize;
-    let init_slice = 0;
-    table[init_class * size2 + init_slice] = 0;
+    table[0] = 0;
 
     let mut distance = 0;
     let mut count = 1;
-
-    let mut class_to_flip = vec![0u16; num_classes];
-    for flip in 0..2048 {
-        if !flip_sym[flip] {
-            class_to_flip[flip_class[flip] as usize] = flip as u16;
-        }
-    }
-
     while count < total_size {
         let mut found = false;
-        for (c, &s1_u16) in class_to_flip.iter().enumerate() {
-            let s1 = s1_u16 as usize;
+        for s1 in 0..2048 {
+            let base = s1 * size2;
             for s2 in 0..size2 {
-                let idx = c * size2 + s2;
-                if table[idx] == distance {
+                if table[base + s2] == distance {
                     for m in 0..18 {
                         let ns1 = mt.flip[s1][m] as usize;
                         let ns2 = mt.ud_slice[s2][m] as usize;
-
-                        let nc = flip_class[ns1] as usize;
-                        let n_slice = if flip_self_sym[ns1] {
-                            ns2.min(ud_slice_x2[ns2] as usize)
-                        } else if flip_sym[ns1] {
-                            ud_slice_x2[ns2] as usize
-                        } else {
-                            ns2
-                        };
-
-                        let n_idx = nc * size2 + n_slice;
+                        let n_idx = ns1 * size2 + ns2;
                         if table[n_idx] == 255 {
                             table[n_idx] = distance + 1;
                             count += 1;
@@ -491,83 +307,78 @@ pub(crate) fn generate_flip_slice_pruning_table(
         }
         distance += 1;
     }
-    table.into_boxed_slice()
+    assert_eq!(count, total_size, "flip_slice pruning BFS incomplete");
+    pack_4bit(&table)
 }
 
 pub(crate) fn generate_cp_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
-    let size1 = 40320;
     let size2 = 24;
-    let total_size = size1 * size2;
+    let total_size = CP_SLICE_STATES;
     let mut table = vec![255u8; total_size];
-
-    let initial1 = 0;
-    let initial2 = 0;
-    table[initial1 * size2 + initial2] = 0;
-
-    // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
-    let allowed_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
+    table[0] = 0;
 
     let mut distance = 0;
     let mut count = 1;
-    let mut found = true;
-    while count < total_size && found {
-        found = false;
-        for i in 0..total_size {
-            if table[i] == distance {
-                let s1 = i / size2;
-                let s2 = i % size2;
-                for &m in &allowed_moves {
-                    let ns1 = mt.cp[s1][m] as usize;
-                    let ns2 = mt.slice_p[s2][m] as usize;
-                    let idx = ns1 * size2 + ns2;
-                    if table[idx] == 255 {
-                        table[idx] = distance + 1;
-                        count += 1;
-                        found = true;
+    while count < total_size {
+        let mut found = false;
+        for s1 in 0..40320 {
+            let base = s1 * size2;
+            for s2 in 0..size2 {
+                if table[base + s2] == distance {
+                    for p2_idx in 0..10 {
+                        let ns1 = mt.cp[s1][p2_idx] as usize;
+                        let ns2 = mt.slice_p[s2][p2_idx] as usize;
+                        let idx = ns1 * size2 + ns2;
+                        if table[idx] == 255 {
+                            table[idx] = distance + 1;
+                            count += 1;
+                            found = true;
+                        }
                     }
                 }
             }
         }
+        if !found {
+            break;
+        }
         distance += 1;
     }
-    table.into_boxed_slice()
+    assert_eq!(count, total_size, "cp_slice pruning BFS incomplete");
+    pack_4bit(&table)
 }
 
 pub(crate) fn generate_ep8_slice_pruning_table(mt: &MoveTable) -> Box<[u8]> {
-    let size1 = 40320;
     let size2 = 24;
-    let total_size = size1 * size2;
+    let total_size = EP8_SLICE_STATES;
     let mut table = vec![255u8; total_size];
-
-    let initial1 = 0;
-    let initial2 = 0;
-    table[initial1 * size2 + initial2] = 0;
-
-    // Phase 2 許可移動: U(0,1,2), R2(4), F2(7), D(9,10,11), L2(13), B2(16)
-    let allowed_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
+    table[0] = 0;
 
     let mut distance = 0;
     let mut count = 1;
-    let mut found = true;
-    while count < total_size && found {
-        found = false;
-        for i in 0..total_size {
-            if table[i] == distance {
-                let s1 = i / size2;
-                let s2 = i % size2;
-                for &m in &allowed_moves {
-                    let ns1 = mt.ep8[s1][m] as usize;
-                    let ns2 = mt.slice_p[s2][m] as usize;
-                    let idx = ns1 * size2 + ns2;
-                    if table[idx] == 255 {
-                        table[idx] = distance + 1;
-                        count += 1;
-                        found = true;
+    while count < total_size {
+        let mut found = false;
+        for s1 in 0..40320 {
+            let base = s1 * size2;
+            for s2 in 0..size2 {
+                if table[base + s2] == distance {
+                    for p2_idx in 0..10 {
+                        let ns1 = mt.ep8[s1][p2_idx] as usize;
+                        let ns2 = mt.slice_p[s2][p2_idx] as usize;
+                        let idx = ns1 * size2 + ns2;
+                        if table[idx] == 255 {
+                            table[idx] = distance + 1;
+                            count += 1;
+                            found = true;
+                        }
                     }
                 }
             }
         }
+        if !found {
+            break;
+        }
         distance += 1;
     }
-    table.into_boxed_slice()
+    assert_eq!(count, total_size, "ep8_slice pruning BFS incomplete");
+    pack_4bit(&table)
 }

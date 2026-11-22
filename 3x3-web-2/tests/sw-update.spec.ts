@@ -104,7 +104,7 @@ const test = base.extend<{
       if (file === presetFile) await presetGate;
       response.writeHead(200, {
         "Content-Type": contentTypes[file],
-        "Cache-Control": "no-store",
+        "Cache-Control": file === presetFile ? "no-cache" : "no-store",
       });
       response.end(body);
     });

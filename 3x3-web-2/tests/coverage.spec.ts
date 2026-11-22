@@ -1929,6 +1929,20 @@ test.describe("E2E Coverage with CDP", () => {
       await page.locator("#help-close").click();
       await expect(page.locator("#help-dialog")).not.toBeVisible();
 
+      // 矢印凡例ポップオーバー（閉じるボタン・外側クリック・Escape キー）
+      await page.locator("#arrow-legend-btn").click();
+      await expect(page.locator("#arrow-legend-popover")).toBeVisible();
+      await page.locator("#arrow-legend-close").click();
+      await expect(page.locator("#arrow-legend-popover")).toBeHidden();
+      await page.locator("#arrow-legend-btn").click();
+      await expect(page.locator("#arrow-legend-popover")).toBeVisible();
+      await page.locator("#cube-status").click();
+      await expect(page.locator("#arrow-legend-popover")).toBeHidden();
+      await page.locator("#arrow-legend-btn").click();
+      await expect(page.locator("#arrow-legend-popover")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#arrow-legend-popover")).toBeHidden();
+
       // プリセットタブ
       await page.locator("#tab-presets").click();
       await page.waitForTimeout(200);
@@ -1992,12 +2006,14 @@ test.describe("E2E Coverage with CDP", () => {
       if (await btn2x2.isVisible()) {
         await btn2x2.click();
         await page.waitForTimeout(200);
-        // 2x2 プリセット選択
+        // 2x2 プリセット選択（state 分岐と scramble 分岐の両方を網羅）
         await page.locator("#tab-presets").click();
         await page.waitForTimeout(100);
-        const preset2x2 = page.locator(".preset-button").first();
-        if (await preset2x2.isVisible()) {
-          await preset2x2.click();
+        const presets2x2 = page.locator("#preset-buttons button");
+        if ((await presets2x2.count()) >= 2) {
+          await presets2x2.nth(0).click();
+          await page.waitForTimeout(100);
+          await presets2x2.nth(1).click();
           await page.waitForTimeout(200);
         }
         // 2x2 解く
@@ -2047,7 +2063,190 @@ test.describe("E2E Coverage with CDP", () => {
       await page.locator("#include-orientation").uncheck();
       await page.locator("#include-orientation").check();
 
-      await page.evaluate(() => {
+      await page.evaluate(async () => {
+        // compare-controller.ts の異常系・再起動・キャンセル・0手比較分岐をインメモリ DOM で網羅
+        const { createCompareController } =
+          await import("/web/compare-controller.ts");
+        const { CubeStore } = await import("/web/cube-store.ts");
+        const { AppStateMachine } = await import("/web/app-state.ts");
+        const { SOLVED } = await import("/web/model.ts");
+
+        const runCompareScenario = async (
+          solveFn: (algo: string, controller: any, store: any) => Promise<any>,
+          restartFn: () => Promise<void> = async () => {},
+          validateFn: () => boolean = () => true,
+        ) => {
+          const mockStore = new CubeStore();
+          const mockApp = new AppStateMachine();
+          let isSolving = false;
+          let intervalId = 0;
+          const panel = document.createElement("div");
+          const list = document.createElement("div");
+          const summary = document.createElement("div");
+          const note = document.createElement("span");
+          const ext = document.createElement("div");
+          const select = document.createElement("select");
+          for (const id of ["kociemba", "cfop", "thistlethwaite", "korf"]) {
+            const opt = document.createElement("option");
+            opt.value = id;
+            select.append(opt);
+          }
+          select.value = "kociemba";
+          const mockSolver = {
+            ready: true,
+            solve: null as any,
+            restart: null as any,
+          };
+          let ctrl: any;
+          mockSolver.solve = (
+            _s: any,
+            _r: any,
+            _b: any,
+            _o: any,
+            _c: any,
+            algo: string,
+          ) => solveFn(algo, mockSolver, mockStore);
+          mockSolver.restart = () => restartFn();
+          ctrl = createCompareController({
+            store: mockStore,
+            appState: mockApp,
+            getSolver: () => mockSolver as any,
+            ensureSolverReady: async () => true,
+            validateState: () => validateFn(),
+            stop: () => {},
+            message: () => {},
+            persist: () => {},
+            refresh: () => ctrl.renderComparisonPanel(),
+            updateSolverNote: () => {},
+            isSolving: () => isSolving,
+            setSolving: (v) => {
+              isSolving = v;
+            },
+            setIntervalId: (id) => {
+              intervalId = id;
+            },
+            clearIntervalId: () => {
+              window.clearInterval(intervalId);
+            },
+            getIncludeOrientation: () => false,
+            getSolverAlgoEl: () => select,
+            getSolverNoteEl: () => note,
+            getExtendedEl: () => ext,
+            getComparePanelEl: () => panel,
+            getCompareListEl: () => list,
+            getCompareSummaryEl: () => summary,
+          });
+          await ctrl.compareAllSolvers(1000);
+          return ctrl;
+        };
+
+        // Case 1: 0手完成 + narrow viewport + selectComparedSolver(0手)
+        const origWidth = window.innerWidth;
+        const origScrollTo = window.scrollTo;
+        try {
+          Object.defineProperty(window, "innerWidth", {
+            configurable: true,
+            value: 375,
+          });
+          window.scrollTo = () => {};
+          let waited = false;
+          const c1 = await runCompareScenario(async (algo) => {
+            if (!waited) {
+              waited = true;
+              await new Promise((r) => setTimeout(r, 120));
+            }
+            return {
+              state: SOLVED,
+              moves: [],
+              states: [SOLVED],
+              elapsed_ms: 1,
+              nodes: 1,
+              algorithm: algo,
+              phases: [],
+            };
+          });
+          c1.selectComparedSolver("kociemba");
+        } finally {
+          Object.defineProperty(window, "innerWidth", {
+            configurable: true,
+            value: origWidth,
+          });
+          window.scrollTo = origScrollTo;
+        }
+
+        // Case 2: 一部エラー + !solver.ready restart 成功/例外 + 代替アルゴリズム選択
+        let restarts = 0;
+        await runCompareScenario(
+          async (algo, s) => {
+            if (algo === "kociemba") {
+              s.ready = false;
+              throw new Error("timeout");
+            }
+            if (algo === "thistlethwaite") {
+              s.ready = false;
+              throw "non-error-fail";
+            }
+            return {
+              state: SOLVED,
+              moves: ["R"],
+              states: [SOLVED, SOLVED],
+              elapsed_ms: 5,
+              nodes: 10,
+              algorithm: algo,
+              phases: [],
+            };
+          },
+          async () => {
+            restarts++;
+            if (restarts > 1) throw new Error("restart failed");
+          },
+        );
+
+        // Case 3: 全アルゴリズム失敗
+        await runCompareScenario(async () => {
+          throw new Error("all failed");
+        });
+
+        // Case 4: キャンセル例外
+        await runCompareScenario(async () => {
+          throw new Error("cancelled by user");
+        });
+
+        // Case 5a: validateState の外側非Error例外
+        await runCompareScenario(
+          async () => ({
+            state: SOLVED,
+            moves: [],
+            states: [SOLVED],
+            elapsed_ms: 0,
+            nodes: 0,
+            algorithm: "kociemba",
+            phases: [],
+          }),
+          async () => {},
+          () => {
+            throw "bad state";
+          },
+        );
+
+        // Case 5b/5c: 実行中に revision が進み早期 return -> finally の isSolving 解除
+        await runCompareScenario(async (_algo, _s, st) => {
+          st.replace(SOLVED);
+          throw new Error("late error");
+        });
+        await runCompareScenario(async (_algo, _s, st) => {
+          st.replace(SOLVED);
+          return {
+            state: SOLVED,
+            moves: [],
+            states: [SOLVED],
+            elapsed_ms: 1,
+            nodes: 1,
+            algorithm: "kociemba",
+            phases: [],
+          };
+        });
+
         const dbg = (window as any).__cube_main_debug__;
         dbg.cancelSearch();
         document.getElementById("solution-close")?.click();

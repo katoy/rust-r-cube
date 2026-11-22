@@ -660,10 +660,15 @@ export class CubeScene {
     }
   }
 
-  async turn(move: string, state: string, duration: number) {
+  async turn(
+    move: string,
+    state: string,
+    duration: number,
+    precomputedArrowInfo?: CellArrowInfo,
+  ) {
     this.finish();
     if (duration <= 0) {
-      this.show(state, this.next);
+      this.show(state, this.next, precomputedArrowInfo);
       return;
     }
     const axis = normal[FACES.indexOf(move[0])];
@@ -700,7 +705,7 @@ export class CubeScene {
         start: performance.now(),
         duration,
         finish: () => {
-          this.show(state, this.next);
+          this.show(state, this.next, precomputedArrowInfo);
           resolve();
         },
       };
@@ -750,7 +755,10 @@ export class CubeScene {
     if (document.hidden) return;
     if (this.active) {
       this.dirty = true;
-      const p = Math.min(1, (time - this.active.start) / this.active.duration);
+      const p = Math.max(
+        0,
+        Math.min(1, (time - this.active.start) / this.active.duration),
+      );
       this.active.layer.quaternion.setFromAxisAngle(
         this.active.axis,
         this.active.angle * (p * p * (3 - 2 * p)),

@@ -209,6 +209,159 @@ const FACE_UPS: Vec3[] = [
 
 const FACE_RIGHTS: Vec3[] = NORMALS.map((n, i) => cross(FACE_UPS[i], n));
 
+const CHAR_ID = (() => {
+  const table = new Uint8Array(128).fill(7);
+  for (let i = 0; i < FACES.length; i++) {
+    table[FACES.charCodeAt(i)] = i;
+  }
+  return table;
+})();
+
+const CORNER_PERMS: readonly [number, number, number][] = [
+  [0, 1, 2],
+  [0, 2, 1],
+  [1, 0, 2],
+  [1, 2, 0],
+  [2, 0, 1],
+  [2, 1, 0],
+];
+
+const CORNER_ENTRY_ID = new Int16Array(512).fill(-1);
+const CORNER_ORIG_PIECE = new Int8Array(48);
+// [slot(8)][entryId(48)][k(3)] のステッカー基準上方向からの回転角キャッシュ
+const CORNER_ANGLES_LUT = new Float64Array(8 * 48 * 3);
+
+const EDGE_ENTRY_ID = new Int16Array(64).fill(-1);
+const EDGE_ORIG_PIECE = new Int8Array(24);
+// [slot(12)][entryId(24)][k(2)] のステッカー基準上方向からの回転角キャッシュ
+const EDGE_ANGLES_LUT = new Float64Array(12 * 24 * 2);
+
+function normalizeAnglePi(angle: number): number {
+  return Math.abs(angle + Math.PI) < 1e-4 ? Math.PI : angle;
+}
+
+(function initArrowTables() {
+  let cornerEntryId = 0;
+  for (let p = 0; p < CORNERS.length; p++) {
+    const origCols = CORNERS[p].map((idx) => CHAR_ID[SOLVED.charCodeAt(idx)]);
+    for (const perm of CORNER_PERMS) {
+      const code =
+        (origCols[perm[0]] << 6) | (origCols[perm[1]] << 3) | origCols[perm[2]];
+      CORNER_ENTRY_ID[code] = cornerEntryId;
+      CORNER_ORIG_PIECE[cornerEntryId] = p;
+
+      // perm[slotPos] = origIdx の逆写像 sigma[origIdx] = slotPos
+      const sigma = [0, 0, 0];
+      for (let pos = 0; pos < 3; pos++) {
+        sigma[perm[pos]] = pos;
+      }
+
+      const origStickers = CORNERS[p];
+      const nNormals = origStickers.map((idx) => NORMALS[Math.floor(idx / 9)]);
+      const vUps = origStickers.map((idx) => FACE_UPS[Math.floor(idx / 9)]);
+
+      for (let slot = 0; slot < CORNERS.length; slot++) {
+        const slotStickers = CORNERS[slot];
+        const mNormals = slotStickers.map(
+          (idx) => NORMALS[Math.floor(idx / 9)],
+        );
+        const R: [Vec3, Vec3, Vec3] = [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ];
+        for (let row = 0; row < 3; row++) {
+          for (let col = 0; col < 3; col++) {
+            let sum = 0;
+            for (let k = 0; k < 3; k++) {
+              sum += mNormals[sigma[k]][row] * nNormals[k][col];
+            }
+            R[row][col] = sum;
+          }
+        }
+        const base = (slot * 48 + cornerEntryId) * 3;
+        for (let k = 0; k < 3; k++) {
+          const curFace = Math.floor(slotStickers[sigma[k]] / 9);
+          const vOrig = vUps[k];
+          const w: Vec3 = [
+            R[0][0] * vOrig[0] + R[0][1] * vOrig[1] + R[0][2] * vOrig[2],
+            R[1][0] * vOrig[0] + R[1][1] * vOrig[1] + R[1][2] * vOrig[2],
+            R[2][0] * vOrig[0] + R[2][1] * vOrig[1] + R[2][2] * vOrig[2],
+          ];
+          const cosVal = dot(w, FACE_UPS[curFace]);
+          const sinVal = dot(w, FACE_RIGHTS[curFace]);
+          CORNER_ANGLES_LUT[base + sigma[k]] = normalizeAnglePi(
+            Math.atan2(sinVal, cosVal),
+          );
+        }
+      }
+      cornerEntryId++;
+    }
+  }
+
+  let edgeEntryId = 0;
+  for (let p = 0; p < EDGES.length; p++) {
+    const origCols = EDGES[p].map((idx) => CHAR_ID[SOLVED.charCodeAt(idx)]);
+    const origStickers = EDGES[p];
+    const n0 = NORMALS[Math.floor(origStickers[0] / 9)];
+    const n1 = NORMALS[Math.floor(origStickers[1] / 9)];
+    const n2 = cross(n0, n1);
+    const vUps = origStickers.map((idx) => FACE_UPS[Math.floor(idx / 9)]);
+
+    for (const perm of [
+      [0, 1],
+      [1, 0],
+    ] as const) {
+      const code = (origCols[perm[0]] << 3) | origCols[perm[1]];
+      EDGE_ENTRY_ID[code] = edgeEntryId;
+      EDGE_ORIG_PIECE[edgeEntryId] = p;
+
+      const sigma0 = perm[0] === 0 ? 0 : 1;
+      const sigma1 = perm[1] === 0 ? 0 : 1;
+
+      for (let slot = 0; slot < EDGES.length; slot++) {
+        const slotStickers = EDGES[slot];
+        const m0 = NORMALS[Math.floor(slotStickers[0] / 9)];
+        const m1 = NORMALS[Math.floor(slotStickers[1] / 9)];
+        const curN0 = sigma0 === 0 ? m0 : m1;
+        const curN1 = sigma1 === 0 ? m0 : m1;
+        const curN2 = cross(curN0, curN1);
+
+        const R: [Vec3, Vec3, Vec3] = [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ];
+        for (let row = 0; row < 3; row++) {
+          for (let col = 0; col < 3; col++) {
+            R[row][col] =
+              curN0[row] * n0[col] +
+              curN1[row] * n1[col] +
+              curN2[row] * n2[col];
+          }
+        }
+        const base = (slot * 24 + edgeEntryId) * 2;
+        const sigmas = [sigma0, sigma1];
+        for (let k = 0; k < 2; k++) {
+          const curFace = Math.floor(slotStickers[sigmas[k]] / 9);
+          const vOrig = vUps[k];
+          const w: Vec3 = [
+            R[0][0] * vOrig[0] + R[0][1] * vOrig[1] + R[0][2] * vOrig[2],
+            R[1][0] * vOrig[0] + R[1][1] * vOrig[1] + R[1][2] * vOrig[2],
+            R[2][0] * vOrig[0] + R[2][1] * vOrig[1] + R[2][2] * vOrig[2],
+          ];
+          const cosVal = dot(w, FACE_UPS[curFace]);
+          const sinVal = dot(w, FACE_RIGHTS[curFace]);
+          EDGE_ANGLES_LUT[base + sigmas[k]] = normalizeAnglePi(
+            Math.atan2(sinVal, cosVal),
+          );
+        }
+      }
+      edgeEntryId++;
+    }
+  }
+})();
+
 export function getCellArrowInfo(
   state: string,
   centerRotations: number[] = [0, 0, 0, 0, 0, 0],
@@ -223,172 +376,90 @@ export function getCellArrowInfo(
   }
 
   // 1. コーナーピース（8ピース）
-  CORNERS.forEach((slotStickers, slot) => {
-    // 現在のスロットにある3つのステッカーの色
-    const currentCols = slotStickers.map((idx) => state[idx]);
-    const mNormals = slotStickers.map((idx) => NORMALS[Math.floor(idx / 9)]);
+  for (let slot = 0; slot < 8; slot++) {
+    const slotStickers = CORNERS[slot];
+    const s0 = slotStickers[0];
+    const s1 = slotStickers[1];
+    const s2 = slotStickers[2];
+    const c0 = state.charCodeAt(s0);
+    const c1 = state.charCodeAt(s1);
+    const c2 = state.charCodeAt(s2);
+    const ci0 = c0 < 128 ? CHAR_ID[c0] : 7;
+    const ci1 = c1 < 128 ? CHAR_ID[c1] : 7;
+    const ci2 = c2 < 128 ? CHAR_ID[c2] : 7;
+    const entryId =
+      ci0 <= 5 && ci1 <= 5 && ci2 <= 5
+        ? CORNER_ENTRY_ID[(ci0 << 6) | (ci1 << 3) | ci2]
+        : -1;
 
-    // 元のどのコーナーピースか探す（色の一致）
-    let origPiece = -1;
-    for (let p = 0; p < CORNERS.length; p++) {
-      const origCols = CORNERS[p].map((idx) => SOLVED[idx]);
-      if (
-        origCols.every((c) => currentCols.includes(c)) &&
-        currentCols.every((c) => origCols.includes(c))
-      ) {
-        origPiece = p;
-        break;
-      }
+    if (entryId < 0) {
+      kinds[s0] = "corner";
+      kinds[s1] = "corner";
+      kinds[s2] = "corner";
+      pieceIndices[s0] = slot;
+      pieceIndices[s1] = slot;
+      pieceIndices[s2] = slot;
+      continue;
     }
 
-    if (origPiece === -1) {
-      // 不正な状態または未入力の場合
-      slotStickers.forEach((idx) => {
-        kinds[idx] = "corner";
-        pieceIndices[idx] = slot;
-      });
-      return;
-    }
+    const origPiece = CORNER_ORIG_PIECE[entryId];
+    const base = (slot * 48 + entryId) * 3;
+    const a0 = CORNER_ANGLES_LUT[base];
+    const a1 = CORNER_ANGLES_LUT[base + 1];
+    const a2 = CORNER_ANGLES_LUT[base + 2];
 
-    const origStickers = CORNERS[origPiece];
-    const nNormals = origStickers.map((idx) => NORMALS[Math.floor(idx / 9)]);
-    const vUps = origStickers.map((idx) => FACE_UPS[Math.floor(idx / 9)]);
-
-    // 元のステッカー k が現在のスロットのどの位置 sigma[k] にあるか
-    const sigma: number[] = [];
-    for (let k = 0; k < 3; k++) {
-      const origCol = SOLVED[origStickers[k]];
-      const curPos = currentCols.indexOf(origCol);
-      sigma.push(curPos);
-    }
-
-    // 剛体回転行列 R: R[row][col] = sum_k m[sigma[k]][row] * n[k][col]
-    const R: [Vec3, Vec3, Vec3] = [
-      [0, 0, 0],
-      [0, 0, 0],
-      [0, 0, 0],
-    ];
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        let sum = 0;
-        for (let k = 0; k < 3; k++) {
-          sum += mNormals[sigma[k]][row] * nNormals[k][col];
-        }
-        R[row][col] = sum;
-      }
-    }
-
-    // 各ステッカーの回転角を計算
-    for (let k = 0; k < 3; k++) {
-      const curSlotStickerIdx = slotStickers[sigma[k]];
-      const curFace = Math.floor(curSlotStickerIdx / 9);
-      const vOrig = vUps[k];
-
-      // 回転後の矢印ベクトル w = R * vOrig
-      const w: Vec3 = [
-        R[0][0] * vOrig[0] + R[0][1] * vOrig[1] + R[0][2] * vOrig[2],
-        R[1][0] * vOrig[0] + R[1][1] * vOrig[1] + R[1][2] * vOrig[2],
-        R[2][0] * vOrig[0] + R[2][1] * vOrig[1] + R[2][2] * vOrig[2],
-      ];
-
-      const uCur = FACE_UPS[curFace];
-      const rCur = FACE_RIGHTS[curFace];
-      const cosVal = dot(w, uCur);
-      const sinVal = dot(w, rCur);
-      let angle = Math.atan2(sinVal, cosVal);
-      // -π を +π に正規化
-      if (Math.abs(angle + Math.PI) < 1e-4) angle = Math.PI;
-
-      angles[curSlotStickerIdx] = angle;
-      colors[curSlotStickerIdx] =
-        Math.abs(angle) < 1e-4
-          ? ARROW_COLORS.NORMAL
-          : ARROW_COLORS.CORNER_TWIST;
-      kinds[curSlotStickerIdx] = "corner";
-      pieceIndices[curSlotStickerIdx] = origPiece;
-    }
-  });
+    angles[s0] = a0;
+    angles[s1] = a1;
+    angles[s2] = a2;
+    colors[s0] =
+      Math.abs(a0) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.CORNER_TWIST;
+    colors[s1] =
+      Math.abs(a1) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.CORNER_TWIST;
+    colors[s2] =
+      Math.abs(a2) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.CORNER_TWIST;
+    kinds[s0] = "corner";
+    kinds[s1] = "corner";
+    kinds[s2] = "corner";
+    pieceIndices[s0] = origPiece;
+    pieceIndices[s1] = origPiece;
+    pieceIndices[s2] = origPiece;
+  }
 
   // 2. エッジピース（12ピース）
-  EDGES.forEach((slotStickers, slot) => {
-    const currentCols = slotStickers.map((idx) => state[idx]);
-    const m0 = NORMALS[Math.floor(slotStickers[0] / 9)];
-    const m1 = NORMALS[Math.floor(slotStickers[1] / 9)];
+  for (let slot = 0; slot < 12; slot++) {
+    const slotStickers = EDGES[slot];
+    const s0 = slotStickers[0];
+    const s1 = slotStickers[1];
+    const c0 = state.charCodeAt(s0);
+    const c1 = state.charCodeAt(s1);
+    const ci0 = c0 < 128 ? CHAR_ID[c0] : 7;
+    const ci1 = c1 < 128 ? CHAR_ID[c1] : 7;
+    const entryId = ci0 <= 5 && ci1 <= 5 ? EDGE_ENTRY_ID[(ci0 << 3) | ci1] : -1;
 
-    let origPiece = -1;
-    for (let p = 0; p < EDGES.length; p++) {
-      const origCols = EDGES[p].map((idx) => SOLVED[idx]);
-      if (
-        origCols.every((c) => currentCols.includes(c)) &&
-        currentCols.every((c) => origCols.includes(c))
-      ) {
-        origPiece = p;
-        break;
-      }
+    if (entryId < 0) {
+      kinds[s0] = "edge";
+      kinds[s1] = "edge";
+      pieceIndices[s0] = slot;
+      pieceIndices[s1] = slot;
+      continue;
     }
 
-    if (origPiece === -1) {
-      slotStickers.forEach((idx) => {
-        kinds[idx] = "edge";
-        pieceIndices[idx] = slot;
-      });
-      return;
-    }
+    const origPiece = EDGE_ORIG_PIECE[entryId];
+    const base = (slot * 24 + entryId) * 2;
+    const a0 = EDGE_ANGLES_LUT[base];
+    const a1 = EDGE_ANGLES_LUT[base + 1];
 
-    const origStickers = EDGES[origPiece];
-    const n0 = NORMALS[Math.floor(origStickers[0] / 9)];
-    const n1 = NORMALS[Math.floor(origStickers[1] / 9)];
-    const n2 = cross(n0, n1);
-    const vUps = origStickers.map((idx) => FACE_UPS[Math.floor(idx / 9)]);
-
-    const sigma: number[] = [];
-    for (let k = 0; k < 2; k++) {
-      const origCol = SOLVED[origStickers[k]];
-      sigma.push(currentCols.indexOf(origCol));
-    }
-
-    const curN0 = sigma[0] === 0 ? m0 : m1;
-    const curN1 = sigma[1] === 0 ? m0 : m1;
-    const curN2 = cross(curN0, curN1);
-
-    // 回転行列 R
-    const R: [Vec3, Vec3, Vec3] = [
-      [0, 0, 0],
-      [0, 0, 0],
-      [0, 0, 0],
-    ];
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        R[row][col] =
-          curN0[row] * n0[col] + curN1[row] * n1[col] + curN2[row] * n2[col];
-      }
-    }
-
-    for (let k = 0; k < 2; k++) {
-      const curSlotStickerIdx = slotStickers[sigma[k]];
-      const curFace = Math.floor(curSlotStickerIdx / 9);
-      const vOrig = vUps[k];
-
-      const w: Vec3 = [
-        R[0][0] * vOrig[0] + R[0][1] * vOrig[1] + R[0][2] * vOrig[2],
-        R[1][0] * vOrig[0] + R[1][1] * vOrig[1] + R[1][2] * vOrig[2],
-        R[2][0] * vOrig[0] + R[2][1] * vOrig[1] + R[2][2] * vOrig[2],
-      ];
-
-      const uCur = FACE_UPS[curFace];
-      const rCur = FACE_RIGHTS[curFace];
-      const cosVal = dot(w, uCur);
-      const sinVal = dot(w, rCur);
-      let angle = Math.atan2(sinVal, cosVal);
-      if (Math.abs(angle + Math.PI) < 1e-4) angle = Math.PI;
-
-      angles[curSlotStickerIdx] = angle;
-      colors[curSlotStickerIdx] =
-        Math.abs(angle) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.EDGE_FLIP;
-      kinds[curSlotStickerIdx] = "edge";
-      pieceIndices[curSlotStickerIdx] = origPiece;
-    }
-  });
+    angles[s0] = a0;
+    angles[s1] = a1;
+    colors[s0] =
+      Math.abs(a0) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.EDGE_FLIP;
+    colors[s1] =
+      Math.abs(a1) < 1e-4 ? ARROW_COLORS.NORMAL : ARROW_COLORS.EDGE_FLIP;
+    kinds[s0] = "edge";
+    kinds[s1] = "edge";
+    pieceIndices[s0] = origPiece;
+    pieceIndices[s1] = origPiece;
+  }
 
   // 3. センターピース（6面）
   for (let f = 0; f < 6; f++) {
@@ -418,8 +489,8 @@ export function countPieceOrientations(
   arrowInfo: CellArrowInfo,
 ): PieceOrientationCounts {
   let normal = 0;
-  let cornerTwist = 0;
-  let edgeFlip = 0;
+  let cornerMask = 0;
+  let edgeMask = 0;
   let centerRotate = 0;
 
   for (let i = 0; i < 54; i++) {
@@ -427,18 +498,29 @@ export function countPieceOrientations(
     if (c === ARROW_COLORS.NORMAL) {
       normal++;
     } else if (c === ARROW_COLORS.CORNER_TWIST) {
-      cornerTwist++;
+      cornerMask |= 1 << arrowInfo.pieceIndices[i];
     } else if (c === ARROW_COLORS.EDGE_FLIP) {
-      edgeFlip++;
+      edgeMask |= 1 << arrowInfo.pieceIndices[i];
     } else if (c === ARROW_COLORS.CENTER_ROTATE) {
       centerRotate++;
     }
   }
 
+  let cornerTwist = 0;
+  while (cornerMask) {
+    cornerMask &= cornerMask - 1;
+    cornerTwist++;
+  }
+  let edgeFlip = 0;
+  while (edgeMask) {
+    edgeMask &= edgeMask - 1;
+    edgeFlip++;
+  }
+
   return {
     normal,
-    cornerTwist: Math.floor(cornerTwist / 3),
-    edgeFlip: Math.floor(edgeFlip / 2),
+    cornerTwist,
+    edgeFlip,
     centerRotate,
   };
 }

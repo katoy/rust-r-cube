@@ -1,30 +1,34 @@
-// Portable little-endian table format. The build script produces this asset;
-// browsers only decode it, never construct pruning tables.
+// Portable little-endian 4-bit packed pruning table format (CUBE0002).
+// The build script produces this asset; browsers zero-copy borrow it from
+// static WASM memory without allocating or copying pruning tables.
+const TABLE_MAGIC: &[u8; 8] = b"CUBE0002";
+
 fn checksum(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf29ce484222325, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100000001b3))
+    bytes.iter().fold(0xcbf29ce484222325, |h, b| {
+        (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
+    })
 }
 
 #[allow(dead_code)] // Used by the build script and reproducibility test.
 pub fn encode() -> Vec<u8> {
-    let mt = MoveTable::get();
     let pt = PruningTable::get();
-    let mut data = Vec::new();
-    macro_rules! moves { ($($field:ident),*) => { $(
-        for row in mt.$field.iter() { for n in row { data.extend(n.to_le_bytes()); } }
-    )* }; }
-    moves!(twist, flip, ud_slice, cp, ep8, slice_p);
-    macro_rules! bytes { ($($field:ident),*) => { $(
-        data.extend((pt.$field.len() as u32).to_le_bytes());
-        data.extend(pt.$field.iter().map(|v| *v as u8));
-    )* }; }
-    bytes!(twist_slice, flip_slice, cp_slice, ep8_slice);
-    macro_rules! shorts { ($field:ident) => { for n in pt.$field.iter() { data.extend(n.to_le_bytes()); } }; }
-    shorts!(twist_class);
-    bytes!(twist_sym, twist_self_sym);
-    shorts!(flip_class);
-    bytes!(flip_sym, flip_self_sym);
-    shorts!(ud_slice_x2);
-    let mut output = b"CUBE0001".to_vec();
+    let total_data_len = 4 * 4
+        + pt.twist_slice.len()
+        + pt.flip_slice.len()
+        + pt.cp_slice.len()
+        + pt.ep8_slice.len();
+    let mut data = Vec::with_capacity(total_data_len);
+    for slice in [
+        pt.twist_slice.as_ref(),
+        pt.flip_slice.as_ref(),
+        pt.cp_slice.as_ref(),
+        pt.ep8_slice.as_ref(),
+    ] {
+        data.extend((slice.len() as u32).to_le_bytes());
+        data.extend(slice);
+    }
+    let mut output = Vec::with_capacity(16 + data.len());
+    output.extend_from_slice(TABLE_MAGIC);
     output.extend(checksum(&data).to_le_bytes());
     output.extend(data);
     output
@@ -35,7 +39,7 @@ pub fn verify_table_data(data: &[u8]) -> Result<(), &'static str> {
     if data.len() < 16 {
         return Err("table data too short");
     }
-    if &data[..8] != b"CUBE0001" {
+    if &data[..8] != TABLE_MAGIC {
         return Err("table version mismatch");
     }
     let expected_checksum = u64::from_le_bytes(data[8..16].try_into().unwrap());
@@ -64,40 +68,23 @@ impl<'a> Reader<'a> {
         ensure_table_verified(data);
         Self { data, at: 16 }
     }
-    fn short(&mut self) -> u16 {
-        let n = u16::from_le_bytes(self.data[self.at..self.at+2].try_into().unwrap());
-        self.at += 2;
-        n
-    }
-    fn moves<const N: usize>(&mut self) -> Box<[[u16;18];N]> {
-        (0..N).map(|_| std::array::from_fn(|_| self.short())).collect::<Vec<_>>()
-            .into_boxed_slice().try_into().unwrap()
-    }
-    fn bytes(&mut self) -> Box<[u8]> {
-        let len = u32::from_le_bytes(self.data[self.at..self.at+4].try_into().unwrap()) as usize;
+    fn slice(&mut self, expected_len: usize) -> &'a [u8] {
+        let len = u32::from_le_bytes(self.data[self.at..self.at + 4].try_into().unwrap()) as usize;
+        assert_eq!(len, expected_len, "table slice length mismatch");
         self.at += 4;
-        let result = self.data[self.at..self.at+len].into();
+        let result = &self.data[self.at..self.at + len];
         self.at += len;
         result
     }
-    fn shorts<const N: usize>(&mut self) -> Box<[u16;N]> {
-        (0..N).map(|_| self.short()).collect::<Vec<_>>().into_boxed_slice().try_into().unwrap()
-    }
-    fn bools<const N: usize>(&mut self) -> Box<[bool;N]> {
-        self.bytes().iter().map(|v| *v != 0).collect::<Vec<_>>().into_boxed_slice().try_into().unwrap()
-    }
 }
-fn decode_moves(bytes: &[u8]) -> MoveTable {
+
+fn decode_pruning(bytes: &'static [u8]) -> PruningTable {
     let mut r = Reader::new(bytes);
-    MoveTable { twist: r.moves(), flip: r.moves(), ud_slice: r.moves(), cp: r.moves(), ep8: r.moves(), slice_p: r.moves() }
-}
-fn decode_pruning(bytes: &[u8]) -> PruningTable {
-    let mut r = Reader::new(bytes);
-    r.at += (2187+2048+495+40320+40320+24)*18*2;
     let result = PruningTable {
-        twist_slice:r.bytes(), flip_slice:r.bytes(), cp_slice:r.bytes(), ep8_slice:r.bytes(),
-        twist_class:r.shorts(), twist_sym:r.bools(), twist_self_sym:r.bools(),
-        flip_class:r.shorts(), flip_sym:r.bools(), flip_self_sym:r.bools(), ud_slice_x2:r.shorts()
+        twist_slice: Cow::Borrowed(r.slice(TWIST_SLICE_PACKED_LEN)),
+        flip_slice: Cow::Borrowed(r.slice(FLIP_SLICE_PACKED_LEN)),
+        cp_slice: Cow::Borrowed(r.slice(CP_SLICE_PACKED_LEN)),
+        ep8_slice: Cow::Borrowed(r.slice(EP8_SLICE_PACKED_LEN)),
     };
     assert_eq!(r.at, bytes.len());
     result

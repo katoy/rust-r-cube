@@ -1,4 +1,7 @@
-use super::coord::{get_all_group_indices, move_cube_18, Corner, RawCube};
+use super::coord::{
+    corner_positions, group_idx_from_pos, move_cube_18, Corner, RawCube, GROUP_A_CORNERS,
+    GROUP_B_CORNERS, GROUP_C_CORNERS, GROUP_D_CORNERS,
+};
 use super::tables::PruningTable;
 use std::collections::{HashSet, VecDeque};
 use std::sync::OnceLock;
@@ -85,6 +88,20 @@ impl Search {
         }
     }
 
+    #[inline]
+    fn heuristic(&self, rc: &RawCube) -> usize {
+        let pos_of = corner_positions(rc);
+        let h_a =
+            self.pruning_table.group_a[group_idx_from_pos(rc, &pos_of, GROUP_A_CORNERS)] as usize;
+        let h_b =
+            self.pruning_table.group_b[group_idx_from_pos(rc, &pos_of, GROUP_B_CORNERS)] as usize;
+        let h_c =
+            self.pruning_table.group_c[group_idx_from_pos(rc, &pos_of, GROUP_C_CORNERS)] as usize;
+        let h_d =
+            self.pruning_table.group_d[group_idx_from_pos(rc, &pos_of, GROUP_D_CORNERS)] as usize;
+        h_a.max(h_b).max(h_c).max(h_d)
+    }
+
     /// 単一の目標状態（RawCube::default()）に対する IDA* 最短探索
     pub fn solve_single_target(&mut self, rc: &RawCube, max_depth: usize) -> Option<Vec<usize>> {
         self.solve_single_target_with_faces(rc, max_depth, 6)
@@ -96,7 +113,12 @@ impl Search {
         max_depth: usize,
         max_faces: usize,
     ) -> Option<Vec<usize>> {
-        for depth in 0..=max_depth {
+        if self.budget_ms == Some(0) {
+            self.timed_out = true;
+            return None;
+        }
+        let init_h = self.heuristic(rc);
+        for depth in init_h..=max_depth {
             self.solution.clear();
             if self.ida_star(*rc, depth, 255, max_faces) {
                 return Some(self.solution.clone());
@@ -126,33 +148,49 @@ impl Search {
             }
         }
 
-        let [idx_a, idx_b, idx_c, idx_d] = get_all_group_indices(&rc);
-
-        let h_a = self.pruning_table.group_a[idx_a] as usize;
-        let h_b = self.pruning_table.group_b[idx_b] as usize;
-        let h_c = self.pruning_table.group_c[idx_c] as usize;
-        let h_d = self.pruning_table.group_d[idx_d] as usize;
-
-        let h = h_a.max(h_b).max(h_c).max(h_d);
-
-        if h == 0 {
-            return true;
+        if depth == 0 {
+            return rc == RawCube::default();
         }
-        if h > depth {
+
+        let pos_of = corner_positions(&rc);
+        if self.pruning_table.group_a[group_idx_from_pos(&rc, &pos_of, GROUP_A_CORNERS)] as usize
+            > depth
+            || self.pruning_table.group_b[group_idx_from_pos(&rc, &pos_of, GROUP_B_CORNERS)]
+                as usize
+                > depth
+            || self.pruning_table.group_c[group_idx_from_pos(&rc, &pos_of, GROUP_C_CORNERS)]
+                as usize
+                > depth
+            || self.pruning_table.group_d[group_idx_from_pos(&rc, &pos_of, GROUP_D_CORNERS)]
+                as usize
+                > depth
+        {
+            return false;
+        }
+
+        if depth == 1 {
+            for face in 0..max_faces {
+                if redundant_face(face, last_face) {
+                    continue;
+                }
+                for m_offset in 0..3 {
+                    let m = face * 3 + m_offset;
+                    let next_rc = rc.multiply(move_cube_18(m));
+                    self.nodes += 1;
+                    if next_rc == RawCube::default() {
+                        self.solution.push(m);
+                        return true;
+                    }
+                    if self.nodes >= self.max_nodes {
+                        return false;
+                    }
+                }
+            }
             return false;
         }
 
         for face in 0..max_faces {
-            // 同一面の連続回転を排除
-            if face == last_face {
-                continue;
-            }
-            // 対面回転の順序を固定（U-D, R-L, F-B）
-            // 0:U と 3:D, 1:R と 4:L, 2:F と 5:B
-            if (face == 3 && last_face == 0)
-                || (face == 4 && last_face == 1)
-                || (face == 5 && last_face == 2)
-            {
+            if redundant_face(face, last_face) {
                 continue;
             }
 
@@ -173,6 +211,15 @@ impl Search {
 
         false
     }
+}
+
+#[inline(always)]
+fn redundant_face(face: usize, last_face: usize) -> bool {
+    // 同一面の連続回転および対面回転の逆順を排除（U-D, R-L, F-B）
+    face == last_face
+        || (face == 3 && last_face == 0)
+        || (face == 4 && last_face == 1)
+        || (face == 5 && last_face == 2)
 }
 
 /// 2x2 キューブの24通りの空間回転（Orientation）を取得します。

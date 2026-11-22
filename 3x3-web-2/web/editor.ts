@@ -137,7 +137,7 @@ export class ColorEditor {
     this.face = Math.floor(index / perFace);
     this.errorIndices = [];
     $("editor-error").textContent = "";
-    if (!is2x2 && !this.manualCenters) {
+    if (!is2x2 && !this.manualCenters && !this.draft.includes("?")) {
       try {
         this.turns = centerTurns(automaticCenters(this.draft));
       } catch {

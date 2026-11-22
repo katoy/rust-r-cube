@@ -46,20 +46,16 @@ export function parseUrlParams(search: string): ParsedUrlParams {
 
   const centersParam = params.get("centers");
   if (centersParam) {
-    const parts = centersParam.split(",");
-    const parsed = parts.map((v) => Number(v.trim()));
-    if (
-      parts.length === 6 &&
-      parsed.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)
-    ) {
-      result.centers = parsed;
+    const parts = centersParam.split(",").map((v) => v.trim());
+    if (parts.length === 6 && parts.every((v) => /^[0-3]$/.test(v))) {
+      result.centers = parts.map((v) => Number(v));
     } else {
       result.hasInvalidCenters = true;
     }
   }
 
   const algParam = params.get("alg");
-  if (algParam) {
+  if (algParam && algParam.length <= 4096) {
     result.alg = algParam;
   }
 

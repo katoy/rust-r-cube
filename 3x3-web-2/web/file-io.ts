@@ -7,24 +7,28 @@ export function validateAndParseCubeJson(
   content: string,
   fileSize: number,
 ): ParsedCubeFile {
-  if (fileSize > 65536) {
+  if (fileSize > 65536 || content.length > 65536) {
     throw new Error("ファイルは64KB以内にしてください。");
   }
   const data: unknown = JSON.parse(content);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
+  }
+  const obj = data as Record<string, unknown>;
   if (
-    !data ||
-    typeof data !== "object" ||
-    !("version" in data) ||
-    data.version !== 1 ||
-    !("state" in data) ||
-    typeof data.state !== "string"
+    !Object.hasOwn(obj, "version") ||
+    obj.version !== 1 ||
+    !Object.hasOwn(obj, "state") ||
+    typeof obj.state !== "string"
   ) {
     throw new Error("Cube Studio v1 のJSONファイルを選んでください。");
   }
 
   return {
-    state: data.state,
-    centerTurns: "centerTurns" in data ? data.centerTurns : undefined,
+    state: obj.state,
+    centerTurns: Object.hasOwn(obj, "centerTurns")
+      ? obj.centerTurns
+      : undefined,
   };
 }
 

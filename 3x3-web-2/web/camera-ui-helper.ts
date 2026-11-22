@@ -9,26 +9,27 @@ export function toCanvasCoords(
   canvas: HTMLCanvasElement,
   clientX: number,
   clientY: number,
+  rect?: DOMRect,
 ): Point {
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+  const r = rect ?? canvas.getBoundingClientRect();
+  if (r.width <= 0 || r.height <= 0) return { x: 0, y: 0 };
 
-  const elemRatio = rect.width / rect.height;
+  const elemRatio = r.width / r.height;
   const canvasRatio = canvas.width / canvas.height;
 
-  let drawWidth = rect.width;
-  let drawHeight = rect.height;
-  let drawLeft = rect.left;
-  let drawTop = rect.top;
+  let drawWidth = r.width;
+  let drawHeight = r.height;
+  let drawLeft = r.left;
+  let drawTop = r.top;
 
   if (elemRatio > canvasRatio) {
     // 横長：左右にレターボックス余白がある場合
-    drawWidth = rect.height * canvasRatio;
-    drawLeft = rect.left + (rect.width - drawWidth) / 2;
+    drawWidth = r.height * canvasRatio;
+    drawLeft = r.left + (r.width - drawWidth) / 2;
   } else {
     // 縦長：上下にレターボックス余白がある場合
-    drawHeight = rect.width / canvasRatio;
-    drawTop = rect.top + (rect.height - drawHeight) / 2;
+    drawHeight = r.width / canvasRatio;
+    drawTop = r.top + (r.height - drawHeight) / 2;
   }
 
   const scaleX = canvas.width / drawWidth;
@@ -51,9 +52,10 @@ export function findHitTarget(
   x: number,
   y: number,
   computeCenterFn: (pts: Point[]) => Point,
+  rect?: DOMRect,
 ): number {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / Math.max(1, rect.width);
+  const r = rect ?? canvas.getBoundingClientRect();
+  const scaleX = canvas.width / Math.max(1, r.width);
   // 画面上で最低30px相当の当たり判定領域を確保
   const hitRadius = Math.max(30, 30 * scaleX);
 

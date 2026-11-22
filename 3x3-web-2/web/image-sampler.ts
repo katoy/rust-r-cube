@@ -286,6 +286,24 @@ export function sampleFaceFromPixels(
   return result;
 }
 
+/** 4頂点領域の中央 (0.5, 0.5) 1点のみをサンプリングして色分類を返す */
+export function sampleFaceCenterFromPixels(
+  pixels: ImageData,
+  points: Point[],
+  adaptation?: ColorAdaptation,
+): string {
+  if (points.length !== 4) throw new Error("面の四隅を4点指定してください。");
+  const transform = getPerspectiveTransform(points);
+  const [topLeft, topRight] = points;
+  const edgeLen = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
+  const radius = Math.max(
+    3,
+    Math.min(25, Math.round(edgeLen / SAMPLE_RADIUS_DIVISOR[3])),
+  );
+  const pt = transform(0.5, 0.5);
+  return classify(pixels, pt.x, pt.y, radius, adaptation);
+}
+
 export function sampleFace(
   image: HTMLImageElement,
   points: Point[],

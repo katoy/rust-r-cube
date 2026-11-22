@@ -59,14 +59,11 @@ impl KorfSearch {
     fn heuristic(&self, cube: &RawCube, twist: usize, flip: usize, slice: usize) -> u8 {
         let h_ts = self.pt.get_twist_slice(twist, slice);
         let h_fs = self.pt.get_flip_slice(flip, slice);
-
         let bad_cp = (0..8).filter(|&i| cube.cp[i] as usize != i).count() as u8;
         let bad_ep = (0..12).filter(|&i| cube.ep[i] as usize != i).count() as u8;
-
-        let h_cp = bad_cp.div_ceil(4);
-        let h_ep = bad_ep.div_ceil(4);
-
-        h_ts.max(h_fs).max(h_cp).max(h_ep)
+        h_ts.max(h_fs)
+            .max(bad_cp.div_ceil(4))
+            .max(bad_ep.div_ceil(4))
     }
 
     pub fn solve(&mut self, cube: &RawCube) -> Option<KorfSolution> {
@@ -81,10 +78,13 @@ impl KorfSearch {
         let init_twist = cube.get_twist() as usize;
         let init_flip = cube.get_flip() as usize;
         let init_slice = cube.get_ud_slice() as usize;
+        let start_depth = self
+            .heuristic(cube, init_twist, init_flip, init_slice)
+            .max(1);
 
-        // 深さ 1 から順に完全最短手を反復深化探索 (IDA*)
+        // 下界値から順に完全最短手を反復深化探索 (IDA*)
         let max_depth = 12; // ブラウザのレスポンス内で探索可能な深さ
-        for depth in 1..=max_depth {
+        for depth in start_depth..=max_depth {
             self.path.clear();
             if self.search(cube, init_twist, init_flip, init_slice, depth, 99) {
                 return Some(KorfSolution {
@@ -130,30 +130,56 @@ impl KorfSearch {
             return *cube == RawCube::default();
         }
 
-        let h = self.heuristic(cube, twist, flip, slice);
-        if h > depth {
+        let max_bad = depth * 4;
+        let bad_cp = (0..8).filter(|&i| cube.cp[i] as usize != i).count() as u8;
+        if bad_cp > max_bad {
+            return false;
+        }
+        let bad_ep = (0..12).filter(|&i| cube.ep[i] as usize != i).count() as u8;
+        if bad_ep > max_bad {
+            return false;
+        }
+        if self
+            .pt
+            .get_twist_slice(twist, slice)
+            .max(self.pt.get_flip_slice(flip, slice))
+            > depth
+        {
             return false;
         }
 
+        let next_depth = depth - 1;
         for face in 0..6 {
             if redundant(face, last_face) {
                 continue;
             }
             for turn in 0..3 {
                 let m = face * 3 + turn;
-                let next_cube = cube.multiply(move_cube_18(m));
-                let next_twist = self.mt.twist[twist][m] as usize;
-                let next_flip = self.mt.flip[flip][m] as usize;
                 let next_slice = self.mt.ud_slice[slice][m] as usize;
+                let next_twist = self.mt.twist[twist][m] as usize;
+                let next_flip;
+                if next_depth == 0 {
+                    if next_twist != 0 || next_slice != 0 {
+                        continue;
+                    }
+                    next_flip = self.mt.flip[flip][m] as usize;
+                    if next_flip != 0 {
+                        continue;
+                    }
+                } else {
+                    if self.pt.get_twist_slice(next_twist, next_slice) > next_depth {
+                        continue;
+                    }
+                    next_flip = self.mt.flip[flip][m] as usize;
+                    if self.pt.get_flip_slice(next_flip, next_slice) > next_depth {
+                        continue;
+                    }
+                }
+                let next_cube = cube.multiply(move_cube_18(m));
 
                 self.path.push(m);
                 if self.search(
-                    &next_cube,
-                    next_twist,
-                    next_flip,
-                    next_slice,
-                    depth - 1,
-                    face,
+                    &next_cube, next_twist, next_flip, next_slice, next_depth, face,
                 ) {
                     return true;
                 }

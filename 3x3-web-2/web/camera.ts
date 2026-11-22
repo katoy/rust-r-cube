@@ -12,11 +12,11 @@ import {
 import { renderCanvasOverlay } from "./camera-canvas-renderer";
 import {
   buildState,
-  sampleFace,
   sampleFaceFromPixels,
+  sampleFaceCenterFromPixels,
   getImagePixels,
 } from "./image-sampler";
-import { FACES, FACE_NAMES } from "./model";
+import { FACES, FACE_NAMES, NAMES } from "./model";
 import { is_valid } from "../pkg/cube_studio";
 import {
   faceColorName,
@@ -127,11 +127,12 @@ export async function readImageDimensions(
   const head = await read(0, Math.min(32, file.size));
   if (!head) return null;
   const n = head.byteLength;
-  // PNG: 89 50 4E 47 0D 0A 1A 0A の後に IHDR の幅・高さ
+  // PNG: 89 50 4E 47 0D 0A 1A 0A の後に IHDR (49 48 44 52) の幅・高さ
   if (
     n >= 24 &&
     head.getUint32(0) === 0x89504e47 &&
-    head.getUint32(4) === 0x0d0a1a0a
+    head.getUint32(4) === 0x0d0a1a0a &&
+    head.getUint32(12) === 0x49484452
   ) {
     return { width: head.getUint32(16), height: head.getUint32(20) };
   }
@@ -220,8 +221,11 @@ export async function checkImagePixelCount(
 export class TwoViewCamera {
   private imageA?: HTMLImageElement;
   private imageB?: HTMLImageElement;
+  private pixelsA?: ImageData;
+  private pixelsB?: ImageData;
   private sourceUrlA?: string;
   private sourceUrlB?: string;
+  private isOpen = false;
   private currentView: "A" | "B" = "A";
   private points: Point[] = [];
   private centerPoint?: Point;
@@ -251,19 +255,22 @@ export class TwoViewCamera {
     dialog.addEventListener("close", () => this.handleDialogClose());
     dialog.addEventListener("cancel", () => this.handleDialogClose());
 
-    const getCanvasCoords = (clientX: number, clientY: number) =>
-      toCanvasCoords(canvas, clientX, clientY);
-
-    const checkHit = (x: number, y: number) =>
-      findHitTarget(canvas, this.points, this.centerPoint, x, y, computeCenter);
-
     const handlePointerDown = (clientX: number, clientY: number) => {
       const activeImage = this.activeImage;
       if (!activeImage) return;
-      const { x, y } = getCanvasCoords(clientX, clientY);
+      const rect = canvas.getBoundingClientRect();
+      const { x, y } = toCanvasCoords(canvas, clientX, clientY, rect);
       this.dragMoved = false;
 
-      const hit = checkHit(x, y);
+      const hit = findHitTarget(
+        canvas,
+        this.points,
+        this.centerPoint,
+        x,
+        y,
+        computeCenter,
+        rect,
+      );
       if (hit !== -1) {
         this.draggingIndex = hit;
         canvas.style.cursor = "grabbing";
@@ -276,7 +283,8 @@ export class TwoViewCamera {
     const handlePointerMove = (clientX: number, clientY: number) => {
       const activeImage = this.activeImage;
       if (!activeImage) return;
-      const { x, y } = getCanvasCoords(clientX, clientY);
+      const rect = canvas.getBoundingClientRect();
+      const { x, y } = toCanvasCoords(canvas, clientX, clientY, rect);
 
       if (this.draggingIndex !== -1) {
         this.dragMoved = true;
@@ -286,12 +294,21 @@ export class TwoViewCamera {
           this.points[this.draggingIndex] = { x, y };
         }
         this.draw();
-        this.update();
       } else {
-        const hit = checkHit(x, y);
-        this.hoverIndex = hit;
-        canvas.style.cursor = hit !== -1 ? "grab" : "crosshair";
-        this.draw();
+        const hit = findHitTarget(
+          canvas,
+          this.points,
+          this.centerPoint,
+          x,
+          y,
+          computeCenter,
+          rect,
+        );
+        if (hit !== this.hoverIndex) {
+          this.hoverIndex = hit;
+          canvas.style.cursor = hit !== -1 ? "grab" : "crosshair";
+          this.draw();
+        }
       }
     };
 
@@ -307,9 +324,19 @@ export class TwoViewCamera {
 
       // ドラッグせずにクリックした場合
       if (!this.dragMoved && this.activeImage) {
-        const { x, y } = getCanvasCoords(clientX, clientY);
+        const rect = canvas.getBoundingClientRect();
+        const { x, y } = toCanvasCoords(canvas, clientX, clientY, rect);
         // 既存の頂点の近くをクリックした場合は新規追加しない
-        if (checkHit(x, y) === -1 && this.points.length < 6) {
+        const hit = findHitTarget(
+          canvas,
+          this.points,
+          this.centerPoint,
+          x,
+          y,
+          computeCenter,
+          rect,
+        );
+        if (hit === -1 && this.points.length < 6) {
           this.points.push({ x, y });
           if (this.points.length === 6) {
             this.points = normalizeOutlinePoints(this.points);
@@ -381,8 +408,9 @@ export class TwoViewCamera {
       this.draw();
     });
     canvas.addEventListener("mouseleave", () => {
-      if (this.draggingIndex === -1) {
+      if (this.draggingIndex === -1 && this.hoverIndex !== -1) {
         this.hoverIndex = -1;
+        canvas.style.cursor = "crosshair";
         this.draw();
       }
     });
@@ -391,8 +419,17 @@ export class TwoViewCamera {
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       if (!this.activeImage) return;
-      const { x, y } = getCanvasCoords(e.clientX, e.clientY);
-      const hit = checkHit(x, y);
+      const rect = canvas.getBoundingClientRect();
+      const { x, y } = toCanvasCoords(canvas, e.clientX, e.clientY, rect);
+      const hit = findHitTarget(
+        canvas,
+        this.points,
+        this.centerPoint,
+        x,
+        y,
+        computeCenter,
+        rect,
+      );
       if (hit >= 0 && hit < this.points.length) {
         this.points.splice(hit, 1);
         this.centerPoint = undefined;
@@ -463,8 +500,8 @@ export class TwoViewCamera {
     if (inputB)
       inputB.onchange = (e) => this.loadFile(e.target as HTMLInputElement, "B");
 
-    this.setupDropZone($("camera-drop-a"), inputA, "A");
-    this.setupDropZone($("camera-drop-b"), inputB, "B");
+    this.setupDropZone($("camera-drop-a"), "A");
+    this.setupDropZone($("camera-drop-b"), "B");
     this.setupCanvasDrop(canvas);
 
     const liveBtn = $("camera-live-stream");
@@ -502,11 +539,7 @@ export class TwoViewCamera {
     }
   }
 
-  private setupDropZone(
-    dropZone: HTMLElement | null,
-    input: HTMLInputElement | null,
-    view: "A" | "B",
-  ) {
+  private setupDropZone(dropZone: HTMLElement | null, view: "A" | "B") {
     if (!dropZone) return;
     dropZone.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -544,6 +577,7 @@ export class TwoViewCamera {
   }
 
   open(cubeType: "2x2" | "3x3" = "3x3") {
+    this.isOpen = true;
     this.cubeType = cubeType;
     this.stopLiveStream();
     this.error("");
@@ -556,6 +590,8 @@ export class TwoViewCamera {
     this.selectedColor = "U";
     this.imageA = undefined;
     this.imageB = undefined;
+    this.pixelsA = undefined;
+    this.pixelsB = undefined;
     if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
     if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
     this.sourceUrlA = undefined;
@@ -629,10 +665,12 @@ export class TwoViewCamera {
       if (this.sourceUrlA) URL.revokeObjectURL(this.sourceUrlA);
       this.sourceUrlA = undefined;
       this.imageA = undefined;
+      this.pixelsA = undefined;
     } else {
       if (this.sourceUrlB) URL.revokeObjectURL(this.sourceUrlB);
       this.sourceUrlB = undefined;
       this.imageB = undefined;
+      this.pixelsB = undefined;
     }
     this.clearViewResults(view);
     if (this.currentView === view) {
@@ -672,10 +710,12 @@ export class TwoViewCamera {
       this.sourceUrlA && URL.revokeObjectURL(this.sourceUrlA);
       this.sourceUrlA = url;
       this.imageA = image;
+      this.pixelsA = undefined;
     } else {
       this.sourceUrlB && URL.revokeObjectURL(this.sourceUrlB);
       this.sourceUrlB = url;
       this.imageB = image;
+      this.pixelsB = undefined;
     }
 
     this.clearViewResults(view);
@@ -855,6 +895,15 @@ export class TwoViewCamera {
     this.update();
   }
 
+  private getActivePixels(img: HTMLImageElement): ImageData {
+    if (this.currentView === "A") {
+      if (!this.pixelsA) this.pixelsA = getImagePixels(img);
+      return this.pixelsA;
+    }
+    if (!this.pixelsB) this.pixelsB = getImagePixels(img);
+    return this.pixelsB;
+  }
+
   private capture() {
     const activeImage = this.activeImage;
     if (!activeImage || this.points.length !== 6) return;
@@ -873,7 +922,7 @@ export class TwoViewCamera {
       const [p1, p2, p3, p4, p5, p6] = pts;
 
       // 3面の各面をサンプリング（同一画像からのImageData抽出を1回に集約してGPU同期とメモリ確保を削減）
-      const pixels = getImagePixels(activeImage);
+      const pixels = this.getActivePixels(activeImage);
       const faceDefs: {
         targetFace: (typeof FACES)[number];
         quad: Point[];
@@ -1060,10 +1109,11 @@ export class TwoViewCamera {
                 [p3, p4, center, p2],
               ];
 
-        const pixels = getImagePixels(img);
-        const sampledNames = quads.map((quad) =>
-          faceColorName(sampleFaceFromPixels(pixels, quad), is2x2),
-        );
+        const pixels = this.getActivePixels(img);
+        const sampledNames = quads.map((quad) => {
+          const c = sampleFaceCenterFromPixels(pixels, quad);
+          return c !== "?" ? NAMES[c] : undefined;
+        });
 
         if (sampledNames.some((c) => c !== undefined)) {
           this.detectedLabels[view] = keys
@@ -1402,6 +1452,8 @@ export class TwoViewCamera {
   }
 
   private handleDialogClose() {
+    if (!this.isOpen) return;
+    this.isOpen = false;
     this.stopLiveStream();
     this.loadGenerationA++;
     this.loadGenerationB++;
@@ -1413,6 +1465,8 @@ export class TwoViewCamera {
     this.sourceUrlB = undefined;
     this.imageA = undefined;
     this.imageB = undefined;
+    this.pixelsA = undefined;
+    this.pixelsB = undefined;
     this.clearViewResults("A");
     this.clearViewResults("B");
     this.points = [];

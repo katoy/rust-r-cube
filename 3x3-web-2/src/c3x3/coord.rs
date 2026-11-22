@@ -325,32 +325,13 @@ impl RawCube {
 
     /// コーナーの置換をインデックス化 (0..40319)
     pub fn get_cp(&self) -> u16 {
-        let mut cp = 0u32;
         let p = self.cp.map(|c| c as u8);
-        for i in 0..7 {
-            let mut k = 0;
-            for j in (i + 1)..8 {
-                if p[j] < p[i] {
-                    k += 1;
-                }
-            }
-            cp = cp * (8 - i as u32) + k as u32;
-        }
-        cp as u16
+        rank_perm8(&p)
     }
 
     /// コーナーの置換を設定
     pub fn set_cp(&mut self, cp: u16) {
-        let mut available = (0..8).collect::<Vec<u8>>();
-        let mut cp_u32 = cp as u32;
-        let mut res = [0u8; 8];
-        for (i, item) in res.iter_mut().enumerate().take(7) {
-            let fact = factorial(7 - i as u8);
-            let idx = (cp_u32 / fact) as usize;
-            *item = available.remove(idx);
-            cp_u32 %= fact;
-        }
-        res[7] = available[0];
+        let res = unrank_perm8(cp);
         for (i, &item) in res.iter().enumerate() {
             self.cp[i] = Self::default().cp[item as usize];
         }
@@ -358,7 +339,6 @@ impl RawCube {
 
     /// U/D面エッジの置換をインデックス化 (Phase 2, 0..40319)
     pub fn get_ep8(&self) -> u16 {
-        let mut ep8 = 0u32;
         let mut p = [0u8; 8];
         let mut count = 0;
         for &ep in &self.ep {
@@ -367,30 +347,12 @@ impl RawCube {
                 count += 1;
             }
         }
-        for i in 0..7 {
-            let mut k = 0;
-            for j in (i + 1)..8 {
-                if p[j] < p[i] {
-                    k += 1;
-                }
-            }
-            ep8 = ep8 * (8 - i as u32) + k as u32;
-        }
-        ep8 as u16
+        rank_perm8(&p)
     }
 
     /// U/D面エッジの置換を設定
     pub fn set_ep8(&mut self, ep8: u16) {
-        let mut available = (0..8).collect::<Vec<u8>>();
-        let mut ep8_u32 = ep8 as u32;
-        let mut res = [0u8; 8];
-        for (i, item) in res.iter_mut().enumerate().take(7) {
-            let fact = factorial(7 - i as u8);
-            let idx = (ep8_u32 / fact) as usize;
-            *item = available.remove(idx);
-            ep8_u32 %= fact;
-        }
-        res[7] = available[0];
+        let res = unrank_perm8(ep8);
         // U/D面の8箇所に配置
         let mut count = 0;
         for ep in &mut self.ep {
@@ -403,7 +365,6 @@ impl RawCube {
 
     /// 中層エッジの置換をインデックス化 (Phase 2, 0..23)
     pub fn get_slice_p(&self) -> u16 {
-        let mut slice_p = 0u32;
         let mut p = [0u8; 4];
         let mut count = 0;
         for &ep in &self.ep {
@@ -412,30 +373,12 @@ impl RawCube {
                 count += 1;
             }
         }
-        for i in 0..3 {
-            let mut k = 0;
-            for j in (i + 1)..4 {
-                if p[j] < p[i] {
-                    k += 1;
-                }
-            }
-            slice_p = slice_p * (4 - i as u32) + k as u32;
-        }
-        slice_p as u16
+        rank_perm4(&p)
     }
 
     /// 中層エッジの置換を設定
     pub fn set_slice_p(&mut self, slice_p: u16) {
-        let mut available = (0..4).collect::<Vec<u8>>();
-        let mut slice_p_u32 = slice_p as u32;
-        let mut res = [0u8; 4];
-        for (i, item) in res.iter_mut().enumerate().take(3) {
-            let fact = factorial(3 - i as u8);
-            let idx = (slice_p_u32 / fact) as usize;
-            *item = available.remove(idx);
-            slice_p_u32 %= fact;
-        }
-        res[3] = available[0];
+        let res = unrank_perm4(slice_p);
         let mut count = 0;
         for ep in &mut self.ep {
             if (*ep as u8) >= 8 {
@@ -446,7 +389,71 @@ impl RawCube {
     }
 }
 
-// --- 数学ユーティリティ ---
+// --- 順列ランク・アンランク & 数学ユーティリティ ---
+
+#[inline]
+pub(crate) fn rank_perm8(p: &[u8; 8]) -> u16 {
+    let mut seen = 0u8;
+    let mut res = 0u32;
+    for (i, &raw) in p.iter().enumerate().take(7) {
+        let x = raw & 7;
+        let before = (seen & ((1u8 << x) - 1)).count_ones();
+        res = res * (8 - i as u32) + (x as u32 - before);
+        seen |= 1u8 << x;
+    }
+    res as u16
+}
+
+#[inline]
+pub(crate) fn unrank_perm8(idx: u16) -> [u8; 8] {
+    const FACT7: [u32; 7] = [5040, 720, 120, 24, 6, 2, 1];
+    let mut available = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    let mut val = idx as u32;
+    let mut res = [0u8; 8];
+    for i in 0..7 {
+        let fact = FACT7[i];
+        let k = (val / fact) as usize;
+        res[i] = available[k];
+        for j in k..(7 - i) {
+            available[j] = available[j + 1];
+        }
+        val %= fact;
+    }
+    res[7] = available[0];
+    res
+}
+
+#[inline]
+pub(crate) fn rank_perm4(p: &[u8; 4]) -> u16 {
+    let mut seen = 0u8;
+    let mut res = 0u32;
+    for (i, &raw) in p.iter().enumerate().take(3) {
+        let x = raw & 3;
+        let before = (seen & ((1u8 << x) - 1)).count_ones();
+        res = res * (4 - i as u32) + (x as u32 - before);
+        seen |= 1u8 << x;
+    }
+    res as u16
+}
+
+#[inline]
+pub(crate) fn unrank_perm4(idx: u16) -> [u8; 4] {
+    const FACT3: [u32; 3] = [6, 2, 1];
+    let mut available = [0u8, 1, 2, 3];
+    let mut val = idx as u32;
+    let mut res = [0u8; 4];
+    for i in 0..3 {
+        let fact = FACT3[i];
+        let k = (val / fact) as usize;
+        res[i] = available[k];
+        for j in k..(3 - i) {
+            available[j] = available[j + 1];
+        }
+        val %= fact;
+    }
+    res[3] = available[0];
+    res
+}
 
 fn n_choose_k(n: i16, mut k: i16) -> u16 {
     if n < k || k < 0 {
@@ -462,6 +469,7 @@ fn n_choose_k(n: i16, mut k: i16) -> u16 {
     res as u16
 }
 
+#[cfg(test)]
 fn factorial(n: u8) -> u32 {
     let mut res = 1u32;
     for i in 2..=n {

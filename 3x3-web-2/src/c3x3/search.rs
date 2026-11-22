@@ -1,5 +1,5 @@
-use crate::coord::{move_cube_18, RawCube};
-use crate::tables::{MoveTable, PruningTable};
+use crate::coord::{move_cube_18, rank_perm4, rank_perm8, RawCube};
+use crate::tables::{MoveTable, PruningTable, PHASE2_MOVES};
 use web_time::Instant;
 
 /// 神の数字（HTM）。どの状態も 20 手以内で解けることが証明されている
@@ -90,10 +90,11 @@ impl Search {
             self.has_gods_solution()
         }
     }
-    pub fn with_max_total(mut self, max: usize) -> Self {
-        self.max_total = max;
-        self.has_custom_max = true;
-        self
+    #[inline]
+    fn h1(&self, twist: u16, flip: u16, slice: u16) -> u8 {
+        self.pt
+            .get_twist_slice(twist as usize, slice as usize)
+            .max(self.pt.get_flip_slice(flip as usize, slice as usize))
     }
     pub fn solve(&mut self, cube: &RawCube) -> Option<Vec<usize>> {
         self.nodes = 0;
@@ -122,85 +123,140 @@ impl Search {
 
         let initial_max = self.max_total;
 
-        // 短い手数（深さ 1..=5）の直接探索（理論的最短手数を瞬時に見つける）
-        for d in 1..=5.min(self.max_total) {
-            self.path.clear();
-            if let Some(target) = self.target_centers {
-                self.current_centers = target;
-            }
-            if self.direct_solve(cube, d as u8, 99) {
-                self.best_phase1_len = self.path.len();
-                return Some(self.path.clone());
-            }
-            if self.timed_out {
-                return None;
-            }
-        }
+        // 3 軸共役の下界を使って 1..=5 手の直接探索の要不要と開始深さを決定する
+        let conj_fwd = [*cube, conjugate_axis(cube, 1), conjugate_axis(cube, 2)];
+        let t0 = conj_fwd[0].get_twist();
+        let f0 = conj_fwd[0].get_flip();
+        let s0 = conj_fwd[0].get_ud_slice();
+        let t1 = conj_fwd[1].get_twist();
+        let f1 = conj_fwd[1].get_flip();
+        let s1 = conj_fwd[1].get_ud_slice();
+        let t2 = conj_fwd[2].get_twist();
+        let f2 = conj_fwd[2].get_flip();
+        let s2 = conj_fwd[2].get_ud_slice();
+        let init_h = self
+            .h1(t0, f0, s0)
+            .max(self.h1(t1, f1, s1))
+            .max(self.h1(t2, f2, s2));
+        let min_centers = self
+            .target_centers
+            .map_or(0, |tc| tc.iter().filter(|&&c| c != 0).count());
+        let start_d = (init_h as usize).max(min_centers).max(1);
+        let max_direct = 5.min(self.max_total);
 
-        for depth in 0..=12 {
-            if depth >= self.max_total {
-                break;
-            }
-            self.path.clear();
-            if let Some(target) = self.target_centers {
-                self.current_centers = target;
-            }
-            self.phase1(
-                cube.get_twist(),
-                cube.get_flip(),
-                cube.get_ud_slice(),
-                depth as u8,
-                99,
-            );
-            if self.timed_out || self.has_acceptable_solution() {
-                break;
-            }
-        }
-
-        // センター向き指定なしで神の数字（20 手）以内の解が得られていない場合、
-        // UD / RL / FB の 3 軸 × 順・逆状態の 6 方向を G1 の基準とする探索を Phase 1 の深さごとに交互に行い
-        // （S_URF3 による共役変換）、20 手以内の解が見つかった時点で打ち切る。
-        // センター向き指定ありの場合は、センター回転の追跡を変換できないため対象外とする。
-        if self.target_centers.is_none() && !self.timed_out && !self.has_gods_solution() {
-            let inv = inverse_cube(cube);
-            let mut directions: Vec<(usize, bool, RawCube)> = Vec::with_capacity(6);
-            for a in 0..3 {
-                for (inverse, base) in [(false, cube), (true, &inv)] {
-                    let dir_cube = conjugate_axis(base, a);
-                    // スーパーフリップのような対称性の高い状態では変換後のキューブが一致するため、重複する方向は探索しない
-                    if directions.iter().all(|&(_, _, c)| c != dir_cube) {
-                        directions.push((a, inverse, dir_cube));
-                    }
+        if start_d <= max_direct {
+            for d in start_d..=max_direct {
+                self.path.clear();
+                if let Some(target) = self.target_centers {
+                    self.current_centers = target;
+                }
+                if self.direct_solve_coords(cube, t0, f0, s0, d as u8, 99) {
+                    self.best_phase1_len = self.path.len();
+                    return Some(self.path.clone());
+                }
+                if self.timed_out {
+                    return None;
                 }
             }
-            'deepen: for depth in 0.. {
-                for &(axis, inverse, ref dir_cube) in &directions {
-                    if depth >= self.max_total {
+        }
+
+        struct DirEntry {
+            axis: usize,
+            inverse: bool,
+            cube: RawCube,
+            centers: [i32; 6],
+            twist: u16,
+            flip: u16,
+            slice: u16,
+        }
+
+        let inv = inverse_cube(cube);
+        let tables = axis_tables();
+        let has_centers = self.target_centers.is_some();
+        let mut directions: Vec<DirEntry> = Vec::with_capacity(6);
+        let mut push_dir = |candidate: DirEntry| {
+            if let Some(existing) = directions.iter_mut().find(|d| d.cube == candidate.cube) {
+                if has_centers
+                    && odd_side_centers(candidate.centers) < odd_side_centers(existing.centers)
+                {
+                    *existing = candidate;
+                }
+            } else {
+                directions.push(candidate);
+            }
+        };
+        let coords_fwd = [(t0, f0, s0), (t1, f1, s1), (t2, f2, s2)];
+        for a in 0..3 {
+            let dir_centers_fwd = if let Some(target) = self.target_centers {
+                std::array::from_fn(|f| target[tables.unconj_move[a][f * 3] / 3])
+            } else {
+                [0; 6]
+            };
+            let (twist, flip, slice) = coords_fwd[a];
+            push_dir(DirEntry {
+                axis: a,
+                inverse: false,
+                cube: conj_fwd[a],
+                centers: dir_centers_fwd,
+                twist,
+                flip,
+                slice,
+            });
+
+            let inv_cube = conjugate_axis(&inv, a);
+            let dir_centers_inv = if has_centers {
+                std::array::from_fn(|f| (4 - dir_centers_fwd[f]) & 3)
+            } else {
+                [0; 6]
+            };
+            push_dir(DirEntry {
+                axis: a,
+                inverse: true,
+                cube: inv_cube,
+                centers: dir_centers_inv,
+                twist: inv_cube.get_twist(),
+                flip: inv_cube.get_flip(),
+                slice: inv_cube.get_ud_slice(),
+            });
+        }
+
+        // UD / RL / FB の 3 軸 × 順・逆状態の重複除去済み最大 6 方向を Phase 1 の深さごとに交互探索する
+        'pass1: for depth in 0..=12 {
+            for dir in &directions {
+                if depth > self.max_total {
+                    break 'pass1;
+                }
+                self.axis = dir.axis;
+                self.inverse = dir.inverse;
+                self.initial = dir.cube;
+                self.path.clear();
+                if self.target_centers.is_some() {
+                    self.current_centers = dir.centers;
+                }
+                self.phase1(dir.twist, dir.flip, dir.slice, depth as u8, 99);
+                if self.timed_out || self.has_acceptable_solution() {
+                    break 'pass1;
+                }
+            }
+        }
+
+        // センター向き指定なしで神の数字（20 手）以内の解が得られていない場合、深さ 13 以降も 6 方向を継続する
+        if self.target_centers.is_none() && !self.timed_out && !self.has_gods_solution() {
+            'deepen: for depth in 13.. {
+                for dir in &directions {
+                    if depth > self.max_total {
                         break 'deepen;
                     }
-                    // axis == 0 かつ順方向は depth <= 12 まで最初のループで探索済み
-                    if axis == 0 && !inverse && depth <= 12 {
-                        continue;
-                    }
-                    self.axis = axis;
-                    self.inverse = inverse;
-                    self.initial = *dir_cube;
+                    self.axis = dir.axis;
+                    self.inverse = dir.inverse;
+                    self.initial = dir.cube;
                     self.path.clear();
-                    self.phase1(
-                        dir_cube.get_twist(),
-                        dir_cube.get_flip(),
-                        dir_cube.get_ud_slice(),
-                        depth as u8,
-                        99,
-                    );
+                    self.phase1(dir.twist, dir.flip, dir.slice, depth as u8, 99);
                     if self.timed_out || self.has_gods_solution() {
                         break 'deepen;
                     }
                 }
             }
-            self.axis = 0;
-            self.inverse = false;
-            self.initial = *cube;
         }
 
         // 1回目の探索（Phase 2 上限 12）で解が見つからなかった場合、段階的に上限を緩和する。
@@ -231,23 +287,22 @@ impl Search {
                 } else {
                     total
                 };
-                for depth in 0..=12 {
-                    if depth >= self.max_total {
-                        break;
-                    }
-                    self.path.clear();
-                    if let Some(target) = self.target_centers {
-                        self.current_centers = target;
-                    }
-                    self.phase1(
-                        cube.get_twist(),
-                        cube.get_flip(),
-                        cube.get_ud_slice(),
-                        depth as u8,
-                        99,
-                    );
-                    if self.best_solution.is_some() || self.timed_out {
-                        break;
+                'pass2: for depth in 0..=12 {
+                    for dir in &directions {
+                        if depth > self.max_total {
+                            break 'pass2;
+                        }
+                        self.axis = dir.axis;
+                        self.inverse = dir.inverse;
+                        self.initial = dir.cube;
+                        self.path.clear();
+                        if self.target_centers.is_some() {
+                            self.current_centers = dir.centers;
+                        }
+                        self.phase1(dir.twist, dir.flip, dir.slice, depth as u8, 99);
+                        if self.best_solution.is_some() || self.timed_out {
+                            break 'pass2;
+                        }
                     }
                 }
                 if self.best_solution.is_some() || self.timed_out {
@@ -256,9 +311,26 @@ impl Search {
             }
         }
 
+        self.axis = 0;
+        self.inverse = false;
+        self.initial = *cube;
         self.best_solution.clone()
     }
     pub fn direct_solve(&mut self, cube: &RawCube, depth: u8, last: usize) -> bool {
+        let twist = cube.get_twist();
+        let flip = cube.get_flip();
+        let slice = cube.get_ud_slice();
+        self.direct_solve_coords(cube, twist, flip, slice, depth, last)
+    }
+    fn direct_solve_coords(
+        &mut self,
+        cube: &RawCube,
+        twist: u16,
+        flip: u16,
+        slice: u16,
+        depth: u8,
+        last: usize,
+    ) -> bool {
         if self.exhausted() {
             return false;
         }
@@ -271,30 +343,60 @@ impl Search {
             }
             return true;
         }
-        if self.target_centers.is_some() {
+        if self.h1(twist, flip, slice) > depth {
+            return false;
+        }
+        let has_centers = self.target_centers.is_some();
+        if has_centers {
             let non_zero_centers = self.current_centers.iter().filter(|&&c| c != 0).count() as u8;
             if non_zero_centers > depth {
                 return false;
             }
         }
+        let next_depth = depth - 1;
         for face in 0..6 {
             if redundant(face, last) {
                 continue;
             }
             for turn in 0..3 {
                 let m = face * 3 + turn;
+                let ns = self.mt.ud_slice[slice as usize][m];
+                let nt = self.mt.twist[twist as usize][m];
+                let nf;
+                if next_depth == 0 {
+                    // depth 0 で完成状態（G1 部分群にも含まれる）以外は RawCube::multiply を省略
+                    if nt != 0 || ns != 0 {
+                        continue;
+                    }
+                    nf = self.mt.flip[flip as usize][m];
+                    if nf != 0 {
+                        continue;
+                    }
+                } else {
+                    if self.pt.get_twist_slice(nt as usize, ns as usize) > next_depth {
+                        continue;
+                    }
+                    nf = self.mt.flip[flip as usize][m];
+                    if self.pt.get_flip_slice(nf as usize, ns as usize) > next_depth {
+                        continue;
+                    }
+                }
                 let t = match turn {
                     0 => 1,
                     1 => 2,
                     _ => 3,
                 };
                 self.path.push(m);
-                self.current_centers[face] = (self.current_centers[face] + t) & 3;
+                if has_centers {
+                    self.current_centers[face] = (self.current_centers[face] + t) & 3;
+                }
                 let next_cube = cube.multiply(move_cube_18(m));
-                if self.direct_solve(&next_cube, depth - 1, face) {
+                if self.direct_solve_coords(&next_cube, nt, nf, ns, next_depth, face) {
                     return true;
                 }
-                self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
+                if has_centers {
+                    self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
+                }
                 self.path.pop();
                 if self.timed_out {
                     return false;
@@ -327,10 +429,7 @@ impl Search {
             // R(1), F(2), L(4), B(5) は Phase 2 では 180° 回転しか行えないため、
             // Phase 1 終了時点でこれらのセンター回転は偶数 (0 mod 2) でなければならない。
             // 奇数回転の面の数が残り深さを超える場合は到達不能として枝刈りする。
-            ((self.current_centers[1] & 1)
-                + (self.current_centers[2] & 1)
-                + (self.current_centers[4] & 1)
-                + (self.current_centers[5] & 1)) as u8
+            odd_side_centers(self.current_centers)
         } else {
             0
         }
@@ -339,14 +438,13 @@ impl Search {
         self.current_centers.iter().filter(|&&c| c != 0).count() as u8
     }
     fn phase1(&mut self, twist: u16, flip: u16, slice: u16, depth: u8, last: usize) -> bool {
-        if self.exhausted() {
+        if self.h1(twist, flip, slice) > depth {
             return false;
         }
-        let distance = self
-            .pt
-            .get_twist_slice(twist as usize, slice as usize)
-            .max(self.pt.get_flip_slice(flip as usize, slice as usize));
-        if distance > depth {
+        self.phase1_search(twist, flip, slice, depth, last)
+    }
+    fn phase1_search(&mut self, twist: u16, flip: u16, slice: u16, depth: u8, last: usize) -> bool {
+        if self.exhausted() {
             return false;
         }
         if self.min_phase1_center_moves() > depth {
@@ -367,11 +465,7 @@ impl Search {
                     return false;
                 }
             }
-            let cube = self
-                .path
-                .iter()
-                .fold(self.initial, |c, m| c.multiply(move_cube_18(*m)));
-            let max = (self.max_total - self.path.len()).min(
+            let max_d = (self.max_total - self.path.len()).min(
                 if self.allow_deep_phase2 || self.max_total == 30 {
                     18
                 } else {
@@ -383,17 +477,19 @@ impl Search {
             } else {
                 0
             };
-            let max_d = max.min(self.max_total.saturating_sub(self.path.len()));
             if min_d > max_d {
                 return false;
             }
-            let cp = cube.get_cp();
-            let ep = cube.get_ep8();
-            let sp = cube.get_slice_p();
-            let h2 = self.pt.cp_slice[cp as usize * 24 + sp as usize]
-                .max(self.pt.ep8_slice[ep as usize * 24 + sp as usize])
-                as usize;
-            let start_d = min_d.max(h2);
+            let (cp_arr, ep_arr) = replay_g1_perms(&self.initial, &self.path);
+            let cp = rank_perm8(&cp_arr);
+            let sp = rank_perm4(&[ep_arr[8] - 8, ep_arr[9] - 8, ep_arr[10] - 8, ep_arr[11] - 8]);
+            let h_cp = self.pt.get_cp_slice(cp as usize, sp as usize) as usize;
+            if h_cp > max_d {
+                return false;
+            }
+            let ep = rank_perm8(&ep_arr[0..8].try_into().unwrap());
+            let h_ep = self.pt.get_ep8_slice(ep as usize, sp as usize) as usize;
+            let start_d = min_d.max(h_cp).max(h_ep);
             if start_d > max_d {
                 return false;
             }
@@ -423,27 +519,47 @@ impl Search {
                 return false;
             }
         }
+        let next_depth = depth - 1;
+        let has_centers = self.target_centers.is_some();
         for face in 0..6 {
             if redundant(face, last) {
                 continue;
             }
             for turn in 0..3 {
                 let m = face * 3 + turn;
+                let ns = self.mt.ud_slice[slice as usize][m];
+                let nt = self.mt.twist[twist as usize][m];
+                let nf;
+                if next_depth == 0 {
+                    if nt != 0 || ns != 0 {
+                        continue;
+                    }
+                    nf = self.mt.flip[flip as usize][m];
+                    if nf != 0 {
+                        continue;
+                    }
+                } else {
+                    if self.pt.get_twist_slice(nt as usize, ns as usize) > next_depth {
+                        continue;
+                    }
+                    nf = self.mt.flip[flip as usize][m];
+                    if self.pt.get_flip_slice(nf as usize, ns as usize) > next_depth {
+                        continue;
+                    }
+                }
                 let t = match turn {
                     0 => 1,
                     1 => 2,
                     _ => 3,
                 };
                 self.path.push(m);
-                self.current_centers[face] = (self.current_centers[face] + t) & 3;
-                let _ = self.phase1(
-                    self.mt.twist[twist as usize][m],
-                    self.mt.flip[flip as usize][m],
-                    self.mt.ud_slice[slice as usize][m],
-                    depth - 1,
-                    face,
-                );
-                self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
+                if has_centers {
+                    self.current_centers[face] = (self.current_centers[face] + t) & 3;
+                }
+                let _ = self.phase1_search(nt, nf, ns, next_depth, face);
+                if has_centers {
+                    self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
+                }
                 self.path.pop();
                 if self.timed_out || self.has_acceptable_solution() {
                     return self.best_solution.is_some();
@@ -453,15 +569,21 @@ impl Search {
         self.best_solution.is_some()
     }
     fn phase2(&mut self, cp: u16, ep: u16, sp: u16, depth: u8, last: usize) -> bool {
-        if self.exhausted() {
-            return false;
-        }
-        let distance = self.pt.cp_slice[cp as usize * 24 + sp as usize]
-            .max(self.pt.ep8_slice[ep as usize * 24 + sp as usize]);
+        let distance = self
+            .pt
+            .get_cp_slice(cp as usize, sp as usize)
+            .max(self.pt.get_ep8_slice(ep as usize, sp as usize));
         if distance > depth {
             return false;
         }
-        if self.target_centers.is_some() {
+        self.phase2_search(cp, ep, sp, depth, last)
+    }
+    fn phase2_search(&mut self, cp: u16, ep: u16, sp: u16, depth: u8, last: usize) -> bool {
+        if self.exhausted() {
+            return false;
+        }
+        let has_centers = self.target_centers.is_some();
+        if has_centers {
             if (self.current_centers[1] & 1) != 0
                 || (self.current_centers[2] & 1) != 0
                 || (self.current_centers[4] & 1) != 0
@@ -489,10 +611,31 @@ impl Search {
             self.max_total = self.path.len().saturating_sub(1);
             return true;
         }
-        for m in [0, 1, 2, 4, 7, 9, 10, 11, 13, 16] {
+        let next_depth = depth - 1;
+        for (p2_idx, &m) in PHASE2_MOVES.iter().enumerate() {
             let face = m / 3;
             if redundant(face, last) {
                 continue;
+            }
+            let nsp = self.mt.slice_p[sp as usize][p2_idx];
+            let ncp = self.mt.cp[cp as usize][p2_idx];
+            let nep;
+            if next_depth == 0 {
+                if ncp != 0 || nsp != 0 {
+                    continue;
+                }
+                nep = self.mt.ep8[ep as usize][p2_idx];
+                if nep != 0 {
+                    continue;
+                }
+            } else {
+                if self.pt.get_cp_slice(ncp as usize, nsp as usize) > next_depth {
+                    continue;
+                }
+                nep = self.mt.ep8[ep as usize][p2_idx];
+                if self.pt.get_ep8_slice(nep as usize, nsp as usize) > next_depth {
+                    continue;
+                }
             }
             let t = match m % 3 {
                 0 => 1,
@@ -500,24 +643,81 @@ impl Search {
                 _ => 3,
             };
             self.path.push(m);
-            self.current_centers[face] = (self.current_centers[face] + t) & 3;
-            if self.phase2(
-                self.mt.cp[cp as usize][m],
-                self.mt.ep8[ep as usize][m],
-                self.mt.slice_p[sp as usize][m],
-                depth - 1,
-                face,
-            ) {
+            if has_centers {
+                self.current_centers[face] = (self.current_centers[face] + t) & 3;
+            }
+            let solved = self.phase2_search(ncp, nep, nsp, next_depth, face);
+            if has_centers {
+                self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
+            }
+            self.path.pop();
+            if solved {
                 return true;
             }
-            self.current_centers[face] = (self.current_centers[face] + 4 - t) & 3;
-            self.path.pop();
             if self.timed_out {
                 return false;
             }
         }
         false
     }
+}
+
+struct PermMove18 {
+    cp: [u8; 8],
+    ep: [u8; 12],
+}
+
+fn perm_moves_18() -> &'static [PermMove18; 18] {
+    static TABLE: std::sync::OnceLock<[PermMove18; 18]> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        std::array::from_fn(|m| {
+            let mc = move_cube_18(m);
+            PermMove18 {
+                cp: mc.cp.map(|c| c as u8),
+                ep: mc.ep.map(|e| e as u8),
+            }
+        })
+    })
+}
+
+/// G1 突入時用の高速リプレイ。向き（co/eo）と剰余演算を行わず 20 バイトの置換のみを計算する。
+#[inline]
+fn replay_g1_perms(initial: &RawCube, path: &[usize]) -> ([u8; 8], [u8; 12]) {
+    let moves = perm_moves_18();
+    let mut cp = initial.cp.map(|c| c as u8);
+    let mut ep = initial.ep.map(|e| e as u8);
+    for &m in path {
+        let mv = &moves[m];
+        cp = [
+            cp[mv.cp[0] as usize],
+            cp[mv.cp[1] as usize],
+            cp[mv.cp[2] as usize],
+            cp[mv.cp[3] as usize],
+            cp[mv.cp[4] as usize],
+            cp[mv.cp[5] as usize],
+            cp[mv.cp[6] as usize],
+            cp[mv.cp[7] as usize],
+        ];
+        ep = [
+            ep[mv.ep[0] as usize],
+            ep[mv.ep[1] as usize],
+            ep[mv.ep[2] as usize],
+            ep[mv.ep[3] as usize],
+            ep[mv.ep[4] as usize],
+            ep[mv.ep[5] as usize],
+            ep[mv.ep[6] as usize],
+            ep[mv.ep[7] as usize],
+            ep[mv.ep[8] as usize],
+            ep[mv.ep[9] as usize],
+            ep[mv.ep[10] as usize],
+            ep[mv.ep[11] as usize],
+        ];
+    }
+    (cp, ep)
+}
+#[inline(always)]
+fn odd_side_centers(centers: [i32; 6]) -> u8 {
+    ((centers[1] & 1) + (centers[2] & 1) + (centers[4] & 1) + (centers[5] & 1)) as u8
 }
 #[inline(always)]
 fn redundant(face: usize, last: usize) -> bool {
@@ -812,5 +1012,54 @@ mod tests {
         // 保証モードを指定しない場合は、従来どおり予算 0 で探索しない
         let cube = crate::cube::apply(&RawCube::default(), &crate::cube::scramble(5));
         assert!(Search::new(0).solve(&cube).is_none());
+    }
+
+    #[test]
+    fn test_corr03_phase1_depth_equals_max_total() {
+        // 6 手で Phase 1 のみにちょうど G1=完成へ到達する状態（例: 6 手逆手順の解決）で max_total == 6 でも解が見つかること
+        let sc = crate::cube::parse_moves("R F L B D R").unwrap();
+        let inv: Vec<usize> = sc.iter().rev().map(|&m| m / 3 * 3 + 2 - m % 3).collect();
+        let cube = crate::cube::apply(&RawCube::default(), &inv);
+        let mut search = Search::new(2000);
+        search.set_max_total(6);
+        let sol = search
+            .solve(&cube)
+            .expect("depth == max_total must not be skipped");
+        assert!(sol.len() <= 6);
+        assert_eq!(crate::cube::apply(&cube, &sol), RawCube::default());
+    }
+
+    #[test]
+    fn test_center_oriented_6dir_conjugation() {
+        for seed in 1..=10 {
+            let sc = crate::cube::scramble(seed);
+            let cube = crate::cube::apply(&RawCube::default(), &sc);
+            let centers = crate::supercube::apply_moves_to_centers([0; 6], &sc);
+            let budget = if cfg!(any(debug_assertions, coverage)) {
+                60_000
+            } else {
+                30_000
+            };
+            let mut search = Search::new(budget).with_target_centers(centers);
+            let sol = search
+                .solve(&cube)
+                .unwrap_or_else(|| panic!("seed {seed} timed out"));
+            crate::verify_solution(&cube, &sol, true, Some(centers))
+                .unwrap_or_else(|e| panic!("seed {seed} invalid: {e}"));
+        }
+    }
+
+    #[test]
+    fn test_t_perm_direct_solve_skips_redundant_nodes() {
+        let sc = crate::cube::parse_moves("R U R' U' R' F R2 U' R' U' R U R' F'").unwrap();
+        let cube = crate::cube::apply(&RawCube::default(), &sc);
+        let mut search = Search::new(2000);
+        let sol = search.solve(&cube).unwrap();
+        assert_eq!(crate::cube::apply(&cube, &sol), RawCube::default());
+        assert!(
+            search.nodes < 50_000,
+            "expected pruned node count < 50000, got {}",
+            search.nodes
+        );
     }
 }
